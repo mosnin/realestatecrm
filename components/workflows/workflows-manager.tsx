@@ -275,6 +275,8 @@ export function WorkflowsManager() {
   const [globalRunsLoading, setGlobalRunsLoading] = useState(false);
   const [globalRunsError, setGlobalRunsError] = useState(false);
   const [globalRunsStatusFilter, setGlobalRunsStatusFilter] = useState<'all' | 'completed' | 'failed'>('all');
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   /** Unique trigger types present in the current workflow list for the filter dropdown. */
   const triggerTypes = useMemo(() => {
@@ -657,6 +659,37 @@ export function WorkflowsManager() {
     }
   }
 
+  // Global keyboard shortcuts — only fire when no input/textarea is focused.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const inInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+      if (inInput) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'n') {
+        e.preventDefault();
+        openBlank();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        switchTab('workflows');
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+      } else if (e.key === 'Escape') {
+        if (showShortcuts) setShowShortcuts(false);
+        else if (composer !== null) closeComposer();
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composer, showShortcuts]);
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -730,6 +763,14 @@ export function WorkflowsManager() {
                 )}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(true)}
+              title="Keyboard shortcuts (?)"
+              className="ml-auto mb-1.5 flex h-5 w-5 items-center justify-center rounded border border-border/60 text-[10px] font-semibold text-muted-foreground/60 hover:border-border hover:text-foreground transition-colors"
+            >
+              ?
+            </button>
           </div>
 
           {activeTab === 'workflows' && (<>
@@ -742,10 +783,11 @@ export function WorkflowsManager() {
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <input
+                ref={searchInputRef}
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}...`}
+                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}... (press / to focus)`}
                 className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
               />
             </div>
@@ -1046,6 +1088,67 @@ export function WorkflowsManager() {
           )}
         </>
       )}
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />
+      )}
+    </div>
+  );
+}
+
+// ── Keyboard shortcuts modal ──────────────────────────────────────────────────
+
+const SHORTCUTS = [
+  { key: 'n', description: 'New workflow' },
+  { key: '/', description: 'Focus search' },
+  { key: '?', description: 'Show / hide shortcuts' },
+  { key: 'Esc', description: 'Close builder / modal' },
+];
+
+function KeyboardShortcutsModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-72 rounded-xl border border-border/60 bg-card p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Keyboard shortcuts</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+            aria-label="Close"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <ul className="space-y-2">
+          {SHORTCUTS.map((s) => (
+            <li key={s.key} className="flex items-center justify-between gap-4">
+              <span className="text-[13px] text-muted-foreground">{s.description}</span>
+              <kbd className="flex-shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                {s.key}
+              </kbd>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-[11px] text-muted-foreground/50">
+          Shortcuts only fire when no text field is focused.
+        </p>
+      </div>
     </div>
   );
 }
@@ -1767,16 +1870,31 @@ function GlobalHistoryPanel({
   onRefresh: () => void;
   onNavigate: (workflowId: string) => void;
 }) {
+  const [historySearch, setHistorySearch] = useState('');
+
   const filtered = useMemo(() => {
     if (!runs) return [];
-    if (statusFilter === 'all') return runs;
-    return runs.filter((r) => r.status === statusFilter);
-  }, [runs, statusFilter]);
+    let list = statusFilter === 'all' ? runs : runs.filter((r) => r.status === statusFilter);
+    const q = historySearch.trim().toLowerCase();
+    if (q) list = list.filter((r) => r.workflowName.toLowerCase().includes(q) || (r.error ?? r.summary ?? '').toLowerCase().includes(q));
+    return list;
+  }, [runs, statusFilter, historySearch]);
 
   return (
     <div className="space-y-3">
       {/* History toolbar */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={historySearch}
+            onChange={(e) => setHistorySearch(e.target.value)}
+            placeholder="Search by workflow name..."
+            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
+          />
+        </div>
         <div className="flex gap-1.5">
           {(
             [
@@ -1806,7 +1924,7 @@ function GlobalHistoryPanel({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
         >
           {loading ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
           Refresh
