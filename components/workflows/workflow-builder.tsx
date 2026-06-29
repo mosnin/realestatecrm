@@ -2739,6 +2739,90 @@ function ConditionRowEditor({
   );
 }
 
+/** Compute a sample output for the formatter so the user can see what it does. */
+function computeFormatterPreview(
+  row: ActionRowState,
+  triggerType: TriggerType,
+): string | null {
+  const rawInput = row.formatterInput?.trim();
+  if (!rawInput) return null;
+
+  // Resolve sample value: if it looks like {{path}}, use TRIGGER_SAMPLE_DATA
+  const tokenMatch = rawInput.match(/^\{\{(.+?)\}\}$/);
+  let sample: string;
+  if (tokenMatch) {
+    const key = tokenMatch[1];
+    const sampleData = TRIGGER_SAMPLE_DATA[triggerType];
+    const raw = sampleData?.[key];
+    if (raw !== undefined) {
+      sample = String(raw);
+    } else {
+      // Fallback heuristics for common token paths
+      if (key.includes('name')) sample = 'Jane Smith';
+      else if (key.includes('email')) sample = 'jane@example.com';
+      else if (key.includes('phone')) sample = '+1 555 123 4567';
+      else if (key.includes('score')) sample = '85';
+      else if (key.includes('price')) sample = '585000';
+      else if (key.includes('date') || key.includes('At')) sample = '2026-06-29T09:00:00Z';
+      else sample = 'Sample value';
+    }
+  } else {
+    sample = rawInput;
+  }
+
+  try {
+    switch (row.formatterOperation) {
+      case 'uppercase': return sample.toUpperCase();
+      case 'lowercase': return sample.toLowerCase();
+      case 'capitalize':
+        return sample.replace(/\b\w/g, (c) => c.toUpperCase());
+      case 'trim': return sample.trim();
+      case 'replace': {
+        if (!row.formatterFind) return sample;
+        return sample.split(row.formatterFind).join(row.formatterReplace || '');
+      }
+      case 'number_format': {
+        const n = parseFloat(sample.replace(/[^0-9.-]/g, ''));
+        if (isNaN(n)) return null;
+        const decimals = row.formatterToFixed ? parseInt(row.formatterToFixed, 10) : undefined;
+        return decimals !== undefined ? n.toFixed(decimals) : n.toLocaleString('en-US');
+      }
+      case 'date_format': {
+        const d = new Date(sample);
+        if (isNaN(d.getTime())) return null;
+        const fmt = row.formatterFormat || 'MM/DD/YYYY';
+        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const pad = (n: number) => String(n).padStart(2, '0');
+        if (fmt === 'relative') {
+          const diff = Math.round((Date.now() - d.getTime()) / 86400000);
+          return diff === 0 ? 'today' : diff === 1 ? '1 day ago' : `${diff} days ago`;
+        }
+        return fmt
+          .replace('YYYY', String(d.getFullYear()))
+          .replace('Month', MONTHS[d.getMonth()])
+          .replace('Mon', MONS[d.getMonth()])
+          .replace('MM', pad(d.getMonth() + 1))
+          .replace('DD', pad(d.getDate()))
+          .replace('D', String(d.getDate()));
+      }
+      case 'extract_number': {
+        const m = sample.match(/-?\d+(\.\d+)?/);
+        return m ? m[0] : null;
+      }
+      case 'extract_email': {
+        const m = sample.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+        return m ? m[0] : null;
+      }
+      case 'extract_phone': {
+        const m = sample.match(/[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}/);
+        return m ? m[0] : null;
+      }
+      default: return null;
+    }
+  } catch { return null; }
+}
+
 function FormatterActionConfig({
   row,
   onChange,
@@ -2860,6 +2944,21 @@ function FormatterActionConfig({
           />
         </FieldRow>
       )}
+      {/* Live sample output — Zapier's "Test output" preview */}
+      {(() => {
+        const preview = computeFormatterPreview(row, triggerType);
+        if (!preview) return null;
+        return (
+          <div className="rounded-md border border-teal-200/60 bg-teal-50 px-3 py-2 dark:border-teal-800/40 dark:bg-teal-950/30">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-teal-600/70 dark:text-teal-400/70">
+              Sample output
+            </p>
+            <p className="font-mono text-[12px] text-teal-800 dark:text-teal-300 break-all">
+              {preview}
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
 }
