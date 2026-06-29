@@ -1926,6 +1926,21 @@ function StepDetailTable({ detail, actionType }: { detail: unknown; actionType: 
     add('field', obj.field);
     add('result', obj.passed !== undefined ? (obj.passed ? 'passed' : 'blocked') : undefined);
     if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'webhook_post') {
+    add('url', obj.url);
+    add('status', obj.statusCode);
+    add('response', obj.responseSnippet);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'update_lead') {
+    add('field', obj.field);
+    add('value', obj.value ?? obj.tag ?? obj.days);
+    if (obj.followUpAt) add('followUpAt', obj.followUpAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'notify_agent') {
+    add('title', obj.title);
+    if (obj.body) add('body', obj.body);
+    add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
+    if (obj.note) add('note', obj.note);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);

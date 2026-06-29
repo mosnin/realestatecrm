@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog, Play } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CAPTION, SECTION_LABEL, PRIMARY_PILL } from '@/lib/typography';
 import {
@@ -54,6 +55,7 @@ import {
   type WorkflowGraph,
 } from '@/lib/workflows/schema';
 import {
+  buildAction,
   buildDefinition,
   type ActionRowState,
   type ConditionRowState,
@@ -1264,6 +1266,46 @@ function StepNotes({
  * Collapse/expand: a chevron button in the header toggles the body. When
  * collapsed the card shows a one-line summary of the configured values.
  */
+/**
+ * Inline display of a single-step test result — mirrors Zapier's per-step
+ * output panel in the Zap editor. Shows key-value pairs from the detail object.
+ */
+function StepTestResult({ detail, error }: { detail?: unknown; error?: string }) {
+  if (error) {
+    return (
+      <div className="mt-2 rounded-md bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700 dark:bg-rose-950/30 dark:text-rose-400">
+        {error}
+      </div>
+    );
+  }
+  if (!detail || typeof detail !== 'object') return null;
+  const obj = detail as Record<string, unknown>;
+  const entries = Object.entries(obj)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .slice(0, 8);
+  if (entries.length === 0) return null;
+  return (
+    <dl className="mt-2 overflow-hidden rounded-md border border-border/40 bg-muted/30 text-[11.5px]">
+      {entries.map(([key, value], i) => (
+        <div
+          key={key}
+          className={cn(
+            'flex items-start gap-2 px-3 py-1.5',
+            i !== entries.length - 1 && 'border-b border-border/30',
+          )}
+        >
+          <dt className="w-28 flex-shrink-0 font-medium capitalize text-muted-foreground/70">
+            {key.replace(/_/g, ' ')}
+          </dt>
+          <dd className="min-w-0 flex-1 break-words font-mono text-[10.5px] text-foreground/80">
+            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function ActionZapCard({
   step,
   row,
@@ -1278,6 +1320,9 @@ function ActionZapCard({
   onDuplicate,
   onToggleCollapse,
   connectedApps,
+  workflowId,
+  stepTest,
+  onTestStep,
 }: {
   step: number;
   row: ActionRowState;
@@ -1292,6 +1337,9 @@ function ActionZapCard({
   onDuplicate: () => void;
   onToggleCollapse: () => void;
   connectedApps: ConnectedAppsState;
+  workflowId?: string;
+  stepTest?: { loading: boolean; status?: 'ok' | 'failed'; detail?: unknown; durationMs?: number; error?: string };
+  onTestStep?: () => void;
 }) {
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
   const cl = actionAccent(row.type);
@@ -1426,6 +1474,49 @@ function ActionZapCard({
             </div>
             <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
           </div>
+          {/* Test this step — Zapier-style per-step test button */}
+          {workflowId && onTestStep && (
+            <div className="border-t border-border/30 pt-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onTestStep}
+                  disabled={stepTest?.loading}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
+                    stepTest?.status === 'ok'
+                      ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400'
+                      : stepTest?.status === 'failed' || stepTest?.error
+                        ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400'
+                        : 'bg-muted text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground',
+                    stepTest?.loading && 'opacity-70',
+                  )}
+                >
+                  {stepTest?.loading ? (
+                    <Loader2 size={11} className="animate-spin" aria-hidden />
+                  ) : (
+                    <Play size={11} aria-hidden />
+                  )}
+                  {stepTest?.loading ? 'Testing…' : 'Test this step'}
+                  {stepTest?.durationMs !== undefined && (
+                    <span className="opacity-60">
+                      · {stepTest.durationMs < 1000 ? `${stepTest.durationMs}ms` : `${(stepTest.durationMs / 1000).toFixed(1)}s`}
+                    </span>
+                  )}
+                </button>
+                {stepTest?.status === 'ok' && !stepTest.loading && (
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400">✓ Passed</span>
+                )}
+                {(stepTest?.status === 'failed' || stepTest?.error) && !stepTest.loading && (
+                  <span className="text-[11px] text-rose-600 dark:text-rose-400">✗ Failed</span>
+                )}
+              </div>
+              {/* Inline test result */}
+              {!stepTest?.loading && (stepTest?.detail || stepTest?.error) && (
+                <StepTestResult detail={stepTest.detail} error={stepTest.error} />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1488,6 +1579,40 @@ export function WorkflowBuilder({
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   /** Index of the insert-between-steps picker (null = closed). */
   const [insertPickerAt, setInsertPickerAt] = useState<number | null>(null);
+  /** Per-action test results keyed by action row id. */
+  const [stepTests, setStepTests] = useState<Record<string, { loading: boolean; status?: 'ok' | 'failed'; detail?: unknown; durationMs?: number; error?: string }>>({});
+
+  async function testStep(row: ActionRowState) {
+    if (!workflowId) return;
+    setStepTests((prev) => ({ ...prev, [row.id]: { loading: true } }));
+    let action: WorkflowAction;
+    try {
+      action = buildAction(row);
+    } catch {
+      setStepTests((prev) => ({ ...prev, [row.id]: { loading: false, error: 'Fill in all required fields first.' } }));
+      return;
+    }
+    try {
+      const res = await fetch(`/api/workflows/${workflowId}/test-step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json() as { status?: string; detail?: unknown; durationMs?: number; error?: string };
+      if (!res.ok) {
+        setStepTests((prev) => ({ ...prev, [row.id]: { loading: false, error: data.error ?? 'Test failed.' } }));
+      } else {
+        setStepTests((prev) => ({
+          ...prev,
+          [row.id]: { loading: false, status: data.status as 'ok' | 'failed', detail: data.detail, durationMs: data.durationMs },
+        }));
+        if (data.status === 'ok') toast.success('Step test passed!');
+        else toast.error('Step test returned an error — see the result below.');
+      }
+    } catch {
+      setStepTests((prev) => ({ ...prev, [row.id]: { loading: false, error: 'Network error — try again.' } }));
+    }
+  }
 
   function toggleCollapse(id: string) {
     setCollapsedSteps((prev) => {
@@ -1957,6 +2082,9 @@ export function WorkflowBuilder({
                 }}
                 onToggleCollapse={() => toggleCollapse(row.id)}
                 connectedApps={connectedApps}
+                workflowId={workflowId}
+                stepTest={stepTests[row.id]}
+                onTestStep={() => testStep(row)}
               />
             </div>
           ))}

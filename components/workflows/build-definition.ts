@@ -246,7 +246,7 @@ function coerceConditionValue(raw: string): unknown {
 }
 
 /** Map one action row to a WorkflowAction by its type's config shape. */
-function buildAction(row: ActionRowState): WorkflowAction {
+export function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
   const note = row.note?.trim() || undefined;
   const onError = row.onError === 'skip' ? 'skip' : undefined;
