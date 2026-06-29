@@ -46,6 +46,7 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - filter: stop workflow if condition not met (config: { field: string, operator: "eq"|"neq"|"gt"|"gte"|"lt"|"lte"|"exists"|"not_exists", value?: string|number })
 - formatter: transform a value — text/number/date (config: { input: string (field path like "lead.name" or literal), operation: "uppercase"|"lowercase"|"capitalize"|"trim"|"replace"|"number_format"|"date_format"|"extract_number"|"extract_email"|"extract_phone", find?: string, replacement?: string, format?: "MM/DD/YYYY"|"YYYY-MM-DD"|"Month D, YYYY"|"relative", toFixed?: number })
 - call_integration: call a connected app (config: { toolkit: string, action: string })
+- webhook_post: HTTP POST to an external HTTPS URL (config: { url: string (must start with https://), bodyJson?: string (JSON template with {{lead.*}} tokens), headersJson?: string (JSON object of extra headers) })
 
 AUTONOMY (how much AI acts without human review):
 - draft: always draft for human approval (safest)
@@ -78,7 +79,10 @@ Return ONLY a JSON object with these exact fields:
       "action": "<action slug, for call_integration>",
       "input": "<field path or literal, for formatter>",
       "operation": "<formatter operation, for formatter>",
-      "format": "<date format string, for formatter date_format>"
+      "format": "<date format string, for formatter date_format>",
+      "webhookUrl": "<https:// URL, for webhook_post>",
+      "webhookBody": "<JSON body template string, for webhook_post>",
+      "webhookHeaders": "<JSON headers object string, for webhook_post>"
     }
   ],
   "autonomy": "draft"

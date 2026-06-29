@@ -130,6 +130,10 @@ function actionPhrase(a: ActionRowState): string {
       const op = a.formatterOperation.replace(/_/g, ' ');
       return input ? `${op} ${input}` : 'format a value';
     }
+    case 'webhook_post': {
+      const url = a.webhookUrl.trim();
+      return url ? `POST to ${url.replace(/^https?:\/\//, '').slice(0, 40)}` : 'POST to a webhook URL';
+    }
     default:
       return 'take an action';
   }

@@ -90,6 +90,9 @@ function blankAction(): WorkflowFormState['actions'][number] {
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
     formatterToFixed: '',
+    webhookUrl: '',
+    webhookBody: '',
+    webhookHeaders: '',
   };
 }
 

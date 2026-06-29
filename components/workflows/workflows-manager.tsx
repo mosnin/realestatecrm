@@ -244,6 +244,9 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
       formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
       formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
+      webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
+      webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
+      webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow
@@ -1186,6 +1189,7 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
   filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
   formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
 };
 
 /**
@@ -1674,6 +1678,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   formatter: 'Format data',
   delay: 'Delay',
   filter: 'Filter',
+  webhook_post: 'Webhook POST',
   condition: 'Condition check',
 };
 
@@ -1812,7 +1817,6 @@ function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: str
               const isLast = idx === run.steps.length - 1;
               const ai = step.actionType ? ACTION_ICON_MAP[step.actionType] : null;
               const AIcon = ai?.icon;
-              const detail = detailLine(step.detail);
               return (
                 <li key={step.id} className="relative flex gap-3 pb-3 last:pb-0">
                   {/* Vertical connector line */}
@@ -1857,11 +1861,7 @@ function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: str
                         {step.status === 'ok' ? 'OK' : step.status === 'failed' ? 'Error' : 'Skipped'}
                       </span>
                     </div>
-                    {detail && (
-                      <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
-                        {detail}
-                      </p>
-                    )}
+                    <StepDetailTable detail={step.detail} actionType={step.actionType} />
                   </div>
                 </li>
               );
@@ -1870,6 +1870,70 @@ function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: str
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * Rich key-value display for a step's output detail — mirrors Zapier's
+ * per-step data panel in Zap History. Shows the most relevant fields for
+ * each action type in a scannable pill-row layout.
+ */
+function StepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
+  if (detail == null || typeof detail !== 'object') return null;
+  const obj = detail as Record<string, unknown>;
+
+  type Row = { key: string; value: string };
+  const rows: Row[] = [];
+
+  function add(key: string, value: unknown) {
+    if (value === undefined || value === null) return;
+    const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    if (str.trim()) rows.push({ key, value: str.trim() });
+  }
+
+  if (actionType === 'formatter') {
+    add('operation', obj.operation);
+    add('input', obj.inputResolved ?? obj.input);
+    add('output', obj.output);
+  } else if (actionType === 'draft_message' || actionType === 'schedule_message') {
+    add('channel', obj.channel);
+    add('recipient', obj.recipient);
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'create_task') {
+    add('title', obj.title);
+    add('due', obj.dueAt);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'run_chippi') {
+    add('summary', obj.summary);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'call_integration') {
+    add('toolkit', obj.toolkit);
+    add('action', obj.action);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'delay') {
+    add('waited', obj.waited ?? obj.delayMinutes);
+  } else if (actionType === 'filter') {
+    add('field', obj.field);
+    add('result', obj.passed !== undefined ? (obj.passed ? 'passed' : 'blocked') : undefined);
+    if (obj.reason) add('reason', obj.reason);
+  } else {
+    for (const [k, v] of Object.entries(obj).slice(0, 4)) {
+      if (typeof v !== 'object') add(k, v);
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <dl className="mt-1 flex flex-col gap-0.5">
+      {rows.map(({ key, value }) => (
+        <div key={key} className="flex items-start gap-1.5 text-[11px]">
+          <dt className="min-w-[52px] flex-shrink-0 font-medium text-muted-foreground/60 capitalize">{key}</dt>
+          <dd className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-foreground/70">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -2725,6 +2789,9 @@ function AIWorkflowGenerator({
           formatterReplace: typeof a.replacement === 'string' ? a.replacement : '',
           formatterFormat: typeof a.format === 'string' ? a.format : 'MM/DD/YYYY',
           formatterToFixed: typeof a.toFixed === 'string' ? a.toFixed : typeof a.toFixed === 'number' ? String(a.toFixed) : '',
+          webhookUrl: typeof a.webhookUrl === 'string' ? a.webhookUrl : '',
+          webhookBody: typeof a.webhookBody === 'string' ? a.webhookBody : '',
+          webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',
         })),
         autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
           ? (raw.autonomy as WorkflowAutonomy)

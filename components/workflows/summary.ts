@@ -68,6 +68,8 @@ function actionPhrase(action: WorkflowAction): string {
       return `check a filter condition (${action.config.field} ${action.config.operator})`;
     case 'formatter':
       return `${action.config.operation.replace(/_/g, ' ')} "${action.config.input}"`;
+    case 'webhook_post':
+      return `POST to ${action.config.url.replace(/^https?:\/\//, '').slice(0, 40)}`;
     default:
       return 'run an action';
   }

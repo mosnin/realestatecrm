@@ -170,6 +170,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
   formatter: 'Format data',
+  webhook_post: 'POST to a webhook URL',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -181,6 +182,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'formatter',
   'delay',
   'call_integration',
+  'webhook_post',
 ];
 
 const OPERATOR_LABELS: Record<Operator, string> = {
