@@ -90,6 +90,11 @@ export async function PATCH(
       typeof body.description === 'string' ? body.description.trim() || null : null;
   }
 
+  if ('description' in body) {
+    patch.description =
+      typeof body.description === 'string' ? body.description.trim() || null : null;
+  }
+
   // A new definition replaces trigger/conditions/actions/autonomy together and
   // bumps version. Validate the raw shape first; 400 with issues on bad input.
   if (body.definition !== undefined) {
