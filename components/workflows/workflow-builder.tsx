@@ -654,14 +654,27 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
 function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const data = TRIGGER_SAMPLE_DATA[triggerType];
+  const [realData, setRealData] = useState<Record<string, string | number> | null>(null);
+  const [loadingReal, setLoadingReal] = useState(false);
+  const staticData = TRIGGER_SAMPLE_DATA[triggerType];
+  const data = realData ?? staticData;
+  const isReal = realData !== null;
+
+  // Trigger types that have real DB records to load
+  const canLoadReal = !['schedule', 'webhook', 'integration_event'].includes(triggerType);
+
+  function loadReal() {
+    setLoadingReal(true);
+    fetch(`/api/workflows/sample-trigger?type=${encodeURIComponent(triggerType)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d: { data: Record<string, string | number>; isReal: boolean }) => {
+        if (d.isReal && Object.keys(d.data).length > 0) setRealData(d.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingReal(false));
+  }
 
   function copyJson() {
-    const obj: Record<string, string | number> = {};
-    Object.entries(data).forEach(([k, v]) => {
-      const key = k.split('.').pop()!;
-      obj[key] = v;
-    });
     navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -680,8 +693,13 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
           <CheckIcon size={11} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
         </span>
         <span className="flex-1 text-[12px] font-medium text-foreground">
-          {open ? 'Hide' : 'Show'} sample trigger data
+          {open ? 'Hide' : 'Show'} trigger data
         </span>
+        {isReal && (
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+            Live
+          </span>
+        )}
         <ChevronDown
           size={13}
           className={cn(
@@ -697,19 +715,45 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
           <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Sample event fields
+                {isReal ? 'Live — your most recent record' : 'Sample event fields'}
               </p>
-              <button
-                type="button"
-                onClick={copyJson}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
-              >
-                {copied ? (
-                  <><CheckIcon size={11} /> Copied</>
-                ) : (
-                  <><Copy size={11} /> Copy JSON</>
+              <div className="flex items-center gap-2">
+                {canLoadReal && !isReal && (
+                  <button
+                    type="button"
+                    onClick={loadReal}
+                    disabled={loadingReal}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                  >
+                    {loadingReal ? (
+                      <Loader2 size={11} className="animate-spin" aria-hidden />
+                    ) : (
+                      <Play size={11} aria-hidden />
+                    )}
+                    {loadingReal ? 'Loading…' : 'Load real data'}
+                  </button>
                 )}
-              </button>
+                {isReal && (
+                  <button
+                    type="button"
+                    onClick={() => setRealData(null)}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                  >
+                    Use sample
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={copyJson}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+                >
+                  {copied ? (
+                    <><CheckIcon size={11} /> Copied</>
+                  ) : (
+                    <><Copy size={11} /> Copy JSON</>
+                  )}
+                </button>
+              </div>
             </div>
             <dl className="space-y-1.5">
               {Object.entries(data).map(([key, val]) => (
@@ -725,7 +769,9 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
             </dl>
           </div>
           <p className={CAPTION}>
-            These are example values — real events will carry actual lead and deal data.
+            {isReal
+              ? 'Real data from your CRM — tokens resolve to these values when the trigger fires.'
+              : 'Example values — click "Load real data" to use a live record from your CRM.'}
           </p>
         </div>
       )}
