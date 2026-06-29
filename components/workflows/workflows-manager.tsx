@@ -58,6 +58,9 @@ import {
   Wand2,
   Activity,
   BellRing,
+  Eye,
+  Building2,
+  RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1185,6 +1188,35 @@ const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   lead_created: { icon: UserPlus, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
   tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
   webhook: { icon: Webhook, cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  deal_created: { icon: Building2, cls: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' },
+  contact_updated: { icon: RefreshCw, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+};
+
+const TRIGGER_LABEL_MAP: Record<string, string> = {
+  lead_created: 'New lead created',
+  lead_score_threshold: 'Lead score threshold reached',
+  inbound_message: 'Inbound message received',
+  integration_event: 'External integration event',
+  deal_stage_changed: 'Deal stage changed',
+  tour_completed: 'Tour completed',
+  schedule: 'Scheduled time',
+  webhook: 'Incoming webhook',
+  deal_created: 'New deal created',
+  contact_updated: 'Contact record updated',
+};
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  draft_message: 'Draft message',
+  schedule_message: 'Schedule message',
+  create_task: 'Create task',
+  call_integration: 'Call integration',
+  run_chippi: 'Run AI (Chippi)',
+  delay: 'Wait / Delay',
+  filter: 'Filter (condition gate)',
+  formatter: 'Format text',
+  webhook_post: 'Send webhook',
+  update_lead: 'Update contact',
+  notify_agent: 'Push notification',
 };
 
 // ── Action type → icon ───────────────────────────────────────────────────────
@@ -2591,6 +2623,26 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-violet-100 dark:bg-violet-950/40',
     dot: 'text-violet-600 dark:text-violet-400',
   },
+  'new-deal-welcome-packet': {
+    icon: Building2,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'new-deal-push-alert': {
+    icon: BellRing,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'contact-updated-score-check': {
+    icon: RefreshCw,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'contact-updated-zapier-webhook': {
+    icon: Webhook,
+    accent: 'bg-teal-100 dark:bg-teal-950/40',
+    dot: 'text-teal-600 dark:text-teal-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {
@@ -2598,6 +2650,189 @@ const TEMPLATE_META_DEFAULT = {
   accent: 'bg-muted',
   dot: 'text-muted-foreground',
 };
+
+/**
+ * Zapier-style template preview modal: shows trigger + conditions + actions
+ * before the user commits to opening the builder. Clicking "Use template"
+ * calls onPick which pre-fills the builder.
+ */
+function TemplatePreviewModal({
+  template,
+  onUse,
+  onClose,
+}: {
+  template: import('./templates').WorkflowTemplate;
+  onUse: () => void;
+  onClose: () => void;
+}) {
+  const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
+  const Icon = meta.icon;
+  const triggerInfo = TRIGGER_ICON_MAP[template.state.trigger.type];
+  const TriggerIcon = triggerInfo?.icon ?? WorkflowIcon;
+  const triggerLabel = TRIGGER_LABEL_MAP[template.state.trigger.type] ?? template.state.trigger.type.replace(/_/g, ' ');
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview: ${template.name}`}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden
+      />
+      {/* Panel */}
+      <div className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        {/* Header with gradient accent */}
+        <div className={cn('flex items-center gap-4 px-5 py-5', meta.accent)}>
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-background/40 shadow-sm">
+            <Icon size={24} className={meta.dot} aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold leading-snug text-foreground">{template.name}</p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground leading-snug">{template.description}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-auto flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+            aria-label="Close preview"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </div>
+
+        {/* Step-by-step flow */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            How it works
+          </p>
+
+          {/* Trigger row */}
+          <div className="flex items-start gap-3">
+            <div className="flex flex-col items-center">
+              <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', triggerInfo?.cls ?? 'bg-muted text-muted-foreground')}>
+                <TriggerIcon size={14} aria-hidden />
+              </span>
+              {(template.state.conditions.length > 0 || template.state.actions.length > 0) && (
+                <span className="mt-1 w-px flex-1 bg-border/50 min-h-[16px]" aria-hidden />
+              )}
+            </div>
+            <div className="pb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">Trigger</p>
+              <p className="text-[13px] font-medium text-foreground">{triggerLabel}</p>
+            </div>
+          </div>
+
+          {/* Conditions (if any) — flat ConditionRowState[] from the form state */}
+          {template.state.conditions.length > 0 && (
+            <div className="flex items-start gap-3">
+              <div className="flex flex-col items-center">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400">
+                  <Filter size={13} aria-hidden />
+                </span>
+                {template.state.actions.length > 0 && (
+                  <span className="mt-1 w-px flex-1 bg-border/50 min-h-[16px]" aria-hidden />
+                )}
+              </div>
+              <div className="pb-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                  Only if ({(template.state.conditionOp ?? 'and').toUpperCase()})
+                </p>
+                <ul className="mt-0.5 space-y-0.5">
+                  {template.state.conditions.slice(0, 3).map((cond, i) => (
+                    <li key={i} className="text-[12.5px] text-muted-foreground">
+                      {`${cond.field.replace(/_/g, ' ')} ${cond.operator} ${String(cond.value).slice(0, 30)}`}
+                    </li>
+                  ))}
+                  {template.state.conditions.length > 3 && (
+                    <li className="text-[12px] text-muted-foreground/60">
+                      +{template.state.conditions.length - 3} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Actions — flat ActionRowState[] from the form state */}
+          {template.state.actions.map((action, i) => {
+            const ai = ACTION_ICON_MAP[action.type];
+            const ActionIcon = ai?.icon ?? WorkflowIcon;
+            const isLast = i === template.state.actions.length - 1;
+            const label = ACTION_LABEL_MAP[action.type] ?? action.type.replace(/_/g, ' ');
+            const detail = (() => {
+              if (action.type === 'draft_message' || action.type === 'schedule_message') {
+                return `Via ${(action.channel ?? 'email').toUpperCase()}`;
+              }
+              if (action.type === 'create_task' && action.title) {
+                return `"${action.title.slice(0, 40)}"`;
+              }
+              if (action.type === 'delay' && action.delayMinutes) {
+                const n = Number(action.delayMinutes);
+                const unit = action.delayUnit ?? 'minutes';
+                if (unit === 'days') return `Wait ${n} day${n !== 1 ? 's' : ''}`;
+                if (unit === 'hours') return `Wait ${n} hour${n !== 1 ? 's' : ''}`;
+                if (n >= 1440) return `Wait ${Math.round(n / 1440)} day(s)`;
+                if (n >= 60) return `Wait ${Math.round(n / 60)} hour(s)`;
+                return `Wait ${n} minute${n !== 1 ? 's' : ''}`;
+              }
+              if (action.type === 'webhook_post' && action.webhookUrl) {
+                try { return new URL(action.webhookUrl).hostname; } catch { return action.webhookUrl.slice(0, 40); }
+              }
+              if (action.type === 'update_lead' && action.updateField) {
+                return `Set ${action.updateField.replace(/_/g, ' ')}`;
+              }
+              if (action.type === 'notify_agent' && action.notifyTitle) {
+                return `"${action.notifyTitle.slice(0, 40)}"`;
+              }
+              return null;
+            })();
+            return (
+              <div key={i} className="flex items-start gap-3">
+                <div className="flex flex-col items-center">
+                  <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', ai?.cls ?? 'bg-muted text-muted-foreground')}>
+                    <ActionIcon size={13} aria-hidden />
+                  </span>
+                  {!isLast && <span className="mt-1 w-px flex-1 bg-border/50 min-h-[16px]" aria-hidden />}
+                </div>
+                <div className={cn('pb-3', isLast && 'pb-0')}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+                    Step {i + 1}
+                  </p>
+                  <p className="text-[13px] font-medium text-foreground">{label}</p>
+                  {detail && <p className="text-[12px] text-muted-foreground">{detail}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 px-5 py-3.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onUse}
+            className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-semibold text-background transition-opacity hover:opacity-80"
+          >
+            <Zap size={13} aria-hidden />
+            Use this template
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Zero-state front door — large visual template cards that look like Zapier's
@@ -2629,6 +2864,7 @@ function TemplateGallery({
   const reduce = useReducedMotion();
   const [q, setQ] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+  const [previewTemplate, setPreviewTemplate] = useState<import('./templates').WorkflowTemplate | null>(null);
 
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -2712,11 +2948,13 @@ function TemplateGallery({
             {visibleTemplates.map((template) => {
               const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
               const Icon = meta.icon;
+              const triggerInfo = TRIGGER_ICON_MAP[template.state.trigger.type];
+              const triggerLabel = TRIGGER_LABEL_MAP[template.state.trigger.type] ?? template.state.trigger.type.replace(/_/g, ' ');
               return (
                 <motion.li key={template.id} variants={reduce ? undefined : STAGGER_ITEM} className="flex">
                   <button
                     type="button"
-                    onClick={() => onPick(cloneTemplateState(template))}
+                    onClick={() => setPreviewTemplate(template)}
                     className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
                   >
                     {/* Icon area */}
@@ -2727,6 +2965,10 @@ function TemplateGallery({
                           Popular
                         </span>
                       )}
+                      {/* Step count badge (bottom-left) */}
+                      <span className="absolute bottom-2 left-2.5 flex items-center gap-1 rounded-full bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 backdrop-blur-sm">
+                        {template.state.actions.length} step{template.state.actions.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
                     {/* Text area */}
                     <div className="flex flex-1 flex-col gap-1.5 p-4">
@@ -2747,14 +2989,20 @@ function TemplateGallery({
                         {template.description}
                       </span>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
-                          {template.state.trigger.type.replace(/_/g, ' ')}
+                        <div className="flex items-center gap-1.5">
+                          {triggerInfo && (
+                            <span className={cn('flex h-4 w-4 items-center justify-center rounded', triggerInfo.cls)}>
+                              <triggerInfo.icon size={9} aria-hidden />
+                            </span>
+                          )}
+                          <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
+                            {triggerLabel}
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/50 transition-colors group-hover/card:text-foreground/70">
+                          <Eye size={10} aria-hidden />
+                          Preview
                         </span>
-                        <ChevronRight
-                          size={14}
-                          aria-hidden
-                          className="text-muted-foreground/30 transition-colors group-hover/card:text-foreground/60"
-                        />
                       </div>
                     </div>
                   </button>
@@ -2775,6 +3023,18 @@ function TemplateGallery({
             </button>
           </div>
         </>
+      )}
+
+      {/* Template preview modal */}
+      {previewTemplate && (
+        <TemplatePreviewModal
+          template={previewTemplate}
+          onUse={() => {
+            onPick(cloneTemplateState(previewTemplate));
+            setPreviewTemplate(null);
+          }}
+          onClose={() => setPreviewTemplate(null)}
+        />
       )}
     </div>
   );
@@ -2967,6 +3227,7 @@ function TemplatePicker({
 }) {
   const [q, setQ] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'all' | TemplateCategory>('all');
+  const [previewTemplate, setPreviewTemplate] = useState<import('./templates').WorkflowTemplate | null>(null);
 
   const visibleTemplates = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -3061,7 +3322,7 @@ function TemplatePicker({
               <li key={template.id} className="flex">
                 <button
                   type="button"
-                  onClick={() => onPick(cloneTemplateState(template))}
+                  onClick={() => setPreviewTemplate(template)}
                   className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
                 >
                   <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
@@ -3091,12 +3352,28 @@ function TemplatePicker({
                     <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
                       {template.description}
                     </span>
+                    <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                      <Eye size={10} aria-hidden />
+                      <span>Preview before using</span>
+                    </div>
                   </div>
                 </button>
               </li>
             );
           })}
         </ul>
+      )}
+
+      {/* Template preview modal */}
+      {previewTemplate && (
+        <TemplatePreviewModal
+          template={previewTemplate}
+          onUse={() => {
+            onPick(cloneTemplateState(previewTemplate));
+            setPreviewTemplate(null);
+          }}
+          onClose={() => setPreviewTemplate(null)}
+        />
       )}
     </div>
   );
