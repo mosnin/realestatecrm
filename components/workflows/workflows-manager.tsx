@@ -2378,6 +2378,51 @@ const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: str
     accent: 'bg-indigo-100 dark:bg-indigo-950/40',
     dot: 'text-indigo-500 dark:text-indigo-400',
   },
+  'buyer-pre-approval-nudge': {
+    icon: Target,
+    accent: 'bg-orange-100 dark:bg-orange-950/40',
+    dot: 'text-orange-500 dark:text-orange-400',
+  },
+  'evening-task-wrap': {
+    icon: Clock,
+    accent: 'bg-amber-100 dark:bg-amber-950/40',
+    dot: 'text-amber-600 dark:text-amber-400',
+  },
+  'stale-leads-weekly-sweep': {
+    icon: RotateCcw,
+    accent: 'bg-blue-100 dark:bg-blue-950/40',
+    dot: 'text-blue-500 dark:text-blue-400',
+  },
+  'inspection-stage-update': {
+    icon: CheckSquare,
+    accent: 'bg-purple-100 dark:bg-purple-950/40',
+    dot: 'text-purple-600 dark:text-purple-400',
+  },
+  'new-lead-survey-drip': {
+    icon: MessageCircle,
+    accent: 'bg-sky-100 dark:bg-sky-950/40',
+    dot: 'text-sky-500 dark:text-sky-400',
+  },
+  'post-showing-feedback': {
+    icon: Home,
+    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
+    dot: 'text-emerald-600 dark:text-emerald-400',
+  },
+  'referral-thank-you': {
+    icon: UserPlus,
+    accent: 'bg-rose-100 dark:bg-rose-950/40',
+    dot: 'text-rose-500 dark:text-rose-400',
+  },
+  'slack-new-lead-alert': {
+    icon: Plug,
+    accent: 'bg-violet-100 dark:bg-violet-950/40',
+    dot: 'text-violet-600 dark:text-violet-400',
+  },
+  'inbound-email-auto-ack': {
+    icon: Mail,
+    accent: 'bg-red-100 dark:bg-red-950/40',
+    dot: 'text-red-500 dark:text-red-400',
+  },
 };
 
 const TEMPLATE_META_DEFAULT = {

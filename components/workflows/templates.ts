@@ -560,6 +560,253 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'draft',
     },
   },
+  {
+    id: 'buyer-pre-approval-nudge',
+    name: 'Warm lead → pre-approval nudge',
+    description: 'When a lead reaches score 60, ask if they\'re pre-approved — the key qualifier question.',
+    category: 'New leads',
+    state: {
+      name: 'Warm lead → pre-approval nudge',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '60' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '60')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a friendly, conversational text to this warm lead asking if they are working with a lender or have pre-approval in hand. Phrase it naturally — like asking a practical next-step question, not a gating requirement. If they say yes, mention you can start sending listings right away.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'evening-task-wrap',
+    name: 'Evening wrap-up → task summary',
+    description: 'Every weekday at 5pm, Chippi summarises what got done today and preps tomorrow\'s list.',
+    category: 'Scheduling',
+    state: {
+      name: 'Evening wrap-up → task summary',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '17' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'It is end of day. Summarise all tasks completed today. Then look at open leads and pending deals and build a short prioritised task list for tomorrow morning — the 3–5 highest-leverage things to do first. Keep it under 150 words.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'stale-leads-weekly-sweep',
+    name: 'Weekly stale-lead sweep',
+    description: 'Every Monday, find leads you haven\'t touched in 21+ days and draft re-engagement messages.',
+    category: 'Scheduling',
+    popular: true,
+    state: {
+      name: 'Weekly stale-lead sweep',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '9' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Scan the pipeline for any lead I have not contacted in 21 or more days. For each one, draft a short, warm re-engagement message personalised to their situation — reference something specific like a neighbourhood they mentioned, a price range, or a home type. Do not send anything generic.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'inspection-stage-update',
+    name: 'Deal hits "Inspection" → buyer update',
+    description: 'When a deal moves to the inspection stage, draft an informative buyer update.',
+    category: 'Follow-up',
+    state: {
+      name: 'Deal hits "Inspection" → buyer update',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed', toStage: 'inspection' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'email',
+          instruction:
+            'The deal just moved to the inspection stage. Draft a clear, reassuring email to the buyer explaining what happens during the inspection, what to expect in the report, and what their options are if issues are found. Keep it informative but not alarming — inspections are normal.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Review inspection report with client',
+          dueInDays: '5',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'new-lead-survey-drip',
+    name: 'New lead → 24h survey invite',
+    description: 'After a new lead arrives, send a welcome and follow up with a preference survey link.',
+    category: 'New leads',
+    state: {
+      name: 'New lead → 24h survey invite',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'Draft a very brief welcome text — introduce yourself, say you are excited to help them find their perfect home, and let them know you will follow up shortly.',
+        },
+        {
+          ...blankAction(),
+          type: 'delay',
+          delayMinutes: '1440',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'It has been 24 hours since first contact. Draft a short follow-up asking this lead a few quick questions about what they are looking for: budget range, must-have features, desired neighbourhoods, and timeline. Keep it casual and easy to respond to.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'post-showing-feedback',
+    name: 'After a showing → request honest feedback',
+    description: 'After a completed tour, text the buyer asking for a quick honest reaction.',
+    category: 'Follow-up',
+    popular: true,
+    state: {
+      name: 'After a showing → request honest feedback',
+      trigger: { ...baseTrigger(), type: 'tour_completed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'delay',
+          delayMinutes: '60',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction:
+            'An hour has passed since the tour. Draft a friendly text asking for their honest gut-reaction: did they love it, was it missing something key, or just okay? Ask them to reply with a quick rating (1–5) or a few words. Keep it short and low pressure.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Review showing feedback and update search',
+          dueInDays: '1',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'referral-thank-you',
+    name: 'Referral lead → thank the referrer',
+    description: 'When a new lead comes from a referral source, draft a thank-you to the referring contact.',
+    category: 'New leads',
+    state: {
+      name: 'Referral lead → thank the referrer',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [condition('lead.source', 'eq', 'referral')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'A new referral lead just arrived. Look up who referred them and draft a warm, genuine thank-you message to the referrer — not a generic one. Mention the name of the person they sent and express real gratitude. Then draft a separate welcome text to the new lead.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Send referral gift to source',
+          dueInDays: '3',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'slack-new-lead-alert',
+    name: 'New lead → Slack alert to team',
+    description: 'Post a formatted lead summary to your team Slack channel the moment a new lead comes in.',
+    category: 'Integrations',
+    state: {
+      name: 'New lead → Slack alert to team',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'call_integration',
+          toolkit: 'slack',
+          action: 'send_message',
+        },
+        {
+          ...blankAction(),
+          type: 'draft_message',
+          channel: 'sms',
+          instruction: 'Draft a brief welcome text to the new lead saying you saw their enquiry and will be in touch shortly.',
+        },
+      ],
+      autonomy: 'notify',
+    },
+  },
+  {
+    id: 'inbound-email-auto-ack',
+    name: 'Inbound email → instant acknowledgement',
+    description: 'Send an immediate auto-response when an email arrives so leads know you\'re on it.',
+    category: 'Follow-up',
+    state: {
+      name: 'Inbound email → instant acknowledgement',
+      trigger: { ...baseTrigger(), type: 'inbound_message', channel: 'email' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'schedule_message',
+          channel: 'email',
+          instruction:
+            'Draft a brief, professional auto-acknowledgement confirming you received their email. Say you personally review every message and will respond within a few hours. Do not sound like a bot — keep it warm and real.',
+          delayMinutes: '2',
+          delayUnit: 'minutes' as const,
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Reply to inbound email',
+          dueInDays: '0',
+        },
+      ],
+      autonomy: 'auto',
+    },
+  },
 ];
 
 /**
