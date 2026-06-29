@@ -89,6 +89,7 @@ interface SidebarProps {
   pendingDraftCount?: number;
   overdueFollowUpCount?: number;
   activePropertyCount?: number;
+  activeWorkflowCount?: number;
   isBroker?: boolean;
   isBrokerOnly?: boolean;
   brokerageName?: string | null;
@@ -1080,6 +1081,7 @@ function RealtorNav({
   overdueFollowUpCount: number;
   pendingDraftCount: number;
   activePropertyCount: number;
+  activeWorkflowCount: number;
   /**
    * True when this realtor belongs to at least one brokerage. Gates the
    * "Reviews" row: deal-reviews are broker feedback on deals the agent
@@ -1203,6 +1205,13 @@ function RealtorNav({
         </span>
       );
     }
+    if (item.badgeKey === 'activeWorkflows' && activeWorkflowCount > 0) {
+      return (
+        <span className={calmBadgeClasses}>
+          <PulseNumber value={activeWorkflowCount > 99 ? '99+' : activeWorkflowCount} />
+        </span>
+      );
+    }
     return undefined;
   };
 
@@ -1215,6 +1224,9 @@ function RealtorNav({
     }
     if (item.badgeKey === 'properties' && activePropertyCount > 0) {
       return activePropertyCount > 99 ? '99+' : String(activePropertyCount);
+    }
+    if (item.badgeKey === 'activeWorkflows' && activeWorkflowCount > 0) {
+      return activeWorkflowCount > 99 ? '99+' : String(activeWorkflowCount);
     }
     return undefined;
   };
@@ -1395,6 +1407,7 @@ export function Sidebar({
   pendingDraftCount = 0,
   overdueFollowUpCount = 0,
   activePropertyCount = 0,
+  activeWorkflowCount = 0,
   isBroker = false,
   isBrokerOnly = false,
   brokerageName = null,
@@ -1712,6 +1725,7 @@ export function Sidebar({
       overdueFollowUpCount={overdueFollowUpCount}
       pendingDraftCount={pendingDraftCount}
       activePropertyCount={activePropertyCount}
+      activeWorkflowCount={activeWorkflowCount}
       brokerageMemberships={brokerageMemberships}
       isOnBrokerPage={isOnBrokerPage}
       displayName={displayName}
@@ -1855,6 +1869,7 @@ function RealtorSidebarShell({
           overdueFollowUpCount={overdueFollowUpCount}
           pendingDraftCount={pendingDraftCount}
           activePropertyCount={activePropertyCount}
+          activeWorkflowCount={activeWorkflowCount}
           isBrokerageMember={brokerageMemberships.length > 0}
         />
 

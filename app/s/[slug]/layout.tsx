@@ -193,8 +193,9 @@ export default async function DashboardLayout({
   let overdueFollowUpCount = 0;
   let pendingDraftCount = 0;
   let activePropertyCount = 0;
+  let activeWorkflowCount = 0;
   try {
-    const [leadResult, followUpResult, draftResult, propertyResult] = await Promise.all([
+    const [leadResult, followUpResult, draftResult, propertyResult, workflowResult] = await Promise.all([
       supabase
         .from('Contact')
         .select('*', { count: 'exact', head: true })
@@ -218,17 +219,24 @@ export default async function DashboardLayout({
         .select('id', { count: 'exact', head: true })
         .eq('spaceId', space.id)
         .in('listingStatus', ['active', 'pending']),
+      supabase
+        .from('Workflow')
+        .select('id', { count: 'exact', head: true })
+        .eq('spaceId', space.id)
+        .eq('enabled', true),
     ]);
     if (leadResult.error) throw leadResult.error;
     unreadLeadCount = leadResult.count ?? 0;
     overdueFollowUpCount = followUpResult.count ?? 0;
     pendingDraftCount = draftResult.count ?? 0;
     activePropertyCount = propertyResult.count ?? 0;
+    activeWorkflowCount = workflowResult.count ?? 0;
   } catch {
     unreadLeadCount = 0;
     overdueFollowUpCount = 0;
     pendingDraftCount = 0;
     activePropertyCount = 0;
+    activeWorkflowCount = 0;
   }
 
   // Check broker context and brokerage memberships for sidebar
@@ -282,7 +290,7 @@ export default async function DashboardLayout({
       {/* Collapse state is shared between the sidebar and the header's panel
           toggle, so the provider wraps both. */}
       <SidebarCollapseProvider>
-        <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
+        <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} activeWorkflowCount={activeWorkflowCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <PlatformBanner />
           <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} accountName={dbUser.name} isBroker={isBroker} brokerageName={brokerageName} isPlatformAdmin={dbUser.isPlatformAdmin} />

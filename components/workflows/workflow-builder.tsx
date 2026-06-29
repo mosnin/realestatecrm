@@ -196,10 +196,10 @@ const OPERATOR_LABELS: Record<Operator, string> = {
 const VALUELESS_OPERATORS = new Set<Operator>(['exists', 'not_exists']);
 
 const ACTION_LABELS: Record<WorkflowActionType, string> = {
-  draft_message: 'Draft a message',
+  call_integration: 'Send via connected app (Gmail, Slack…)',
+  draft_message: 'AI draft — compose for review',
   schedule_message: 'Schedule a message',
   create_task: 'Create a task',
-  call_integration: 'Call a connected app',
   run_chippi: 'Ask Chippi to do something',
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
@@ -210,6 +210,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
+  'call_integration',
   'draft_message',
   'run_chippi',
   'create_task',
@@ -219,7 +220,6 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'filter',
   'formatter',
   'delay',
-  'call_integration',
   'webhook_post',
 ];
 
@@ -238,10 +238,10 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
-  draft_message: 'Compose an email for you to review before sending',
-  schedule_message: 'Auto-send a message after a delay',
+  call_integration: 'Send email or message via your connected Gmail, Slack, Outlook, and more',
+  draft_message: 'Ask Chippi to draft an email — you review and approve before it sends',
+  schedule_message: 'Queue an AI-drafted email to auto-send after a delay',
   create_task: 'Create a follow-up task for you or your team',
-  call_integration: 'Trigger an action in a connected app',
   run_chippi: 'Ask Chippi to research, summarize, or reason',
   delay: 'Pause the workflow before the next step',
   filter: 'Stop the run if a condition is not met',
@@ -415,8 +415,8 @@ export function emptyFormState(): WorkflowFormState {
   return {
     name: '',
     trigger: {
-      type: 'lead_score_threshold',
-      min: '80',
+      type: 'lead_created',
+      min: '',
       channel: 'any',
       toolkit: '',
       event: '',

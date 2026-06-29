@@ -71,6 +71,7 @@ export const realtorNavItems: NavItem[] = [
     href: '/automations',
     label: 'Automations',
     icon: Zap,
+    badgeKey: 'activeWorkflows',
     children: [
       { href: '/automations/workflows', label: 'Workflows' },
       { href: '/automations/workflows?new=1', label: 'New workflow' },
