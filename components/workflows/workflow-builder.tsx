@@ -1971,6 +1971,7 @@ function BuilderRunItem({ run, workflowId }: { run: BuilderRunRecord; workflowId
 export function WorkflowBuilder({
   initial,
   initialEnabled,
+  initialNotifyOnError,
   saving,
   workflowId,
   lastRunAt,
@@ -1981,6 +1982,8 @@ export function WorkflowBuilder({
   initial?: WorkflowFormState;
   /** Starting value for the "Turn on when saved" toggle. Defaults to true for new workflows. */
   initialEnabled?: boolean;
+  /** Starting value for the "Notify me on failure" toggle. Defaults to false. */
+  initialNotifyOnError?: boolean;
   saving: boolean;
   /** The id of the workflow being edited (if editing an existing one). Used to
    *  display the webhook URL for webhook-triggered workflows. */
@@ -1988,12 +1991,13 @@ export function WorkflowBuilder({
   /** Last execution time / status — shown in the builder footer for existing workflows. */
   lastRunAt?: string | null;
   lastRunStatus?: 'ok' | 'error' | 'skipped' | null;
-  /** Receives the validated definition + name + description + enabled; the manager owns the fetch. */
-  onSave: (payload: { name: string; description?: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
+  /** Receives the validated definition + name + description + enabled + notifyOnError; the manager owns the fetch. */
+  onSave: (payload: { name: string; description?: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean; notifyOnError: boolean }) => void;
   onCancel: () => void;
 }) {
   const [state, setState] = useState<WorkflowFormState>(() => initial ?? emptyFormState());
   const [enabled, setEnabled] = useState(() => initialEnabled ?? true);
+  const [notifyOnError, setNotifyOnError] = useState(() => initialNotifyOnError ?? false);
   /**
    * 'simple'  → the When / If / Then linear composer (state.graph stays null).
    * 'advanced'→ the visual canvas owns the If/Then logic via state.graph.
@@ -2237,7 +2241,7 @@ export function WorkflowBuilder({
     }
 
     const description = state.description?.trim() || undefined;
-    onSave({ name, description, definition, enabled });
+    onSave({ name, description, definition, enabled, notifyOnError });
   }
 
   return (
@@ -2790,6 +2794,31 @@ export function WorkflowBuilder({
             id="wf-enabled-toggle"
             checked={enabled}
             onCheckedChange={setEnabled}
+            disabled={saving}
+            className="ml-0.5"
+          />
+        </label>
+
+        {/* Notify on failure toggle — Zapier-style "Alert me when this fails" */}
+        <label
+          htmlFor="wf-notify-error-toggle"
+          className={cn(
+            'flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
+            notifyOnError
+              ? 'border-rose-300/60 bg-rose-50 text-rose-700 dark:border-rose-700/40 dark:bg-rose-950/30 dark:text-rose-400'
+              : 'border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <BellRing
+            size={12}
+            className={notifyOnError ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground/60'}
+            aria-hidden
+          />
+          <span>Alert on failure</span>
+          <Switch
+            id="wf-notify-error-toggle"
+            checked={notifyOnError}
+            onCheckedChange={setNotifyOnError}
             disabled={saving}
             className="ml-0.5"
           />

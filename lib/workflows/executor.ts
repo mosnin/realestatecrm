@@ -24,6 +24,7 @@
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions } from './conditions';
 import { executeAction, type WorkflowContext, type ActionStepResult } from './actions';
 import { walkGraph } from './graph-walk';
@@ -54,6 +55,8 @@ export interface WorkflowRow {
    * linear conditions→actions path. Absent/null for every linear workflow.
    */
   graph?: WorkflowGraph | null;
+  /** When true, a push notification fires to the space on any failed run. */
+  notifyOnError?: boolean;
 }
 
 export interface RunWorkflowInput {
@@ -255,6 +258,12 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
     if (anyFailed) {
       await finishRun({ runId, status: 'failed', summary: 'one or more actions failed' });
       await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'error' });
+      if (workflow.notifyOnError) {
+        sendPushToSpace(workflow.spaceId, {
+          title: 'Automation failed',
+          body: `One or more steps in your workflow failed. Check the run history for details.`,
+        }).catch(() => {/* best-effort */});
+      }
       return { runId, status: 'failed' };
     }
     await finishRun({ runId, status: 'completed', summary: 'all actions completed' });
@@ -271,6 +280,12 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
       error: err instanceof Error ? err.message : String(err),
     });
     await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'error' });
+    if (workflow.notifyOnError) {
+      sendPushToSpace(workflow.spaceId, {
+        title: 'Automation errored',
+        body: `An unexpected error occurred in your workflow. Check the run history for details.`,
+      }).catch(() => {/* best-effort */});
+    }
     return { runId, status: 'failed' };
   }
 }

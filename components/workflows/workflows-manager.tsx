@@ -90,6 +90,7 @@ interface WorkflowRecord {
   name: string;
   description: string | null;
   enabled: boolean;
+  notifyOnError: boolean;
   trigger: WorkflowTrigger;
   conditions: ConditionGroup;
   actions: WorkflowAction[];
@@ -426,6 +427,7 @@ export function WorkflowsManager() {
         name: parsed.name,
         description: parsed.description ?? null,
         enabled: true,
+        notifyOnError: false,
         trigger: parsed.definition.trigger,
         conditions: parsed.definition.conditions ?? { op: 'and', rules: [] },
         actions: parsed.definition.actions ?? [],
@@ -454,7 +456,7 @@ export function WorkflowsManager() {
     setActionError('');
   }
 
-  async function createWorkflow(payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) {
+  async function createWorkflow(payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean; notifyOnError?: boolean }) {
     setBusyId('new');
     setActionError('');
     try {
@@ -490,7 +492,7 @@ export function WorkflowsManager() {
 
   async function saveEdit(
     id: string,
-    payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean },
+    payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean; notifyOnError?: boolean },
   ) {
     setBusyId(id);
     setActionError('');
@@ -942,6 +944,7 @@ export function WorkflowsManager() {
                 <WorkflowBuilder
                   initial={recordToFormState(editing)}
                   initialEnabled={editing.enabled}
+                  initialNotifyOnError={editing.notifyOnError}
                   saving={busyId === editingId}
                   workflowId={editingId}
                   lastRunAt={editing.lastRunAt}
@@ -1342,7 +1345,7 @@ function WorkflowRow({
   onSelect: (v: boolean) => void;
   onEdit: () => void;
   onCancelEdit: () => void;
-  onSave: (payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) => void;
+  onSave: (payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean; notifyOnError?: boolean }) => void;
   onToggle: () => void;
   onTest: () => void;
   onDuplicate: () => void;

@@ -30,7 +30,7 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
 const SELECT =
-  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
+  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, notifyOnError, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
 /**
  * The full persisted row as the routes surface it — the executor's WorkflowRow
@@ -41,6 +41,7 @@ export interface WorkflowRecord extends WorkflowRow {
   name: string;
   description: string | null;
   enabled: boolean;
+  notifyOnError: boolean;
   version: number;
   lastRunAt: string | null;
   lastRunStatus: 'ok' | 'error' | 'skipped' | null;
@@ -86,9 +87,9 @@ export async function getWorkflow(
  */
 export async function createWorkflow(
   spaceId: string,
-  input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean },
+  input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean; notifyOnError?: boolean },
 ): Promise<WorkflowRecord> {
-  const { name, description, definition, enabled = true } = input;
+  const { name, description, definition, enabled = true, notifyOnError = false } = input;
   const { data, error } = await supabase
     .from('Workflow')
     .insert({
@@ -96,6 +97,7 @@ export async function createWorkflow(
       name,
       ...(description ? { description } : {}),
       enabled,
+      notifyOnError,
       trigger: definition.trigger,
       conditions: definition.conditions,
       actions: definition.actions,
@@ -115,6 +117,7 @@ export interface UpdateWorkflowPatch {
   name?: string;
   description?: string | null;
   enabled?: boolean;
+  notifyOnError?: boolean;
   definition?: WorkflowDefinition;
 }
 
@@ -133,6 +136,7 @@ export async function updateWorkflow(
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.description !== undefined) update.description = patch.description ?? null;
   if (patch.enabled !== undefined) update.enabled = patch.enabled;
+  if (patch.notifyOnError !== undefined) update.notifyOnError = patch.notifyOnError;
   if (patch.definition) {
     update.trigger = patch.definition.trigger;
     update.conditions = patch.definition.conditions;

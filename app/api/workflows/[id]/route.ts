@@ -83,6 +83,7 @@ export async function PATCH(
   }
 
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+  if (typeof body.notifyOnError === 'boolean') patch.notifyOnError = body.notifyOnError;
 
   if ('description' in body) {
     patch.description =
