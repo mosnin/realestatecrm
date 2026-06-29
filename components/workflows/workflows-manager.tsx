@@ -2155,6 +2155,169 @@ function TemplateGallery({
   );
 }
 
+// ── AI workflow generator ────────────────────────────────────────────────────
+
+let aiGenSeq = 0;
+function aiGenRowId(): string {
+  aiGenSeq += 1;
+  return `aigen-${aiGenSeq}`;
+}
+
+/**
+ * Zapier-style AI workflow generator: type what you want to automate in plain
+ * English, get a pre-filled builder. Calls POST /api/workflows/generate and maps
+ * the LLM response into a WorkflowFormState the builder can open with.
+ */
+function AIWorkflowGenerator({
+  onGenerate,
+}: {
+  onGenerate: (state: WorkflowFormState) => void;
+}) {
+  const [prompt, setPrompt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function generate() {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/workflows/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Generation failed — try again.');
+        return;
+      }
+      const raw = data.workflow as Record<string, unknown>;
+      if (!raw || typeof raw !== 'object') {
+        setError('Unexpected response — try again.');
+        return;
+      }
+
+      // Map the LLM response to a WorkflowFormState
+      const t = (raw.trigger ?? {}) as Record<string, unknown>;
+      const rawActions = Array.isArray(raw.actions) ? (raw.actions as Record<string, unknown>[]) : [];
+      const rawConditions = Array.isArray(raw.conditions) ? (raw.conditions as Record<string, unknown>[]) : [];
+
+      const formState: WorkflowFormState = {
+        name: typeof raw.name === 'string' ? raw.name : trimmed.slice(0, 60),
+        description: typeof raw.description === 'string' ? raw.description : undefined,
+        trigger: {
+          type: (typeof t.type === 'string' ? t.type : 'lead_created') as WorkflowFormState['trigger']['type'],
+          min: typeof t.min === 'string' ? t.min : typeof t.min === 'number' ? String(t.min) : '',
+          channel: (typeof t.channel === 'string' ? t.channel : 'any') as 'sms' | 'email' | 'any',
+          toolkit: typeof t.toolkit === 'string' ? t.toolkit : '',
+          event: typeof t.event === 'string' ? t.event : '',
+          toStage: typeof t.toStage === 'string' ? t.toStage : '',
+          cadence: (typeof t.cadence === 'string' ? t.cadence : 'daily') as 'hourly' | 'daily' | 'weekdays',
+          hour: typeof t.hour === 'string' ? t.hour : typeof t.hour === 'number' ? String(t.hour) : '',
+        },
+        conditionOp: raw.conditionOp === 'or' ? 'or' : 'and',
+        conditions: rawConditions.map((c) => ({
+          id: aiGenRowId(),
+          field: typeof c.field === 'string' ? c.field : '',
+          operator: (typeof c.operator === 'string' ? c.operator : 'eq') as WorkflowFormState['conditions'][number]['operator'],
+          value: typeof c.value === 'string' ? c.value : typeof c.value === 'number' ? String(c.value) : '',
+        })),
+        actions: rawActions.map((a) => ({
+          id: aiGenRowId(),
+          type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
+          label: typeof a.label === 'string' ? a.label : undefined,
+          channel: (typeof a.channel === 'string' ? a.channel : 'sms') as 'sms' | 'email',
+          instruction: typeof a.instruction === 'string' ? a.instruction : '',
+          delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',
+          delayUnit: 'minutes' as const,
+          title: typeof a.title === 'string' ? a.title : '',
+          dueInDays: typeof a.dueInDays === 'string' ? a.dueInDays : typeof a.dueInDays === 'number' ? String(a.dueInDays) : '',
+          toolkit: typeof a.toolkit === 'string' ? a.toolkit : '',
+          action: typeof a.action === 'string' ? a.action : '',
+          paramsJson: '',
+          filterField: typeof a.filterField === 'string' ? a.filterField : '',
+          filterOperator: (typeof a.filterOperator === 'string' ? a.filterOperator : 'eq') as WorkflowFormState['actions'][number]['filterOperator'],
+          filterValue: typeof a.filterValue === 'string' ? a.filterValue : '',
+        })),
+        autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
+          ? (raw.autonomy as WorkflowAutonomy)
+          : 'draft',
+        graph: null,
+      };
+
+      onGenerate(formState);
+    } catch {
+      setError('Network error — try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const EXAMPLE_PROMPTS = [
+    'Send a welcome SMS when a new lead is created',
+    'Remind me to call when a lead score exceeds 80',
+    'Follow up 2 days after a tour is completed',
+    'Create a task when a deal moves to offer stage',
+  ];
+
+  return (
+    <div className="rounded-xl border border-orange-200/60 bg-gradient-to-br from-orange-50/80 to-amber-50/60 p-4 dark:border-orange-800/30 dark:from-orange-950/20 dark:to-amber-950/20">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-500 text-white">
+          <Sparkles size={12} aria-hidden />
+        </span>
+        <p className="text-sm font-semibold text-foreground">Build with AI</p>
+        <span className="rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-orange-600 dark:bg-orange-950/40 dark:text-orange-400">
+          Beta
+        </span>
+      </div>
+      <p className={cn(CAPTION, 'mb-3')}>
+        Describe what you want to automate in plain English. Chippi will build the workflow for you to review and edit.
+      </p>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !busy) void generate(); }}
+          placeholder="e.g. Send a follow-up text 3 days after a tour…"
+          maxLength={400}
+          disabled={busy}
+          className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-orange-400/40 disabled:opacity-60 dark:bg-input/30"
+        />
+        <button
+          type="button"
+          onClick={() => void generate()}
+          disabled={busy || !prompt.trim()}
+          className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+          {busy ? 'Generating…' : 'Generate'}
+        </button>
+      </div>
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {EXAMPLE_PROMPTS.map((ex) => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => { setPrompt(ex); }}
+            disabled={busy}
+            className="rounded-full border border-orange-200/80 bg-white/80 px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-400/60 hover:text-foreground disabled:opacity-50 dark:border-orange-800/30 dark:bg-orange-950/20"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Template picker ──────────────────────────────────────────────────────────
 
 function TemplatePicker({
@@ -2191,6 +2354,18 @@ function TemplatePicker({
         >
           Cancel
         </button>
+      </div>
+
+      {/* AI generator — prominent hero above the template grid */}
+      <AIWorkflowGenerator onGenerate={onPick} />
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/40" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-3 text-[11px] text-muted-foreground/50">or start from a template</span>
+        </div>
       </div>
 
       {/* Search + category pills */}
