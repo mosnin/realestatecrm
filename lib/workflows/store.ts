@@ -30,7 +30,7 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
 const SELECT =
-  'id, spaceId, name, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
+  'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
 /**
  * The full persisted row as the routes surface it — the executor's WorkflowRow
@@ -39,6 +39,7 @@ const SELECT =
  */
 export interface WorkflowRecord extends WorkflowRow {
   name: string;
+  description: string | null;
   enabled: boolean;
   version: number;
   lastRunAt: string | null;
@@ -85,14 +86,15 @@ export async function getWorkflow(
  */
 export async function createWorkflow(
   spaceId: string,
-  input: { name: string; definition: WorkflowDefinition; enabled?: boolean },
+  input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean },
 ): Promise<WorkflowRecord> {
-  const { name, definition, enabled = true } = input;
+  const { name, description, definition, enabled = true } = input;
   const { data, error } = await supabase
     .from('Workflow')
     .insert({
       spaceId,
       name,
+      ...(description ? { description } : {}),
       enabled,
       trigger: definition.trigger,
       conditions: definition.conditions,
@@ -111,6 +113,7 @@ export async function createWorkflow(
  *  columns and bumps version. */
 export interface UpdateWorkflowPatch {
   name?: string;
+  description?: string | null;
   enabled?: boolean;
   definition?: WorkflowDefinition;
 }
@@ -128,6 +131,7 @@ export async function updateWorkflow(
 ): Promise<WorkflowRecord | null> {
   const update: Record<string, unknown> = {};
   if (patch.name !== undefined) update.name = patch.name;
+  if (patch.description !== undefined) update.description = patch.description ?? null;
   if (patch.enabled !== undefined) update.enabled = patch.enabled;
   if (patch.definition) {
     update.trigger = patch.definition.trigger;

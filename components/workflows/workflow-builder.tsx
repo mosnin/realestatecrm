@@ -1286,8 +1286,8 @@ export function WorkflowBuilder({
   /** Last execution time / status — shown in the builder footer for existing workflows. */
   lastRunAt?: string | null;
   lastRunStatus?: 'ok' | 'error' | 'skipped' | null;
-  /** Receives the validated definition + name + enabled; the manager owns the fetch. */
-  onSave: (payload: { name: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
+  /** Receives the validated definition + name + description + enabled; the manager owns the fetch. */
+  onSave: (payload: { name: string; description?: string; definition: ReturnType<typeof buildDefinition>; enabled: boolean }) => void;
   onCancel: () => void;
 }) {
   const [state, setState] = useState<WorkflowFormState>(() => initial ?? emptyFormState());
@@ -1477,7 +1477,8 @@ export function WorkflowBuilder({
       throw err;
     }
 
-    onSave({ name, definition, enabled });
+    const description = state.description?.trim() || undefined;
+    onSave({ name, description, definition, enabled });
   }
 
   return (
@@ -1500,6 +1501,16 @@ export function WorkflowBuilder({
             autoFocus
           />
           {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+        </div>
+        <div className="w-full basis-full">
+          <Textarea
+            value={state.description ?? ''}
+            onChange={(e) => patch({ description: e.target.value || undefined })}
+            placeholder="Add a description… (optional — shown on the workflow list)"
+            rows={1}
+            maxLength={300}
+            className="resize-none text-[12.5px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground"
+          />
         </div>
         <div className="flex-shrink-0 space-y-1.5">
           <div

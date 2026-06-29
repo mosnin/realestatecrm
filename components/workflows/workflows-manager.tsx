@@ -82,6 +82,7 @@ import { useHashHighlight } from '@/hooks/use-hash-highlight';
 interface WorkflowRecord {
   id: string;
   name: string;
+  description: string | null;
   enabled: boolean;
   trigger: WorkflowTrigger;
   conditions: ConditionGroup;
@@ -153,6 +154,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
   const t = w.trigger;
   return {
     name: w.name,
+    description: w.description ?? undefined,
     trigger: {
       type: t.type,
       min: t.type === 'lead_score_threshold' ? String(t.config.min) : '',
@@ -250,6 +252,8 @@ export function WorkflowsManager() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'on' | 'off' | 'failed'>('all');
   const [triggerFilter, setTriggerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun' | 'modified'>('created');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   /** Unique trigger types present in the current workflow list for the filter dropdown. */
   const triggerTypes = useMemo(() => {
@@ -340,7 +344,7 @@ export function WorkflowsManager() {
     setActionError('');
   }
 
-  async function createWorkflow(payload: { name: string; definition: WorkflowDefinition; enabled: boolean }) {
+  async function createWorkflow(payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) {
     setBusyId('new');
     setActionError('');
     try {
@@ -376,7 +380,7 @@ export function WorkflowsManager() {
 
   async function saveEdit(
     id: string,
-    payload: { name: string; definition: WorkflowDefinition; enabled: boolean },
+    payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean },
   ) {
     setBusyId(id);
     setActionError('');
@@ -464,6 +468,58 @@ export function WorkflowsManager() {
       setActionError("Couldn't delete the workflow.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function bulkSetEnabled(enabled: boolean) {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${API_BASE}/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+          }).then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
+            }
+          }),
+        ),
+      );
+      setSelectedIds(new Set());
+      toast.success(enabled ? `${ids.length} workflow${ids.length > 1 ? 's' : ''} turned on` : `${ids.length} workflow${ids.length > 1 ? 's' : ''} paused`);
+    } catch {
+      setActionError('Bulk action failed. Try again.');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then((res) => {
+            if (res.ok) {
+              setWorkflows((ws) => ws.filter((w) => w.id !== id));
+              if (editingId === id) setEditingId(null);
+            }
+          }),
+        ),
+      );
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} workflow${ids.length > 1 ? 's' : ''} deleted`);
+    } catch {
+      setActionError('Bulk delete failed. Try again.');
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -682,7 +738,25 @@ export function WorkflowsManager() {
           {/* Table container */}
           <div className="rounded-xl border border-border/60 overflow-hidden">
             {/* Table header */}
-            <div className="grid grid-cols-[1fr_160px_140px_60px_128px] border-b border-border/60 bg-muted/40 px-3 py-2">
+            <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] border-b border-border/60 bg-muted/40 px-3 py-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={filteredWorkflows.length > 0 && filteredWorkflows.every((w) => selectedIds.has(w.id))}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selectedIds.size > 0 && !filteredWorkflows.every((w) => selectedIds.has(w.id));
+                  }}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(new Set(filteredWorkflows.map((w) => w.id)));
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+                />
+              </div>
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Workflow
               </span>
@@ -712,6 +786,13 @@ export function WorkflowsManager() {
                     busy={busyId === workflow.id}
                     testing={testingId === workflow.id}
                     testResult={testResults[workflow.id]}
+                    selected={selectedIds.has(workflow.id)}
+                    onSelect={(v) => setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (v) next.add(workflow.id);
+                      else next.delete(workflow.id);
+                      return next;
+                    })}
                     onEdit={() => {
                       setEditingId(workflow.id);
                       setComposer(null);
@@ -735,6 +816,48 @@ export function WorkflowsManager() {
               </div>
             )}
           </div>
+
+          {/* Bulk action bar — appears when items are selected */}
+          {selectedIds.size > 0 && (
+            <div className="sticky bottom-4 z-20 mt-3 flex items-center gap-2 rounded-xl border border-border/70 bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur-sm">
+              <span className="text-[12.5px] font-medium text-foreground">
+                {selectedIds.size} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear
+              </button>
+              <div className="mx-2 h-4 w-px bg-border/60" />
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSetEnabled(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
+              >
+                Turn on
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => bulkSetEnabled(false)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
+              >
+                Pause
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={bulkDelete}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-600 hover:bg-rose-100 disabled:opacity-50 transition-colors dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60"
+              >
+                Delete
+              </button>
+              {bulkBusy && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -886,6 +1009,8 @@ function WorkflowRow({
   busy,
   testing,
   testResult,
+  selected,
+  onSelect,
   onEdit,
   onCancelEdit: _onCancelEdit,
   onSave: _onSave,
@@ -901,9 +1026,11 @@ function WorkflowRow({
   busy: boolean;
   testing: boolean;
   testResult: TestResult | undefined;
+  selected: boolean;
+  onSelect: (v: boolean) => void;
   onEdit: () => void;
   onCancelEdit: () => void;
-  onSave: (payload: { name: string; definition: WorkflowDefinition; enabled: boolean }) => void;
+  onSave: (payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean }) => void;
   onToggle: () => void;
   onTest: () => void;
   onDuplicate: () => void;
@@ -971,7 +1098,18 @@ function WorkflowRow({
       )}
     >
       {/* Main grid row */}
-      <div className="grid grid-cols-[1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
+      <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
+
+        {/* Col 0 — Checkbox */}
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            aria-label={`Select ${workflow.name}`}
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+          />
+        </div>
 
         {/* Col 1 — Name + visual flow */}
         <div className="min-w-0 pr-3">
@@ -1015,7 +1153,11 @@ function WorkflowRow({
             )}
           </div>
           <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
-          {workflow.trigger.type === 'webhook' ? (
+          {workflow.description ? (
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/80 italic">
+              {workflow.description}
+            </p>
+          ) : workflow.trigger.type === 'webhook' ? (
             <WebhookUrlChip workflowId={workflow.id} />
           ) : (
             <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">

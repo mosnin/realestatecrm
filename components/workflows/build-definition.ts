@@ -104,6 +104,8 @@ export interface ActionRowState {
 
 export interface WorkflowFormState {
   name: string;
+  /** Optional short annotation shown on the workflow list card — Zapier-style Zap description. */
+  description?: string;
   trigger: TriggerFormState;
   conditionOp: 'and' | 'or';
   conditions: ConditionRowState[];
