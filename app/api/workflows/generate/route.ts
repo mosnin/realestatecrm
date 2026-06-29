@@ -47,6 +47,7 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - formatter: transform a value — text/number/date (config: { input: string (field path like "lead.name" or literal), operation: "uppercase"|"lowercase"|"capitalize"|"trim"|"replace"|"number_format"|"date_format"|"extract_number"|"extract_email"|"extract_phone", find?: string, replacement?: string, format?: "MM/DD/YYYY"|"YYYY-MM-DD"|"Month D, YYYY"|"relative", toFixed?: number })
 - call_integration: call a connected app (config: { toolkit: string, action: string })
 - webhook_post: HTTP POST to an external HTTPS URL (config: { url: string (must start with https://), bodyJson?: string (JSON template with {{lead.*}} tokens), headersJson?: string (JSON object of extra headers) })
+- update_lead: write a field back to this lead's CRM record (config: { field: "score_label"|"follow_up_in_days"|"tag_add"|"tag_remove", value: string ("hot"/"warm"/"cold" for score_label, integer days for follow_up_in_days, tag string for tag_add/tag_remove) })
 
 AUTONOMY (how much AI acts without human review):
 - draft: always draft for human approval (safest)
@@ -82,7 +83,9 @@ Return ONLY a JSON object with these exact fields:
       "format": "<date format string, for formatter date_format>",
       "webhookUrl": "<https:// URL, for webhook_post>",
       "webhookBody": "<JSON body template string, for webhook_post>",
-      "webhookHeaders": "<JSON headers object string, for webhook_post>"
+      "webhookHeaders": "<JSON headers object string, for webhook_post>",
+      "updateField": "<score_label|follow_up_in_days|tag_add|tag_remove, for update_lead>",
+      "updateValue": "<value to set, for update_lead>"
     }
   ],
   "autonomy": "draft"

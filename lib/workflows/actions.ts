@@ -24,6 +24,7 @@ import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { evaluateConditions, resolveField } from './conditions';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
+import { UPDATE_LEAD_FIELDS } from './schema';
 
 /**
  * The trigger context an action runs against — the same object shape passed to
@@ -504,6 +505,184 @@ function runFormatter(
 }
 
 /**
+ * update_lead — write a whitelisted field back to the Contact row referenced in
+ * context.lead.id. The allowed field names come from UPDATE_LEAD_FIELDS; the
+ * executor rejects anything not in that list so a tampered definition can't touch
+ * arbitrary columns.
+ *
+ * - score_label: sets scoreLabel (must be hot/warm/cold) + scoringStatus='scored'.
+ * - follow_up_in_days: sets followUpAt to now + N days (value is a positive integer).
+ * - tag_add: appends value to the tags array (idempotent — no-op if already there).
+ * - tag_remove: removes value from the tags array.
+ */
+async function runUpdateLead(
+  action: Extract<WorkflowAction, { type: 'update_lead' }>,
+  context: WorkflowContext,
+  spaceId: string,
+): Promise<ActionStepResult> {
+  const { field, value: rawValue } = action.config;
+  const resolvedValue = resolveTokens(rawValue, context);
+
+  const contactId = context.lead?.id as string | undefined;
+  if (!contactId) {
+    return { status: 'failed', detail: { error: 'No contact id in workflow context — cannot update lead.', field } };
+  }
+
+  if (!(UPDATE_LEAD_FIELDS as readonly string[]).includes(field)) {
+    return { status: 'failed', detail: { error: `Unknown update_lead field: ${field}` } };
+  }
+
+  const now = new Date().toISOString();
+
+  if (field === 'score_label') {
+    const allowed = ['hot', 'warm', 'cold'];
+    if (!allowed.includes(resolvedValue)) {
+      return { status: 'failed', detail: { error: `score_label must be hot/warm/cold, got: ${resolvedValue}`, field } };
+    }
+    const { error } = await supabase
+      .from('Contact')
+      .update({ scoreLabel: resolvedValue, scoringStatus: 'scored', updatedAt: now })
+      .eq('id', contactId)
+      .eq('spaceId', spaceId);
+    if (error) return { status: 'failed', detail: { error: error.message, field } };
+    return { status: 'ok', detail: { field, value: resolvedValue, contactId } };
+  }
+
+  if (field === 'follow_up_in_days') {
+    const days = parseInt(resolvedValue, 10);
+    if (!Number.isFinite(days) || days < 0) {
+      return { status: 'failed', detail: { error: `follow_up_in_days must be a non-negative integer, got: ${resolvedValue}` } };
+    }
+    const followUpAt = new Date(Date.now() + days * 86_400_000).toISOString();
+    const { error } = await supabase
+      .from('Contact')
+      .update({ followUpAt, updatedAt: now })
+      .eq('id', contactId)
+      .eq('spaceId', spaceId);
+    if (error) return { status: 'failed', detail: { error: error.message, field } };
+    return { status: 'ok', detail: { field, days, followUpAt, contactId } };
+  }
+
+  if (field === 'tag_add' || field === 'tag_remove') {
+    const tag = resolvedValue.trim();
+    if (!tag) return { status: 'failed', detail: { error: 'Tag value must not be empty', field } };
+
+    const { data: row, error: fetchErr } = await supabase
+      .from('Contact')
+      .select('tags')
+      .eq('id', contactId)
+      .eq('spaceId', spaceId)
+      .single();
+    if (fetchErr) return { status: 'failed', detail: { error: fetchErr.message, field } };
+
+    const currentTags: string[] = Array.isArray((row as { tags?: string[] } | null)?.tags)
+      ? ((row as { tags: string[] }).tags)
+      : [];
+
+    const nextTags =
+      field === 'tag_add'
+        ? currentTags.includes(tag) ? currentTags : [...currentTags, tag]
+        : currentTags.filter((t) => t !== tag);
+
+    const { error: updateErr } = await supabase
+      .from('Contact')
+      .update({ tags: nextTags, updatedAt: now })
+      .eq('id', contactId)
+      .eq('spaceId', spaceId);
+    if (updateErr) return { status: 'failed', detail: { error: updateErr.message, field } };
+    return { status: 'ok', detail: { field, tag, contactId, tags: nextTags } };
+  }
+
+  return { status: 'failed', detail: { error: `Unhandled field: ${field}` } };
+}
+
+/**
+ * SSRF guard — returns true if the hostname appears to be a private/internal
+ * address that should never be the target of an outbound webhook. Only applied
+ * in the executor; the Zod schema already enforces HTTPS.
+ */
+function isPrivateHost(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    const h = hostname.toLowerCase();
+    if (h === 'localhost' || h === '0.0.0.0') return true;
+    // IPv4 private ranges
+    const ipv4 = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipv4) {
+      const [, a, b] = ipv4.map(Number);
+      if (a === 10) return true;
+      if (a === 127) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 169 && b === 254) return true; // link-local (AWS metadata etc.)
+    }
+    // IPv6 loopback / link-local
+    if (h === '::1' || h.startsWith('fe80:') || h.startsWith('[::1]') || h.startsWith('[fe80:')) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * webhook_post — POST JSON to an external HTTPS URL. The body and URL are
+ * interpolated ({{token}} replaced). SSRF is guarded by blocking private IPs.
+ * Response body is read up to 10 KB and returned in the detail for audit.
+ */
+async function runWebhookPost(
+  action: Extract<WorkflowAction, { type: 'webhook_post' }>,
+  context: WorkflowContext,
+): Promise<ActionStepResult> {
+  const { url: rawUrl, bodyJson, headersJson } = action.config;
+  const url = resolveTokens(rawUrl, context);
+  if (isPrivateHost(url)) {
+    return { status: 'failed', detail: { error: 'Webhook URL targets a private or loopback address.', url } };
+  }
+
+  let body: string | undefined;
+  if (bodyJson) {
+    body = resolveTokens(bodyJson, context);
+    try { JSON.parse(body); } catch {
+      return { status: 'failed', detail: { error: 'Webhook body is not valid JSON.', body } };
+    }
+  }
+
+  let headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': 'chippi-workflows/1.0' };
+  if (headersJson) {
+    try {
+      const parsed = JSON.parse(headersJson) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'string') headers[k] = v;
+      }
+    } catch {
+      return { status: 'failed', detail: { error: 'Headers JSON is invalid.', headersJson } };
+    }
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: body ?? '{}',
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await res.text().then((t) => t.slice(0, 10_000));
+    return {
+      status: res.ok ? 'ok' : 'failed',
+      detail: {
+        url,
+        statusCode: res.status,
+        ok: res.ok,
+        responseSnippet: text.slice(0, 500),
+        ...(res.ok ? {} : { error: `HTTP ${res.status}` }),
+      },
+    };
+  } catch (err) {
+    return { status: 'failed', detail: { url, error: err instanceof Error ? err.message : String(err) } };
+  }
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -530,6 +709,10 @@ export async function executeAction(
         return runFilter(action, context);
       case 'formatter':
         return runFormatter(action, context);
+      case 'webhook_post':
+        return await runWebhookPost(action, context);
+      case 'update_lead':
+        return await runUpdateLead(action, context, opts.spaceId);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

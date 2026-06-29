@@ -247,6 +247,8 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
+      updateField: a.type === 'update_lead' ? a.config.field : 'score_label' as const,
+      updateValue: a.type === 'update_lead' ? a.config.value : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow
@@ -1190,6 +1192,7 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
   formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
+  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
 };
 
 /**
@@ -1679,6 +1682,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   delay: 'Delay',
   filter: 'Filter',
   webhook_post: 'Webhook POST',
+  update_lead: 'Update lead',
   condition: 'Condition check',
 };
 
@@ -2792,6 +2796,8 @@ function AIWorkflowGenerator({
           webhookUrl: typeof a.webhookUrl === 'string' ? a.webhookUrl : '',
           webhookBody: typeof a.webhookBody === 'string' ? a.webhookBody : '',
           webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',
+          updateField: (typeof a.updateField === 'string' ? a.updateField : 'score_label') as WorkflowFormState['actions'][number]['updateField'],
+          updateValue: typeof a.updateValue === 'string' ? a.updateValue : '',
         })),
         autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
           ? (raw.autonomy as WorkflowAutonomy)

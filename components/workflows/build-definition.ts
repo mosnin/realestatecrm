@@ -35,6 +35,7 @@ import type {
   FormatterOperation,
   Operator,
   TriggerType,
+  UpdateLeadField,
   WorkflowAction,
   WorkflowActionType,
   WorkflowAutonomy,
@@ -113,6 +114,16 @@ export interface ActionRowState {
   formatterFormat: string;
   /** formatter: decimal places for 'number_format' (as string off a number input). */
   formatterToFixed: string;
+  /** webhook_post: target HTTPS URL. */
+  webhookUrl: string;
+  /** webhook_post: JSON body template (optional, {{tokens}} supported). */
+  webhookBody: string;
+  /** webhook_post: extra headers as JSON object string (optional). */
+  webhookHeaders: string;
+  /** update_lead: which Contact column to update. */
+  updateField: UpdateLeadField;
+  /** update_lead: the value to set (supports {{tokens}}). */
+  updateValue: string;
 }
 
 export interface WorkflowFormState {
@@ -311,6 +322,26 @@ function buildAction(row: ActionRowState): WorkflowAction {
           : { ...base, value: coerceConditionValue(row.filterValue) },
       };
     }
+    case 'webhook_post': {
+      const url = row.webhookUrl.trim();
+      const bodyJson = row.webhookBody.trim() || undefined;
+      const headersJson = row.webhookHeaders.trim() || undefined;
+      return {
+        type: 'webhook_post',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: { url, ...(bodyJson ? { bodyJson } : {}), ...(headersJson ? { headersJson } : {}) },
+      };
+    }
+    case 'update_lead':
+      return {
+        type: 'update_lead',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: { field: row.updateField, value: row.updateValue.trim() },
+      };
     case 'formatter': {
       const op = row.formatterOperation;
       type FormatterConfig = {

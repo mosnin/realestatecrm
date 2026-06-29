@@ -188,7 +188,27 @@ export type WorkflowActionType =
   | 'run_chippi'
   | 'delay'
   | 'filter'
-  | 'formatter';
+  | 'formatter'
+  | 'webhook_post'
+  | 'update_lead';
+
+/**
+ * Whitelisted fields the update_lead action can write on the Contact row.
+ * Kept intentionally narrow — the executor validates against this list before
+ * touching Supabase, so a tampered definition can't write arbitrary columns.
+ */
+export type UpdateLeadField =
+  | 'score_label'     // set scoreLabel to hot/warm/cold
+  | 'follow_up_in_days' // set followUpAt to now + N days
+  | 'tag_add'         // append a tag to the tags array (idempotent)
+  | 'tag_remove';     // remove a tag from the tags array
+
+export const UPDATE_LEAD_FIELDS = [
+  'score_label',
+  'follow_up_in_days',
+  'tag_add',
+  'tag_remove',
+] as const satisfies readonly UpdateLeadField[];
 
 export type FormatterOperation =
   | 'uppercase'
@@ -321,6 +341,36 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
         replacement: z.string().max(200).optional(),
         format: z.string().max(100).optional(),
         toFixed: z.number().int().min(0).max(20).optional(),
+      })
+      .strict(),
+  }),
+  // webhook_post: POST to an external URL (HTTPS only, SSRF-guarded in the executor).
+  z.object({
+    type: z.literal('webhook_post'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        url: z.string().url().max(2000).refine((u) => u.startsWith('https://'), {
+          message: 'Webhook URL must use HTTPS.',
+        }),
+        bodyJson: z.string().max(4000).optional(),
+        headersJson: z.string().max(1000).optional(),
+      })
+      .strict(),
+  }),
+  // update_lead: write a whitelisted field back to the Contact row that triggered
+  // this workflow (score_label, follow_up_in_days, tag_add, tag_remove).
+  z.object({
+    type: z.literal('update_lead'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        field: z.enum(UPDATE_LEAD_FIELDS),
+        value: z.string().trim().min(1).max(SHORT_TEXT),
       })
       .strict(),
   }),

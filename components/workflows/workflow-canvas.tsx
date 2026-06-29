@@ -171,12 +171,14 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   filter: 'Filter — only continue if…',
   formatter: 'Format data',
   webhook_post: 'POST to a webhook URL',
+  update_lead: 'Update this lead',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
   'draft_message',
   'run_chippi',
   'create_task',
+  'update_lead',
   'schedule_message',
   'filter',
   'formatter',

@@ -134,6 +134,18 @@ function actionPhrase(a: ActionRowState): string {
       const url = a.webhookUrl.trim();
       return url ? `POST to ${url.replace(/^https?:\/\//, '').slice(0, 40)}` : 'POST to a webhook URL';
     }
+    case 'update_lead': {
+      const fieldLabel: Record<string, string> = {
+        score_label: 'set score to',
+        follow_up_in_days: 'follow up in',
+        tag_add: 'add tag',
+        tag_remove: 'remove tag',
+      };
+      const val = a.updateValue.trim();
+      return val
+        ? `${fieldLabel[a.updateField] ?? a.updateField} "${val}"`
+        : 'update this lead';
+    }
     default:
       return 'take an action';
   }

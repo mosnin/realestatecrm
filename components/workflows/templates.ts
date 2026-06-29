@@ -93,6 +93,8 @@ function blankAction(): WorkflowFormState['actions'][number] {
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
+    updateField: 'score_label',
+    updateValue: '',
   };
 }
 

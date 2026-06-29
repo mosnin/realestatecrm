@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2 } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, Wand2, Send, UserCog } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,12 +40,14 @@ import {
   FORMATTER_OPERATIONS,
   MAX_ACTIONS,
   OPERATORS,
+  UPDATE_LEAD_FIELDS,
   parseWorkflowDefinition,
   WorkflowDefinitionError,
   type ConditionGroup,
   type FormatterOperation,
   type Operator,
   type TriggerType,
+  type UpdateLeadField,
   type WorkflowAction,
   type WorkflowActionType,
   type WorkflowAutonomy,
@@ -200,17 +202,21 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   delay: 'Wait / Delay',
   filter: 'Filter — only continue if…',
   formatter: 'Format data',
+  webhook_post: 'POST to a webhook URL',
+  update_lead: 'Update this lead',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
   'draft_message',
   'run_chippi',
   'create_task',
+  'update_lead',
   'schedule_message',
   'filter',
   'formatter',
   'delay',
   'call_integration',
+  'webhook_post',
 ];
 
 const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
@@ -222,6 +228,8 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   delay: Clock,
   filter: Filter,
   formatter: Wand2,
+  webhook_post: Send,
+  update_lead: UserCog,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -233,6 +241,8 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   delay: 'Pause the workflow before the next step',
   filter: 'Stop the run if a condition is not met',
   formatter: 'Transform text, numbers, or dates before the next step',
+  webhook_post: 'POST JSON to any HTTPS endpoint — CRMs, Slack, or custom backends',
+  update_lead: 'Set the score tier, follow-up date, or tags on this lead',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -454,6 +464,11 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
     formatterToFixed: '',
+    webhookUrl: '',
+    webhookBody: '',
+    webhookHeaders: '',
+    updateField: 'score_label',
+    updateValue: '',
   };
 }
 
@@ -534,6 +549,11 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       formatterReplace: a.type === 'formatter' ? (a.config.replacement ?? '') : '',
       formatterFormat: a.type === 'formatter' ? (a.config.format ?? 'MM/DD/YYYY') : 'MM/DD/YYYY',
       formatterToFixed: a.type === 'formatter' && a.config.toFixed !== undefined ? String(a.config.toFixed) : '',
+      webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
+      webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
+      webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
+      updateField: a.type === 'update_lead' ? a.config.field : 'score_label',
+      updateValue: a.type === 'update_lead' ? a.config.value : '',
     };
   });
 }
@@ -788,6 +808,19 @@ function actionSummary(row: ActionRowState): string {
       return row.formatterInput
         ? `${FORMATTER_OPERATION_LABELS[row.formatterOperation]}: ${row.formatterInput}`
         : 'No input set';
+    case 'webhook_post':
+      return row.webhookUrl ? `POST ${row.webhookUrl.slice(0, 50)}` : 'No URL set';
+    case 'update_lead': {
+      const fieldLabels: Record<UpdateLeadField, string> = {
+        score_label: 'Set score tier',
+        follow_up_in_days: 'Set follow-up in',
+        tag_add: 'Add tag',
+        tag_remove: 'Remove tag',
+      };
+      return row.updateValue
+        ? `${fieldLabels[row.updateField]}: ${row.updateValue}`
+        : `${fieldLabels[row.updateField]} — no value set`;
+    }
     default:
       return '';
   }
@@ -814,6 +847,20 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-teal-400 dark:border-l-teal-500/70',
       badge: 'bg-teal-500',
       icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
+    };
+  }
+  if (type === 'webhook_post') {
+    return {
+      border: 'border-l-orange-400 dark:border-l-orange-500/70',
+      badge: 'bg-orange-500',
+      icon: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
+    };
+  }
+  if (type === 'update_lead') {
+    return {
+      border: 'border-l-indigo-400 dark:border-l-indigo-500/70',
+      badge: 'bg-indigo-500',
+      icon: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400',
     };
   }
   return {
@@ -1517,6 +1564,8 @@ export function WorkflowBuilder({
     if (row.type === 'delay') return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
     if (row.type === 'filter') return !row.filterField.trim();
     if (row.type === 'formatter') return !row.formatterInput.trim();
+    if (row.type === 'webhook_post') return !row.webhookUrl.trim();
+    if (row.type === 'update_lead') return !row.updateValue.trim();
     return false;
   }
 
@@ -2710,6 +2759,209 @@ function FilterActionConfig({
   );
 }
 
+function WebhookPostActionConfig({
+  row,
+  onChange,
+  triggerType = 'lead_created',
+  prevSteps = [],
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType?: TriggerType;
+  prevSteps?: ActionRowState[];
+}) {
+  const urlRef = useRef<HTMLInputElement>(null);
+  const urlSelRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const bodySelRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  function saveUrlSel() {
+    const el = urlRef.current;
+    if (el) urlSelRef.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+  }
+  function insertUrlToken(token: string) {
+    const { start, end } = urlSelRef.current;
+    const next = row.webhookUrl.slice(0, start) + token + row.webhookUrl.slice(end);
+    onChange({ webhookUrl: next });
+    requestAnimationFrame(() => {
+      const el = urlRef.current;
+      if (el) { el.focus(); const p = start + token.length; el.setSelectionRange(p, p); urlSelRef.current = { start: p, end: p }; }
+    });
+  }
+  function saveBodySel() {
+    const el = bodyRef.current;
+    if (el) bodySelRef.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+  }
+  function insertBodyToken(token: string) {
+    const { start, end } = bodySelRef.current;
+    const next = row.webhookBody.slice(0, start) + token + row.webhookBody.slice(end);
+    onChange({ webhookBody: next });
+    requestAnimationFrame(() => {
+      const el = bodyRef.current;
+      if (el) { el.focus(); const p = start + token.length; el.setSelectionRange(p, p); bodySelRef.current = { start: p, end: p }; }
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className={CAPTION}>
+        POST JSON to any HTTPS URL. Use <code className="rounded bg-muted px-1 py-px text-[10px]">{'{{lead.name}}'}</code> tokens in the URL or body.
+      </p>
+
+      {/* URL */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`wh-url-${row.id}`} className="text-[12px] text-muted-foreground">
+            URL <span className="text-rose-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertUrlToken} />
+        </div>
+        <Input
+          ref={urlRef}
+          id={`wh-url-${row.id}`}
+          value={row.webhookUrl}
+          onChange={(e) => onChange({ webhookUrl: e.target.value })}
+          onSelect={saveUrlSel}
+          onKeyUp={saveUrlSel}
+          onClick={saveUrlSel}
+          placeholder="https://hooks.example.com/lead-created"
+          className="h-8 font-mono text-[12px]"
+          type="url"
+        />
+        {row.webhookUrl && !row.webhookUrl.startsWith('https://') && (
+          <p className="text-[11px] text-rose-500">URL must use HTTPS.</p>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`wh-body-${row.id}`} className="text-[12px] text-muted-foreground">
+            Body (JSON, optional)
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertBodyToken} />
+        </div>
+        <Textarea
+          ref={bodyRef}
+          id={`wh-body-${row.id}`}
+          value={row.webhookBody}
+          onChange={(e) => onChange({ webhookBody: e.target.value })}
+          onSelect={saveBodySel}
+          onKeyUp={saveBodySel}
+          onClick={saveBodySel}
+          placeholder={'{\n  "lead": "{{lead.name}}",\n  "score": "{{lead.score}}"\n}'}
+          rows={4}
+          className="font-mono text-[12px]"
+        />
+      </div>
+
+      {/* Headers — advanced */}
+      <details className="group/adv">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Plus size={12} aria-hidden className="transition-transform group-open/adv:rotate-45" />
+          Custom headers (optional)
+        </summary>
+        <div className="mt-2 space-y-1.5">
+          <Label htmlFor={`wh-headers-${row.id}`} className="text-[12px] text-muted-foreground">
+            Headers (JSON object)
+          </Label>
+          <Textarea
+            id={`wh-headers-${row.id}`}
+            value={row.webhookHeaders}
+            onChange={(e) => onChange({ webhookHeaders: e.target.value })}
+            placeholder={'{ "Authorization": "Bearer YOUR_TOKEN" }'}
+            rows={2}
+            className="font-mono text-[12px]"
+          />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+const UPDATE_LEAD_FIELD_OPTIONS: { value: UpdateLeadField; label: string; hint: string }[] = [
+  { value: 'score_label', label: 'Set score tier', hint: 'hot, warm, or cold' },
+  { value: 'follow_up_in_days', label: 'Set follow-up in N days', hint: 'e.g. 3 (from now)' },
+  { value: 'tag_add', label: 'Add tag', hint: 'e.g. toured, high-intent' },
+  { value: 'tag_remove', label: 'Remove tag', hint: 'remove a tag from the lead' },
+];
+
+const SCORE_LABEL_OPTIONS = [
+  { value: 'hot', label: '🔥 Hot' },
+  { value: 'warm', label: '🌤 Warm' },
+  { value: 'cold', label: '🧊 Cold' },
+];
+
+function UpdateLeadActionConfig({
+  row,
+  onChange,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+}) {
+  const fieldOpt = UPDATE_LEAD_FIELD_OPTIONS.find((o) => o.value === row.updateField);
+  return (
+    <div className="space-y-3">
+      <p className={CAPTION}>Write a field back to this lead's contact record in the CRM.</p>
+      <FieldRow label="Field to update" htmlFor={`act-uf-${row.id}`}>
+        <Select
+          value={row.updateField}
+          onValueChange={(v) => onChange({ updateField: v as UpdateLeadField, updateValue: '' })}
+        >
+          <SelectTrigger id={`act-uf-${row.id}`} className="h-8 text-[12px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UPDATE_LEAD_FIELD_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value} className="text-[12px]">
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FieldRow>
+
+      {row.updateField === 'score_label' ? (
+        <FieldRow label="Score tier" htmlFor={`act-uv-sl-${row.id}`}>
+          <Select
+            value={row.updateValue || 'hot'}
+            onValueChange={(v) => onChange({ updateValue: v })}
+          >
+            <SelectTrigger id={`act-uv-sl-${row.id}`} className="h-8 text-[12px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SCORE_LABEL_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-[12px]">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor={`act-uv-${row.id}`} className="text-[12px] text-muted-foreground">
+            Value
+            {fieldOpt && <span className="ml-1 text-muted-foreground/60">({fieldOpt.hint})</span>}
+          </Label>
+          <Input
+            id={`act-uv-${row.id}`}
+            value={row.updateValue}
+            onChange={(e) => onChange({ updateValue: e.target.value })}
+            placeholder={
+              row.updateField === 'follow_up_in_days' ? '3' :
+              row.updateField === 'tag_add' ? 'toured' :
+              'tag-name'
+            }
+            className="h-8"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -2841,6 +3093,14 @@ function ActionConfig({
 
   if (row.type === 'formatter') {
     return <FormatterActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'webhook_post') {
+    return <WebhookPostActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'update_lead') {
+    return <UpdateLeadActionConfig row={row} onChange={onChange} />;
   }
 
   // call_integration — app + action lead; show connected apps picker when apps

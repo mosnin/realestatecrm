@@ -70,6 +70,15 @@ function actionPhrase(action: WorkflowAction): string {
       return `${action.config.operation.replace(/_/g, ' ')} "${action.config.input}"`;
     case 'webhook_post':
       return `POST to ${action.config.url.replace(/^https?:\/\//, '').slice(0, 40)}`;
+    case 'update_lead': {
+      const fieldLabel: Record<string, string> = {
+        score_label: 'set score to',
+        follow_up_in_days: 'follow up in',
+        tag_add: 'add tag',
+        tag_remove: 'remove tag',
+      };
+      return `${fieldLabel[action.config.field] ?? action.config.field} ${action.config.value}`;
+    }
     default:
       return 'run an action';
   }
