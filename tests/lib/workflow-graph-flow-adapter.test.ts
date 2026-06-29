@@ -1,7 +1,7 @@
 /**
  * Unit tests for the pure graph↔flow adapter that backs the advanced canvas.
  * The canvas component is thin React-Flow glue; the correctness lives here:
- * lossless round-trip, layered layout (children right of parents), and the
+ * lossless round-trip, layered layout (children below parents, top-down), and the
  * connect-time cycle guard.
  */
 
@@ -70,12 +70,12 @@ describe('graphToFlow / flowToGraph round-trip', () => {
 });
 
 describe('layered layout', () => {
-  it('places children to the right of their parents (increasing x by depth)', () => {
+  it('places children below their parents (increasing y by depth)', () => {
     const { nodes } = graphToFlow(branchGraph);
-    const x = (id: string) => nodes.find((n) => n.id === id)!.position.x;
-    expect(x('t')).toBeLessThan(x('c'));
-    expect(x('c')).toBeLessThan(x('hot'));
-    expect(x('c')).toBeLessThan(x('warm'));
+    const y = (id: string) => nodes.find((n) => n.id === id)!.position.y;
+    expect(y('t')).toBeLessThan(y('c'));
+    expect(y('c')).toBeLessThan(y('hot'));
+    expect(y('c')).toBeLessThan(y('warm'));
   });
 
   it('sits a diamond-join past its deepest parent', () => {
@@ -94,8 +94,8 @@ describe('layered layout', () => {
       ],
     };
     const { nodes } = graphToFlow(graph);
-    const x = (id: string) => nodes.find((n) => n.id === id)!.position.x;
-    expect(x('join')).toBeGreaterThan(x('a2'));
+    const y = (id: string) => nodes.find((n) => n.id === id)!.position.y;
+    expect(y('join')).toBeGreaterThan(y('a2'));
   });
 });
 
