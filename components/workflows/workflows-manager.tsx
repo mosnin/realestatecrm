@@ -265,7 +265,9 @@ export function WorkflowsManager() {
   const filteredWorkflows = useMemo(() => {
     let list = workflows;
     const q = searchQuery.trim().toLowerCase();
-    if (q) list = list.filter((w) => w.name.toLowerCase().includes(q));
+    if (q) list = list.filter(
+      (w) => w.name.toLowerCase().includes(q) || (w.description ?? '').toLowerCase().includes(q),
+    );
     if (statusFilter === 'on') list = list.filter((w) => w.enabled);
     else if (statusFilter === 'off') list = list.filter((w) => !w.enabled);
     else if (statusFilter === 'failed') list = list.filter((w) => w.lastRunStatus === 'error');
@@ -1149,6 +1151,15 @@ function WorkflowRow({
             {workflow.actions.length > 0 && (
               <span className="inline-flex flex-shrink-0 items-center rounded-full bg-muted/60 px-1.5 py-px text-[10px] tabular-nums text-muted-foreground/60">
                 {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
+              </span>
+            )}
+            {workflow.enabled && workflow.actions.length === 0 && !workflow.graph && (
+              <span
+                title="Workflow is on but has no actions — add at least one step"
+                className="inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"
+              >
+                <AlertTriangle size={9} aria-hidden />
+                No steps
               </span>
             )}
           </div>
