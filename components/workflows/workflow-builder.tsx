@@ -3428,8 +3428,7 @@ function ConditionGroupEditor({
   group,
   triggerType,
   onChange,
-  triggerType = 'lead_created',
-  prevSteps = [],
+  onRemove,
 }: {
   group: ConditionGroupFormState;
   triggerType: TriggerType;
