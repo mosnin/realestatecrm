@@ -30,7 +30,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -93,12 +95,21 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
 const TRIGGER_ORDER: TriggerType[] = [
   'lead_created',
   'lead_score_threshold',
+  'contact_updated',
   'inbound_message',
   'tour_completed',
   'deal_stage_changed',
+  'deal_created',
   'integration_event',
   'schedule',
   'webhook',
+];
+
+const TRIGGER_CATEGORIES: { label: string; keys: TriggerType[] }[] = [
+  { label: 'Lead Events', keys: ['lead_created', 'lead_score_threshold', 'contact_updated'] },
+  { label: 'Deal Events', keys: ['deal_created', 'deal_stage_changed', 'tour_completed'] },
+  { label: 'Conversation', keys: ['inbound_message'] },
+  { label: 'External / Scheduled', keys: ['integration_event', 'schedule', 'webhook'] },
 ];
 
 /** Sample trigger event data shown in the "Test trigger" panel. Each entry is a
@@ -925,9 +936,9 @@ function actionAccent(type: WorkflowActionType) {
   }
   if (type === 'filter') {
     return {
-      border: 'border-l-sky-400 dark:border-l-sky-500/70',
-      badge: 'bg-sky-500',
-      icon: 'bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-400',
+      border: 'border-l-yellow-400 dark:border-l-yellow-500/70',
+      badge: 'bg-yellow-500',
+      icon: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-400',
     };
   }
   if (type === 'formatter') {
@@ -1671,7 +1682,7 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
   run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  filter:           { icon: Filter,       cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400' },
   formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
@@ -2336,10 +2347,17 @@ export function WorkflowBuilder({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TRIGGER_ORDER.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {TRIGGER_LABELS[t]}
-                </SelectItem>
+              {TRIGGER_CATEGORIES.map((cat) => (
+                <SelectGroup key={cat.label}>
+                  <SelectLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-2 py-1.5">
+                    {cat.label}
+                  </SelectLabel>
+                  {cat.keys.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TRIGGER_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
