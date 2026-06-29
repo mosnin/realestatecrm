@@ -57,6 +57,7 @@ import {
   RotateCcw,
   Wand2,
   Activity,
+  BellRing,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -249,6 +250,8 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
       updateField: a.type === 'update_lead' ? a.config.field : 'score_label' as const,
       updateValue: a.type === 'update_lead' ? a.config.value : '',
+      notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
+      notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow
@@ -1193,6 +1196,7 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
+  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
 };
 
 /**
@@ -1683,6 +1687,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   filter: 'Filter',
   webhook_post: 'Webhook POST',
   update_lead: 'Update lead',
+  notify_agent: 'Push alert',
   condition: 'Condition check',
 };
 
@@ -2798,6 +2803,8 @@ function AIWorkflowGenerator({
           webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',
           updateField: (typeof a.updateField === 'string' ? a.updateField : 'score_label') as WorkflowFormState['actions'][number]['updateField'],
           updateValue: typeof a.updateValue === 'string' ? a.updateValue : '',
+          notifyTitle: typeof a.notifyTitle === 'string' ? a.notifyTitle : '',
+          notifyBody: typeof a.notifyBody === 'string' ? a.notifyBody : '',
         })),
         autonomy: (['draft', 'notify', 'auto'] as const).includes(raw.autonomy as WorkflowAutonomy)
           ? (raw.autonomy as WorkflowAutonomy)

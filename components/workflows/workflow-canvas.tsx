@@ -164,6 +164,7 @@ export interface WorkflowCanvasProps {
 const ACTION_LABELS: Record<WorkflowActionType, string> = {
   draft_message: 'Draft a message',
   schedule_message: 'Schedule a message',
+  notify_agent: 'Notify me',
   create_task: 'Create a task',
   call_integration: 'Call a connected app',
   run_chippi: 'Ask Chippi to do something',
@@ -179,6 +180,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'run_chippi',
   'create_task',
   'update_lead',
+  'notify_agent',
   'schedule_message',
   'filter',
   'formatter',
@@ -1054,7 +1056,19 @@ function ActionInspector({
             ? { type, config: { title: '' } }
             : type === 'call_integration'
               ? { type, config: { toolkit: '', action: '' } }
-              : { type: 'run_chippi', config: { instruction: '' } };
+              : type === 'update_lead'
+                ? { type, config: { field: 'score_label' as const, value: '' } }
+                : type === 'webhook_post'
+                  ? { type, config: { url: '' } }
+                  : type === 'notify_agent'
+                    ? { type, config: { title: '' } }
+                    : type === 'delay'
+                      ? { type, config: { delayMinutes: 60 } }
+                      : type === 'filter'
+                        ? { type, config: { field: '', operator: 'eq' as const } }
+                        : type === 'formatter'
+                          ? { type, config: { input: '', operation: 'uppercase' as const } }
+                          : { type: 'run_chippi', config: { instruction: '' } };
     onChange(next);
   }
 
@@ -1209,6 +1223,34 @@ function ActionInspector({
           onChange={onChange}
           connectedApps={connectedApps}
         />
+      )}
+
+      {action.type === 'notify_agent' && (
+        <>
+          <FieldBlock label="Notification title">
+            <Input
+              value={action.config.title}
+              onChange={(e) =>
+                onChange({ type: 'notify_agent', config: { ...action.config, title: e.target.value } })
+              }
+              placeholder="Hot lead: check their profile"
+              className="h-8"
+            />
+          </FieldBlock>
+          <FieldBlock label="Body (optional)">
+            <Textarea
+              value={action.config.body ?? ''}
+              onChange={(e) =>
+                onChange({
+                  type: 'notify_agent',
+                  config: { ...action.config, body: e.target.value || undefined },
+                })
+              }
+              placeholder="Score hit threshold — tap to review."
+              rows={2}
+            />
+          </FieldBlock>
+        </>
       )}
     </div>
   );

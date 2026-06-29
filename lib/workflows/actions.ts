@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
+import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions, resolveField } from './conditions';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
@@ -597,6 +598,26 @@ async function runUpdateLead(
 }
 
 /**
+ * notify_agent — send a push notification to the realtor's subscribed device(s).
+ * Always allowed regardless of autonomy (it notifies the human, never the lead).
+ * Non-blocking: if push isn't configured or there are no subscriptions, returns
+ * 'ok' with a note rather than failing the workflow run.
+ */
+async function runNotifyAgent(
+  action: Extract<WorkflowAction, { type: 'notify_agent' }>,
+  context: WorkflowContext,
+  spaceId: string,
+): Promise<ActionStepResult> {
+  const title = resolveTokens(action.config.title, context);
+  const body = action.config.body ? resolveTokens(action.config.body, context) : '';
+  const sent = await sendPushToSpace(spaceId, { title, body });
+  return {
+    status: 'ok',
+    detail: { title, body, sent, note: sent === 0 ? 'No subscribed devices or push not configured.' : undefined },
+  };
+}
+
+/**
  * SSRF guard — returns true if the hostname appears to be a private/internal
  * address that should never be the target of an outbound webhook. Only applied
  * in the executor; the Zod schema already enforces HTTPS.
@@ -713,6 +734,8 @@ export async function executeAction(
         return await runWebhookPost(action, context);
       case 'update_lead':
         return await runUpdateLead(action, context, opts.spaceId);
+      case 'notify_agent':
+        return await runNotifyAgent(action, context, opts.spaceId);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

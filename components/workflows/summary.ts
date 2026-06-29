@@ -79,6 +79,8 @@ function actionPhrase(action: WorkflowAction): string {
       };
       return `${fieldLabel[action.config.field] ?? action.config.field} ${action.config.value}`;
     }
+    case 'notify_agent':
+      return `send a push alert: "${action.config.title.slice(0, 40)}"`;
     default:
       return 'run an action';
   }

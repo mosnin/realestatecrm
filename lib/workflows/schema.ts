@@ -190,7 +190,8 @@ export type WorkflowActionType =
   | 'filter'
   | 'formatter'
   | 'webhook_post'
-  | 'update_lead';
+  | 'update_lead'
+  | 'notify_agent';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -371,6 +372,20 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
       .object({
         field: z.enum(UPDATE_LEAD_FIELDS),
         value: z.string().trim().min(1).max(SHORT_TEXT),
+      })
+      .strict(),
+  }),
+  // notify_agent: send a push notification to the realtor's subscribed device(s).
+  // Like Zapier's "Send yourself an email" — a lightweight personal alert step.
+  z.object({
+    type: z.literal('notify_agent'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        title: z.string().trim().min(1).max(SHORT_TEXT),
+        body: z.string().trim().max(500).optional(),
       })
       .strict(),
   }),

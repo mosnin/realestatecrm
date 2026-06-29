@@ -204,6 +204,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   formatter: 'Format data',
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
+  notify_agent: 'Notify me — send a push alert',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -211,6 +212,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'run_chippi',
   'create_task',
   'update_lead',
+  'notify_agent',
   'schedule_message',
   'filter',
   'formatter',
@@ -230,6 +232,7 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   formatter: Wand2,
   webhook_post: Send,
   update_lead: UserCog,
+  notify_agent: BellRing,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -243,6 +246,7 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   formatter: 'Transform text, numbers, or dates before the next step',
   webhook_post: 'POST JSON to any HTTPS endpoint — CRMs, Slack, or custom backends',
   update_lead: 'Set the score tier, follow-up date, or tags on this lead',
+  notify_agent: 'Push a personal alert to your phone or browser — stay in the loop',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -469,6 +473,8 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     webhookHeaders: '',
     updateField: 'score_label',
     updateValue: '',
+    notifyTitle: '',
+    notifyBody: '',
   };
 }
 
@@ -554,6 +560,8 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
       updateField: a.type === 'update_lead' ? a.config.field : 'score_label',
       updateValue: a.type === 'update_lead' ? a.config.value : '',
+      notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
+      notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
     };
   });
 }
@@ -821,6 +829,8 @@ function actionSummary(row: ActionRowState): string {
         ? `${fieldLabels[row.updateField]}: ${row.updateValue}`
         : `${fieldLabels[row.updateField]} — no value set`;
     }
+    case 'notify_agent':
+      return row.notifyTitle ? `"${trunc(row.notifyTitle)}"` : 'No title set';
     default:
       return '';
   }
@@ -861,6 +871,13 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-indigo-400 dark:border-l-indigo-500/70',
       badge: 'bg-indigo-500',
       icon: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400',
+    };
+  }
+  if (type === 'notify_agent') {
+    return {
+      border: 'border-l-rose-400 dark:border-l-rose-500/70',
+      badge: 'bg-rose-500',
+      icon: 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400',
     };
   }
   return {
@@ -1566,6 +1583,7 @@ export function WorkflowBuilder({
     if (row.type === 'formatter') return !row.formatterInput.trim();
     if (row.type === 'webhook_post') return !row.webhookUrl.trim();
     if (row.type === 'update_lead') return !row.updateValue.trim();
+    if (row.type === 'notify_agent') return !row.notifyTitle.trim();
     return false;
   }
 
@@ -2962,6 +2980,63 @@ function UpdateLeadActionConfig({
   );
 }
 
+function NotifyAgentActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps = [],
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+}) {
+  function insertTitle(token: string) {
+    onChange({ notifyTitle: (row.notifyTitle + token) });
+  }
+  function insertBody(token: string) {
+    onChange({ notifyBody: (row.notifyBody + token) });
+  }
+  return (
+    <div className="space-y-3">
+      <p className={CAPTION}>{'Send a push notification to your phone or browser. {{tokens}} are replaced with live lead data.'}</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-nt-${row.id}`} className="text-[12px] text-muted-foreground">
+            Notification title <span className="text-red-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertTitle} />
+        </div>
+        <Input
+          id={`act-nt-${row.id}`}
+          value={row.notifyTitle}
+          onChange={(e) => onChange({ notifyTitle: e.target.value })}
+          placeholder={`Hot lead: {{lead.name}}`}
+          maxLength={200}
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-nb-${row.id}`} className="text-[12px] text-muted-foreground">
+            Body (optional)
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertBody} />
+        </div>
+        <Textarea
+          id={`act-nb-${row.id}`}
+          value={row.notifyBody}
+          onChange={(e) => onChange({ notifyBody: e.target.value })}
+          placeholder={`Score hit {{lead.score}} — tap to review their profile.`}
+          maxLength={500}
+          rows={2}
+          className="text-[12px]"
+        />
+      </div>
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -3101,6 +3176,10 @@ function ActionConfig({
 
   if (row.type === 'update_lead') {
     return <UpdateLeadActionConfig row={row} onChange={onChange} />;
+  }
+
+  if (row.type === 'notify_agent') {
+    return <NotifyAgentActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
   // call_integration — app + action lead; show connected apps picker when apps

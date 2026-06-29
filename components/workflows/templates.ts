@@ -95,6 +95,8 @@ function blankAction(): WorkflowFormState['actions'][number] {
     webhookHeaders: '',
     updateField: 'score_label',
     updateValue: '',
+    notifyTitle: '',
+    notifyBody: '',
   };
 }
 
@@ -922,6 +924,58 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         },
       ],
       autonomy: 'draft',
+    },
+  },
+
+  // ── notify_agent templates ─────────────────────────────────────────────────
+
+  {
+    id: 'hot-lead-push-alert',
+    name: 'Hot lead → push alert to you',
+    description: 'When a lead crosses 80, send yourself a push notification so you can act in seconds.',
+    category: 'New leads',
+    popular: true,
+    state: {
+      name: 'Hot lead → push alert to you',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '80' },
+      conditionOp: 'and',
+      conditions: [condition('lead.score', 'gte', '80')],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: '🔥 Hot lead: {{lead.name}}',
+          notifyBody: 'Score hit {{lead.score}} — tap to review their profile and reach out now.',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Call {{lead.name}} — hot!',
+          dueInDays: '0',
+        },
+      ],
+      autonomy: 'auto',
+    },
+  },
+  {
+    id: 'deal-stage-push-alert',
+    name: 'Deal stage change → push alert',
+    description: 'Stay in the loop when a deal moves — get a push notification the moment it happens.',
+    category: 'Follow-up',
+    state: {
+      name: 'Deal stage change → push alert',
+      trigger: { ...baseTrigger(), type: 'deal_stage_changed' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: 'Deal moved: {{lead.name}}',
+          notifyBody: 'Stage changed — check the pipeline and take next steps.',
+        },
+      ],
+      autonomy: 'auto',
     },
   },
 

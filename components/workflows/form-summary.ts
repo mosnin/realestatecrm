@@ -146,6 +146,10 @@ function actionPhrase(a: ActionRowState): string {
         ? `${fieldLabel[a.updateField] ?? a.updateField} "${val}"`
         : 'update this lead';
     }
+    case 'notify_agent': {
+      const title = a.notifyTitle.trim();
+      return title ? `send push: "${title.slice(0, 40)}"` : 'send a push alert';
+    }
     default:
       return 'take an action';
   }

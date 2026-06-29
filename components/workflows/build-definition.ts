@@ -124,6 +124,10 @@ export interface ActionRowState {
   updateField: UpdateLeadField;
   /** update_lead: the value to set (supports {{tokens}}). */
   updateValue: string;
+  /** notify_agent: notification title (supports {{tokens}}). */
+  notifyTitle: string;
+  /** notify_agent: notification body text (optional, supports {{tokens}}). */
+  notifyBody: string;
 }
 
 export interface WorkflowFormState {
@@ -342,6 +346,16 @@ function buildAction(row: ActionRowState): WorkflowAction {
         ...(onError ? { onError } : {}),
         config: { field: row.updateField, value: row.updateValue.trim() },
       };
+    case 'notify_agent': {
+      const body = row.notifyBody.trim();
+      return {
+        type: 'notify_agent',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: { title: row.notifyTitle.trim(), ...(body ? { body } : {}) },
+      };
+    }
     case 'formatter': {
       const op = row.formatterOperation;
       type FormatterConfig = {

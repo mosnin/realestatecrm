@@ -48,6 +48,7 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - call_integration: call a connected app (config: { toolkit: string, action: string })
 - webhook_post: HTTP POST to an external HTTPS URL (config: { url: string (must start with https://), bodyJson?: string (JSON template with {{lead.*}} tokens), headersJson?: string (JSON object of extra headers) })
 - update_lead: write a field back to this lead's CRM record (config: { field: "score_label"|"follow_up_in_days"|"tag_add"|"tag_remove", value: string ("hot"/"warm"/"cold" for score_label, integer days for follow_up_in_days, tag string for tag_add/tag_remove) })
+- notify_agent: send a push notification to the realtor's phone/browser (config: { title: string (max 60 chars, {{tokens}} ok), body?: string (optional, max 120 chars, {{tokens}} ok) })
 
 AUTONOMY (how much AI acts without human review):
 - draft: always draft for human approval (safest)
@@ -85,7 +86,9 @@ Return ONLY a JSON object with these exact fields:
       "webhookBody": "<JSON body template string, for webhook_post>",
       "webhookHeaders": "<JSON headers object string, for webhook_post>",
       "updateField": "<score_label|follow_up_in_days|tag_add|tag_remove, for update_lead>",
-      "updateValue": "<value to set, for update_lead>"
+      "updateValue": "<value to set, for update_lead>",
+      "notifyTitle": "<notification title (max 60 chars), for notify_agent>",
+      "notifyBody": "<notification body (optional, max 120 chars), for notify_agent>"
     }
   ],
   "autonomy": "draft"
