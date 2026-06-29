@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
-import { getLLMClient, openaiModel } from '@/lib/llm';
+import { getLLMClient } from '@/lib/llm';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   try {
     const llm = getLLMClient();
     const completion = await llm.chat.completions.create({
-      model: openaiModel('gpt-4o-mini'),
+      model: 'qwen/qwen3.7-plus',
       response_format: { type: 'json_object' },
       temperature: 0.3,
       max_tokens: 1000,

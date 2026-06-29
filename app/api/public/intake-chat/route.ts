@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
-import { getLLMClient, hasLLMKey, openaiModel } from '@/lib/llm';
+import { getLLMClient, hasLLMKey } from '@/lib/llm';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -393,7 +393,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   let openaiStream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
   try {
     openaiStream = await openai.chat.completions.create({
-      model: openaiModel('gpt-4o-mini'),
+      model: 'qwen/qwen3.7-plus',
       temperature: 0.7,
       max_tokens: 400,
       stream: true,

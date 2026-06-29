@@ -35,7 +35,7 @@ import {
   downloadRecording,
   encodeClientState,
 } from '@/lib/voice';
-import { getLLMClient, openaiModel } from '@/lib/llm';
+import { getLLMClient } from '@/lib/llm';
 import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
@@ -237,7 +237,7 @@ async function handleRecordingSaved(
   try {
     const client = getLLMClient();
     const completion = await client.chat.completions.create({
-      model: openaiModel('gpt-4o-mini'),
+      model: 'qwen/qwen3.7-plus',
       temperature: 0.2,
       max_tokens: 180,
       messages: [
