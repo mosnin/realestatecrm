@@ -1273,6 +1273,75 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       autonomy: 'auto',
     },
   },
+
+  // ── iterate / loop templates ───────────────────────────────────────────────
+
+  {
+    id: 'iterate-tags-personalized-outreach',
+    name: 'New lead → personalized message per interest',
+    description: 'Loop over each interest tag on a new lead and draft a tailored outreach message for each one.',
+    category: 'New leads',
+    popular: true,
+    state: {
+      name: 'New lead → personalized message per interest',
+      trigger: { ...baseTrigger(), type: 'lead_created' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'iterate',
+          filterField: 'lead.tags',
+          instruction:
+            'This lead has listed "{{item}}" as one of their property interests. Draft a short, personalised message specifically about what we have available matching that interest — mention a specific neighbourhood, price range, or feature relevant to {{item}}. Keep it to 2-3 sentences.',
+          delayMinutes: '5',
+        },
+        {
+          ...blankAction(),
+          type: 'create_task',
+          title: 'Review per-interest drafts and pick the best one to send',
+          dueInDays: '0',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+
+  {
+    id: 'iterate-pipeline-weekly-checkins',
+    name: 'Weekly → loop over pipeline stages and draft check-ins',
+    description: 'Every Monday, iterate over your active pipeline stages and have Chippi draft a stage-specific check-in for each.',
+    category: 'Scheduling',
+    state: {
+      name: 'Weekly pipeline loop → stage check-ins',
+      trigger: { ...baseTrigger(), type: 'schedule', cadence: 'weekdays', hour: '8' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'run_chippi',
+          instruction:
+            'Build a list of the unique deal stages that have active leads right now (e.g. prospect, touring, offer, inspection, closing). Store this as lead.activeStages in the context.',
+        },
+        {
+          ...blankAction(),
+          type: 'iterate',
+          filterField: 'lead.activeStages',
+          instruction:
+            'Draft a brief, stage-appropriate check-in message for all leads currently in the "{{item}}" stage. Reference what typically happens at this stage and what the next step is.',
+          delayMinutes: '6',
+        },
+        {
+          ...blankAction(),
+          type: 'notify_agent',
+          notifyTitle: 'Weekly pipeline check-ins ready',
+          notifyBody: 'Chippi has drafted a check-in for each active deal stage — review and pick which to send.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
 ];
 
 /**
