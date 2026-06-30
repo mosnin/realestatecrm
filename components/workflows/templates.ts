@@ -124,7 +124,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'email',
+          channel: 'sms',
           instruction:
             'Draft a warm, personal intro to this new high-intent lead and reference their interest.',
         },
@@ -195,7 +195,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'email',
+          channel: 'sms',
           instruction:
             'Draft a warm thank-you for the tour and ask for their honest take on the home.',
         },

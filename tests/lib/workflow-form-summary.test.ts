@@ -77,6 +77,7 @@ describe('summarizeFormState — filled forms', () => {
 describe('summarizeFormState — blank tolerance (mid-edit)', () => {
   it('never emits NaN or undefined for an empty score threshold', () => {
     const state = emptyFormState();
+    state.trigger.type = 'lead_score_threshold';
     state.trigger.min = '';
     const s = summarizeFormState(state);
     expect(s.when).toBe("a lead's score crosses your threshold");
