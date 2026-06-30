@@ -177,6 +177,8 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   branch: 'Paths — conditional branching',
   run_workflow: 'Run sub-workflow',
   lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [

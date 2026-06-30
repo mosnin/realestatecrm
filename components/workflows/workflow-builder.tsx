@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff, Workflow as WorkflowIcon, Table2 } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff, Workflow as WorkflowIcon, Table2, Variable } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -243,6 +243,8 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   branch: 'Paths — conditional branching',
   run_workflow: 'Run another workflow',
   lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -257,6 +259,8 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'branch',
   'formatter',
   'lookup_table',
+  'set_variable',
+  'get_variable',
   'delay',
   'iterate',
   'webhook_post',
@@ -270,7 +274,7 @@ const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   },
   {
     label: 'Logic',
-    keys: ['filter', 'branch', 'formatter', 'lookup_table', 'delay', 'iterate'],
+    keys: ['filter', 'branch', 'formatter', 'lookup_table', 'set_variable', 'get_variable', 'delay', 'iterate'],
   },
 ];
 
@@ -290,6 +294,8 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   branch: GitBranch,
   run_workflow: WorkflowIcon,
   lookup_table: Table2,
+  set_variable: Variable,
+  get_variable: Variable,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -308,6 +314,8 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   branch: 'Route the workflow down different paths based on conditions',
   run_workflow: 'Trigger another workflow as a sub-step (Sub-Zap)',
   lookup_table: 'Map a value to another using a key→value table',
+  set_variable: 'Store a value in a named variable for use in later steps',
+  get_variable: 'Read a named variable and set a default if missing',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -567,6 +575,9 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     lookupInput: '',
     lookupEntriesJson: '',
     lookupFallback: '',
+    varName: '',
+    varValue: '',
+    varDefault: '',
   };
 }
 
@@ -695,6 +706,9 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       lookupInput: a.type === 'lookup_table' ? a.config.input : '',
       lookupEntriesJson: a.type === 'lookup_table' ? JSON.stringify(a.config.entries) : '',
       lookupFallback: a.type === 'lookup_table' ? (a.config.fallback ?? '') : '',
+      varName: (a.type === 'set_variable' || a.type === 'get_variable') ? a.config.name : '',
+      varValue: a.type === 'set_variable' ? a.config.value : '',
+      varDefault: a.type === 'get_variable' ? (a.config.defaultValue ?? '') : '',
       branchPaths: a.type === 'branch'
         ? a.config.paths.map((p) => ({
             id: nextRowId('bp'),
@@ -1044,6 +1058,10 @@ function actionSummary(row: ActionRowState): string {
       return row.subWorkflowId ? `Sub-workflow: ${row.subWorkflowId.slice(0, 8)}…` : 'No workflow selected';
     case 'lookup_table':
       return row.lookupInput ? `Lookup: ${row.lookupInput}` : 'No input set';
+    case 'set_variable':
+      return row.varName ? `Set {{vars.${row.varName}}}` : 'No variable name set';
+    case 'get_variable':
+      return row.varName ? `Get {{vars.${row.varName}}}` : 'No variable name set';
     default:
       return '';
   }
@@ -1119,6 +1137,13 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-cyan-400 dark:border-l-cyan-500/70',
       badge: 'bg-cyan-500',
       icon: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400',
+    };
+  }
+  if (type === 'set_variable' || type === 'get_variable') {
+    return {
+      border: 'border-l-lime-400 dark:border-l-lime-500/70',
+      badge: 'bg-lime-500',
+      icon: 'bg-lime-100 text-lime-700 dark:bg-lime-950/50 dark:text-lime-400',
     };
   }
   return {
@@ -1994,6 +2019,8 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   branch: 'Paths — conditional branching',
   run_workflow: 'Run sub-workflow',
   lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -2012,6 +2039,8 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
   run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
   lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
+  set_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
+  get_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -2086,6 +2115,13 @@ function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actio
     add('input', obj.input);
     add('matched', obj.matched !== undefined ? (obj.matched ? `yes (${obj.matchedKey})` : 'no') : undefined);
     add('output', obj.output);
+  } else if (actionType === 'set_variable') {
+    add('name', obj.name);
+    add('value', obj.value);
+  } else if (actionType === 'get_variable') {
+    add('name', obj.name);
+    add('value', obj.value);
+    add('found', obj.found !== undefined ? String(obj.found) : undefined);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
@@ -5068,7 +5104,7 @@ function BranchActionConfig({
         );
       })}
 
-      {paths.length < 4 && (
+      {paths.length < 8 && (
         <button
           type="button"
           onClick={addPath}
@@ -5569,6 +5605,66 @@ function ActionConfig({
         triggerType={triggerType}
         prevSteps={prevSteps}
       />
+    );
+  }
+
+  if (row.type === 'set_variable') {
+    return (
+      <div className="space-y-2.5">
+        <FieldRow label="Variable name" htmlFor={`act-sv-name-${row.id}`}>
+          <Input
+            id={`act-sv-name-${row.id}`}
+            value={row.varName}
+            onChange={(e) => onChange({ varName: e.target.value })}
+            placeholder="my_variable"
+            className="h-8 font-mono text-[12px]"
+          />
+        </FieldRow>
+        <FieldRow label="Value" htmlFor={`act-sv-val-${row.id}`}>
+          <Input
+            id={`act-sv-val-${row.id}`}
+            value={row.varValue}
+            onChange={(e) => onChange({ varValue: e.target.value })}
+            placeholder="{{lead.name}} or literal text"
+            className="h-8 text-[12px]"
+          />
+        </FieldRow>
+        <p className="text-[11px] text-muted-foreground/60">
+          Access this value in later steps as{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{`{{vars.${row.varName || 'name'}}}`}</code>.
+          Names must start with a letter or underscore.
+        </p>
+      </div>
+    );
+  }
+
+  if (row.type === 'get_variable') {
+    return (
+      <div className="space-y-2.5">
+        <FieldRow label="Variable name" htmlFor={`act-gv-name-${row.id}`}>
+          <Input
+            id={`act-gv-name-${row.id}`}
+            value={row.varName}
+            onChange={(e) => onChange({ varName: e.target.value })}
+            placeholder="my_variable"
+            className="h-8 font-mono text-[12px]"
+          />
+        </FieldRow>
+        <FieldRow label="Default (if not set)" htmlFor={`act-gv-default-${row.id}`}>
+          <Input
+            id={`act-gv-default-${row.id}`}
+            value={row.varDefault}
+            onChange={(e) => onChange({ varDefault: e.target.value })}
+            placeholder="Leave blank for empty string"
+            className="h-8 text-[12px]"
+          />
+        </FieldRow>
+        <p className="text-[11px] text-muted-foreground/60">
+          The value is available as{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{`{{vars.${row.varName || 'name'}}}`}</code>{' '}
+          in this and all subsequent steps.
+        </p>
+      </div>
     );
   }
 

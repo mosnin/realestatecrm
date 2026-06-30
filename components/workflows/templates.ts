@@ -116,6 +116,9 @@ function blankAction(): WorkflowFormState['actions'][number] {
     lookupInput: '',
     lookupEntriesJson: '',
     lookupFallback: '',
+    varName: '',
+    varValue: '',
+    varDefault: '',
   };
 }
 

@@ -144,6 +144,16 @@ function resolveTokens(template: string, context: WorkflowContext): string {
       } else if (itemData !== undefined && itemData !== null) {
         value = typeof itemData === 'object' ? resolveField(itemData as Record<string, unknown>, rest) : itemData;
       }
+    } else if (ns === 'lookup') {
+      const lookupData = (context as Record<string, unknown>).lookup;
+      if (lookupData && typeof lookupData === 'object') {
+        value = resolveField(lookupData as Record<string, unknown>, rest);
+      }
+    } else if (ns === 'vars') {
+      const varsData = (context as Record<string, unknown>).vars;
+      if (varsData && typeof varsData === 'object') {
+        value = resolveField(varsData as Record<string, unknown>, rest);
+      }
     }
 
     if (value === undefined || value === null) return _match;
@@ -1037,6 +1047,40 @@ function runLookupTable(
 }
 
 /**
+ * set_variable — write a named variable into the run context under {{vars.name}}.
+ * Equivalent to Zapier's Storage set action. Tokens in `value` are resolved first.
+ */
+function runSetVariable(
+  action: Extract<WorkflowAction, { type: 'set_variable' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { name, value } = action.config;
+  const resolvedValue = resolveTokens(value, context);
+  const ctx = context as Record<string, unknown>;
+  if (!ctx.vars || typeof ctx.vars !== 'object') ctx.vars = {};
+  (ctx.vars as Record<string, string>)[name] = resolvedValue;
+  return { status: 'ok', detail: { name, value: resolvedValue } };
+}
+
+/**
+ * get_variable — read a named variable from context; falls back to defaultValue.
+ * The retrieved value is available as {{vars.name}} in subsequent steps.
+ */
+function runGetVariable(
+  action: Extract<WorkflowAction, { type: 'get_variable' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { name, defaultValue } = action.config;
+  const ctx = context as Record<string, unknown>;
+  const vars = ctx.vars && typeof ctx.vars === 'object' ? (ctx.vars as Record<string, string>) : {};
+  const found = Object.prototype.hasOwnProperty.call(vars, name);
+  const value = found ? vars[name] : (defaultValue ?? '');
+  if (!ctx.vars || typeof ctx.vars !== 'object') ctx.vars = {};
+  (ctx.vars as Record<string, string>)[name] = String(value);
+  return { status: 'ok', detail: { name, value, found } };
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -1080,6 +1124,10 @@ export async function executeAction(
         return await runSubWorkflow(action, context, opts);
       case 'lookup_table':
         return runLookupTable(action, context);
+      case 'set_variable':
+        return runSetVariable(action, context);
+      case 'get_variable':
+        return runGetVariable(action, context);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

@@ -210,7 +210,9 @@ export type WorkflowActionType =
   | 'iterate'
   | 'branch'
   | 'run_workflow'
-  | 'lookup_table';
+  | 'lookup_table'
+  | 'set_variable'
+  | 'get_variable';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -558,6 +560,39 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // set_variable: write a named variable into the run context ({{vars.name}}).
+  // Equivalent to Zapier's "Storage by Zapier" set action. Values persist for
+  // the duration of the run and are available in all subsequent steps.
+  z.object({
+    type: z.literal('set_variable'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        name: z.string().trim().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Variable names must start with a letter or underscore and contain only letters, numbers, and underscores'),
+        value: z.string().max(SHORT_TEXT),
+      })
+      .strict(),
+  }),
+  // get_variable: read a named variable from context ({{vars.name}}).
+  // Used to retrieve values set by a prior set_variable step or pass a default.
+  z.object({
+    type: z.literal('get_variable'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        name: z.string().trim().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Variable names must start with a letter or underscore and contain only letters, numbers, and underscores'),
+        defaultValue: z.string().max(SHORT_TEXT).optional(),
+      })
+      .strict(),
+  }),
 ]);
 
 export type InnerWorkflowAction = z.infer<typeof innerWorkflowActionSchema>;
@@ -586,7 +621,7 @@ export const branchActionSchema = z.object({
   enabled: stepEnabled,
   config: z
     .object({
-      paths: z.array(branchPathSchema).min(1).max(4),
+      paths: z.array(branchPathSchema).min(1).max(8),
       defaultActions: z.array(innerWorkflowActionSchema).max(10).optional(),
     })
     .strict(),

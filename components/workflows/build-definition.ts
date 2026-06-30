@@ -193,6 +193,12 @@ export interface ActionRowState {
   lookupEntriesJson: string;
   /** lookup_table: fallback value when no matching key is found. */
   lookupFallback: string;
+  /** set_variable / get_variable: variable name (identifier). */
+  varName: string;
+  /** set_variable: the value to store (supports {{tokens}}). */
+  varValue: string;
+  /** get_variable: default value when the variable is not set. */
+  varDefault: string;
 }
 
 export interface WorkflowFormState {
@@ -566,6 +572,28 @@ export function buildAction(row: ActionRowState): WorkflowAction {
           entries,
           ...(fallback ? { fallback } : {}),
         },
+      };
+    }
+    case 'set_variable':
+      return {
+        type: 'set_variable',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { name: row.varName.trim(), value: row.varValue },
+      };
+    case 'get_variable': {
+      const defaultValue = row.varDefault.trim();
+      return {
+        type: 'get_variable',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { name: row.varName.trim(), ...(defaultValue ? { defaultValue } : {}) },
       };
     }
     default: {
