@@ -397,8 +397,6 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       };
     }
     case 'iterate': {
-      const iterateSource = row.filterField.trim() || row.instruction.trim();
-      const iterateInstruction = row.filterField.trim() ? row.instruction.trim() : '';
       const limitStr = row.delayMinutes.trim();
       return {
         type: 'iterate',
@@ -406,8 +404,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
         config: {
-          source: iterateSource || 'lead.tags',
-          instruction: iterateInstruction || 'Process {{item}}',
+          source: row.filterField.trim() || 'lead.tags',
+          instruction: row.instruction.trim() || 'Process {{item}}',
           ...(limitStr && !isNaN(Number(limitStr)) ? { limit: Number(limitStr) } : {}),
         },
       };

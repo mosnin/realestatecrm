@@ -608,11 +608,15 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       instruction:
         a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
           ? a.config.instruction
-          : '',
+          : a.type === 'iterate'
+            ? a.config.instruction
+            : '',
       delayMinutes:
         a.type === 'schedule_message' || (a.type === 'delay' && !isDelayUntil)
           ? (delayDisplay?.amount ?? '')
-          : '',
+          : a.type === 'iterate' && a.config.limit !== undefined
+            ? String(a.config.limit)
+            : '',
       delayUnit: delayDisplay?.unit ?? 'hours',
       delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
       untilWeekday: a.type === 'delay' && isDelayUntil && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
@@ -628,7 +632,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
         a.type === 'call_integration' && a.config.params
           ? JSON.stringify(a.config.params, null, 2)
           : '',
-      filterField: a.type === 'filter' ? a.config.field : '',
+      filterField: a.type === 'filter' ? a.config.field : a.type === 'iterate' ? a.config.source : '',
       filterOperator: a.type === 'filter' ? a.config.operator : 'eq',
       filterValue:
         a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
@@ -1158,6 +1162,16 @@ function stepOutputGroups(prevSteps: ActionRowState[]): TokenGroup[] {
           label: `Step ${n}: ${label}`,
           tokens: [
             { label: 'Task ID', token: `{{step${n}.taskId}}`, hint: 'ID of the created task' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'iterate') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Loop results (JSON)', token: `{{step${n}.results}}`, hint: 'array of per-item summaries' },
+            { label: 'Items processed', token: `{{step${n}.processed}}`, hint: 'count of items processed' },
             ...base,
           ],
         };
@@ -1810,6 +1824,11 @@ function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actio
     if (obj.body) add('body', obj.body);
     add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
     if (obj.note) add('note', obj.note);
+  } else if (actionType === 'iterate') {
+    add('processed', obj.processed !== undefined ? `${obj.processed} of ${obj.total}` : undefined);
+    if (obj.failed) add('failed', obj.failed);
+    if (obj.capped) add('capped', 'yes — limit reached');
+    if (obj.error) add('error', obj.error);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
