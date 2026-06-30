@@ -184,6 +184,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'notify_agent',
   'schedule_message',
   'filter',
+  'iterate',
   'formatter',
   'delay',
   'call_integration',
@@ -229,6 +230,8 @@ function actionFace(action: WorkflowAction | undefined): string {
       return action.config.toolkit ? `Call ${action.config.toolkit}` : 'Call a connected app';
     case 'run_chippi':
       return 'Ask Chippi';
+    case 'iterate':
+      return action.config.source ? `Loop over ${action.config.source}` : 'Loop over a list';
     default:
       return 'Action';
   }
@@ -1068,7 +1071,9 @@ function ActionInspector({
                         ? { type, config: { field: '', operator: 'eq' as const } }
                         : type === 'formatter'
                           ? { type, config: { input: '', operation: 'uppercase' as const } }
-                          : { type: 'run_chippi', config: { instruction: '' } };
+                          : type === 'iterate'
+                            ? { type, config: { source: '', instruction: '' } }
+                            : { type: 'run_chippi', config: { instruction: '' } };
     onChange(next);
   }
 
@@ -1248,6 +1253,58 @@ function ActionInspector({
               }
               placeholder="Score hit threshold — tap to review."
               rows={2}
+            />
+          </FieldBlock>
+        </>
+      )}
+
+      {action.type === 'iterate' && (
+        <>
+          <FieldBlock label="Source array (dot-path)">
+            <Input
+              value={action.config.source}
+              onChange={(e) =>
+                onChange({ type: 'iterate', config: { ...action.config, source: e.target.value } })
+              }
+              placeholder="lead.tags"
+              className="h-8 font-mono text-xs"
+            />
+          </FieldBlock>
+          <FieldBlock label="Per-item instruction">
+            <Textarea
+              value={action.config.instruction}
+              onChange={(e) =>
+                onChange({
+                  type: 'iterate',
+                  config: { ...action.config, instruction: e.target.value },
+                })
+              }
+              placeholder="Handle {{item}} — e.g. draft a message about {{item}}"
+              rows={3}
+            />
+          </FieldBlock>
+          <FieldBlock label="Limit (optional, max 50)">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={50}
+              value={action.config.limit === undefined ? '' : String(action.config.limit)}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                const limit = raw === '' ? undefined : Math.min(50, Math.max(1, Number(raw)));
+                onChange({
+                  type: 'iterate',
+                  config: {
+                    source: action.config.source,
+                    instruction: action.config.instruction,
+                    ...(limit === undefined || Number.isNaN(limit) ? {} : { limit }),
+                    ...(action.config.outputField ? { outputField: action.config.outputField } : {}),
+                  },
+                });
+              }}
+              placeholder="10"
+              className="h-8 w-24"
             />
           </FieldBlock>
         </>
