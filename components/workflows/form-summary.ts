@@ -158,6 +158,10 @@ function actionPhrase(a: ActionRowState): string {
     }
     case 'iterate':
       return 'loop over a list';
+    case 'branch': {
+      const count = (a.branchPaths ?? []).length;
+      return count > 0 ? `route down ${count} path${count === 1 ? '' : 's'}` : 'conditional branching';
+    }
     default:
       return 'take an action';
   }

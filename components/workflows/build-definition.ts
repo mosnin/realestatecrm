@@ -33,6 +33,7 @@ import type {
   ConditionGroup,
   ConditionRule,
   FormatterOperation,
+  InnerWorkflowAction,
   Operator,
   TriggerType,
   UpdateLeadField,
@@ -78,6 +79,21 @@ export interface ConditionGroupFormState {
   type: 'group';
   op: 'and' | 'or';
   rules: ConditionRowState[];
+}
+
+/** One path lane in a branch step's config. */
+export interface BranchPathFormState {
+  /** Stable key for React lists. */
+  id: string;
+  /** Optional label shown on the path lane header. */
+  label: string;
+  /** Dot-path into workflow context (e.g. 'lead.score'). */
+  field: string;
+  operator: Operator;
+  /** Comparison value (string; coerced on build). */
+  value: string;
+  /** Nested actions for this path (no branch-in-branch). */
+  actions: ActionRowState[];
 }
 
 export interface ActionRowState {
@@ -153,6 +169,8 @@ export interface ActionRowState {
   notifyTitle: string;
   /** notify_agent: notification body text (optional, supports {{tokens}}). */
   notifyBody: string;
+  /** branch: the conditional path lanes. */
+  branchPaths?: BranchPathFormState[];
 }
 
 export interface WorkflowFormState {
@@ -407,6 +425,23 @@ export function buildAction(row: ActionRowState): WorkflowAction {
           source: row.filterField.trim() || 'lead.tags',
           instruction: row.instruction.trim() || 'Process {{item}}',
           ...(limitStr && !isNaN(Number(limitStr)) ? { limit: Number(limitStr) } : {}),
+        },
+      };
+    }
+    case 'branch': {
+      return {
+        type: 'branch',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: {
+          paths: (row.branchPaths ?? []).map((p) => ({
+            ...(p.label.trim() ? { label: p.label.trim() } : {}),
+            field: p.field.trim(),
+            operator: p.operator,
+            ...(VALUELESS_OPERATORS.has(p.operator) ? {} : { value: coerceConditionValue(p.value) }),
+            actions: p.actions.map(buildAction) as InnerWorkflowAction[],
+          })),
         },
       };
     }

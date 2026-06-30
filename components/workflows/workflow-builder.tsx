@@ -60,6 +60,7 @@ import {
   buildAction,
   buildDefinition,
   type ActionRowState,
+  type BranchPathFormState,
   type ConditionRowState,
   type ConditionGroupFormState,
   type WorkflowFormState,
@@ -239,6 +240,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   update_lead: 'Update this lead',
   notify_agent: 'Notify me — send a push alert',
   iterate: 'Loop / Iterate',
+  branch: 'Paths — conditional branching',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -250,6 +252,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'notify_agent',
   'schedule_message',
   'filter',
+  'branch',
   'formatter',
   'delay',
   'iterate',
@@ -263,7 +266,7 @@ const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   },
   {
     label: 'Logic',
-    keys: ['filter', 'formatter', 'delay', 'iterate'],
+    keys: ['filter', 'branch', 'formatter', 'delay', 'iterate'],
   },
 ];
 
@@ -280,6 +283,7 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   update_lead: UserCog,
   notify_agent: BellRing,
   iterate: RotateCcw,
+  branch: GitBranch,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -295,6 +299,7 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   update_lead: 'Set the score tier, follow-up date, or tags on this lead',
   notify_agent: 'Push a personal alert to your phone or browser — stay in the loop',
   iterate: 'Run steps for each item in a list',
+  branch: 'Route the workflow down different paths based on conditions',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -536,6 +541,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     updateValue: '',
     notifyTitle: '',
     notifyBody: '',
+    branchPaths: [],
   };
 }
 
@@ -654,6 +660,16 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       updateValue: a.type === 'update_lead' ? a.config.value : '',
       notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
       notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
+      branchPaths: a.type === 'branch'
+        ? a.config.paths.map((p) => ({
+            id: nextRowId('bp'),
+            label: p.label ?? '',
+            field: p.field,
+            operator: p.operator as Operator,
+            value: p.value !== undefined && p.value !== null ? String(p.value) : '',
+            actions: actionsToRows(p.actions as WorkflowAction[]),
+          }))
+        : [],
     };
   });
 }
@@ -982,6 +998,10 @@ function actionSummary(row: ActionRowState): string {
       return row.instruction
         ? `Loop: ${row.instruction.slice(0, 60)}${row.instruction.length > 60 ? '…' : ''}`
         : 'Loop over a list';
+    case 'branch': {
+      const count = row.branchPaths?.length ?? 0;
+      return count > 0 ? `${count} path${count === 1 ? '' : 's'} configured` : 'No paths configured';
+    }
     default:
       return '';
   }
@@ -1036,6 +1056,13 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-teal-400 dark:border-l-teal-500/70',
       badge: 'bg-teal-500',
       icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
+    };
+  }
+  if (type === 'branch') {
+    return {
+      border: 'border-l-blue-400 dark:border-l-blue-500/70',
+      badge: 'bg-blue-500',
+      icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
     };
   }
   return {
@@ -1176,6 +1203,15 @@ function stepOutputGroups(prevSteps: ActionRowState[]): TokenGroup[] {
           ],
         };
       }
+      if (s.type === 'branch') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Path taken', token: `{{step${n}.pathTaken}}`, hint: 'label or field of the matched path' },
+            ...base,
+          ],
+        };
+      }
       return null;
     })
     .filter((g): g is TokenGroup => g !== null);
@@ -1297,19 +1333,23 @@ function TokenPicker({
 function AddStepPicker({
   onSelect,
   onClose,
+  exclude,
 }: {
   onSelect: (type: WorkflowActionType) => void;
   onClose: () => void;
+  exclude?: WorkflowActionType[];
 }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'All' | 'Actions' | 'Logic'>('All');
   const q = query.toLowerCase().trim();
 
+  const baseOrder = exclude ? ACTION_ORDER.filter((t) => !exclude.includes(t)) : ACTION_ORDER;
+
   const pool = q
-    ? ACTION_ORDER
+    ? baseOrder
     : category === 'All'
-      ? ACTION_ORDER
-      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys ?? ACTION_ORDER);
+      ? baseOrder
+      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys.filter((t) => !exclude?.includes(t)) ?? baseOrder);
 
   const filtered = q
     ? pool.filter(
@@ -1753,6 +1793,7 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   notify_agent: 'Push alert',
   condition: 'Condition check',
   iterate: 'Loop / Iterate',
+  branch: 'Paths — conditional branching',
 };
 
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -1768,6 +1809,7 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
   notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
   iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -1829,6 +1871,10 @@ function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actio
     if (obj.failed) add('failed', obj.failed);
     if (obj.capped) add('capped', 'yes — limit reached');
     if (obj.error) add('error', obj.error);
+  } else if (actionType === 'branch') {
+    add('path taken', obj.pathTaken != null ? String(obj.pathTaken) : 'none matched');
+    if (obj.stepsRun !== undefined) add('steps run', obj.stepsRun);
+    if (obj.reason) add('reason', obj.reason);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
@@ -2275,6 +2321,10 @@ export function WorkflowBuilder({
     if (row.type === 'webhook_post') return !row.webhookUrl.trim();
     if (row.type === 'update_lead') return !row.updateValue.trim();
     if (row.type === 'notify_agent') return !row.notifyTitle.trim();
+    if (row.type === 'branch') {
+      if (!row.branchPaths || row.branchPaths.length === 0) return true;
+      return row.branchPaths.some((p) => !p.field.trim() || p.actions.length === 0);
+    }
     return false;
   }
 
@@ -4414,6 +4464,259 @@ function KeyValueEditor({
   );
 }
 
+/**
+ * BranchActionConfig — Zapier-style "Paths" step UI.
+ * Renders up to 4 path lanes, each with a condition (field/op/value) and a
+ * nested mini-step list. Branch-in-branch is prevented by the sub-step picker.
+ */
+function BranchActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps = [],
+  connectedApps,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+  connectedApps: ConnectedAppsState;
+}) {
+  const paths = row.branchPaths ?? [];
+
+  function addPath() {
+    if (paths.length >= 4) return;
+    onChange({
+      branchPaths: [
+        ...paths,
+        {
+          id: nextRowId('bp'),
+          label: '',
+          field: '',
+          operator: 'eq' as Operator,
+          value: '',
+          actions: [newActionRow('draft_message')],
+        },
+      ],
+    });
+  }
+
+  function updatePath(pathId: string, next: Partial<BranchPathFormState>) {
+    onChange({
+      branchPaths: paths.map((p) => (p.id === pathId ? { ...p, ...next } : p)),
+    });
+  }
+
+  function removePath(pathId: string) {
+    onChange({ branchPaths: paths.filter((p) => p.id !== pathId) });
+  }
+
+  function addSubAction(pathId: string, type: WorkflowActionType) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId ? { ...p, actions: [...p.actions, newActionRow(type)] } : p
+      ),
+    });
+  }
+
+  function updateSubAction(pathId: string, actionId: string, next: Partial<ActionRowState>) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId
+          ? { ...p, actions: p.actions.map((a) => (a.id === actionId ? { ...a, ...next } : a)) }
+          : p
+      ),
+    });
+  }
+
+  function removeSubAction(pathId: string, actionId: string) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId ? { ...p, actions: p.actions.filter((a) => a.id !== actionId) } : p
+      ),
+    });
+  }
+
+  const PATH_COLORS = [
+    'border-l-blue-400',
+    'border-l-violet-400',
+    'border-l-emerald-400',
+    'border-l-amber-400',
+  ];
+
+  /** Which path's sub-step picker is open (null = none). */
+  const [subPickerForPath, setSubPickerForPath] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-muted-foreground">
+        The workflow takes the first path whose condition is met. If none match, the run continues after this step.
+      </p>
+
+      {paths.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
+          <GitBranch size={18} className="mx-auto mb-2 text-muted-foreground/40" aria-hidden />
+          <p className="text-[12px] text-muted-foreground">No paths yet — add your first path below.</p>
+        </div>
+      )}
+
+      {paths.map((path, pi) => {
+        const subPickerOpen = subPickerForPath === path.id;
+        return (
+          <div
+            key={path.id}
+            className={`overflow-hidden rounded-lg border border-border/60 border-l-4 bg-muted/10 ${PATH_COLORS[pi] ?? 'border-l-blue-400'}`}
+          >
+            {/* Path header */}
+            <div className="flex items-center gap-2 border-b border-border/30 bg-background/50 px-3 py-2">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+                {pi + 1}
+              </span>
+              <input
+                type="text"
+                value={path.label}
+                onChange={(e) => updatePath(path.id, { label: e.target.value })}
+                placeholder={`Path ${pi + 1}`}
+                maxLength={100}
+                className="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-foreground outline-none placeholder:text-muted-foreground/40"
+                aria-label={`Path ${pi + 1} label`}
+              />
+              {paths.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removePath(path.id)}
+                  aria-label="Remove path"
+                  className="flex-shrink-0 text-muted-foreground/40 transition-colors hover:text-destructive"
+                >
+                  <X size={13} aria-hidden />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2.5 p-3">
+              {/* Condition row */}
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  If
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Input
+                    value={path.field}
+                    onChange={(e) => updatePath(path.id, { field: e.target.value })}
+                    placeholder="lead.score"
+                    className="h-7 w-32 font-mono text-[11.5px]"
+                    aria-label="Condition field"
+                  />
+                  <MiniSelect
+                    value={path.operator}
+                    onValueChange={(v) => updatePath(path.id, { operator: v as Operator })}
+                    options={OPERATORS.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+                  />
+                  {!VALUELESS_OPERATORS.has(path.operator) && (
+                    <Input
+                      value={path.value}
+                      onChange={(e) => updatePath(path.id, { value: e.target.value })}
+                      placeholder="value"
+                      className="h-7 w-24 text-[11.5px]"
+                      aria-label="Condition value"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-actions */}
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  Then
+                </p>
+                <div className="space-y-1.5">
+                  {path.actions.map((subRow, si) => {
+                    const SubIcon = ACTION_ICONS[subRow.type] ?? Sparkles;
+                    const subCl = actionAccent(subRow.type);
+                    return (
+                      <div
+                        key={subRow.id}
+                        className={`overflow-hidden rounded-md border border-border/50 border-l-2 bg-card ${subCl.border}`}
+                      >
+                        <div className="flex items-center gap-2 px-2.5 py-1.5">
+                          <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded ${subCl.icon}`}>
+                            <SubIcon size={11} aria-hidden />
+                          </span>
+                          <MiniSelect
+                            value={subRow.type}
+                            onValueChange={(v) =>
+                              updateSubAction(path.id, subRow.id, { type: v as WorkflowActionType })
+                            }
+                            options={ACTION_ORDER
+                              .filter((t) => t !== 'branch')
+                              .map((t) => ({ value: t, label: ACTION_LABELS[t] }))}
+                          />
+                          <span className="text-[10px] text-muted-foreground/50">#{si + 1}</span>
+                          {path.actions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeSubAction(path.id, subRow.id)}
+                              aria-label="Remove sub-step"
+                              className="ml-auto text-muted-foreground/30 transition-colors hover:text-destructive"
+                            >
+                              <X size={11} aria-hidden />
+                            </button>
+                          )}
+                        </div>
+                        <div className="border-t border-border/30 px-2.5 pb-2.5 pt-2">
+                          <ActionConfig
+                            row={subRow}
+                            onChange={(next) => updateSubAction(path.id, subRow.id, next)}
+                            connectedApps={connectedApps}
+                            triggerType={triggerType}
+                            prevSteps={prevSteps}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {path.actions.length < 10 && (
+                    subPickerOpen ? (
+                      <AddStepPicker
+                        onSelect={(type) => {
+                          addSubAction(path.id, type);
+                          setSubPickerForPath(null);
+                        }}
+                        onClose={() => setSubPickerForPath(null)}
+                        exclude={['branch']}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSubPickerForPath(path.id)}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
+                      >
+                        <Plus size={11} aria-hidden />
+                        Add step to this path
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {paths.length < 4 && (
+        <button
+          type="button"
+          onClick={addPath}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-300/70 py-2 text-[12px] font-medium text-blue-500 transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-950/20"
+        >
+          <Plus size={13} aria-hidden />
+          Add path
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -4637,6 +4940,18 @@ function ActionConfig({
 
   if (row.type === 'iterate') {
     return <IterateActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'branch') {
+    return (
+      <BranchActionConfig
+        row={row}
+        onChange={onChange}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+        connectedApps={connectedApps}
+      />
+    );
   }
 
   // call_integration — app + action picker; key-value params editor.

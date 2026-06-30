@@ -105,6 +105,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
     updateValue: '',
     notifyTitle: '',
     notifyBody: '',
+    branchPaths: [],
   };
 }
 
@@ -1337,6 +1338,95 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'notify_agent',
           notifyTitle: 'Weekly pipeline check-ins ready',
           notifyBody: 'Chippi has drafted a check-in for each active deal stage — review and pick which to send.',
+        },
+      ],
+      autonomy: 'draft',
+    },
+  },
+  {
+    id: 'score-based-routing',
+    name: 'Score-based lead routing',
+    description: 'Route hot, warm, and cold leads down different paths — each gets a tailored action.',
+    category: 'New leads',
+    popular: true,
+    state: {
+      name: 'Score-based lead routing',
+      trigger: { ...baseTrigger(), type: 'lead_score_threshold', min: '1' },
+      conditionOp: 'and',
+      conditions: [],
+      actions: [
+        {
+          ...blankAction(),
+          type: 'branch',
+          branchPaths: [
+            {
+              id: rowId('bp'),
+              label: 'Hot (score ≥ 80)',
+              field: 'lead.score',
+              operator: 'gte',
+              value: '80',
+              actions: [
+                {
+                  ...blankAction(),
+                  type: 'draft_message',
+                  channel: 'email',
+                  instruction:
+                    'Draft an urgent, personal intro to this hot lead — they are ready to buy. Reference their property interest.',
+                },
+                {
+                  ...blankAction(),
+                  type: 'update_lead',
+                  updateField: 'score_label',
+                  updateValue: 'hot',
+                },
+              ],
+            },
+            {
+              id: rowId('bp'),
+              label: 'Warm (score ≥ 50)',
+              field: 'lead.score',
+              operator: 'gte',
+              value: '50',
+              actions: [
+                {
+                  ...blankAction(),
+                  type: 'schedule_message',
+                  channel: 'email',
+                  instruction:
+                    'Draft a friendly check-in for this warm lead to go out in two days.',
+                  delayMinutes: '2880',
+                  delayUnit: 'minutes',
+                },
+                {
+                  ...blankAction(),
+                  type: 'update_lead',
+                  updateField: 'score_label',
+                  updateValue: 'warm',
+                },
+              ],
+            },
+            {
+              id: rowId('bp'),
+              label: 'Cold (below 50)',
+              field: 'lead.score',
+              operator: 'lt',
+              value: '50',
+              actions: [
+                {
+                  ...blankAction(),
+                  type: 'update_lead',
+                  updateField: 'follow_up_in_days',
+                  updateValue: '14',
+                },
+                {
+                  ...blankAction(),
+                  type: 'update_lead',
+                  updateField: 'score_label',
+                  updateValue: 'cold',
+                },
+              ],
+            },
+          ],
         },
       ],
       autonomy: 'draft',

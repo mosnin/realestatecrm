@@ -198,7 +198,8 @@ export type WorkflowActionType =
   | 'webhook_post'
   | 'update_lead'
   | 'notify_agent'
-  | 'iterate';
+  | 'iterate'
+  | 'branch';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -268,7 +269,11 @@ const stepNote = z.string().trim().max(500).optional();
  */
 const stepOnError = z.enum(['stop', 'skip']).optional();
 
-export const workflowActionSchema = z.discriminatedUnion('type', [
+/**
+ * All action schemas EXCEPT branch — used as the element type for nested
+ * actions inside branch paths (no branch-within-branch).
+ */
+export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
     label: stepLabel,
@@ -451,6 +456,44 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
       .strict(),
   }),
 ]);
+
+export type InnerWorkflowAction = z.infer<typeof innerWorkflowActionSchema>;
+
+/**
+ * branch: Zapier-style "Paths" step. Routes execution down the FIRST path
+ * whose condition matches. If no path matches and defaultActions is set,
+ * those run instead. Nested actions are InnerWorkflowAction (no branch-in-branch).
+ */
+const branchPathSchema = z
+  .object({
+    label: z.string().trim().max(100).optional(),
+    field: z.string().trim().min(1).max(SHORT_TEXT),
+    operator: operatorSchema,
+    value: z.unknown().optional(),
+    actions: z.array(innerWorkflowActionSchema).min(1).max(10),
+  })
+  .strict();
+
+export const branchActionSchema = z.object({
+  type: z.literal('branch'),
+  label: stepLabel,
+  note: stepNote,
+  onError: stepOnError,
+  config: z
+    .object({
+      paths: z.array(branchPathSchema).min(1).max(4),
+      defaultActions: z.array(innerWorkflowActionSchema).max(10).optional(),
+    })
+    .strict(),
+});
+
+export type BranchAction = z.infer<typeof branchActionSchema>;
+
+/**
+ * Full action schema including branch. The outer union wraps the inner
+ * discriminated union (12 types) plus branch.
+ */
+export const workflowActionSchema = z.union([innerWorkflowActionSchema, branchActionSchema]);
 
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
 

@@ -858,6 +858,60 @@ async function runIterate(
 }
 
 /**
+ * branch — evaluate up to 4 conditional paths in order and run the first
+ * matching path's sub-actions. Each path is a single AND condition against
+ * the workflow context. If no path matches and defaultActions are configured,
+ * those run instead. Never throws.
+ */
+async function runBranch(
+  action: Extract<WorkflowAction, { type: 'branch' }>,
+  context: WorkflowContext,
+  opts: ExecuteActionOptions,
+): Promise<ActionStepResult> {
+  const { paths, defaultActions } = action.config;
+
+  for (const path of paths) {
+    const matched = evaluateConditions(
+      { op: 'and', rules: [{ field: path.field, operator: path.operator, value: path.value }] },
+      context as Record<string, unknown>,
+    );
+    if (matched) {
+      const results: ActionStepResult[] = [];
+      for (const subAction of path.actions as WorkflowAction[]) {
+        const r = await executeAction(subAction, context, opts);
+        results.push(r);
+        if (r.stop) break;
+      }
+      const anyFailed = results.some((r) => r.status === 'failed');
+      return {
+        status: anyFailed ? 'failed' : 'ok',
+        detail: {
+          pathTaken: path.label ?? path.field,
+          stepsRun: results.length,
+          results: results.map((r) => ({ status: r.status })),
+        },
+      };
+    }
+  }
+
+  // No path matched — run default actions if present.
+  if (defaultActions && defaultActions.length > 0) {
+    const results: ActionStepResult[] = [];
+    for (const subAction of defaultActions as WorkflowAction[]) {
+      const r = await executeAction(subAction, context, opts);
+      results.push(r);
+      if (r.stop) break;
+    }
+    return {
+      status: results.some((r) => r.status === 'failed') ? 'failed' : 'ok',
+      detail: { pathTaken: 'default', stepsRun: results.length },
+    };
+  }
+
+  return { status: 'ok', detail: { pathTaken: null, reason: 'No path conditions matched' } };
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -892,6 +946,8 @@ export async function executeAction(
         return await runNotifyAgent(action, context, opts.spaceId);
       case 'iterate':
         return await runIterate(action, context, opts.spaceId);
+      case 'branch':
+        return await runBranch(action, context, opts);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

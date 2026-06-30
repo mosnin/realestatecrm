@@ -174,6 +174,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
   iterate: 'Loop over a list',
+  branch: 'Paths — conditional branching',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -189,6 +190,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'delay',
   'call_integration',
   'webhook_post',
+  'branch',
 ];
 
 const OPERATOR_LABELS: Record<Operator, string> = {
@@ -232,6 +234,10 @@ function actionFace(action: WorkflowAction | undefined): string {
       return 'Ask Chippi';
     case 'iterate':
       return action.config.source ? `Loop over ${action.config.source}` : 'Loop over a list';
+    case 'branch': {
+      const count = action.config.paths.length;
+      return count > 0 ? `${count} path${count === 1 ? '' : 's'}` : 'Conditional paths';
+    }
     default:
       return 'Action';
   }
@@ -1073,7 +1079,9 @@ function ActionInspector({
                           ? { type, config: { input: '', operation: 'uppercase' as const } }
                           : type === 'iterate'
                             ? { type, config: { source: '', instruction: '' } }
-                            : { type: 'run_chippi', config: { instruction: '' } };
+                            : type === 'branch'
+                              ? { type, config: { paths: [{ field: '', operator: 'eq' as const, value: '', actions: [{ type: 'draft_message' as const, config: { channel: 'email' as const, instruction: '' } }] }] } }
+                              : { type: 'run_chippi', config: { instruction: '' } };
     onChange(next);
   }
 
