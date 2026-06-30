@@ -31,10 +31,10 @@ describe('summarizeFormState — filled forms', () => {
   it('reads the hot-lead template as a clean sentence', () => {
     const s = summarizeFormState(hotLeadState());
     expect(s.when).toBe("a lead's score reaches 80");
-    expect(s.then).toBe('draft a text');
+    expect(s.then).toBe('draft an email');
     expect(s.autonomy).toBe('You approve each one before anything goes out.');
     expect(summaryToSentence(s)).toBe(
-      "When a lead's score reaches 80, only if 1 condition matches, I’ll draft a text. You approve each one before anything goes out.",
+      "When a lead's score reaches 80, only if 1 condition matches, I'll draft an email. You approve each one before anything goes out.",
     );
   });
 
@@ -43,7 +43,7 @@ describe('summarizeFormState — filled forms', () => {
     if (!tour) throw new Error('tour template missing');
     const s = summarizeFormState(cloneTemplateState(tour));
     expect(s.when).toBe('a tour wraps up');
-    expect(s.then).toBe('draft a text (+1 more)');
+    expect(s.then).toBe('draft an email (+1 more)');
     expect(s.conditions).toBeNull(); // no conditions on that template
   });
 
@@ -77,6 +77,7 @@ describe('summarizeFormState — filled forms', () => {
 describe('summarizeFormState — blank tolerance (mid-edit)', () => {
   it('never emits NaN or undefined for an empty score threshold', () => {
     const state = emptyFormState();
+    state.trigger.type = 'lead_score_threshold';
     state.trigger.min = '';
     const s = summarizeFormState(state);
     expect(s.when).toBe("a lead's score crosses your threshold");

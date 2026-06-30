@@ -182,6 +182,13 @@ const ESCALATION_PHRASES = [
   // Plain refusals tied to action
   /\bi can'?t (?:actually )?(?:run|send|fire|execute|trigger|invoke)\b/i,
   /\bi don'?t have (?:access to|the ability to|tools to) (?:run|send|create|do)\b/i,
+  // "I don't have access to any tools / your CRM / your data" — the exact phrasing
+  // the direct-path model uses when asked a workspace question it can't answer.
+  // Previously unmatched; model would commit the deflection instead of escalating.
+  /\bi don'?t have (?:access to |the ability to access )?(?:any )?(?:tools?|your (?:crm|contacts?|deals?|workspace|data|pipeline|calendar)|the (?:crm|workspace|tool))\b/i,
+  /\bi (?:can'?t|cannot) (?:access|look up|query|retrieve|fetch|read) (?:your|the) (?:crm|contacts?|deals?|workspace|data|pipeline|calendar|leads?)\b/i,
+  /\bthis (?:is (?:the )?)?(?:fast q&a|q&a|chat|direct) (?:surface|path|mode)\b.*(?:can'?t|cannot|don'?t|no)\b/i,
+  /\b(?:no|don'?t have) (?:access to|tools to|ability to) (?:look up|query|read|fetch|check)\b/i,
 ];
 
 /**

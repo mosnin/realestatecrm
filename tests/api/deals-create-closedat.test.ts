@@ -14,6 +14,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
+// next/server's `after()` requires a real request scope and throws in Vitest.
+// Override it with a no-op so the route can reach its 201 response.
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return { ...actual, after: vi.fn() };
+});
 vi.mock('@/lib/api-auth', () => ({
   requireSpaceOwner: vi.fn(),
 }));
@@ -22,6 +28,19 @@ vi.mock('@/lib/vectorize', () => ({
 }));
 vi.mock('@/lib/notify', () => ({
   notifyNewDeal: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn(() => Promise.resolve({ allowed: true })),
+}));
+vi.mock('@/lib/agent/ts-idempotency', () => ({
+  makeIdempotencyKey: vi.fn((...args: unknown[]) => args.join(':')),
+  withIdempotency: vi.fn((_key: string, fn: () => Promise<unknown>) => fn()),
+}));
+vi.mock('@/lib/workflows/executor', () => ({
+  runWorkflowsForEvent: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('@/lib/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 // ── Supabase mock — records the Deal insert payload for assertion ───────────

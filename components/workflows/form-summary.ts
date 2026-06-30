@@ -156,6 +156,12 @@ function actionPhrase(a: ActionRowState): string {
       const title = a.notifyTitle.trim();
       return title ? `send push: "${title.slice(0, 40)}"` : 'send a push alert';
     }
+    case 'iterate':
+      return 'loop over a list';
+    case 'branch': {
+      const count = (a.branchPaths ?? []).length;
+      return count > 0 ? `route down ${count} path${count === 1 ? '' : 's'}` : 'conditional branching';
+    }
     default:
       return 'take an action';
   }
@@ -190,5 +196,5 @@ export function summarizeFormState(state: WorkflowFormState): FormSummary {
 /** Flatten a FormSummary into one sentence (tests + plain-text consumers). */
 export function summaryToSentence(s: FormSummary): string {
   const cond = s.conditions ? `, ${s.conditions}` : '';
-  return `When ${s.when}${cond}, I’ll ${s.then}. ${s.autonomy}`;
+  return `When ${s.when}${cond}, I'll ${s.then}. ${s.autonomy}`;
 }

@@ -33,6 +33,7 @@ import type {
   ConditionGroup,
   ConditionRule,
   FormatterOperation,
+  InnerWorkflowAction,
   Operator,
   TriggerType,
   UpdateLeadField,
@@ -61,6 +62,10 @@ export interface TriggerFormState {
   cadence: 'hourly' | 'daily' | 'weekdays';
   /** schedule hour, 0-23 (string off a number input; blank = omit). */
   hour: string;
+  /** schedule: IANA timezone name, e.g. "America/New_York". Blank/omit = UTC. */
+  timezone?: string;
+  /** webhook: optional HMAC-SHA256 signing secret (min 8 chars). Blank = unsigned. */
+  webhookSecret?: string;
 }
 
 export interface ConditionRowState {
@@ -80,6 +85,21 @@ export interface ConditionGroupFormState {
   rules: ConditionRowState[];
 }
 
+/** One path lane in a branch step's config. */
+export interface BranchPathFormState {
+  /** Stable key for React lists. */
+  id: string;
+  /** Optional label shown on the path lane header. */
+  label: string;
+  /** Dot-path into workflow context (e.g. 'lead.score'). */
+  field: string;
+  operator: Operator;
+  /** Comparison value (string; coerced on build). */
+  value: string;
+  /** Nested actions for this path (no branch-in-branch). */
+  actions: ActionRowState[];
+}
+
 export interface ActionRowState {
   id: string;
   type: WorkflowActionType;
@@ -87,8 +107,12 @@ export interface ActionRowState {
   label?: string;
   /** Optional private note for internal documentation — not executed or sent. */
   note?: string;
-  /** What to do if this step errors: 'stop' (default) or 'skip' and continue. */
-  onError?: 'stop' | 'skip';
+  /** What to do if this step errors: 'stop' (default), 'skip' and continue, or 'retry' with backoff. */
+  onError?: 'stop' | 'skip' | 'retry';
+  /** Number of retry attempts when onError='retry'. 1–5; defaults to 3. Stored as string off number input. */
+  retryCount: string;
+  /** When false, this step is skipped at runtime (Zapier-style step disable). Defaults to true. */
+  stepEnabled: boolean;
   /** draft_message / schedule_message. */
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
@@ -97,12 +121,14 @@ export interface ActionRowState {
   delayMinutes: string;
   /** delay: the display unit. Converted to minutes by buildAction. */
   delayUnit: 'minutes' | 'hours' | 'days' | 'weeks';
-  /** delay: mode — 'relative' (wait N units) or 'until_weekday' (wait until day+time). */
-  delayMode: 'relative' | 'until_weekday';
+  /** delay: mode — 'relative', 'until_weekday', or 'until_date'. */
+  delayMode: 'relative' | 'until_weekday' | 'until_date';
   /** delay (until_weekday mode): 0=Sun … 6=Sat. */
   untilWeekday: string;
   /** delay (until_weekday mode): 0-23 hour. */
   untilHour: string;
+  /** delay (until_date mode): ISO date string YYYY-MM-DD. */
+  untilDate: string;
   /** create_task. */
   title: string;
   dueInDays: string;
@@ -139,6 +165,10 @@ export interface ActionRowState {
   formatterSplitSeparator: string;
   /** formatter: 1-based part index for 'split'. */
   formatterSplitIndex: string;
+  /** formatter: regex pattern for 'regex_extract'. */
+  formatterRegexPattern: string;
+  /** formatter: regex flags for 'regex_extract' (e.g. 'i'). */
+  formatterRegexFlags: string;
   /** webhook_post: target HTTPS URL. */
   webhookUrl: string;
   /** webhook_post: JSON body template (optional, {{tokens}} supported). */
@@ -153,6 +183,22 @@ export interface ActionRowState {
   notifyTitle: string;
   /** notify_agent: notification body text (optional, supports {{tokens}}). */
   notifyBody: string;
+  /** branch: the conditional path lanes. */
+  branchPaths?: BranchPathFormState[];
+  /** run_workflow: the ID of the workflow to invoke as a sub-step. */
+  subWorkflowId: string;
+  /** lookup_table: the input value to look up (supports {{tokens}}). */
+  lookupInput: string;
+  /** lookup_table: JSON-encoded array of {key, value} entries. */
+  lookupEntriesJson: string;
+  /** lookup_table: fallback value when no matching key is found. */
+  lookupFallback: string;
+  /** set_variable / get_variable: variable name (identifier). */
+  varName: string;
+  /** set_variable: the value to store (supports {{tokens}}). */
+  varValue: string;
+  /** get_variable: default value when the variable is not set. */
+  varDefault: string;
 }
 
 export interface WorkflowFormState {
@@ -232,16 +278,15 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
         type: 'integration_event',
         config: { toolkit: t.toolkit.trim(), event: t.event.trim() },
       };
-    case 'schedule':
-      return {
-        type: 'schedule',
-        config:
-          t.hour.trim() === ''
-            ? { cadence: t.cadence }
-            : { cadence: t.cadence, hour: toNumber(t.hour) },
-      };
-    case 'webhook':
-      return { type: 'webhook', config: {} };
+    case 'schedule': {
+      const tz = (t.timezone ?? '').trim();
+      const baseConfig = t.hour.trim() === '' ? { cadence: t.cadence } : { cadence: t.cadence, hour: toNumber(t.hour) };
+      return { type: 'schedule', config: tz ? { ...baseConfig, timezone: tz } : baseConfig };
+    }
+    case 'webhook': {
+      const secret = t.webhookSecret?.trim();
+      return { type: 'webhook', config: secret && secret.length >= 8 ? { webhookSecret: secret } : {} };
+    }
     default: {
       // Exhaustiveness guard — an unknown type still produces SOMETHING the
       // schema will reject rather than throwing here.
@@ -279,7 +324,9 @@ function coerceConditionValue(raw: string): unknown {
 export function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
   const note = row.note?.trim() || undefined;
-  const onError = row.onError === 'skip' ? 'skip' : undefined;
+  const onError = row.onError === 'skip' ? 'skip' : row.onError === 'retry' ? 'retry' : undefined;
+  const maxRetriesProp = row.onError === 'retry' && row.retryCount.trim() !== '' ? { maxRetries: Math.max(1, Math.min(5, Number(row.retryCount) || 3)) } : {};
+  const enabledProp = row.stepEnabled === false ? { enabled: false as const } : {};
   switch (row.type) {
     case 'draft_message':
       return {
@@ -287,6 +334,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message': {
@@ -296,6 +345,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
@@ -309,6 +360,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config:
           row.dueInDays.trim() === ''
             ? { title: row.title.trim() }
@@ -320,6 +373,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: {
           toolkit: row.toolkit.trim(),
           action: row.action.trim(),
@@ -332,27 +387,27 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
       const multiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
-      const isUntil = row.delayMode === 'until_weekday';
-      return {
-        type: 'delay',
+      const delayMeta = {
+        type: 'delay' as const,
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
-        config: isUntil
-          ? {
-              delayMode: 'until_weekday' as const,
-              untilWeekday: toNumber(row.untilWeekday),
-              untilHour: toNumber(row.untilHour),
-            }
-          : {
-              delayMode: 'relative' as const,
-              delayMinutes: toNumber(row.delayMinutes) * multiplier,
-            },
+        ...maxRetriesProp,
+        ...enabledProp,
       };
+      if (row.delayMode === 'until_weekday') {
+        return { ...delayMeta, config: { delayMode: 'until_weekday' as const, untilWeekday: toNumber(row.untilWeekday), untilHour: toNumber(row.untilHour) } } as WorkflowAction;
+      }
+      if (row.delayMode === 'until_date') {
+        return { ...delayMeta, config: { delayMode: 'until_date' as const, untilDate: row.untilDate.trim() } } as WorkflowAction;
+      }
+      return { ...delayMeta, config: { delayMode: 'relative' as const, delayMinutes: toNumber(row.delayMinutes) * multiplier } } as WorkflowAction;
     }
     case 'filter': {
       const base = { field: row.filterField.trim(), operator: row.filterOperator };
@@ -361,6 +416,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },
@@ -375,6 +432,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: { url, ...(bodyJson ? { bodyJson } : {}), ...(headersJson ? { headersJson } : {}) },
       };
     }
@@ -384,6 +443,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: { field: row.updateField, value: row.updateValue.trim() },
       };
     case 'notify_agent': {
@@ -393,7 +454,44 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: { title: row.notifyTitle.trim(), ...(body ? { body } : {}) },
+      };
+    }
+    case 'iterate': {
+      const limitStr = row.delayMinutes.trim();
+      return {
+        type: 'iterate',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: {
+          source: row.filterField.trim() || 'lead.tags',
+          instruction: row.instruction.trim() || 'Process {{item}}',
+          ...(limitStr && !isNaN(Number(limitStr)) ? { limit: Number(limitStr) } : {}),
+        },
+      };
+    }
+    case 'branch': {
+      return {
+        type: 'branch',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: {
+          paths: (row.branchPaths ?? []).map((p) => ({
+            ...(p.label.trim() ? { label: p.label.trim() } : {}),
+            field: p.field.trim(),
+            operator: p.operator,
+            ...(VALUELESS_OPERATORS.has(p.operator) ? {} : { value: coerceConditionValue(p.value) }),
+            actions: p.actions.map(buildAction) as InnerWorkflowAction[],
+          })),
+        },
       };
     }
     case 'formatter': {
@@ -403,6 +501,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         operation: FormatterOperation;
         find?: string;
         replacement?: string;
+        regexPattern?: string;
+        regexFlags?: string;
         format?: string;
         toFixed?: number;
         fallback?: string;
@@ -415,6 +515,10 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       if (op === 'replace') {
         if (row.formatterFind) cfg.find = row.formatterFind;
         cfg.replacement = row.formatterReplace;
+      }
+      if (op === 'regex_extract') {
+        if (row.formatterRegexPattern) cfg.regexPattern = row.formatterRegexPattern;
+        if (row.formatterRegexFlags) cfg.regexFlags = row.formatterRegexFlags;
       }
       if (op === 'date_format' && row.formatterFormat.trim()) cfg.format = row.formatterFormat.trim();
       if (op === 'number_format' && row.formatterToFixed.trim() !== '') {
@@ -434,7 +538,62 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
         config: cfg,
+      };
+    }
+    case 'run_workflow':
+      return {
+        type: 'run_workflow',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { workflowId: row.subWorkflowId.trim() },
+      };
+    case 'lookup_table': {
+      let entries: { key: string; value: string }[] = [];
+      const trimmed = row.lookupEntriesJson.trim();
+      if (trimmed) {
+        try { entries = JSON.parse(trimmed) as { key: string; value: string }[]; } catch { /* schema will reject */ }
+      }
+      const fallback = row.lookupFallback.trim();
+      return {
+        type: 'lookup_table',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: {
+          input: row.lookupInput.trim(),
+          entries,
+          ...(fallback ? { fallback } : {}),
+        },
+      };
+    }
+    case 'set_variable':
+      return {
+        type: 'set_variable',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { name: row.varName.trim(), value: row.varValue },
+      };
+    case 'get_variable': {
+      const defaultValue = row.varDefault.trim();
+      return {
+        type: 'get_variable',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { name: row.varName.trim(), ...(defaultValue ? { defaultValue } : {}) },
       };
     }
     default: {

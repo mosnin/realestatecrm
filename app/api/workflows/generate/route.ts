@@ -49,6 +49,9 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - webhook_post: HTTP POST to an external HTTPS URL (config: { url: string (must start with https://), bodyJson?: string (JSON template with {{lead.*}} tokens), headersJson?: string (JSON object of extra headers) })
 - update_lead: write a field back to this lead's CRM record (config: { field: "score_label"|"follow_up_in_days"|"tag_add"|"tag_remove", value: string ("hot"/"warm"/"cold" for score_label, integer days for follow_up_in_days, tag string for tag_add/tag_remove) })
 - notify_agent: send a push notification to the realtor's phone/browser (config: { title: string (max 60 chars, {{tokens}} ok), body?: string (optional, max 120 chars, {{tokens}} ok) })
+- lookup_table: map an input value to an output via a key→value table (config: { input: string (field path or literal), entries: [{ key: string, value: string }], fallback?: string }); the result is available to later steps as {{lookup.output}}
+- set_variable: store a value in a named variable for use in later steps (config: { varName: string (letters/numbers/underscore, must start with a letter or underscore), varValue: string ({{tokens}} ok) }); read it later as {{vars.<varName>}}
+- get_variable: read a named variable, optionally with a default (config: { varName: string, varDefault?: string }); the value is available as {{vars.<varName>}}
 
 AUTONOMY (how much AI acts without human review):
 - draft: always draft for human approval (safest)
@@ -88,7 +91,13 @@ Return ONLY a JSON object with these exact fields:
       "updateField": "<score_label|follow_up_in_days|tag_add|tag_remove, for update_lead>",
       "updateValue": "<value to set, for update_lead>",
       "notifyTitle": "<notification title (max 60 chars), for notify_agent>",
-      "notifyBody": "<notification body (optional, max 120 chars), for notify_agent>"
+      "notifyBody": "<notification body (optional, max 120 chars), for notify_agent>",
+      "lookupInput": "<field path or literal, for lookup_table>",
+      "entries": "<array of { key, value } objects, for lookup_table>",
+      "lookupFallback": "<fallback value when no key matches, for lookup_table>",
+      "varName": "<variable name, for set_variable/get_variable>",
+      "varValue": "<value to store, for set_variable>",
+      "varDefault": "<default value when unset, for get_variable>"
     }
   ],
   "autonomy": "draft"

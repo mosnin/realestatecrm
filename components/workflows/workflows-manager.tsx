@@ -190,7 +190,14 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         t.type === 'schedule' && typeof t.config.hour === 'number'
           ? String(t.config.hour)
           : '',
-      // webhook trigger has no config fields
+      timezone:
+        t.type === 'schedule'
+          ? ((t.config as { timezone?: string }).timezone ?? '')
+          : '',
+      webhookSecret:
+        t.type === 'webhook'
+          ? ((t.config as { webhookSecret?: string }).webhookSecret ?? '')
+          : '',
     },
     conditionOp: w.conditions.op,
     conditions: w.conditions.rules.flatMap((r) => {
@@ -211,7 +218,9 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       type: a.type,
       label: a.label,
       note: a.note,
-      onError: a.onError,
+      onError: a.onError as 'stop' | 'skip' | 'retry' | undefined,
+      retryCount: 'maxRetries' in a && typeof a.maxRetries === 'number' ? String(a.maxRetries) : '3',
+      stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel
@@ -229,9 +238,10 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
             ? String(a.config.delayMinutes ?? '')
             : '',
       delayUnit: 'minutes' as const,
-      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday' | 'until_date',
       untilWeekday: a.type === 'delay' && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
       untilHour: a.type === 'delay' && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
+      untilDate: a.type === 'delay' && 'untilDate' in a.config && typeof a.config.untilDate === 'string' ? a.config.untilDate : '',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -258,6 +268,15 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
       formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
       formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
+      formatterRegexPattern: a.type === 'formatter' ? (a.config.regexPattern ?? '') : '',
+      formatterRegexFlags: a.type === 'formatter' ? (a.config.regexFlags ?? '') : '',
+      subWorkflowId: a.type === 'run_workflow' ? a.config.workflowId : '',
+      lookupInput: a.type === 'lookup_table' ? a.config.input : '',
+      lookupEntriesJson: a.type === 'lookup_table' ? JSON.stringify(a.config.entries) : '',
+      lookupFallback: a.type === 'lookup_table' ? (a.config.fallback ?? '') : '',
+      varName: (a.type === 'set_variable' || a.type === 'get_variable') ? a.config.name : '',
+      varValue: a.type === 'set_variable' ? a.config.value : '',
+      varDefault: a.type === 'get_variable' ? (a.config.defaultValue ?? '') : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -3109,6 +3128,7 @@ function AIWorkflowGenerator({
           toStage: typeof t.toStage === 'string' ? t.toStage : '',
           cadence: (typeof t.cadence === 'string' ? t.cadence : 'daily') as 'hourly' | 'daily' | 'weekdays',
           hour: typeof t.hour === 'string' ? t.hour : typeof t.hour === 'number' ? String(t.hour) : '',
+          timezone: typeof t.timezone === 'string' ? t.timezone : '',
         },
         conditionOp: raw.conditionOp === 'or' ? 'or' : 'and',
         conditions: rawConditions.map((c) => ({
@@ -3121,13 +3141,16 @@ function AIWorkflowGenerator({
           id: aiGenRowId(),
           type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
           label: typeof a.label === 'string' ? a.label : undefined,
+          retryCount: '3',
+          stepEnabled: true,
           channel: (typeof a.channel === 'string' ? a.channel : 'email') as 'sms' | 'email',
           instruction: typeof a.instruction === 'string' ? a.instruction : '',
           delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',
           delayUnit: 'minutes' as const,
-          delayMode: (typeof a.delayMode === 'string' ? a.delayMode : 'relative') as 'relative' | 'until_weekday',
+          delayMode: (typeof a.delayMode === 'string' ? a.delayMode : 'relative') as 'relative' | 'until_weekday' | 'until_date',
           untilWeekday: typeof a.untilWeekday === 'number' ? String(a.untilWeekday) : '1',
           untilHour: typeof a.untilHour === 'number' ? String(a.untilHour) : '9',
+          untilDate: typeof a.untilDate === 'string' ? a.untilDate : '',
           title: typeof a.title === 'string' ? a.title : '',
           dueInDays: typeof a.dueInDays === 'string' ? a.dueInDays : typeof a.dueInDays === 'number' ? String(a.dueInDays) : '',
           toolkit: typeof a.toolkit === 'string' ? a.toolkit : '',
@@ -3147,6 +3170,15 @@ function AIWorkflowGenerator({
           formatterTruncateSuffix: typeof a.truncateSuffix === 'string' ? a.truncateSuffix : '',
           formatterSplitSeparator: typeof a.splitSeparator === 'string' ? a.splitSeparator : '',
           formatterSplitIndex: typeof a.splitIndex === 'number' ? String(a.splitIndex) : '',
+          formatterRegexPattern: typeof a.regexPattern === 'string' ? a.regexPattern : '',
+          formatterRegexFlags: typeof a.regexFlags === 'string' ? a.regexFlags : '',
+          subWorkflowId: typeof a.workflowId === 'string' ? a.workflowId : '',
+          lookupInput: typeof a.lookupInput === 'string' ? a.lookupInput : '',
+          lookupEntriesJson: Array.isArray(a.entries) ? JSON.stringify(a.entries) : '',
+          lookupFallback: typeof a.lookupFallback === 'string' ? a.lookupFallback : '',
+          varName: typeof a.varName === 'string' ? a.varName : '',
+          varValue: typeof a.varValue === 'string' ? a.varValue : '',
+          varDefault: typeof a.varDefault === 'string' ? a.varDefault : '',
           webhookUrl: typeof a.webhookUrl === 'string' ? a.webhookUrl : '',
           webhookBody: typeof a.webhookBody === 'string' ? a.webhookBody : '',
           webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',

@@ -80,6 +80,8 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       .object({
         cadence: z.enum(['hourly', 'daily', 'weekdays']),
         hour: z.number().int().min(0).max(23).optional(),
+        /** IANA timezone name, e.g. "America/New_York". Defaults to UTC. */
+        timezone: z.string().max(50).optional(),
       })
       .strict(),
   }),
@@ -88,8 +90,15 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
   // contact_updated: fires when an existing contact record is edited.
   z.object({ type: z.literal('contact_updated'), config: z.object({}).strict() }),
   // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
-  // config is empty — the URL is derived from the workflow id at display time.
-  z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),
+  // When webhookSecret is set, the route validates the HMAC-SHA256 signature in
+  // the X-Webhook-Signature header (hex-encoded sha256=<sig> format like Zapier).
+  z.object({
+    type: z.literal('webhook'),
+    config: z.object({
+      /** Optional signing secret for HMAC-SHA256 payload verification. */
+      webhookSecret: z.string().min(8).max(128).optional(),
+    }).strict(),
+  }),
 ]);
 
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
@@ -197,7 +206,13 @@ export type WorkflowActionType =
   | 'formatter'
   | 'webhook_post'
   | 'update_lead'
-  | 'notify_agent';
+  | 'notify_agent'
+  | 'iterate'
+  | 'branch'
+  | 'run_workflow'
+  | 'lookup_table'
+  | 'set_variable'
+  | 'get_variable';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -221,35 +236,49 @@ export type FormatterOperation =
   | 'uppercase'
   | 'lowercase'
   | 'capitalize'
+  | 'title_case'
   | 'trim'
   | 'replace'
+  | 'regex_extract'
   | 'number_format'
   | 'date_format'
   | 'extract_number'
   | 'extract_email'
   | 'extract_phone'
+  | 'extract_url'
   | 'default_value'
   | 'truncate'
   | 'length'
+  | 'count_words'
   | 'split'
-  | 'url_encode';
+  | 'url_encode'
+  | 'url_decode'
+  | 'remove_html'
+  | 'reverse';
 
 export const FORMATTER_OPERATIONS = [
   'uppercase',
   'lowercase',
   'capitalize',
+  'title_case',
   'trim',
   'replace',
+  'regex_extract',
   'number_format',
   'date_format',
   'extract_number',
   'extract_email',
   'extract_phone',
+  'extract_url',
   'default_value',
   'truncate',
   'length',
+  'count_words',
   'split',
   'url_encode',
+  'url_decode',
+  'remove_html',
+  'reverse',
 ] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
@@ -264,15 +293,31 @@ const stepNote = z.string().trim().max(500).optional();
  * behaviour), matching Zapier's default error handling. 'skip' logs the
  * failure and continues with the next step — useful for non-critical side
  * effects (Slack pings, CRM log notes) that shouldn't derail the whole run.
+ * 'retry' re-runs the step up to maxRetries times (default 3) with
+ * exponential backoff before marking it failed — mirrors Zapier's built-in
+ * retry behaviour.
  */
-const stepOnError = z.enum(['stop', 'skip']).optional();
+const stepOnError = z.enum(['stop', 'skip', 'retry']).optional();
+/**
+ * Max retry attempts when onError='retry'. 1–5; defaults to 3 at runtime.
+ * Ignored when onError is 'stop' or 'skip'.
+ */
+const stepMaxRetries = z.number().int().min(1).max(5).optional();
+/** When false, the step is skipped at runtime (like Zapier's step disable toggle). */
+const stepEnabled = z.boolean().optional();
 
-export const workflowActionSchema = z.discriminatedUnion('type', [
+/**
+ * All action schemas EXCEPT branch — used as the element type for nested
+ * actions inside branch paths (no branch-within-branch).
+ */
+export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('draft_message'),
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
@@ -282,6 +327,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         channel: channelSchema,
@@ -295,6 +342,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         title: shortText,
@@ -307,6 +356,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         toolkit: shortText,
@@ -320,6 +371,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
@@ -331,12 +384,16 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
-        delayMode: z.enum(['relative', 'until_weekday']).optional(),
+        delayMode: z.enum(['relative', 'until_weekday', 'until_date']).optional(),
         delayMinutes: z.number().int().min(1).optional(),
         untilWeekday: z.number().int().min(0).max(6).optional(),
         untilHour: z.number().int().min(0).max(23).optional(),
+        /** ISO date string (YYYY-MM-DD) for until_date mode. */
+        untilDate: z.string().optional(),
       })
       .superRefine((cfg, ctx) => {
         const mode = cfg.delayMode ?? 'relative';
@@ -351,6 +408,10 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
           if (cfg.untilHour === undefined) {
             ctx.addIssue({ code: 'custom', path: ['untilHour'], message: 'untilHour required.' });
           }
+        } else if (mode === 'until_date') {
+          if (!cfg.untilDate) {
+            ctx.addIssue({ code: 'custom', path: ['untilDate'], message: 'untilDate (YYYY-MM-DD) required for until_date delay.' });
+          }
         }
       }),
   }),
@@ -360,6 +421,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         field: z.string().trim().min(1).max(SHORT_TEXT),
@@ -374,12 +437,16 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         input: z.string().trim().min(1).max(SHORT_TEXT),
         operation: z.enum(FORMATTER_OPERATIONS),
         find: z.string().max(200).optional(),
         replacement: z.string().max(200).optional(),
+        regexPattern: z.string().max(500).optional(),
+        regexFlags: z.string().max(10).optional(),
         format: z.string().max(100).optional(),
         toFixed: z.number().int().min(0).max(20).optional(),
         fallback: z.string().max(500).optional(),
@@ -396,6 +463,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         url: z.string().url().max(2000).refine((u) => u.startsWith('https://'), {
@@ -413,6 +482,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         field: z.enum(UPDATE_LEAD_FIELDS),
@@ -427,6 +498,8 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
     config: z
       .object({
         title: z.string().trim().min(1).max(SHORT_TEXT),
@@ -434,7 +507,133 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
       })
       .strict(),
   }),
+  // iterate: loop over a list (e.g. lead.tags) and apply an instruction to each item.
+  z.object({
+    type: z.literal('iterate'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        source: z.string().trim().min(1).max(SHORT_TEXT),
+        instruction: z.string().trim().min(1).max(LONG_TEXT),
+        limit: z.number().int().min(1).max(50).optional(),
+        outputField: z.string().trim().max(100).optional(),
+      })
+      .strict(),
+  }),
+  // run_workflow: invoke another workflow by ID (Zapier-style "Sub-Zap").
+  // Max nesting depth is enforced at runtime (3 levels) to prevent infinite loops.
+  z.object({
+    type: z.literal('run_workflow'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        workflowId: z.string().uuid(),
+      })
+      .strict(),
+  }),
+  // lookup_table: map an input value to an output via a hardcoded key→value table.
+  // Equivalent to Zapier's "Lookup Table" built-in app. Falls back to `fallback`
+  // (or the raw input) when no matching key is found.
+  z.object({
+    type: z.literal('lookup_table'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        input: z.string().trim().min(1).max(SHORT_TEXT),
+        entries: z
+          .array(z.object({ key: z.string().max(200), value: z.string().max(500) }).strict())
+          .min(1)
+          .max(50),
+        fallback: z.string().max(500).optional(),
+      })
+      .strict(),
+  }),
+  // set_variable: write a named variable into the run context ({{vars.name}}).
+  // Equivalent to Zapier's "Storage by Zapier" set action. Values persist for
+  // the duration of the run and are available in all subsequent steps.
+  z.object({
+    type: z.literal('set_variable'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        name: z.string().trim().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Variable names must start with a letter or underscore and contain only letters, numbers, and underscores'),
+        value: z.string().max(SHORT_TEXT),
+      })
+      .strict(),
+  }),
+  // get_variable: read a named variable from context ({{vars.name}}).
+  // Used to retrieve values set by a prior set_variable step or pass a default.
+  z.object({
+    type: z.literal('get_variable'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        name: z.string().trim().min(1).max(100).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Variable names must start with a letter or underscore and contain only letters, numbers, and underscores'),
+        defaultValue: z.string().max(SHORT_TEXT).optional(),
+      })
+      .strict(),
+  }),
 ]);
+
+export type InnerWorkflowAction = z.infer<typeof innerWorkflowActionSchema>;
+
+/**
+ * branch: Zapier-style "Paths" step. Routes execution down the FIRST path
+ * whose condition matches. If no path matches and defaultActions is set,
+ * those run instead. Nested actions are InnerWorkflowAction (no branch-in-branch).
+ */
+const branchPathSchema = z
+  .object({
+    label: z.string().trim().max(100).optional(),
+    field: z.string().trim().min(1).max(SHORT_TEXT),
+    operator: operatorSchema,
+    value: z.unknown().optional(),
+    actions: z.array(innerWorkflowActionSchema).min(1).max(10),
+  })
+  .strict();
+
+export const branchActionSchema = z.object({
+  type: z.literal('branch'),
+  label: stepLabel,
+  note: stepNote,
+  onError: stepOnError,
+  maxRetries: stepMaxRetries,
+  enabled: stepEnabled,
+  config: z
+    .object({
+      paths: z.array(branchPathSchema).min(1).max(8),
+      defaultActions: z.array(innerWorkflowActionSchema).max(10).optional(),
+    })
+    .strict(),
+});
+
+export type BranchAction = z.infer<typeof branchActionSchema>;
+
+/**
+ * Full action schema including branch. The outer union wraps the inner
+ * discriminated union (12 types) plus branch.
+ */
+export const workflowActionSchema = z.union([innerWorkflowActionSchema, branchActionSchema]);
 
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
 

@@ -18,6 +18,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
+// next/server's `after()` requires a real request scope and throws in Vitest.
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return { ...actual, after: vi.fn() };
+});
+
 // ── Shared mocks ─────────────────────────────────────────────────────────────
 vi.mock('@/lib/api-auth', () => ({
   requireSpaceOwner: vi.fn(),

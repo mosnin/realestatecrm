@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff, Workflow as WorkflowIcon, Table2, Variable } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,6 +60,7 @@ import {
   buildAction,
   buildDefinition,
   type ActionRowState,
+  type BranchPathFormState,
   type ConditionRowState,
   type ConditionGroupFormState,
   type WorkflowFormState,
@@ -238,6 +239,12 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
   notify_agent: 'Notify me — send a push alert',
+  iterate: 'Loop / Iterate',
+  branch: 'Paths — conditional branching',
+  run_workflow: 'Run another workflow',
+  lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -249,19 +256,25 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'notify_agent',
   'schedule_message',
   'filter',
+  'branch',
   'formatter',
+  'lookup_table',
+  'set_variable',
+  'get_variable',
   'delay',
+  'iterate',
   'webhook_post',
+  'run_workflow',
 ];
 
 const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   {
     label: 'Actions',
-    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post'],
+    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post', 'run_workflow'],
   },
   {
     label: 'Logic',
-    keys: ['filter', 'formatter', 'delay'],
+    keys: ['filter', 'branch', 'formatter', 'lookup_table', 'set_variable', 'get_variable', 'delay', 'iterate'],
   },
 ];
 
@@ -277,6 +290,12 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   webhook_post: Send,
   update_lead: UserCog,
   notify_agent: BellRing,
+  iterate: RotateCcw,
+  branch: GitBranch,
+  run_workflow: WorkflowIcon,
+  lookup_table: Table2,
+  set_variable: Variable,
+  get_variable: Variable,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -291,24 +310,37 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   webhook_post: 'POST JSON to any HTTPS endpoint — CRMs, Slack, or custom backends',
   update_lead: 'Set the score tier, follow-up date, or tags on this lead',
   notify_agent: 'Push a personal alert to your phone or browser — stay in the loop',
+  iterate: 'Run steps for each item in a list',
+  branch: 'Route the workflow down different paths based on conditions',
+  run_workflow: 'Trigger another workflow as a sub-step (Sub-Zap)',
+  lookup_table: 'Map a value to another using a key→value table',
+  set_variable: 'Store a value in a named variable for use in later steps',
+  get_variable: 'Read a named variable and set a default if missing',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
   uppercase: 'Uppercase',
   lowercase: 'Lowercase',
-  capitalize: 'Capitalize',
+  capitalize: 'Capitalize first',
+  title_case: 'Title Case',
   trim: 'Trim whitespace',
   replace: 'Find & replace',
+  regex_extract: 'Regex extract',
   number_format: 'Format number',
   date_format: 'Format date',
   extract_number: 'Extract number',
   extract_email: 'Extract email',
   extract_phone: 'Extract phone',
+  extract_url: 'Extract URL',
   default_value: 'Default value',
   truncate: 'Truncate text',
   length: 'Text length',
+  count_words: 'Count words',
   split: 'Split text',
   url_encode: 'URL encode',
+  url_decode: 'URL decode',
+  remove_html: 'Remove HTML tags',
+  reverse: 'Reverse text',
 };
 
 const DATE_FORMAT_OPTIONS = [
@@ -470,6 +502,7 @@ export function emptyFormState(): WorkflowFormState {
       toStage: '',
       cadence: 'daily',
       hour: '',
+      timezone: '',
     },
     conditionOp: 'and',
     conditions: [],
@@ -499,6 +532,8 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
   return {
     id: nextRowId('act'),
     type,
+    retryCount: '3',
+    stepEnabled: true,
     channel: 'email',
     instruction: '',
     delayMinutes: '',
@@ -516,6 +551,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     delayMode: 'relative',
     untilWeekday: '1',
     untilHour: '9',
+    untilDate: '',
     formatterFind: '',
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
@@ -525,6 +561,8 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     formatterTruncateSuffix: '',
     formatterSplitSeparator: '',
     formatterSplitIndex: '',
+    formatterRegexPattern: '',
+    formatterRegexFlags: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
@@ -532,6 +570,14 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     updateValue: '',
     notifyTitle: '',
     notifyBody: '',
+    branchPaths: [],
+    subWorkflowId: '',
+    lookupInput: '',
+    lookupEntriesJson: '',
+    lookupFallback: '',
+    varName: '',
+    varValue: '',
+    varDefault: '',
   };
 }
 
@@ -599,20 +645,28 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       type: a.type,
       label: a.label,
       note: a.note,
+      onError: a.onError as 'stop' | 'skip' | 'retry' | undefined,
+      retryCount: 'maxRetries' in a && typeof a.maxRetries === 'number' ? String(a.maxRetries) : '3',
+      stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'email',
       instruction:
         a.type === 'draft_message' || a.type === 'schedule_message' || a.type === 'run_chippi'
           ? a.config.instruction
-          : '',
+          : a.type === 'iterate'
+            ? a.config.instruction
+            : '',
       delayMinutes:
         a.type === 'schedule_message' || (a.type === 'delay' && !isDelayUntil)
           ? (delayDisplay?.amount ?? '')
-          : '',
+          : a.type === 'iterate' && a.config.limit !== undefined
+            ? String(a.config.limit)
+            : '',
       delayUnit: delayDisplay?.unit ?? 'hours',
-      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday' | 'until_date',
       untilWeekday: a.type === 'delay' && isDelayUntil && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
       untilHour: a.type === 'delay' && isDelayUntil && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
+      untilDate: a.type === 'delay' && 'untilDate' in a.config && typeof a.config.untilDate === 'string' ? a.config.untilDate : '',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -624,7 +678,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
         a.type === 'call_integration' && a.config.params
           ? JSON.stringify(a.config.params, null, 2)
           : '',
-      filterField: a.type === 'filter' ? a.config.field : '',
+      filterField: a.type === 'filter' ? a.config.field : a.type === 'iterate' ? a.config.source : '',
       filterOperator: a.type === 'filter' ? a.config.operator : 'eq',
       filterValue:
         a.type === 'filter' && a.config.value !== undefined ? String(a.config.value) : '',
@@ -639,6 +693,8 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
       formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
       formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
+      formatterRegexPattern: a.type === 'formatter' ? (a.config.regexPattern ?? '') : '',
+      formatterRegexFlags: a.type === 'formatter' ? (a.config.regexFlags ?? '') : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -646,6 +702,23 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       updateValue: a.type === 'update_lead' ? a.config.value : '',
       notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
       notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
+      subWorkflowId: a.type === 'run_workflow' ? a.config.workflowId : '',
+      lookupInput: a.type === 'lookup_table' ? a.config.input : '',
+      lookupEntriesJson: a.type === 'lookup_table' ? JSON.stringify(a.config.entries) : '',
+      lookupFallback: a.type === 'lookup_table' ? (a.config.fallback ?? '') : '',
+      varName: (a.type === 'set_variable' || a.type === 'get_variable') ? a.config.name : '',
+      varValue: a.type === 'set_variable' ? a.config.value : '',
+      varDefault: a.type === 'get_variable' ? (a.config.defaultValue ?? '') : '',
+      branchPaths: a.type === 'branch'
+        ? a.config.paths.map((p) => ({
+            id: nextRowId('bp'),
+            label: p.label ?? '',
+            field: p.field,
+            operator: p.operator as Operator,
+            value: p.value !== undefined && p.value !== null ? String(p.value) : '',
+            actions: actionsToRows(p.actions as WorkflowAction[]),
+          }))
+        : [],
     };
   });
 }
@@ -943,6 +1016,9 @@ function actionSummary(row: ActionRowState): string {
         const h12 = ((h + 11) % 12) + 1;
         return `Wait until ${day} at ${h12}:00 ${ampm}`;
       }
+      if (row.delayMode === 'until_date') {
+        return row.untilDate ? `Wait until ${row.untilDate}` : 'Wait until date (not set)';
+      }
       return `Wait ${row.delayMinutes || '?'} ${row.delayUnit}`;
     }
     case 'filter':
@@ -970,6 +1046,22 @@ function actionSummary(row: ActionRowState): string {
     }
     case 'notify_agent':
       return row.notifyTitle ? `"${trunc(row.notifyTitle)}"` : 'No title set';
+    case 'iterate':
+      return row.instruction
+        ? `Loop: ${row.instruction.slice(0, 60)}${row.instruction.length > 60 ? '…' : ''}`
+        : 'Loop over a list';
+    case 'branch': {
+      const count = row.branchPaths?.length ?? 0;
+      return count > 0 ? `${count} path${count === 1 ? '' : 's'} configured` : 'No paths configured';
+    }
+    case 'run_workflow':
+      return row.subWorkflowId ? `Sub-workflow: ${row.subWorkflowId.slice(0, 8)}…` : 'No workflow selected';
+    case 'lookup_table':
+      return row.lookupInput ? `Lookup: ${row.lookupInput}` : 'No input set';
+    case 'set_variable':
+      return row.varName ? `Set {{vars.${row.varName}}}` : 'No variable name set';
+    case 'get_variable':
+      return row.varName ? `Get {{vars.${row.varName}}}` : 'No variable name set';
     default:
       return '';
   }
@@ -1019,6 +1111,41 @@ function actionAccent(type: WorkflowActionType) {
       icon: 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400',
     };
   }
+  if (type === 'iterate') {
+    return {
+      border: 'border-l-teal-400 dark:border-l-teal-500/70',
+      badge: 'bg-teal-500',
+      icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
+    };
+  }
+  if (type === 'branch') {
+    return {
+      border: 'border-l-blue-400 dark:border-l-blue-500/70',
+      badge: 'bg-blue-500',
+      icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+    };
+  }
+  if (type === 'run_workflow') {
+    return {
+      border: 'border-l-purple-400 dark:border-l-purple-500/70',
+      badge: 'bg-purple-500',
+      icon: 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
+    };
+  }
+  if (type === 'lookup_table') {
+    return {
+      border: 'border-l-cyan-400 dark:border-l-cyan-500/70',
+      badge: 'bg-cyan-500',
+      icon: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400',
+    };
+  }
+  if (type === 'set_variable' || type === 'get_variable') {
+    return {
+      border: 'border-l-lime-400 dark:border-l-lime-500/70',
+      badge: 'bg-lime-500',
+      icon: 'bg-lime-100 text-lime-700 dark:bg-lime-950/50 dark:text-lime-400',
+    };
+  }
   return {
     border: 'border-l-violet-400 dark:border-l-violet-500/70',
     badge: 'bg-violet-500',
@@ -1044,19 +1171,36 @@ interface TokenGroup {
 }
 
 const LEAD_TOKEN_GROUP: TokenGroup = {
-  label: 'Lead',
+  label: 'Lead / Contact',
   tokens: [
     { label: 'Full name', token: '{{lead.name}}', hint: 'e.g. Jane Smith' },
+    { label: 'First name', token: '{{lead.firstName}}', hint: 'e.g. Jane' },
+    { label: 'Last name', token: '{{lead.lastName}}', hint: 'e.g. Smith' },
     { label: 'Email', token: '{{lead.email}}', hint: 'e.g. jane@example.com' },
     { label: 'Phone', token: '{{lead.phone}}', hint: 'e.g. +1 555 123 4567' },
     { label: 'Lead score', token: '{{lead.score}}', hint: 'e.g. 82' },
+    { label: 'Score label', token: '{{lead.scoreLabel}}', hint: 'e.g. Hot' },
     { label: 'Source', token: '{{lead.source}}', hint: 'e.g. Zillow' },
+    { label: 'Status', token: '{{lead.status}}', hint: 'e.g. Active, Nurture' },
     { label: 'Assigned agent', token: '{{lead.assignedAgent}}', hint: 'e.g. Alex Johnson' },
     { label: 'Property interest', token: '{{lead.propertyInterest}}', hint: 'e.g. 3BR in Austin' },
+    { label: 'Budget', token: '{{lead.budget}}', hint: 'e.g. $450,000' },
+    { label: 'Timeline', token: '{{lead.timeline}}', hint: 'e.g. 3 months' },
+    { label: 'City', token: '{{lead.city}}', hint: 'e.g. Austin' },
+    { label: 'Deal stage', token: '{{lead.dealStage}}', hint: 'e.g. Under Contract' },
+    { label: 'Created at', token: '{{lead.createdAt}}', hint: 'ISO date when lead was added' },
+    { label: 'Last activity', token: '{{lead.lastActivity}}', hint: 'ISO date of last interaction' },
   ],
 };
 
 const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
+  lead_created: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Lead source', token: '{{trigger.source}}', hint: 'e.g. Zillow, Referral' },
+      { label: 'Created at', token: '{{trigger.createdAt}}', hint: 'ISO datetime when lead was added' },
+    ],
+  },
   lead_score_threshold: {
     label: 'Trigger',
     tokens: [
@@ -1069,12 +1213,14 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Message text', token: '{{trigger.message}}', hint: 'the raw message body' },
       { label: 'Channel', token: '{{trigger.channel}}', hint: 'e.g. email' },
+      { label: 'Sent at', token: '{{trigger.sentAt}}', hint: 'ISO datetime of the message' },
     ],
   },
   tour_completed: {
     label: 'Trigger',
     tokens: [
       { label: 'Tour date', token: '{{trigger.tourDate}}', hint: 'e.g. June 28, 2026' },
+      { label: 'Property address', token: '{{trigger.address}}', hint: 'address that was toured' },
     ],
   },
   deal_stage_changed: {
@@ -1082,6 +1228,23 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'New stage', token: '{{trigger.stage}}', hint: 'e.g. Under Contract' },
       { label: 'Previous stage', token: '{{trigger.previousStage}}', hint: 'e.g. Active' },
+      { label: 'Changed at', token: '{{trigger.changedAt}}', hint: 'ISO datetime of the stage change' },
+    ],
+  },
+  deal_created: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Deal name', token: '{{trigger.dealName}}', hint: 'name of the new deal' },
+      { label: 'Deal stage', token: '{{trigger.stage}}', hint: 'initial stage' },
+      { label: 'Deal value', token: '{{trigger.value}}', hint: 'e.g. 450000' },
+    ],
+  },
+  contact_updated: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Field changed', token: '{{trigger.field}}', hint: 'name of the updated field' },
+      { label: 'Old value', token: '{{trigger.oldValue}}', hint: 'value before the update' },
+      { label: 'New value', token: '{{trigger.newValue}}', hint: 'value after the update' },
     ],
   },
   integration_event: {
@@ -1089,6 +1252,7 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Event name', token: '{{trigger.event}}', hint: 'e.g. contact.updated' },
       { label: 'App / toolkit', token: '{{trigger.toolkit}}', hint: 'e.g. hubspot' },
+      { label: 'Event payload (JSON)', token: '{{trigger.payload}}', hint: 'full event payload' },
     ],
   },
   schedule: {
@@ -1096,11 +1260,15 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Run date', token: '{{trigger.date}}', hint: 'e.g. 2026-06-28' },
       { label: 'Run time', token: '{{trigger.time}}', hint: 'e.g. 09:00' },
+      { label: 'Run timestamp', token: '{{trigger.timestamp}}', hint: 'ISO datetime of scheduled run' },
     ],
   },
   webhook: {
     label: 'Trigger',
-    tokens: [{ label: 'Payload JSON', token: '{{trigger.payload}}', hint: 'full JSON body' }],
+    tokens: [
+      { label: 'Payload JSON', token: '{{trigger.payload}}', hint: 'full JSON body' },
+      { label: 'Request headers', token: '{{trigger.headers}}', hint: 'JSON object of headers' },
+    ],
   },
 };
 
@@ -1143,6 +1311,84 @@ function stepOutputGroups(prevSteps: ActionRowState[]): TokenGroup[] {
           label: `Step ${n}: ${label}`,
           tokens: [
             { label: 'Task ID', token: `{{step${n}.taskId}}`, hint: 'ID of the created task' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'iterate') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Loop results (JSON)', token: `{{step${n}.results}}`, hint: 'array of per-item summaries' },
+            { label: 'Items processed', token: `{{step${n}.processed}}`, hint: 'count of items processed' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'branch') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Path taken', token: `{{step${n}.pathTaken}}`, hint: 'label or field of the matched path' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'webhook_post') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'HTTP status code', token: `{{step${n}.statusCode}}`, hint: 'e.g. 200, 404, 500' },
+            { label: 'Response body (snippet)', token: `{{step${n}.responseSnippet}}`, hint: 'first 500 chars of the response' },
+            { label: 'Request URL', token: `{{step${n}.url}}`, hint: 'the URL that was called' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'filter') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Filter passed', token: `{{step${n}.passed}}`, hint: 'true if condition met, false if run was halted' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'update_lead') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Updated field', token: `{{step${n}.field}}`, hint: 'the CRM field that was updated' },
+            { label: 'New value', token: `{{step${n}.value}}`, hint: 'the value the field was set to' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'draft_message' || s.type === 'schedule_message') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Draft ID', token: `{{step${n}.draftId}}`, hint: 'ID of the drafted message' },
+            { label: 'Channel', token: `{{step${n}.channel}}`, hint: 'email or sms' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'notify_agent') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Notification sent', token: `{{step${n}.sent}}`, hint: 'true if push was sent' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'delay') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Delay (minutes)', token: `{{step${n}.delayMinutes}}`, hint: 'computed delay in minutes' },
+            { label: 'Delay mode', token: `{{step${n}.delayMode}}`, hint: 'relative / until_weekday / until_date' },
             ...base,
           ],
         };
@@ -1268,19 +1514,23 @@ function TokenPicker({
 function AddStepPicker({
   onSelect,
   onClose,
+  exclude,
 }: {
   onSelect: (type: WorkflowActionType) => void;
   onClose: () => void;
+  exclude?: WorkflowActionType[];
 }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'All' | 'Actions' | 'Logic'>('All');
   const q = query.toLowerCase().trim();
 
+  const baseOrder = exclude ? ACTION_ORDER.filter((t) => !exclude.includes(t)) : ACTION_ORDER;
+
   const pool = q
-    ? ACTION_ORDER
+    ? baseOrder
     : category === 'All'
-      ? ACTION_ORDER
-      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys ?? ACTION_ORDER);
+      ? baseOrder
+      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys.filter((t) => !exclude?.includes(t)) ?? baseOrder);
 
   const filtered = q
     ? pool.filter(
@@ -1508,8 +1758,9 @@ function ActionZapCard({
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
   const cl = actionAccent(row.type);
   const summary = collapsed ? actionSummary(row) : null;
+  const isDisabled = row.stepEnabled === false;
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
+    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card transition-opacity', cl.border, isDisabled && 'opacity-60')}>
       <div className={cn('flex items-center gap-3 bg-muted/20 px-4 py-3', !collapsed && 'border-b border-border/40')}>
         {showDragHandle && (
           <GripVertical
@@ -1538,6 +1789,9 @@ function ActionZapCard({
               </p>
               {summary && (
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{summary}</p>
+              )}
+              {row.note && (
+                <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/50">{row.note}</p>
               )}
             </button>
           ) : (
@@ -1576,7 +1830,12 @@ function ActionZapCard({
             </div>
           )}
         </div>
-        {incomplete ? (
+        {isDisabled ? (
+          <span className="flex items-center gap-1 rounded-full bg-muted/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <Power size={10} aria-hidden />
+            Disabled
+          </span>
+        ) : incomplete ? (
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
             <AlertCircle size={11} aria-hidden />
             Incomplete
@@ -1586,6 +1845,21 @@ function ActionZapCard({
             <CheckIcon size={11} strokeWidth={3} aria-hidden />
           </span>
         )}
+        {/* Enable/disable step toggle — Zapier-style per-step on/off */}
+        <button
+          type="button"
+          onClick={() => onChange({ stepEnabled: !row.stepEnabled })}
+          aria-label={isDisabled ? 'Enable this step' : 'Disable this step'}
+          title={isDisabled ? 'Enable step' : 'Disable step (skip at runtime)'}
+          className={cn(
+            'flex-shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+            isDisabled
+              ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30'
+              : 'text-muted-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground',
+          )}
+        >
+          <Power size={13} aria-hidden />
+        </button>
         {/* Collapse / expand toggle */}
         <button
           type="button"
@@ -1618,23 +1892,41 @@ function ActionZapCard({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12px] text-muted-foreground">On error:</span>
               <div className="flex overflow-hidden rounded-md border border-border/50">
-                {(['stop', 'skip'] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => onChange({ onError: opt === 'stop' ? undefined : opt })}
-                    aria-pressed={opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip'}
-                    className={cn(
-                      'px-2.5 py-1 text-[11px] font-medium capitalize transition-colors',
-                      (opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip')
-                        ? 'bg-foreground text-background'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {opt === 'stop' ? 'Stop workflow' : 'Skip & continue'}
-                  </button>
-                ))}
+                {(['stop', 'skip', 'retry'] as const).map((opt) => {
+                  const active = opt === 'stop' ? !row.onError || row.onError === 'stop'
+                    : row.onError === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => onChange({ onError: opt === 'stop' ? undefined : opt })}
+                      aria-pressed={active}
+                      className={cn(
+                        'px-2.5 py-1 text-[11px] font-medium transition-colors',
+                        active
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {opt === 'stop' ? 'Stop' : opt === 'skip' ? 'Skip' : 'Retry'}
+                    </button>
+                  );
+                })}
               </div>
+              {row.onError === 'retry' && (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={row.retryCount}
+                    onChange={(e) => onChange({ retryCount: e.target.value })}
+                    className="h-7 w-14 text-center text-[12px]"
+                    aria-label="Retry attempts"
+                  />
+                  <span className="text-[11px] text-muted-foreground">times</span>
+                </div>
+              )}
             </div>
             <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
           </div>
@@ -1723,6 +2015,12 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   update_lead: 'Update lead',
   notify_agent: 'Push alert',
   condition: 'Condition check',
+  iterate: 'Loop / Iterate',
+  branch: 'Paths — conditional branching',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -1737,6 +2035,12 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
   notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+  iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
+  run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
+  lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
+  set_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
+  get_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -1793,6 +2097,31 @@ function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actio
     if (obj.body) add('body', obj.body);
     add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
     if (obj.note) add('note', obj.note);
+  } else if (actionType === 'iterate') {
+    add('processed', obj.processed !== undefined ? `${obj.processed} of ${obj.total}` : undefined);
+    if (obj.failed) add('failed', obj.failed);
+    if (obj.capped) add('capped', 'yes — limit reached');
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'branch') {
+    add('path taken', obj.pathTaken != null ? String(obj.pathTaken) : 'none matched');
+    if (obj.stepsRun !== undefined) add('steps run', obj.stepsRun);
+    if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'run_workflow') {
+    add('workflow id', obj.workflowId);
+    add('run id', obj.runId);
+    add('status', obj.status);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'lookup_table') {
+    add('input', obj.input);
+    add('matched', obj.matched !== undefined ? (obj.matched ? `yes (${obj.matchedKey})` : 'no') : undefined);
+    add('output', obj.output);
+  } else if (actionType === 'set_variable') {
+    add('name', obj.name);
+    add('value', obj.value);
+  } else if (actionType === 'get_variable') {
+    add('name', obj.name);
+    add('value', obj.value);
+    add('found', obj.found !== undefined ? String(obj.found) : undefined);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
@@ -2084,6 +2413,7 @@ export function WorkflowBuilder({
   const [showHistory, setShowHistory] = useState(false);
   const [historyRuns, setHistoryRuns] = useState<BuilderRunRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'completed' | 'failed' | 'skipped'>('all');
 
   useEffect(() => {
     if (!showHistory || !workflowId) return;
@@ -2226,12 +2556,14 @@ export function WorkflowBuilder({
 
   function actionIncomplete(row: ActionRowState): boolean {
     if (!dirty) return false;
+    if (row.stepEnabled === false) return false;
     if (row.type === 'draft_message' || row.type === 'schedule_message' || row.type === 'run_chippi')
       return !row.instruction.trim();
     if (row.type === 'create_task') return !row.title.trim();
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
     if (row.type === 'delay') {
       if (row.delayMode === 'until_weekday') return row.untilWeekday === '' || row.untilHour === '';
+      if (row.delayMode === 'until_date') return !row.untilDate.trim();
       return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
     }
     if (row.type === 'filter') return !row.filterField.trim();
@@ -2239,6 +2571,10 @@ export function WorkflowBuilder({
     if (row.type === 'webhook_post') return !row.webhookUrl.trim();
     if (row.type === 'update_lead') return !row.updateValue.trim();
     if (row.type === 'notify_agent') return !row.notifyTitle.trim();
+    if (row.type === 'branch') {
+      if (!row.branchPaths || row.branchPaths.length === 0) return true;
+      return row.branchPaths.some((p) => !p.field.trim() || p.actions.length === 0);
+    }
     return false;
   }
 
@@ -2833,6 +3169,36 @@ export function WorkflowBuilder({
               Refresh
             </button>
           </div>
+          {/* Status filter tabs */}
+          {historyRuns.length > 0 && (
+            <div className="flex gap-1 border-b border-border/40 px-3 py-1.5">
+              {(['all', 'completed', 'failed', 'skipped'] as const).map((f) => {
+                const count = f === 'all' ? historyRuns.length : historyRuns.filter((r) => r.status === f).length;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setHistoryStatusFilter(f)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                      historyStatusFilter === f
+                        ? f === 'failed'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                          : f === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : f === 'skipped'
+                              ? 'bg-muted text-foreground'
+                              : 'bg-foreground/10 text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="p-3">
             {historyLoading ? (
               <div className="flex items-center gap-2 py-3">
@@ -2845,11 +3211,21 @@ export function WorkflowBuilder({
                 <p className="text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
               </div>
             ) : (
-              <ul className="space-y-1.5">
-                {historyRuns.map((run) => (
-                  <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-1.5">
+                  {historyRuns
+                    .filter((r) => historyStatusFilter === 'all' || r.status === historyStatusFilter)
+                    .map((run) => (
+                      <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
+                    ))}
+                </ul>
+                {historyStatusFilter !== 'all' &&
+                  historyRuns.filter((r) => r.status === historyStatusFilter).length === 0 && (
+                    <p className="py-3 text-center text-[12px] text-muted-foreground">
+                      No {historyStatusFilter} runs.
+                    </p>
+                  )}
+              </>
             )}
           </div>
         </div>
@@ -2977,9 +3353,19 @@ export function WorkflowBuilder({
  * workflow's id routed through the webhook endpoint — the UUID randomness is
  * the auth token (128 bits, same security posture as Zapier webhook URLs).
  * For new (unsaved) workflows, a "save first" prompt.
+ * Optionally shows a signing secret field for HMAC-SHA256 payload verification.
  */
-function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
+function WebhookTriggerDisplay({
+  workflowId,
+  webhookSecret,
+  onSecretChange,
+}: {
+  workflowId?: string;
+  webhookSecret?: string;
+  onSecretChange?: (v: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const url = workflowId
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/workflows/${workflowId}/webhook`
     : null;
@@ -2992,8 +3378,10 @@ function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
     });
   }
 
+  const secretSet = (webhookSecret?.trim().length ?? 0) >= 8;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <p className={CAPTION}>
         POST any JSON payload to this URL and the workflow fires immediately. The URL is your secret — keep it private.
       </p>
@@ -3016,6 +3404,42 @@ function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
         <p className={CAPTION}>
           <span className="font-medium text-foreground">Save this workflow first</span> — your unique webhook URL will appear here.
         </p>
+      )}
+      {/* Signing secret — optional HMAC-SHA256 payload verification (like Zapier) */}
+      {onSecretChange && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="wf-webhook-secret" className="text-[12px] text-muted-foreground">
+              Signing secret <span className="text-muted-foreground/50">(optional)</span>
+            </Label>
+            {secretSet && (
+              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓ Signature verification enabled</span>
+            )}
+          </div>
+          <div className="relative flex items-center">
+            <Input
+              id="wf-webhook-secret"
+              type={showSecret ? 'text' : 'password'}
+              value={webhookSecret ?? ''}
+              onChange={(e) => onSecretChange(e.target.value)}
+              placeholder="Min 8 characters — leave blank to skip verification"
+              className="h-8 pr-9 font-mono text-[12px]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+              className="absolute right-2 text-muted-foreground/60 hover:text-foreground"
+            >
+              {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+          {secretSet && (
+            <p className="text-[11px] text-muted-foreground">
+              Send <code className="rounded bg-muted px-1">X-Webhook-Signature: sha256=&lt;hmac&gt;</code> with each request.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -3157,10 +3581,20 @@ function TriggerConfig({
             />
           </FieldRow>
         )}
+        <FieldRow label="Timezone" htmlFor="wf-tz">
+          <Input
+            id="wf-tz"
+            value={t.timezone ?? ''}
+            onChange={(e) => patchTrigger({ timezone: e.target.value })}
+            placeholder="America/New_York (default: UTC)"
+            className="h-8"
+          />
+        </FieldRow>
         <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
           <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
           <span className="text-[12px] text-amber-700 dark:text-amber-300">
             Next run: <span className="font-medium">{computeNextRun(t.cadence, t.hour || '9')}</span>
+            {t.timezone && <span className="ml-1 text-amber-600/70"> ({t.timezone})</span>}
           </span>
         </div>
       </div>
@@ -3168,7 +3602,13 @@ function TriggerConfig({
   }
 
   if (t.type === 'webhook') {
-    return <WebhookTriggerDisplay workflowId={workflowId} />;
+    return (
+      <WebhookTriggerDisplay
+        workflowId={workflowId}
+        webhookSecret={t.webhookSecret ?? ''}
+        onSecretChange={(v) => patchTrigger({ webhookSecret: v || undefined })}
+      />
+    );
   }
 
   // lead_created, tour_completed — no config.
@@ -3540,7 +3980,7 @@ function computeFormatterPreview(
       case 'uppercase': return sample.toUpperCase();
       case 'lowercase': return sample.toLowerCase();
       case 'capitalize':
-        return sample.replace(/\b\w/g, (c) => c.toUpperCase());
+        return sample.charAt(0).toUpperCase() + sample.slice(1).toLowerCase();
       case 'trim': return sample.trim();
       case 'replace': {
         if (!row.formatterFind) return sample;
@@ -3593,6 +4033,10 @@ function computeFormatterPreview(
       }
       case 'length':
         return String(sample.length);
+      case 'count_words':
+        return String(sample.trim() === '' ? 0 : sample.trim().split(/\s+/).length);
+      case 'title_case':
+        return sample.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
       case 'split': {
         const sep = row.formatterSplitSeparator || ',';
         const idx = (parseInt(row.formatterSplitIndex, 10) || 1) - 1;
@@ -3601,6 +4045,26 @@ function computeFormatterPreview(
       }
       case 'url_encode':
         return encodeURIComponent(sample);
+      case 'url_decode': {
+        try { return decodeURIComponent(sample); } catch { return sample; }
+      }
+      case 'remove_html':
+        return sample.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      case 'reverse':
+        return sample.split('').reverse().join('');
+      case 'regex_extract': {
+        if (!row.formatterRegexPattern) return null;
+        try {
+          const flags = (row.formatterRegexFlags ?? '').replace(/[^gimsuy]/g, '');
+          const re = new RegExp(row.formatterRegexPattern, flags);
+          const m = sample.match(re);
+          return m ? (m[1] ?? m[0]) : '';
+        } catch { return null; }
+      }
+      case 'extract_url': {
+        const m = sample.match(/https?:\/\/[^\s"'<>]+/);
+        return m ? m[0] : null;
+      }
       default: return null;
     }
   } catch { return null; }
@@ -3643,6 +4107,7 @@ function FormatterActionConfig({
 
   const op = row.formatterOperation;
   const needsReplace = op === 'replace';
+  const needsRegex = op === 'regex_extract';
   const needsFormat = op === 'date_format';
   const needsToFixed = op === 'number_format';
   const needsFallback = op === 'default_value';
@@ -3700,6 +4165,28 @@ function FormatterActionConfig({
               onChange={(e) => onChange({ formatterReplace: e.target.value })}
               placeholder="(leave blank to delete)"
               className="h-8"
+            />
+          </FieldRow>
+        </>
+      )}
+      {needsRegex && (
+        <>
+          <FieldRow label="Pattern" htmlFor={`fmt-rx-${row.id}`}>
+            <Input
+              id={`fmt-rx-${row.id}`}
+              value={row.formatterRegexPattern ?? ''}
+              onChange={(e) => onChange({ formatterRegexPattern: e.target.value })}
+              placeholder="(\d{3}-\d{4})"
+              className="h-8 font-mono text-[12px]"
+            />
+          </FieldRow>
+          <FieldRow label="Flags (optional)" htmlFor={`fmt-rxf-${row.id}`}>
+            <Input
+              id={`fmt-rxf-${row.id}`}
+              value={row.formatterRegexFlags ?? ''}
+              onChange={(e) => onChange({ formatterRegexFlags: e.target.value })}
+              placeholder="i"
+              className="h-8 w-20 font-mono text-[12px]"
             />
           </FieldRow>
         </>
@@ -4160,6 +4647,82 @@ function NotifyAgentActionConfig({
   );
 }
 
+function IterateActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps = [],
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+}) {
+  // Field mapping (pragmatic reuse of existing ActionRowState fields):
+  //   row.filterField  = array source path  e.g. "{{step1.result.items}}"
+  //   row.instruction  = per-item instruction text (use {{item}} as the element)
+  //   row.delayMinutes = max items limit (stored as string, default "10")
+  function insertSource(token: string) {
+    onChange({ filterField: (row.filterField ?? '') + token });
+  }
+  function insertInstruction(token: string) {
+    onChange({ instruction: (row.instruction ?? '') + token });
+  }
+  return (
+    <div className="space-y-3">
+      <p className={CAPTION}>Loop over every element in an array. Use <code>{'{{item}}'}</code> in your instruction to reference the current element.</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-iter-src-${row.id}`} className="text-[12px] text-muted-foreground">
+            Array source <span className="text-red-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertSource} />
+        </div>
+        <Input
+          id={`act-iter-src-${row.id}`}
+          value={row.filterField ?? ''}
+          onChange={(e) => onChange({ filterField: e.target.value })}
+          placeholder="e.g. {{step1.result.items}} or lead.tags"
+          className="h-8"
+        />
+        <p className={CAPTION}>The array to loop over.</p>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-iter-inst-${row.id}`} className="text-[12px] text-muted-foreground">
+            Instruction for each item <span className="text-red-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertInstruction} />
+        </div>
+        <Textarea
+          id={`act-iter-inst-${row.id}`}
+          value={row.instruction ?? ''}
+          onChange={(e) => onChange({ instruction: e.target.value })}
+          placeholder="Use {{item}} to reference each element…"
+          rows={3}
+          className="text-[12px]"
+        />
+        <p className={CAPTION}>What Chippi should do for each item. Use <code>{'{{item}}'}</code> for the current element.</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`act-iter-max-${row.id}`} className="text-[12px] text-muted-foreground">
+          Max items
+        </Label>
+        <Input
+          id={`act-iter-max-${row.id}`}
+          type="number"
+          min={1}
+          max={50}
+          value={row.delayMinutes || '10'}
+          onChange={(e) => onChange({ delayMinutes: e.target.value })}
+          className="h-8 w-24"
+        />
+        <p className={CAPTION}>Stops after this many items (1–50, default 10).</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Key-value params editor (call_integration) ───────────────────────────────
 
 function parseParamsToRows(json: string): { id: string; key: string; val: string }[] {
@@ -4302,6 +4865,476 @@ function KeyValueEditor({
   );
 }
 
+/**
+ * BranchActionConfig — Zapier-style "Paths" step UI.
+ * Renders up to 4 path lanes, each with a condition (field/op/value) and a
+ * nested mini-step list. Branch-in-branch is prevented by the sub-step picker.
+ */
+function BranchActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps = [],
+  connectedApps,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+  connectedApps: ConnectedAppsState;
+}) {
+  const paths = row.branchPaths ?? [];
+
+  function addPath() {
+    if (paths.length >= 4) return;
+    onChange({
+      branchPaths: [
+        ...paths,
+        {
+          id: nextRowId('bp'),
+          label: '',
+          field: '',
+          operator: 'eq' as Operator,
+          value: '',
+          actions: [newActionRow('draft_message')],
+        },
+      ],
+    });
+  }
+
+  function updatePath(pathId: string, next: Partial<BranchPathFormState>) {
+    onChange({
+      branchPaths: paths.map((p) => (p.id === pathId ? { ...p, ...next } : p)),
+    });
+  }
+
+  function removePath(pathId: string) {
+    onChange({ branchPaths: paths.filter((p) => p.id !== pathId) });
+  }
+
+  function addSubAction(pathId: string, type: WorkflowActionType) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId ? { ...p, actions: [...p.actions, newActionRow(type)] } : p
+      ),
+    });
+  }
+
+  function updateSubAction(pathId: string, actionId: string, next: Partial<ActionRowState>) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId
+          ? { ...p, actions: p.actions.map((a) => (a.id === actionId ? { ...a, ...next } : a)) }
+          : p
+      ),
+    });
+  }
+
+  function removeSubAction(pathId: string, actionId: string) {
+    onChange({
+      branchPaths: paths.map((p) =>
+        p.id === pathId ? { ...p, actions: p.actions.filter((a) => a.id !== actionId) } : p
+      ),
+    });
+  }
+
+  const PATH_COLORS = [
+    'border-l-blue-400',
+    'border-l-violet-400',
+    'border-l-emerald-400',
+    'border-l-amber-400',
+  ];
+
+  /** Which path's sub-step picker is open (null = none). */
+  const [subPickerForPath, setSubPickerForPath] = useState<string | null>(null);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] text-muted-foreground">
+        The workflow takes the first path whose condition is met. If none match, the run continues after this step.
+      </p>
+
+      {paths.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
+          <GitBranch size={18} className="mx-auto mb-2 text-muted-foreground/40" aria-hidden />
+          <p className="text-[12px] text-muted-foreground">No paths yet — add your first path below.</p>
+        </div>
+      )}
+
+      {paths.map((path, pi) => {
+        const subPickerOpen = subPickerForPath === path.id;
+        return (
+          <div
+            key={path.id}
+            className={`overflow-hidden rounded-lg border border-border/60 border-l-4 bg-muted/10 ${PATH_COLORS[pi] ?? 'border-l-blue-400'}`}
+          >
+            {/* Path header */}
+            <div className="flex items-center gap-2 border-b border-border/30 bg-background/50 px-3 py-2">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+                {pi + 1}
+              </span>
+              <input
+                type="text"
+                value={path.label}
+                onChange={(e) => updatePath(path.id, { label: e.target.value })}
+                placeholder={`Path ${pi + 1}`}
+                maxLength={100}
+                className="min-w-0 flex-1 bg-transparent text-[12px] font-medium text-foreground outline-none placeholder:text-muted-foreground/40"
+                aria-label={`Path ${pi + 1} label`}
+              />
+              {paths.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removePath(path.id)}
+                  aria-label="Remove path"
+                  className="flex-shrink-0 text-muted-foreground/40 transition-colors hover:text-destructive"
+                >
+                  <X size={13} aria-hidden />
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2.5 p-3">
+              {/* Condition row */}
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  If
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Input
+                    value={path.field}
+                    onChange={(e) => updatePath(path.id, { field: e.target.value })}
+                    placeholder="lead.score"
+                    className="h-7 w-32 font-mono text-[11.5px]"
+                    aria-label="Condition field"
+                  />
+                  <MiniSelect
+                    value={path.operator}
+                    onValueChange={(v) => updatePath(path.id, { operator: v as Operator })}
+                    options={OPERATORS.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+                  />
+                  {!VALUELESS_OPERATORS.has(path.operator) && (
+                    <Input
+                      value={path.value}
+                      onChange={(e) => updatePath(path.id, { value: e.target.value })}
+                      placeholder="value"
+                      className="h-7 w-24 text-[11.5px]"
+                      aria-label="Condition value"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-actions */}
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                  Then
+                </p>
+                <div className="space-y-1.5">
+                  {path.actions.map((subRow, si) => {
+                    const SubIcon = ACTION_ICONS[subRow.type] ?? Sparkles;
+                    const subCl = actionAccent(subRow.type);
+                    return (
+                      <div
+                        key={subRow.id}
+                        className={`overflow-hidden rounded-md border border-border/50 border-l-2 bg-card ${subCl.border}`}
+                      >
+                        <div className="flex items-center gap-2 px-2.5 py-1.5">
+                          <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded ${subCl.icon}`}>
+                            <SubIcon size={11} aria-hidden />
+                          </span>
+                          <MiniSelect
+                            value={subRow.type}
+                            onValueChange={(v) =>
+                              updateSubAction(path.id, subRow.id, { type: v as WorkflowActionType })
+                            }
+                            options={ACTION_ORDER
+                              .filter((t) => t !== 'branch')
+                              .map((t) => ({ value: t, label: ACTION_LABELS[t] }))}
+                          />
+                          <span className="text-[10px] text-muted-foreground/50">#{si + 1}</span>
+                          {path.actions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeSubAction(path.id, subRow.id)}
+                              aria-label="Remove sub-step"
+                              className="ml-auto text-muted-foreground/30 transition-colors hover:text-destructive"
+                            >
+                              <X size={11} aria-hidden />
+                            </button>
+                          )}
+                        </div>
+                        <div className="border-t border-border/30 px-2.5 pb-2.5 pt-2">
+                          <ActionConfig
+                            row={subRow}
+                            onChange={(next) => updateSubAction(path.id, subRow.id, next)}
+                            connectedApps={connectedApps}
+                            triggerType={triggerType}
+                            prevSteps={prevSteps}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {path.actions.length < 10 && (
+                    subPickerOpen ? (
+                      <AddStepPicker
+                        onSelect={(type) => {
+                          addSubAction(path.id, type);
+                          setSubPickerForPath(null);
+                        }}
+                        onClose={() => setSubPickerForPath(null)}
+                        exclude={['branch']}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSubPickerForPath(path.id)}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
+                      >
+                        <Plus size={11} aria-hidden />
+                        Add step to this path
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {paths.length < 8 && (
+        <button
+          type="button"
+          onClick={addPath}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-300/70 py-2 text-[12px] font-medium text-blue-500 transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-950/20"
+        >
+          <Plus size={13} aria-hidden />
+          Add path
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── RunWorkflowActionConfig ──────────────────────────────────────────────────
+
+interface WorkflowListItem {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
+function RunWorkflowActionConfig({
+  row,
+  onChange,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+}) {
+  const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/workflows')
+      .then((r) => r.json())
+      .then((d) => {
+        setWorkflows((d.workflows ?? []) as WorkflowListItem[]);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const enabledWorkflows = workflows.filter((w) => w.enabled);
+
+  return (
+    <div className="space-y-2.5">
+      <FieldRow label="Sub-workflow" htmlFor={`act-subwf-${row.id}`}>
+        {loading ? (
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <Loader2 size={12} className="animate-spin" aria-hidden />
+            Loading workflows…
+          </p>
+        ) : enabledWorkflows.length === 0 ? (
+          <p className="text-[12px] text-muted-foreground">
+            No other enabled workflows found in this space.
+          </p>
+        ) : (
+          <MiniSelect
+            id={`act-subwf-${row.id}`}
+            value={row.subWorkflowId || '__none__'}
+            onValueChange={(v) => onChange({ subWorkflowId: v === '__none__' ? '' : v })}
+            options={[
+              { value: '__none__', label: 'Pick a workflow…' },
+              ...enabledWorkflows.map((w) => ({ value: w.id, label: w.name })),
+            ]}
+          />
+        )}
+      </FieldRow>
+      {row.subWorkflowId && (
+        <p className="text-[11px] text-muted-foreground/70">
+          ID: <span className="font-mono">{row.subWorkflowId}</span>
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground/60">
+        The selected workflow will run synchronously. Results are available via{' '}
+        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{'{{step#.runId}}'}</code>.
+      </p>
+    </div>
+  );
+}
+
+// ── LookupTableActionConfig ──────────────────────────────────────────────────
+
+function LookupTableActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps: ActionRowState[];
+}) {
+  type LookupEntry = { key: string; value: string };
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  function saveInputSel() {
+    const el = inputRef.current;
+    if (el) selRef.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+  }
+
+  function insertInputToken(token: string) {
+    const { start, end } = selRef.current;
+    const cur = row.lookupInput;
+    const next = cur.slice(0, start) + token + cur.slice(end);
+    onChange({ lookupInput: next });
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+        selRef.current = { start: pos, end: pos };
+      }
+    });
+  }
+
+  const entries: LookupEntry[] = useMemo(() => {
+    try {
+      const parsed = JSON.parse(row.lookupEntriesJson || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [row.lookupEntriesJson]);
+
+  function updateEntries(next: LookupEntry[]) {
+    onChange({ lookupEntriesJson: JSON.stringify(next) });
+  }
+
+  function addEntry() {
+    updateEntries([...entries, { key: '', value: '' }]);
+  }
+
+  function updateEntry(i: number, patch: Partial<LookupEntry>) {
+    const next = entries.map((e, idx) => (idx === i ? { ...e, ...patch } : e));
+    updateEntries(next);
+  }
+
+  function removeEntry(i: number) {
+    updateEntries(entries.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`act-lk-input-${row.id}`} className="text-[12px] text-muted-foreground">
+            Input value
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertInputToken} />
+        </div>
+        <Input
+          ref={inputRef}
+          id={`act-lk-input-${row.id}`}
+          value={row.lookupInput}
+          onChange={(e) => onChange({ lookupInput: e.target.value })}
+          onSelect={saveInputSel}
+          onKeyUp={saveInputSel}
+          onClick={saveInputSel}
+          placeholder="{{lead.score}} or literal value"
+          className="h-8"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[12px] text-muted-foreground">Key → Value pairs</Label>
+        {entries.length === 0 && (
+          <p className="text-[12px] text-muted-foreground/60 italic">
+            No entries yet. Add rows below.
+          </p>
+        )}
+        {entries.map((entry, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <Input
+              value={entry.key}
+              onChange={(e) => updateEntry(i, { key: e.target.value })}
+              placeholder="Key (exact match)"
+              className="h-7 flex-1 text-[12px]"
+            />
+            <span className="text-[11px] text-muted-foreground/50">→</span>
+            <Input
+              value={entry.value}
+              onChange={(e) => updateEntry(i, { value: e.target.value })}
+              placeholder="Value (output)"
+              className="h-7 flex-1 text-[12px]"
+            />
+            <button
+              type="button"
+              onClick={() => removeEntry(i)}
+              aria-label="Remove entry"
+              className="text-muted-foreground/40 transition-colors hover:text-destructive"
+            >
+              <X size={12} aria-hidden />
+            </button>
+          </div>
+        ))}
+        {entries.length < 50 && (
+          <button
+            type="button"
+            onClick={addEntry}
+            className="flex items-center gap-1 text-[12px] text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            <Plus size={11} aria-hidden />
+            Add row
+          </button>
+        )}
+      </div>
+
+      <FieldRow label="Fallback (if no match)" htmlFor={`act-lk-fallback-${row.id}`}>
+        <Input
+          id={`act-lk-fallback-${row.id}`}
+          value={row.lookupFallback}
+          onChange={(e) => onChange({ lookupFallback: e.target.value })}
+          placeholder="Leave blank to pass through input unchanged"
+          className="h-7 text-[12px]"
+        />
+      </FieldRow>
+
+      <p className="text-[11px] text-muted-foreground/60">
+        Result stored as{' '}
+        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{'{{lookup.output}}'}</code>.
+        Matching is case-insensitive.
+      </p>
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -4411,9 +5444,9 @@ function ActionConfig({
     return (
       <div className="space-y-2.5">
         <p className={CAPTION}>Pause the automation before the next step runs.</p>
-        {/* Mode toggle: relative vs until weekday */}
+        {/* Mode toggle: relative / until weekday / until date */}
         <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 w-fit">
-          {(['relative', 'until_weekday'] as const).map((m) => (
+          {(['relative', 'until_weekday', 'until_date'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -4424,7 +5457,7 @@ function ActionConfig({
                 mode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {m === 'relative' ? 'Wait duration' : 'Wait until day'}
+              {m === 'relative' ? 'Wait duration' : m === 'until_weekday' ? 'Wait until day' : 'Wait until date'}
             </button>
           ))}
         </div>
@@ -4455,7 +5488,7 @@ function ActionConfig({
               ]}
             />
           </div>
-        ) : (
+        ) : mode === 'until_weekday' ? (
           <div className="flex flex-wrap items-center gap-2">
             <Label className="text-[12px] text-muted-foreground">Until next</Label>
             <MiniSelect
@@ -4474,6 +5507,19 @@ function ActionConfig({
                 const h12 = ((h + 11) % 12) + 1;
                 return { value: String(h), label: `${h12}:00 ${ampm}` };
               })}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`act-delay-date-${row.id}`} className="text-[12px] text-muted-foreground">
+              Wait until
+            </Label>
+            <Input
+              id={`act-delay-date-${row.id}`}
+              type="date"
+              value={row.untilDate}
+              onChange={(e) => onChange({ untilDate: e.target.value })}
+              className="h-8 w-40"
             />
           </div>
         )}
@@ -4499,6 +5545,14 @@ function ActionConfig({
             </span>
           </div>
         )}
+        {mode === 'until_date' && row.untilDate && (
+          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+              Pauses until <span className="font-medium">{new Date(row.untilDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -4521,6 +5575,97 @@ function ActionConfig({
 
   if (row.type === 'notify_agent') {
     return <NotifyAgentActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'iterate') {
+    return <IterateActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'branch') {
+    return (
+      <BranchActionConfig
+        row={row}
+        onChange={onChange}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+        connectedApps={connectedApps}
+      />
+    );
+  }
+
+  if (row.type === 'run_workflow') {
+    return <RunWorkflowActionConfig row={row} onChange={onChange} />;
+  }
+
+  if (row.type === 'lookup_table') {
+    return (
+      <LookupTableActionConfig
+        row={row}
+        onChange={onChange}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
+      />
+    );
+  }
+
+  if (row.type === 'set_variable') {
+    return (
+      <div className="space-y-2.5">
+        <FieldRow label="Variable name" htmlFor={`act-sv-name-${row.id}`}>
+          <Input
+            id={`act-sv-name-${row.id}`}
+            value={row.varName}
+            onChange={(e) => onChange({ varName: e.target.value })}
+            placeholder="my_variable"
+            className="h-8 font-mono text-[12px]"
+          />
+        </FieldRow>
+        <FieldRow label="Value" htmlFor={`act-sv-val-${row.id}`}>
+          <Input
+            id={`act-sv-val-${row.id}`}
+            value={row.varValue}
+            onChange={(e) => onChange({ varValue: e.target.value })}
+            placeholder="{{lead.name}} or literal text"
+            className="h-8 text-[12px]"
+          />
+        </FieldRow>
+        <p className="text-[11px] text-muted-foreground/60">
+          Access this value in later steps as{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{`{{vars.${row.varName || 'name'}}}`}</code>.
+          Names must start with a letter or underscore.
+        </p>
+      </div>
+    );
+  }
+
+  if (row.type === 'get_variable') {
+    return (
+      <div className="space-y-2.5">
+        <FieldRow label="Variable name" htmlFor={`act-gv-name-${row.id}`}>
+          <Input
+            id={`act-gv-name-${row.id}`}
+            value={row.varName}
+            onChange={(e) => onChange({ varName: e.target.value })}
+            placeholder="my_variable"
+            className="h-8 font-mono text-[12px]"
+          />
+        </FieldRow>
+        <FieldRow label="Default (if not set)" htmlFor={`act-gv-default-${row.id}`}>
+          <Input
+            id={`act-gv-default-${row.id}`}
+            value={row.varDefault}
+            onChange={(e) => onChange({ varDefault: e.target.value })}
+            placeholder="Leave blank for empty string"
+            className="h-8 text-[12px]"
+          />
+        </FieldRow>
+        <p className="text-[11px] text-muted-foreground/60">
+          The value is available as{' '}
+          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{`{{vars.${row.varName || 'name'}}}`}</code>{' '}
+          in this and all subsequent steps.
+        </p>
+      </div>
+    );
   }
 
   // call_integration — app + action picker; key-value params editor.

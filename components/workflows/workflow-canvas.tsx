@@ -173,6 +173,12 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   formatter: 'Format data',
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
+  iterate: 'Loop over a list',
+  branch: 'Paths — conditional branching',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -183,10 +189,12 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'notify_agent',
   'schedule_message',
   'filter',
+  'iterate',
   'formatter',
   'delay',
   'call_integration',
   'webhook_post',
+  'branch',
 ];
 
 const OPERATOR_LABELS: Record<Operator, string> = {
@@ -228,6 +236,12 @@ function actionFace(action: WorkflowAction | undefined): string {
       return action.config.toolkit ? `Call ${action.config.toolkit}` : 'Call a connected app';
     case 'run_chippi':
       return 'Ask Chippi';
+    case 'iterate':
+      return action.config.source ? `Loop over ${action.config.source}` : 'Loop over a list';
+    case 'branch': {
+      const count = action.config.paths.length;
+      return count > 0 ? `${count} path${count === 1 ? '' : 's'}` : 'Conditional paths';
+    }
     default:
       return 'Action';
   }
@@ -1067,7 +1081,11 @@ function ActionInspector({
                         ? { type, config: { field: '', operator: 'eq' as const } }
                         : type === 'formatter'
                           ? { type, config: { input: '', operation: 'uppercase' as const } }
-                          : { type: 'run_chippi', config: { instruction: '' } };
+                          : type === 'iterate'
+                            ? { type, config: { source: '', instruction: '' } }
+                            : type === 'branch'
+                              ? { type, config: { paths: [{ field: '', operator: 'eq' as const, value: '', actions: [{ type: 'draft_message' as const, config: { channel: 'email' as const, instruction: '' } }] }] } }
+                              : { type: 'run_chippi', config: { instruction: '' } };
     onChange(next);
   }
 
@@ -1247,6 +1265,58 @@ function ActionInspector({
               }
               placeholder="Score hit threshold — tap to review."
               rows={2}
+            />
+          </FieldBlock>
+        </>
+      )}
+
+      {action.type === 'iterate' && (
+        <>
+          <FieldBlock label="Source array (dot-path)">
+            <Input
+              value={action.config.source}
+              onChange={(e) =>
+                onChange({ type: 'iterate', config: { ...action.config, source: e.target.value } })
+              }
+              placeholder="lead.tags"
+              className="h-8 font-mono text-xs"
+            />
+          </FieldBlock>
+          <FieldBlock label="Per-item instruction">
+            <Textarea
+              value={action.config.instruction}
+              onChange={(e) =>
+                onChange({
+                  type: 'iterate',
+                  config: { ...action.config, instruction: e.target.value },
+                })
+              }
+              placeholder="Handle {{item}} — e.g. draft a message about {{item}}"
+              rows={3}
+            />
+          </FieldBlock>
+          <FieldBlock label="Limit (optional, max 50)">
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={50}
+              value={action.config.limit === undefined ? '' : String(action.config.limit)}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                const limit = raw === '' ? undefined : Math.min(50, Math.max(1, Number(raw)));
+                onChange({
+                  type: 'iterate',
+                  config: {
+                    source: action.config.source,
+                    instruction: action.config.instruction,
+                    ...(limit === undefined || Number.isNaN(limit) ? {} : { limit }),
+                    ...(action.config.outputField ? { outputField: action.config.outputField } : {}),
+                  },
+                });
+              }}
+              placeholder="10"
+              className="h-8 w-24"
             />
           </FieldBlock>
         </>

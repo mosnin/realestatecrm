@@ -28,6 +28,27 @@ import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
 /**
+ * Retry a function up to maxAttempts times with exponential backoff.
+ * Retries only when isTransient returns true; permanent failures (4xx) are
+ * returned immediately. Matches Zapier's default error-retry behaviour.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  isTransient: (result: T) => boolean,
+  maxAttempts = 3,
+  baseDelayMs = 1000,
+): Promise<T> {
+  let last: T | undefined;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await fn();
+    if (!isTransient(result) || attempt === maxAttempts) return result;
+    last = result;
+    await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** (attempt - 1)));
+  }
+  return last!;
+}
+
+/**
  * The trigger context an action runs against — the same object shape passed to
  * `evaluateConditions`. The trigger event plus whatever entity rows the
  * trigger-wiring pass resolved. All fields are optional; an action reads
@@ -114,6 +135,24 @@ function resolveTokens(template: string, context: WorkflowContext): string {
       const fmtData = context.formatter;
       if (fmtData && typeof fmtData === 'object') {
         value = resolveField(fmtData as Record<string, unknown>, rest);
+      }
+    } else if (ns === 'item') {
+      // Inside iterate loops the context carries `item`, `item.index`, `item.count`.
+      const itemData = (context as Record<string, unknown>).item;
+      if (rest === 'index' || rest === 'count') {
+        value = (context as Record<string, unknown>)[`item.${rest}`];
+      } else if (itemData !== undefined && itemData !== null) {
+        value = typeof itemData === 'object' ? resolveField(itemData as Record<string, unknown>, rest) : itemData;
+      }
+    } else if (ns === 'lookup') {
+      const lookupData = (context as Record<string, unknown>).lookup;
+      if (lookupData && typeof lookupData === 'object') {
+        value = resolveField(lookupData as Record<string, unknown>, rest);
+      }
+    } else if (ns === 'vars') {
+      const varsData = (context as Record<string, unknown>).vars;
+      if (varsData && typeof varsData === 'object') {
+        value = resolveField(varsData as Record<string, unknown>, rest);
       }
     }
 
@@ -396,12 +435,14 @@ function minutesUntilWeekdayHour(weekday: number, hour: number): number {
 function runDelay(
   action: Extract<WorkflowAction, { type: 'delay' }>,
 ): ActionStepResult {
-  const { delayMode, delayMinutes, untilWeekday, untilHour } = action.config;
+  const { delayMode, delayMinutes, untilWeekday, untilHour, untilDate } = action.config;
   const mode = delayMode ?? 'relative';
   const computedMinutes =
     mode === 'until_weekday' && untilWeekday !== undefined && untilHour !== undefined
       ? minutesUntilWeekdayHour(untilWeekday, untilHour)
-      : (delayMinutes ?? 1);
+      : mode === 'until_date' && untilDate
+        ? Math.max(1, Math.round((new Date(untilDate).getTime() - Date.now()) / 60_000))
+        : (delayMinutes ?? 1);
 
   return {
     status: 'ok',
@@ -475,7 +516,7 @@ function runFormatter(
   action: Extract<WorkflowAction, { type: 'formatter' }>,
   context: WorkflowContext,
 ): ActionStepResult {
-  const { input, operation, find, replacement, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
+  const { input, operation, find, replacement, regexPattern, regexFlags, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
   const resolved = resolveField(context as Record<string, unknown>, input);
   const strValue = String(resolved !== undefined && resolved !== null ? resolved : input);
 
@@ -484,12 +525,26 @@ function runFormatter(
     case 'uppercase': output = strValue.toUpperCase(); break;
     case 'lowercase': output = strValue.toLowerCase(); break;
     case 'capitalize': output = strValue.charAt(0).toUpperCase() + strValue.slice(1).toLowerCase(); break;
+    case 'title_case': {
+      output = strValue.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      break;
+    }
     case 'trim': output = strValue.trim(); break;
     case 'replace': {
       const needle = find ?? '';
       if (!needle) { output = strValue; break; }
       const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       output = strValue.replace(new RegExp(escaped, 'g'), replacement ?? '');
+      break;
+    }
+    case 'regex_extract': {
+      if (!regexPattern) { output = ''; break; }
+      try {
+        const flags = (regexFlags ?? '').replace(/[^gimsuy]/g, '');
+        const re = new RegExp(regexPattern, flags);
+        const m = strValue.match(re);
+        output = m ? (m[1] ?? m[0]) : '';
+      } catch { output = ''; }
       break;
     }
     case 'number_format': {
@@ -519,6 +574,11 @@ function runFormatter(
       output = m ? m[0] : '';
       break;
     }
+    case 'extract_url': {
+      const m = strValue.match(/https?:\/\/[^\s"'<>]+/);
+      output = m ? m[0] : '';
+      break;
+    }
     case 'default_value': {
       output = strValue.trim() !== '' ? strValue : (fallback ?? '');
       break;
@@ -534,6 +594,10 @@ function runFormatter(
       output = String(strValue.length);
       break;
     }
+    case 'count_words': {
+      output = String(strValue.trim() === '' ? 0 : strValue.trim().split(/\s+/).length);
+      break;
+    }
     case 'split': {
       const sep = splitSeparator ?? ',';
       const idx = (splitIndex ?? 1) - 1; // 1-based in config, 0-based internally
@@ -543,6 +607,18 @@ function runFormatter(
     }
     case 'url_encode': {
       output = encodeURIComponent(strValue);
+      break;
+    }
+    case 'url_decode': {
+      try { output = decodeURIComponent(strValue); } catch { output = strValue; }
+      break;
+    }
+    case 'remove_html': {
+      output = strValue.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+      break;
+    }
+    case 'reverse': {
+      output = strValue.split('').reverse().join('');
       break;
     }
     default: output = strValue;
@@ -729,27 +805,279 @@ async function runWebhookPost(
     }
   }
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: body ?? '{}',
-      signal: AbortSignal.timeout(10_000),
-    });
-    const text = await res.text().then((t) => t.slice(0, 10_000));
-    return {
-      status: res.ok ? 'ok' : 'failed',
-      detail: {
-        url,
-        statusCode: res.status,
-        ok: res.ok,
-        responseSnippet: text.slice(0, 500),
-        ...(res.ok ? {} : { error: `HTTP ${res.status}` }),
-      },
-    };
-  } catch (err) {
-    return { status: 'failed', detail: { url, error: err instanceof Error ? err.message : String(err) } };
+  type FetchOutcome = { ok: boolean; status: number; text: string } | { networkError: string };
+  const isFetchTransient = (r: FetchOutcome) =>
+    'networkError' in r || (!('networkError' in r) && r.status >= 500);
+
+  const outcome = await withRetry<FetchOutcome>(
+    async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: body ?? '{}',
+          signal: AbortSignal.timeout(10_000),
+        });
+        const text = await res.text().then((t) => t.slice(0, 10_000));
+        return { ok: res.ok, status: res.status, text };
+      } catch (err) {
+        return { networkError: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    isFetchTransient,
+    3,
+    1000,
+  );
+
+  if ('networkError' in outcome) {
+    return { status: 'failed', detail: { url, error: outcome.networkError } };
   }
+  return {
+    status: outcome.ok ? 'ok' : 'failed',
+    detail: {
+      url,
+      statusCode: outcome.status,
+      ok: outcome.ok,
+      responseSnippet: outcome.text.slice(0, 500),
+      ...(outcome.ok ? {} : { error: `HTTP ${outcome.status}` }),
+    },
+  };
+}
+
+/**
+ * iterate: loop over an array and run an AI instruction for each item.
+ * Equivalent to Zapier's "Looping by Zapier". Resolves the source to an array
+ * (via dot-path in context or JSON parse), calls runAutonomousInstruction for
+ * each element up to `limit`, and stashes results in context[outputField].
+ */
+async function runIterate(
+  action: Extract<WorkflowAction, { type: 'iterate' }>,
+  context: WorkflowContext,
+  spaceId: string,
+): Promise<ActionStepResult> {
+  const { source, instruction, limit = 10, outputField = 'iterate' } = action.config;
+
+  // Resolve source: try dot-path first, then JSON parse of a resolved token.
+  const resolvedSource = resolveTokens(source, context);
+  let items: unknown[] = [];
+  const fieldVal = resolveField(context, resolvedSource);
+  if (Array.isArray(fieldVal)) {
+    items = fieldVal;
+  } else {
+    try {
+      const parsed = JSON.parse(resolvedSource);
+      if (Array.isArray(parsed)) items = parsed;
+      else if (parsed != null) items = [parsed];
+    } catch {
+      if (fieldVal != null) items = [fieldVal];
+    }
+  }
+
+  if (items.length === 0) {
+    return { status: 'ok', detail: { source: resolvedSource, processed: 0, total: 0, results: [] } };
+  }
+
+  const capped = items.slice(0, limit);
+  const summaries: string[] = [];
+  let failedCount = 0;
+
+  for (let itemIdx = 0; itemIdx < capped.length; itemIdx++) {
+    const item = capped[itemIdx];
+    const itemStr = typeof item === 'object' ? JSON.stringify(item) : String(item ?? '');
+    // Expose {{item}}, {{item.index}} (1-based), {{item.count}} (total items).
+    const itemCtx = { ...context, item, 'item.index': itemIdx + 1, 'item.count': capped.length };
+    const itemInstruction = resolveTokens(instruction, itemCtx).replace(/\{\{item\}\}/g, itemStr);
+    try {
+      const result = await runAutonomousInstruction({ spaceId, instruction: itemInstruction });
+      summaries.push(result.summary ?? '');
+      if (!result.ok) failedCount++;
+    } catch (err) {
+      summaries.push('');
+      failedCount++;
+      logger.error('[workflows.iterate] item failed', { spaceId }, err);
+    }
+  }
+
+  // Stash results into context so subsequent steps can reference them.
+  (context as Record<string, unknown>)[outputField] = summaries;
+
+  const allFailed = failedCount === capped.length && capped.length > 0;
+  return {
+    status: allFailed ? 'failed' : 'ok',
+    detail: {
+      source: resolvedSource,
+      processed: capped.length,
+      total: items.length,
+      capped: items.length > limit,
+      failed: failedCount,
+      results: summaries.slice(0, 5).map((s) => ({ responseSnippet: s.slice(0, 200) })),
+    },
+  };
+}
+
+/**
+ * branch — evaluate up to 4 conditional paths in order and run the first
+ * matching path's sub-actions. Each path is a single AND condition against
+ * the workflow context. If no path matches and defaultActions are configured,
+ * those run instead. Never throws.
+ */
+async function runBranch(
+  action: Extract<WorkflowAction, { type: 'branch' }>,
+  context: WorkflowContext,
+  opts: ExecuteActionOptions,
+): Promise<ActionStepResult> {
+  const { paths, defaultActions } = action.config;
+
+  for (const path of paths) {
+    const matched = evaluateConditions(
+      { op: 'and', rules: [{ field: path.field, operator: path.operator, value: path.value }] },
+      context as Record<string, unknown>,
+    );
+    if (matched) {
+      const results: ActionStepResult[] = [];
+      for (const subAction of path.actions as WorkflowAction[]) {
+        const r = await executeAction(subAction, context, opts);
+        results.push(r);
+        if (r.stop) break;
+      }
+      const anyFailed = results.some((r) => r.status === 'failed');
+      return {
+        status: anyFailed ? 'failed' : 'ok',
+        detail: {
+          pathTaken: path.label ?? path.field,
+          stepsRun: results.length,
+          results: results.map((r) => ({ status: r.status })),
+        },
+      };
+    }
+  }
+
+  // No path matched — run default actions if present.
+  if (defaultActions && defaultActions.length > 0) {
+    const results: ActionStepResult[] = [];
+    for (const subAction of defaultActions as WorkflowAction[]) {
+      const r = await executeAction(subAction, context, opts);
+      results.push(r);
+      if (r.stop) break;
+    }
+    return {
+      status: results.some((r) => r.status === 'failed') ? 'failed' : 'ok',
+      detail: { pathTaken: 'default', stepsRun: results.length },
+    };
+  }
+
+  return { status: 'ok', detail: { pathTaken: null, reason: 'No path conditions matched' } };
+}
+
+/**
+ * run_workflow — invoke another workflow by ID as a sub-step (Zapier-style "Sub-Zap").
+ * Scoped to the same spaceId for security. Max nesting depth = 3 to prevent
+ * infinite loops (A calls B calls A). Uses a dynamic import to avoid a circular
+ * dependency with executor.ts (which imports this file).
+ */
+async function runSubWorkflow(
+  action: Extract<WorkflowAction, { type: 'run_workflow' }>,
+  context: WorkflowContext,
+  opts: ExecuteActionOptions,
+): Promise<ActionStepResult> {
+  const { workflowId } = action.config;
+
+  // Depth guard — stored as a private key on context to thread through nested calls.
+  const depth = ((context as Record<string, unknown>)._subWorkflowDepth as number) ?? 0;
+  if (depth >= 3) {
+    return { status: 'failed', detail: { error: 'Max sub-workflow nesting depth (3) exceeded', workflowId } };
+  }
+
+  // Load the target workflow — must belong to the same space.
+  const { data: targetWf, error: wfErr } = await supabase
+    .from('Workflow')
+    .select('id, spaceId, trigger, conditions, actions, autonomy')
+    .eq('id', workflowId)
+    .eq('spaceId', opts.spaceId)
+    .eq('enabled', true)
+    .single();
+
+  if (wfErr || !targetWf) {
+    return {
+      status: 'failed',
+      detail: { error: wfErr?.message ?? 'Target workflow not found or disabled', workflowId },
+    };
+  }
+
+  // Dynamic import breaks the circular dependency at module-load time while
+  // still allowing the call at runtime (after all modules are fully loaded).
+  const { runWorkflow } = await import('./executor');
+  const subContext: WorkflowContext = { ...context, _subWorkflowDepth: depth + 1 };
+
+  const result = await runWorkflow({
+    workflow: targetWf as Parameters<typeof runWorkflow>[0]['workflow'],
+    context: subContext,
+    triggerEvent: { type: 'sub_workflow', callerRunId: opts.runId, workflowId },
+  });
+
+  return {
+    status: result.status === 'failed' ? 'failed' : 'ok',
+    detail: { workflowId, runId: result.runId, status: result.status },
+  };
+}
+
+/**
+ * lookup_table — map an input value to an output via a hardcoded key→value table.
+ * Equivalent to Zapier's "Lookup Table" built-in app. Pure, no external calls.
+ * The result is stored in context.lookup.output for subsequent steps to reference.
+ */
+function runLookupTable(
+  action: Extract<WorkflowAction, { type: 'lookup_table' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { input, entries, fallback } = action.config;
+  const resolvedInput = resolveTokens(input, context);
+
+  // Case-insensitive key match.
+  const match = entries.find((e) => e.key.trim().toLowerCase() === resolvedInput.trim().toLowerCase());
+  const output = match ? match.value : (fallback ?? resolvedInput);
+
+  // Stash in context so later steps can read '{{lookup.output}}'.
+  (context as Record<string, unknown>).lookup = { output, input: resolvedInput, matched: !!match };
+
+  return {
+    status: 'ok',
+    detail: { input: resolvedInput, matched: !!match, output, matchedKey: match?.key ?? null },
+  };
+}
+
+/**
+ * set_variable — write a named variable into the run context under {{vars.name}}.
+ * Equivalent to Zapier's Storage set action. Tokens in `value` are resolved first.
+ */
+function runSetVariable(
+  action: Extract<WorkflowAction, { type: 'set_variable' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { name, value } = action.config;
+  const resolvedValue = resolveTokens(value, context);
+  const ctx = context as Record<string, unknown>;
+  if (!ctx.vars || typeof ctx.vars !== 'object') ctx.vars = {};
+  (ctx.vars as Record<string, string>)[name] = resolvedValue;
+  return { status: 'ok', detail: { name, value: resolvedValue } };
+}
+
+/**
+ * get_variable — read a named variable from context; falls back to defaultValue.
+ * The retrieved value is available as {{vars.name}} in subsequent steps.
+ */
+function runGetVariable(
+  action: Extract<WorkflowAction, { type: 'get_variable' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { name, defaultValue } = action.config;
+  const ctx = context as Record<string, unknown>;
+  const vars = ctx.vars && typeof ctx.vars === 'object' ? (ctx.vars as Record<string, string>) : {};
+  const found = Object.prototype.hasOwnProperty.call(vars, name);
+  const value = found ? vars[name] : (defaultValue ?? '');
+  if (!ctx.vars || typeof ctx.vars !== 'object') ctx.vars = {};
+  (ctx.vars as Record<string, string>)[name] = String(value);
+  return { status: 'ok', detail: { name, value, found } };
 }
 
 /**
@@ -761,6 +1089,9 @@ export async function executeAction(
   context: WorkflowContext,
   opts: ExecuteActionOptions,
 ): Promise<ActionStepResult> {
+  if (action.enabled === false) {
+    return { status: 'skipped', detail: { reason: 'step disabled', type: action.type } };
+  }
   try {
     switch (action.type) {
       case 'draft_message':
@@ -785,6 +1116,18 @@ export async function executeAction(
         return await runUpdateLead(action, context, opts.spaceId);
       case 'notify_agent':
         return await runNotifyAgent(action, context, opts.spaceId);
+      case 'iterate':
+        return await runIterate(action, context, opts.spaceId);
+      case 'branch':
+        return await runBranch(action, context, opts);
+      case 'run_workflow':
+        return await runSubWorkflow(action, context, opts);
+      case 'lookup_table':
+        return runLookupTable(action, context);
+      case 'set_variable':
+        return runSetVariable(action, context);
+      case 'get_variable':
+        return runGetVariable(action, context);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;
