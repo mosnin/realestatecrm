@@ -175,6 +175,8 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   update_lead: 'Update this lead',
   iterate: 'Loop over a list',
   branch: 'Paths — conditional branching',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [

@@ -112,6 +112,10 @@ function blankAction(): WorkflowFormState['actions'][number] {
     notifyTitle: '',
     notifyBody: '',
     branchPaths: [],
+    subWorkflowId: '',
+    lookupInput: '',
+    lookupEntriesJson: '',
+    lookupFallback: '',
   };
 }
 

@@ -185,6 +185,14 @@ export interface ActionRowState {
   notifyBody: string;
   /** branch: the conditional path lanes. */
   branchPaths?: BranchPathFormState[];
+  /** run_workflow: the ID of the workflow to invoke as a sub-step. */
+  subWorkflowId: string;
+  /** lookup_table: the input value to look up (supports {{tokens}}). */
+  lookupInput: string;
+  /** lookup_table: JSON-encoded array of {key, value} entries. */
+  lookupEntriesJson: string;
+  /** lookup_table: fallback value when no matching key is found. */
+  lookupFallback: string;
 }
 
 export interface WorkflowFormState {
@@ -527,6 +535,37 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...maxRetriesProp,
         ...enabledProp,
         config: cfg,
+      };
+    }
+    case 'run_workflow':
+      return {
+        type: 'run_workflow',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: { workflowId: row.subWorkflowId.trim() },
+      };
+    case 'lookup_table': {
+      let entries: { key: string; value: string }[] = [];
+      const trimmed = row.lookupEntriesJson.trim();
+      if (trimmed) {
+        try { entries = JSON.parse(trimmed) as { key: string; value: string }[]; } catch { /* schema will reject */ }
+      }
+      const fallback = row.lookupFallback.trim();
+      return {
+        type: 'lookup_table',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
+        ...enabledProp,
+        config: {
+          input: row.lookupInput.trim(),
+          entries,
+          ...(fallback ? { fallback } : {}),
+        },
       };
     }
     default: {

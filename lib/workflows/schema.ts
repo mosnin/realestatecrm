@@ -208,7 +208,9 @@ export type WorkflowActionType =
   | 'update_lead'
   | 'notify_agent'
   | 'iterate'
-  | 'branch';
+  | 'branch'
+  | 'run_workflow'
+  | 'lookup_table';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -517,6 +519,42 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
         instruction: z.string().trim().min(1).max(LONG_TEXT),
         limit: z.number().int().min(1).max(50).optional(),
         outputField: z.string().trim().max(100).optional(),
+      })
+      .strict(),
+  }),
+  // run_workflow: invoke another workflow by ID (Zapier-style "Sub-Zap").
+  // Max nesting depth is enforced at runtime (3 levels) to prevent infinite loops.
+  z.object({
+    type: z.literal('run_workflow'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        workflowId: z.string().uuid(),
+      })
+      .strict(),
+  }),
+  // lookup_table: map an input value to an output via a hardcoded key→value table.
+  // Equivalent to Zapier's "Lookup Table" built-in app. Falls back to `fallback`
+  // (or the raw input) when no matching key is found.
+  z.object({
+    type: z.literal('lookup_table'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    maxRetries: stepMaxRetries,
+    enabled: stepEnabled,
+    config: z
+      .object({
+        input: z.string().trim().min(1).max(SHORT_TEXT),
+        entries: z
+          .array(z.object({ key: z.string().max(200), value: z.string().max(500) }).strict())
+          .min(1)
+          .max(50),
+        fallback: z.string().max(500).optional(),
       })
       .strict(),
   }),

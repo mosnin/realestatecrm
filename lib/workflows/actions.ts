@@ -960,6 +960,83 @@ async function runBranch(
 }
 
 /**
+ * run_workflow — invoke another workflow by ID as a sub-step (Zapier-style "Sub-Zap").
+ * Scoped to the same spaceId for security. Max nesting depth = 3 to prevent
+ * infinite loops (A calls B calls A). Uses a dynamic import to avoid a circular
+ * dependency with executor.ts (which imports this file).
+ */
+async function runSubWorkflow(
+  action: Extract<WorkflowAction, { type: 'run_workflow' }>,
+  context: WorkflowContext,
+  opts: ExecuteActionOptions,
+): Promise<ActionStepResult> {
+  const { workflowId } = action.config;
+
+  // Depth guard — stored as a private key on context to thread through nested calls.
+  const depth = ((context as Record<string, unknown>)._subWorkflowDepth as number) ?? 0;
+  if (depth >= 3) {
+    return { status: 'failed', detail: { error: 'Max sub-workflow nesting depth (3) exceeded', workflowId } };
+  }
+
+  // Load the target workflow — must belong to the same space.
+  const { data: targetWf, error: wfErr } = await supabase
+    .from('Workflow')
+    .select('id, spaceId, trigger, conditions, actions, autonomy')
+    .eq('id', workflowId)
+    .eq('spaceId', opts.spaceId)
+    .eq('enabled', true)
+    .single();
+
+  if (wfErr || !targetWf) {
+    return {
+      status: 'failed',
+      detail: { error: wfErr?.message ?? 'Target workflow not found or disabled', workflowId },
+    };
+  }
+
+  // Dynamic import breaks the circular dependency at module-load time while
+  // still allowing the call at runtime (after all modules are fully loaded).
+  const { runWorkflow } = await import('./executor');
+  const subContext: WorkflowContext = { ...context, _subWorkflowDepth: depth + 1 };
+
+  const result = await runWorkflow({
+    workflow: targetWf as Parameters<typeof runWorkflow>[0]['workflow'],
+    context: subContext,
+    triggerEvent: { type: 'sub_workflow', callerRunId: opts.runId, workflowId },
+  });
+
+  return {
+    status: result.status === 'failed' ? 'failed' : 'ok',
+    detail: { workflowId, runId: result.runId, status: result.status },
+  };
+}
+
+/**
+ * lookup_table — map an input value to an output via a hardcoded key→value table.
+ * Equivalent to Zapier's "Lookup Table" built-in app. Pure, no external calls.
+ * The result is stored in context.lookup.output for subsequent steps to reference.
+ */
+function runLookupTable(
+  action: Extract<WorkflowAction, { type: 'lookup_table' }>,
+  context: WorkflowContext,
+): ActionStepResult {
+  const { input, entries, fallback } = action.config;
+  const resolvedInput = resolveTokens(input, context);
+
+  // Case-insensitive key match.
+  const match = entries.find((e) => e.key.trim().toLowerCase() === resolvedInput.trim().toLowerCase());
+  const output = match ? match.value : (fallback ?? resolvedInput);
+
+  // Stash in context so later steps can read '{{lookup.output}}'.
+  (context as Record<string, unknown>).lookup = { output, input: resolvedInput, matched: !!match };
+
+  return {
+    status: 'ok',
+    detail: { input: resolvedInput, matched: !!match, output, matchedKey: match?.key ?? null },
+  };
+}
+
+/**
  * Execute one workflow action and return its step result. Never throws — any
  * unexpected error is caught and surfaced as `{ status: 'failed' }`.
  */
@@ -999,6 +1076,10 @@ export async function executeAction(
         return await runIterate(action, context, opts.spaceId);
       case 'branch':
         return await runBranch(action, context, opts);
+      case 'run_workflow':
+        return await runSubWorkflow(action, context, opts);
+      case 'lookup_table':
+        return runLookupTable(action, context);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

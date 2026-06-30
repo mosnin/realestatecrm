@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff, Workflow as WorkflowIcon, Table2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -241,6 +241,8 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   notify_agent: 'Notify me — send a push alert',
   iterate: 'Loop / Iterate',
   branch: 'Paths — conditional branching',
+  run_workflow: 'Run another workflow',
+  lookup_table: 'Lookup table',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -254,19 +256,21 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'filter',
   'branch',
   'formatter',
+  'lookup_table',
   'delay',
   'iterate',
   'webhook_post',
+  'run_workflow',
 ];
 
 const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   {
     label: 'Actions',
-    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post'],
+    keys: ['call_integration', 'draft_message', 'run_chippi', 'create_task', 'update_lead', 'notify_agent', 'schedule_message', 'webhook_post', 'run_workflow'],
   },
   {
     label: 'Logic',
-    keys: ['filter', 'branch', 'formatter', 'delay', 'iterate'],
+    keys: ['filter', 'branch', 'formatter', 'lookup_table', 'delay', 'iterate'],
   },
 ];
 
@@ -284,6 +288,8 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   notify_agent: BellRing,
   iterate: RotateCcw,
   branch: GitBranch,
+  run_workflow: WorkflowIcon,
+  lookup_table: Table2,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -300,6 +306,8 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   notify_agent: 'Push a personal alert to your phone or browser — stay in the loop',
   iterate: 'Run steps for each item in a list',
   branch: 'Route the workflow down different paths based on conditions',
+  run_workflow: 'Trigger another workflow as a sub-step (Sub-Zap)',
+  lookup_table: 'Map a value to another using a key→value table',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -555,6 +563,10 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     notifyTitle: '',
     notifyBody: '',
     branchPaths: [],
+    subWorkflowId: '',
+    lookupInput: '',
+    lookupEntriesJson: '',
+    lookupFallback: '',
   };
 }
 
@@ -679,6 +691,10 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       updateValue: a.type === 'update_lead' ? a.config.value : '',
       notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
       notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
+      subWorkflowId: a.type === 'run_workflow' ? a.config.workflowId : '',
+      lookupInput: a.type === 'lookup_table' ? a.config.input : '',
+      lookupEntriesJson: a.type === 'lookup_table' ? JSON.stringify(a.config.entries) : '',
+      lookupFallback: a.type === 'lookup_table' ? (a.config.fallback ?? '') : '',
       branchPaths: a.type === 'branch'
         ? a.config.paths.map((p) => ({
             id: nextRowId('bp'),
@@ -1024,6 +1040,10 @@ function actionSummary(row: ActionRowState): string {
       const count = row.branchPaths?.length ?? 0;
       return count > 0 ? `${count} path${count === 1 ? '' : 's'} configured` : 'No paths configured';
     }
+    case 'run_workflow':
+      return row.subWorkflowId ? `Sub-workflow: ${row.subWorkflowId.slice(0, 8)}…` : 'No workflow selected';
+    case 'lookup_table':
+      return row.lookupInput ? `Lookup: ${row.lookupInput}` : 'No input set';
     default:
       return '';
   }
@@ -1085,6 +1105,20 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-blue-400 dark:border-l-blue-500/70',
       badge: 'bg-blue-500',
       icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
+    };
+  }
+  if (type === 'run_workflow') {
+    return {
+      border: 'border-l-purple-400 dark:border-l-purple-500/70',
+      badge: 'bg-purple-500',
+      icon: 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
+    };
+  }
+  if (type === 'lookup_table') {
+    return {
+      border: 'border-l-cyan-400 dark:border-l-cyan-500/70',
+      badge: 'bg-cyan-500',
+      icon: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400',
     };
   }
   return {
@@ -1958,6 +1992,8 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   condition: 'Condition check',
   iterate: 'Loop / Iterate',
   branch: 'Paths — conditional branching',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
 };
 
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -1974,6 +2010,8 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
   iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
   branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
+  run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
+  lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -2039,6 +2077,15 @@ function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actio
     add('path taken', obj.pathTaken != null ? String(obj.pathTaken) : 'none matched');
     if (obj.stepsRun !== undefined) add('steps run', obj.stepsRun);
     if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'run_workflow') {
+    add('workflow id', obj.workflowId);
+    add('run id', obj.runId);
+    add('status', obj.status);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'lookup_table') {
+    add('input', obj.input);
+    add('matched', obj.matched !== undefined ? (obj.matched ? `yes (${obj.matchedKey})` : 'no') : undefined);
+    add('output', obj.output);
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
@@ -5035,6 +5082,223 @@ function BranchActionConfig({
   );
 }
 
+// ── RunWorkflowActionConfig ──────────────────────────────────────────────────
+
+interface WorkflowListItem {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
+function RunWorkflowActionConfig({
+  row,
+  onChange,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+}) {
+  const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/workflows')
+      .then((r) => r.json())
+      .then((d) => {
+        setWorkflows((d.workflows ?? []) as WorkflowListItem[]);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const enabledWorkflows = workflows.filter((w) => w.enabled);
+
+  return (
+    <div className="space-y-2.5">
+      <FieldRow label="Sub-workflow" htmlFor={`act-subwf-${row.id}`}>
+        {loading ? (
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <Loader2 size={12} className="animate-spin" aria-hidden />
+            Loading workflows…
+          </p>
+        ) : enabledWorkflows.length === 0 ? (
+          <p className="text-[12px] text-muted-foreground">
+            No other enabled workflows found in this space.
+          </p>
+        ) : (
+          <MiniSelect
+            id={`act-subwf-${row.id}`}
+            value={row.subWorkflowId || '__none__'}
+            onValueChange={(v) => onChange({ subWorkflowId: v === '__none__' ? '' : v })}
+            options={[
+              { value: '__none__', label: 'Pick a workflow…' },
+              ...enabledWorkflows.map((w) => ({ value: w.id, label: w.name })),
+            ]}
+          />
+        )}
+      </FieldRow>
+      {row.subWorkflowId && (
+        <p className="text-[11px] text-muted-foreground/70">
+          ID: <span className="font-mono">{row.subWorkflowId}</span>
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground/60">
+        The selected workflow will run synchronously. Results are available via{' '}
+        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{'{{step#.runId}}'}</code>.
+      </p>
+    </div>
+  );
+}
+
+// ── LookupTableActionConfig ──────────────────────────────────────────────────
+
+function LookupTableActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps,
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps: ActionRowState[];
+}) {
+  type LookupEntry = { key: string; value: string };
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  function saveInputSel() {
+    const el = inputRef.current;
+    if (el) selRef.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+  }
+
+  function insertInputToken(token: string) {
+    const { start, end } = selRef.current;
+    const cur = row.lookupInput;
+    const next = cur.slice(0, start) + token + cur.slice(end);
+    onChange({ lookupInput: next });
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+        selRef.current = { start: pos, end: pos };
+      }
+    });
+  }
+
+  const entries: LookupEntry[] = useMemo(() => {
+    try {
+      const parsed = JSON.parse(row.lookupEntriesJson || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [row.lookupEntriesJson]);
+
+  function updateEntries(next: LookupEntry[]) {
+    onChange({ lookupEntriesJson: JSON.stringify(next) });
+  }
+
+  function addEntry() {
+    updateEntries([...entries, { key: '', value: '' }]);
+  }
+
+  function updateEntry(i: number, patch: Partial<LookupEntry>) {
+    const next = entries.map((e, idx) => (idx === i ? { ...e, ...patch } : e));
+    updateEntries(next);
+  }
+
+  function removeEntry(i: number) {
+    updateEntries(entries.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`act-lk-input-${row.id}`} className="text-[12px] text-muted-foreground">
+            Input value
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertInputToken} />
+        </div>
+        <Input
+          ref={inputRef}
+          id={`act-lk-input-${row.id}`}
+          value={row.lookupInput}
+          onChange={(e) => onChange({ lookupInput: e.target.value })}
+          onSelect={saveInputSel}
+          onKeyUp={saveInputSel}
+          onClick={saveInputSel}
+          placeholder="{{lead.score}} or literal value"
+          className="h-8"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[12px] text-muted-foreground">Key → Value pairs</Label>
+        {entries.length === 0 && (
+          <p className="text-[12px] text-muted-foreground/60 italic">
+            No entries yet. Add rows below.
+          </p>
+        )}
+        {entries.map((entry, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <Input
+              value={entry.key}
+              onChange={(e) => updateEntry(i, { key: e.target.value })}
+              placeholder="Key (exact match)"
+              className="h-7 flex-1 text-[12px]"
+            />
+            <span className="text-[11px] text-muted-foreground/50">→</span>
+            <Input
+              value={entry.value}
+              onChange={(e) => updateEntry(i, { value: e.target.value })}
+              placeholder="Value (output)"
+              className="h-7 flex-1 text-[12px]"
+            />
+            <button
+              type="button"
+              onClick={() => removeEntry(i)}
+              aria-label="Remove entry"
+              className="text-muted-foreground/40 transition-colors hover:text-destructive"
+            >
+              <X size={12} aria-hidden />
+            </button>
+          </div>
+        ))}
+        {entries.length < 50 && (
+          <button
+            type="button"
+            onClick={addEntry}
+            className="flex items-center gap-1 text-[12px] text-muted-foreground/60 transition-colors hover:text-foreground"
+          >
+            <Plus size={11} aria-hidden />
+            Add row
+          </button>
+        )}
+      </div>
+
+      <FieldRow label="Fallback (if no match)" htmlFor={`act-lk-fallback-${row.id}`}>
+        <Input
+          id={`act-lk-fallback-${row.id}`}
+          value={row.lookupFallback}
+          onChange={(e) => onChange({ lookupFallback: e.target.value })}
+          placeholder="Leave blank to pass through input unchanged"
+          className="h-7 text-[12px]"
+        />
+      </FieldRow>
+
+      <p className="text-[11px] text-muted-foreground/60">
+        Result stored as{' '}
+        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{'{{lookup.output}}'}</code>.
+        Matching is case-insensitive.
+      </p>
+    </div>
+  );
+}
+
 function ActionConfig({
   row,
   onChange,
@@ -5289,6 +5553,21 @@ function ActionConfig({
         triggerType={triggerType}
         prevSteps={prevSteps}
         connectedApps={connectedApps}
+      />
+    );
+  }
+
+  if (row.type === 'run_workflow') {
+    return <RunWorkflowActionConfig row={row} onChange={onChange} />;
+  }
+
+  if (row.type === 'lookup_table') {
+    return (
+      <LookupTableActionConfig
+        row={row}
+        onChange={onChange}
+        triggerType={triggerType}
+        prevSteps={prevSteps}
       />
     );
   }
