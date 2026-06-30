@@ -1097,19 +1097,36 @@ interface TokenGroup {
 }
 
 const LEAD_TOKEN_GROUP: TokenGroup = {
-  label: 'Lead',
+  label: 'Lead / Contact',
   tokens: [
     { label: 'Full name', token: '{{lead.name}}', hint: 'e.g. Jane Smith' },
+    { label: 'First name', token: '{{lead.firstName}}', hint: 'e.g. Jane' },
+    { label: 'Last name', token: '{{lead.lastName}}', hint: 'e.g. Smith' },
     { label: 'Email', token: '{{lead.email}}', hint: 'e.g. jane@example.com' },
     { label: 'Phone', token: '{{lead.phone}}', hint: 'e.g. +1 555 123 4567' },
     { label: 'Lead score', token: '{{lead.score}}', hint: 'e.g. 82' },
+    { label: 'Score label', token: '{{lead.scoreLabel}}', hint: 'e.g. Hot' },
     { label: 'Source', token: '{{lead.source}}', hint: 'e.g. Zillow' },
+    { label: 'Status', token: '{{lead.status}}', hint: 'e.g. Active, Nurture' },
     { label: 'Assigned agent', token: '{{lead.assignedAgent}}', hint: 'e.g. Alex Johnson' },
     { label: 'Property interest', token: '{{lead.propertyInterest}}', hint: 'e.g. 3BR in Austin' },
+    { label: 'Budget', token: '{{lead.budget}}', hint: 'e.g. $450,000' },
+    { label: 'Timeline', token: '{{lead.timeline}}', hint: 'e.g. 3 months' },
+    { label: 'City', token: '{{lead.city}}', hint: 'e.g. Austin' },
+    { label: 'Deal stage', token: '{{lead.dealStage}}', hint: 'e.g. Under Contract' },
+    { label: 'Created at', token: '{{lead.createdAt}}', hint: 'ISO date when lead was added' },
+    { label: 'Last activity', token: '{{lead.lastActivity}}', hint: 'ISO date of last interaction' },
   ],
 };
 
 const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
+  lead_created: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Lead source', token: '{{trigger.source}}', hint: 'e.g. Zillow, Referral' },
+      { label: 'Created at', token: '{{trigger.createdAt}}', hint: 'ISO datetime when lead was added' },
+    ],
+  },
   lead_score_threshold: {
     label: 'Trigger',
     tokens: [
@@ -1122,12 +1139,14 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Message text', token: '{{trigger.message}}', hint: 'the raw message body' },
       { label: 'Channel', token: '{{trigger.channel}}', hint: 'e.g. email' },
+      { label: 'Sent at', token: '{{trigger.sentAt}}', hint: 'ISO datetime of the message' },
     ],
   },
   tour_completed: {
     label: 'Trigger',
     tokens: [
       { label: 'Tour date', token: '{{trigger.tourDate}}', hint: 'e.g. June 28, 2026' },
+      { label: 'Property address', token: '{{trigger.address}}', hint: 'address that was toured' },
     ],
   },
   deal_stage_changed: {
@@ -1135,6 +1154,23 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'New stage', token: '{{trigger.stage}}', hint: 'e.g. Under Contract' },
       { label: 'Previous stage', token: '{{trigger.previousStage}}', hint: 'e.g. Active' },
+      { label: 'Changed at', token: '{{trigger.changedAt}}', hint: 'ISO datetime of the stage change' },
+    ],
+  },
+  deal_created: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Deal name', token: '{{trigger.dealName}}', hint: 'name of the new deal' },
+      { label: 'Deal stage', token: '{{trigger.stage}}', hint: 'initial stage' },
+      { label: 'Deal value', token: '{{trigger.value}}', hint: 'e.g. 450000' },
+    ],
+  },
+  contact_updated: {
+    label: 'Trigger',
+    tokens: [
+      { label: 'Field changed', token: '{{trigger.field}}', hint: 'name of the updated field' },
+      { label: 'Old value', token: '{{trigger.oldValue}}', hint: 'value before the update' },
+      { label: 'New value', token: '{{trigger.newValue}}', hint: 'value after the update' },
     ],
   },
   integration_event: {
@@ -1142,6 +1178,7 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Event name', token: '{{trigger.event}}', hint: 'e.g. contact.updated' },
       { label: 'App / toolkit', token: '{{trigger.toolkit}}', hint: 'e.g. hubspot' },
+      { label: 'Event payload (JSON)', token: '{{trigger.payload}}', hint: 'full event payload' },
     ],
   },
   schedule: {
@@ -1149,11 +1186,15 @@ const TRIGGER_TOKEN_GROUPS: Partial<Record<TriggerType, TokenGroup>> = {
     tokens: [
       { label: 'Run date', token: '{{trigger.date}}', hint: 'e.g. 2026-06-28' },
       { label: 'Run time', token: '{{trigger.time}}', hint: 'e.g. 09:00' },
+      { label: 'Run timestamp', token: '{{trigger.timestamp}}', hint: 'ISO datetime of scheduled run' },
     ],
   },
   webhook: {
     label: 'Trigger',
-    tokens: [{ label: 'Payload JSON', token: '{{trigger.payload}}', hint: 'full JSON body' }],
+    tokens: [
+      { label: 'Payload JSON', token: '{{trigger.payload}}', hint: 'full JSON body' },
+      { label: 'Request headers', token: '{{trigger.headers}}', hint: 'JSON object of headers' },
+    ],
   },
 };
 
@@ -1215,6 +1256,65 @@ function stepOutputGroups(prevSteps: ActionRowState[]): TokenGroup[] {
           label: `Step ${n}: ${label}`,
           tokens: [
             { label: 'Path taken', token: `{{step${n}.pathTaken}}`, hint: 'label or field of the matched path' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'webhook_post') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'HTTP status code', token: `{{step${n}.statusCode}}`, hint: 'e.g. 200, 404, 500' },
+            { label: 'Response body (snippet)', token: `{{step${n}.responseSnippet}}`, hint: 'first 500 chars of the response' },
+            { label: 'Request URL', token: `{{step${n}.url}}`, hint: 'the URL that was called' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'filter') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Filter passed', token: `{{step${n}.passed}}`, hint: 'true if condition met, false if run was halted' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'update_lead') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Updated field', token: `{{step${n}.field}}`, hint: 'the CRM field that was updated' },
+            { label: 'New value', token: `{{step${n}.value}}`, hint: 'the value the field was set to' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'draft_message' || s.type === 'schedule_message') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Draft ID', token: `{{step${n}.draftId}}`, hint: 'ID of the drafted message' },
+            { label: 'Channel', token: `{{step${n}.channel}}`, hint: 'email or sms' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'notify_agent') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Notification sent', token: `{{step${n}.sent}}`, hint: 'true if push was sent' },
+            ...base,
+          ],
+        };
+      }
+      if (s.type === 'delay') {
+        return {
+          label: `Step ${n}: ${label}`,
+          tokens: [
+            { label: 'Delay (minutes)', token: `{{step${n}.delayMinutes}}`, hint: 'computed delay in minutes' },
+            { label: 'Delay mode', token: `{{step${n}.delayMode}}`, hint: 'relative / until_weekday / until_date' },
             ...base,
           ],
         };
