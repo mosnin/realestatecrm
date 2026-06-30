@@ -72,7 +72,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
   return {
     id: rowId('act'),
     type: 'draft_message',
-    channel: 'sms',
+    channel: 'email',
     instruction: '',
     delayMinutes: '',
     delayUnit: 'minutes',
@@ -124,7 +124,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm, personal intro to this new high-intent lead and reference their interest.',
         },
@@ -195,7 +195,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         {
           ...blankAction(),
           type: 'draft_message',
-          channel: 'sms',
+          channel: 'email',
           instruction:
             'Draft a warm thank-you for the tour and ask for their honest take on the home.',
         },

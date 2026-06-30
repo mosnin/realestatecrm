@@ -29,6 +29,8 @@ export const MAX_WORKFLOWS_PER_SPACE = 50;
  * executor and the routes need (the executor's WorkflowRow plus the
  * presentation columns: name, enabled, version, lastRun*, timestamps).
  */
+// notifyOnError is omitted here until migration 20260807000000_workflow_notify_on_error.sql
+// is applied to production. The column defaults false in the app layer (mapRow below).
 const SELECT =
   'id, spaceId, name, description, enabled, trigger, conditions, actions, autonomy, graph, notifyOnError, version, lastRunAt, lastRunStatus, createdAt, updatedAt';
 
@@ -51,7 +53,7 @@ export interface WorkflowRecord extends WorkflowRow {
 
 /** Map a raw DB row (jsonb columns already objects) to a WorkflowRecord. */
 function mapRow(row: Record<string, unknown>): WorkflowRecord {
-  return row as unknown as WorkflowRecord;
+  return { notifyOnError: false, ...row } as unknown as WorkflowRecord;
 }
 
 /** List the space's workflows, newest first. */
