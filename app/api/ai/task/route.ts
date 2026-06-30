@@ -754,17 +754,21 @@ export async function POST(req: NextRequest) {
     mimeType: a.mime_type,
   }));
   // Explicit per-message mode from the composer's Chat/Agent switch wins over
-  // the heuristic router. 'chat' maps to the lean direct path (no tools, no
-  // loop — the 500k-token fix); 'agent' maps to the full tool surface. An
-  // absent mode (older client) falls back to decideRoute so nothing breaks.
+  // the heuristic router. 'agent' always gets the full tool surface. 'chat'
+  // gets the fast direct path ONLY when the heuristic router would also send
+  // it direct — workspace-data reads and integration queries still need tools
+  // regardless of which mode the composer is in (forcing them direct made the
+  // model say "I don't have access to any tools", the bug the escalation
+  // hook was meant to rescue). An absent mode falls back to decideRoute.
   const explicitMode: 'chat' | 'agent' | null =
     body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+  const heuristicRoute = decideRoute(message, routerAttachments);
   const route =
-    explicitMode === 'chat'
-      ? 'direct'
-      : explicitMode === 'agent'
-        ? 'agent'
-        : decideRoute(message, routerAttachments);
+    explicitMode === 'agent'
+      ? 'agent'
+      : explicitMode === 'chat' && heuristicRoute === 'direct'
+        ? 'direct'
+        : heuristicRoute;
 
   // Resolve the model for THIS turn: the workspace model forced to something
   // the active provider can actually serve (kills the grok-slug-to-OpenAI
