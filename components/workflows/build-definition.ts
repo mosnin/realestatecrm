@@ -103,8 +103,10 @@ export interface ActionRowState {
   label?: string;
   /** Optional private note for internal documentation — not executed or sent. */
   note?: string;
-  /** What to do if this step errors: 'stop' (default) or 'skip' and continue. */
-  onError?: 'stop' | 'skip';
+  /** What to do if this step errors: 'stop' (default), 'skip' and continue, or 'retry' with backoff. */
+  onError?: 'stop' | 'skip' | 'retry';
+  /** Number of retry attempts when onError='retry'. 1–5; defaults to 3. Stored as string off number input. */
+  retryCount: string;
   /** When false, this step is skipped at runtime (Zapier-style step disable). Defaults to true. */
   stepEnabled: boolean;
   /** draft_message / schedule_message. */
@@ -301,7 +303,8 @@ function coerceConditionValue(raw: string): unknown {
 export function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
   const note = row.note?.trim() || undefined;
-  const onError = row.onError === 'skip' ? 'skip' : undefined;
+  const onError = row.onError === 'skip' ? 'skip' : row.onError === 'retry' ? 'retry' : undefined;
+  const maxRetriesProp = row.onError === 'retry' && row.retryCount.trim() !== '' ? { maxRetries: Math.max(1, Math.min(5, Number(row.retryCount) || 3)) } : {};
   const enabledProp = row.stepEnabled === false ? { enabled: false as const } : {};
   switch (row.type) {
     case 'draft_message':
@@ -310,6 +313,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
@@ -320,6 +324,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: {
           channel: row.channel,
@@ -334,6 +339,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config:
           row.dueInDays.trim() === ''
@@ -346,6 +352,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: {
           toolkit: row.toolkit.trim(),
@@ -359,6 +366,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: { instruction: row.instruction.trim() },
       };
@@ -369,6 +377,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
       };
       if (row.delayMode === 'until_weekday') {
@@ -386,6 +395,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
@@ -401,6 +411,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: { url, ...(bodyJson ? { bodyJson } : {}), ...(headersJson ? { headersJson } : {}) },
       };
@@ -411,6 +422,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: { field: row.updateField, value: row.updateValue.trim() },
       };
@@ -421,6 +433,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: { title: row.notifyTitle.trim(), ...(body ? { body } : {}) },
       };
@@ -432,6 +445,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: {
           source: row.filterField.trim() || 'lead.tags',
@@ -446,6 +460,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: {
           paths: (row.branchPaths ?? []).map((p) => ({
@@ -496,6 +511,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...maxRetriesProp,
         ...enabledProp,
         config: cfg,
       };

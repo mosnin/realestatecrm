@@ -211,7 +211,8 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       type: a.type,
       label: a.label,
       note: a.note,
-      onError: a.onError,
+      onError: a.onError as 'stop' | 'skip' | 'retry' | undefined,
+      retryCount: 'maxRetries' in a && typeof a.maxRetries === 'number' ? String(a.maxRetries) : '3',
       stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
@@ -3123,6 +3124,7 @@ function AIWorkflowGenerator({
           id: aiGenRowId(),
           type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
           label: typeof a.label === 'string' ? a.label : undefined,
+          retryCount: '3',
           stepEnabled: true,
           channel: (typeof a.channel === 'string' ? a.channel : 'email') as 'sms' | 'email',
           instruction: typeof a.instruction === 'string' ? a.instruction : '',

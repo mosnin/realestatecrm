@@ -508,6 +508,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
   return {
     id: nextRowId('act'),
     type,
+    retryCount: '3',
     stepEnabled: true,
     channel: 'email',
     instruction: '',
@@ -611,6 +612,8 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       type: a.type,
       label: a.label,
       note: a.note,
+      onError: a.onError as 'stop' | 'skip' | 'retry' | undefined,
+      retryCount: 'maxRetries' in a && typeof a.maxRetries === 'number' ? String(a.maxRetries) : '3',
       stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'email',
@@ -1818,23 +1821,41 @@ function ActionZapCard({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[12px] text-muted-foreground">On error:</span>
               <div className="flex overflow-hidden rounded-md border border-border/50">
-                {(['stop', 'skip'] as const).map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => onChange({ onError: opt === 'stop' ? undefined : opt })}
-                    aria-pressed={opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip'}
-                    className={cn(
-                      'px-2.5 py-1 text-[11px] font-medium capitalize transition-colors',
-                      (opt === 'skip' ? row.onError === 'skip' : row.onError !== 'skip')
-                        ? 'bg-foreground text-background'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {opt === 'stop' ? 'Stop workflow' : 'Skip & continue'}
-                  </button>
-                ))}
+                {(['stop', 'skip', 'retry'] as const).map((opt) => {
+                  const active = opt === 'stop' ? !row.onError || row.onError === 'stop'
+                    : row.onError === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => onChange({ onError: opt === 'stop' ? undefined : opt })}
+                      aria-pressed={active}
+                      className={cn(
+                        'px-2.5 py-1 text-[11px] font-medium transition-colors',
+                        active
+                          ? 'bg-foreground text-background'
+                          : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {opt === 'stop' ? 'Stop' : opt === 'skip' ? 'Skip' : 'Retry'}
+                    </button>
+                  );
+                })}
               </div>
+              {row.onError === 'retry' && (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={row.retryCount}
+                    onChange={(e) => onChange({ retryCount: e.target.value })}
+                    className="h-7 w-14 text-center text-[12px]"
+                    aria-label="Retry attempts"
+                  />
+                  <span className="text-[11px] text-muted-foreground">times</span>
+                </div>
+              )}
             </div>
             <StepNotes note={row.note ?? ''} onChange={(n) => onChange({ note: n || undefined })} rowId={row.id} />
           </div>

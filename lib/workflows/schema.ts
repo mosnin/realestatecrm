@@ -266,8 +266,16 @@ const stepNote = z.string().trim().max(500).optional();
  * behaviour), matching Zapier's default error handling. 'skip' logs the
  * failure and continues with the next step — useful for non-critical side
  * effects (Slack pings, CRM log notes) that shouldn't derail the whole run.
+ * 'retry' re-runs the step up to maxRetries times (default 3) with
+ * exponential backoff before marking it failed — mirrors Zapier's built-in
+ * retry behaviour.
  */
-const stepOnError = z.enum(['stop', 'skip']).optional();
+const stepOnError = z.enum(['stop', 'skip', 'retry']).optional();
+/**
+ * Max retry attempts when onError='retry'. 1–5; defaults to 3 at runtime.
+ * Ignored when onError is 'stop' or 'skip'.
+ */
+const stepMaxRetries = z.number().int().min(1).max(5).optional();
 /** When false, the step is skipped at runtime (like Zapier's step disable toggle). */
 const stepEnabled = z.boolean().optional();
 
@@ -281,6 +289,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
@@ -291,6 +300,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -305,6 +315,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -318,6 +329,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -332,6 +344,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z.object({ instruction: instructionField }).strict(),
   }),
@@ -344,6 +357,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -380,6 +394,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -395,6 +410,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -418,6 +434,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -436,6 +453,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -451,6 +469,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -465,6 +484,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    maxRetries: stepMaxRetries,
     enabled: stepEnabled,
     config: z
       .object({
@@ -499,6 +519,7 @@ export const branchActionSchema = z.object({
   label: stepLabel,
   note: stepNote,
   onError: stepOnError,
+  maxRetries: stepMaxRetries,
   enabled: stepEnabled,
   config: z
     .object({

@@ -72,6 +72,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
   return {
     id: rowId('act'),
     type: 'draft_message',
+    retryCount: '3',
     stepEnabled: true,
     channel: 'email',
     instruction: '',

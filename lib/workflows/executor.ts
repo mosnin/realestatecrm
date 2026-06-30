@@ -226,31 +226,46 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
     let anyFailed = false;
     for (let i = 0; i < workflow.actions.length; i++) {
       const action = workflow.actions[i];
-      const result: ActionStepResult = await executeAction(action, context, {
-        spaceId: workflow.spaceId,
-        autonomy: workflow.autonomy,
-        runId,
-      });
+
+      // Retry loop: when onError='retry' re-run the step up to maxRetries times
+      // (default 3) with exponential backoff before giving up.
+      const maxAttempts = action.onError === 'retry' ? (action.maxRetries ?? 3) : 1;
+      let result: ActionStepResult = { status: 'failed', detail: { error: 'not run' } };
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        result = await executeAction(action, context, {
+          spaceId: workflow.spaceId,
+          autonomy: workflow.autonomy,
+          runId,
+        });
+        if (result.status !== 'failed') break;
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+        }
+      }
+      if (action.onError === 'retry' && result.status === 'failed') {
+        result = { ...result, detail: { ...result.detail, retried: maxAttempts } };
+      }
+
       // Stash step output in context so later steps can reference {{step#.*}}.
       (context as Record<string, unknown>)[`step${i + 1}`] = {
         status: result.status,
         ...result.detail,
       };
-      const failedAndStop = result.status === 'failed' && action.onError !== 'skip';
+      const failedAndStop = result.status === 'failed' && action.onError !== 'skip' && action.onError !== 'retry';
       if (result.status === 'failed') anyFailed = true;
       await writeStep({
         runId,
         stepIndex: i + 1,
         kind: 'action',
         actionType: action.type,
-        // When onError=skip and the step failed, record as 'skipped' so the
-        // run history makes clear the error was absorbed rather than fatal.
-        status: result.status === 'failed' && action.onError === 'skip' ? 'skipped' : result.status,
+        // When onError=skip/retry and the step ultimately failed, record as
+        // 'skipped' so the run history makes clear the error was absorbed.
+        status: result.status === 'failed' && (action.onError === 'skip' || action.onError === 'retry') ? 'skipped' : result.status,
         detail: result.detail,
       });
       // filter gate: when stop is true (filter condition not met), halt remaining actions.
       if (result.stop) break;
-      // Error gate: stop on failure unless onError=skip.
+      // Error gate: stop on failure unless onError=skip/retry.
       if (failedAndStop) break;
     }
 
