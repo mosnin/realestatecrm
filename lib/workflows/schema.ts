@@ -197,7 +197,8 @@ export type WorkflowActionType =
   | 'formatter'
   | 'webhook_post'
   | 'update_lead'
-  | 'notify_agent';
+  | 'notify_agent'
+  | 'iterate';
 
 /**
  * Whitelisted fields the update_lead action can write on the Contact row.
@@ -431,6 +432,21 @@ export const workflowActionSchema = z.discriminatedUnion('type', [
       .object({
         title: z.string().trim().min(1).max(SHORT_TEXT),
         body: z.string().trim().max(500).optional(),
+      })
+      .strict(),
+  }),
+  // iterate: loop over a list (e.g. lead.tags) and apply an instruction to each item.
+  z.object({
+    type: z.literal('iterate'),
+    label: stepLabel,
+    note: stepNote,
+    onError: stepOnError,
+    config: z
+      .object({
+        source: z.string().trim().min(1).max(SHORT_TEXT),
+        instruction: z.string().trim().min(1).max(LONG_TEXT),
+        limit: z.number().int().min(1).max(50).optional(),
+        outputField: z.string().trim().max(100).optional(),
       })
       .strict(),
   }),

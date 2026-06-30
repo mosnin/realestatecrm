@@ -396,6 +396,22 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         config: { title: row.notifyTitle.trim(), ...(body ? { body } : {}) },
       };
     }
+    case 'iterate': {
+      const iterateSource = row.filterField.trim() || row.instruction.trim();
+      const iterateInstruction = row.filterField.trim() ? row.instruction.trim() : '';
+      const limitStr = row.delayMinutes.trim();
+      return {
+        type: 'iterate',
+        ...(label ? { label } : {}),
+        ...(note ? { note } : {}),
+        ...(onError ? { onError } : {}),
+        config: {
+          source: iterateSource || 'lead.tags',
+          instruction: iterateInstruction || 'Process {{item}}',
+          ...(limitStr && !isNaN(Number(limitStr)) ? { limit: Number(limitStr) } : {}),
+        },
+      };
+    }
     case 'formatter': {
       const op = row.formatterOperation;
       type FormatterConfig = {

@@ -156,6 +156,8 @@ function actionPhrase(a: ActionRowState): string {
       const title = a.notifyTitle.trim();
       return title ? `send push: "${title.slice(0, 40)}"` : 'send a push alert';
     }
+    case 'iterate':
+      return 'loop over a list';
     default:
       return 'take an action';
   }

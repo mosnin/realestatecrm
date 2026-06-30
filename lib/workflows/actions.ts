@@ -28,6 +28,27 @@ import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
 /**
+ * Retry a function up to maxAttempts times with exponential backoff.
+ * Retries only when isTransient returns true; permanent failures (4xx) are
+ * returned immediately. Matches Zapier's default error-retry behaviour.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  isTransient: (result: T) => boolean,
+  maxAttempts = 3,
+  baseDelayMs = 1000,
+): Promise<T> {
+  let last: T | undefined;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await fn();
+    if (!isTransient(result) || attempt === maxAttempts) return result;
+    last = result;
+    await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** (attempt - 1)));
+  }
+  return last!;
+}
+
+/**
  * The trigger context an action runs against — the same object shape passed to
  * `evaluateConditions`. The trigger event plus whatever entity rows the
  * trigger-wiring pass resolved. All fields are optional; an action reads
@@ -729,27 +750,111 @@ async function runWebhookPost(
     }
   }
 
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: body ?? '{}',
-      signal: AbortSignal.timeout(10_000),
-    });
-    const text = await res.text().then((t) => t.slice(0, 10_000));
-    return {
-      status: res.ok ? 'ok' : 'failed',
-      detail: {
-        url,
-        statusCode: res.status,
-        ok: res.ok,
-        responseSnippet: text.slice(0, 500),
-        ...(res.ok ? {} : { error: `HTTP ${res.status}` }),
-      },
-    };
-  } catch (err) {
-    return { status: 'failed', detail: { url, error: err instanceof Error ? err.message : String(err) } };
+  type FetchOutcome = { ok: boolean; status: number; text: string } | { networkError: string };
+  const isFetchTransient = (r: FetchOutcome) =>
+    'networkError' in r || (!('networkError' in r) && r.status >= 500);
+
+  const outcome = await withRetry<FetchOutcome>(
+    async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: body ?? '{}',
+          signal: AbortSignal.timeout(10_000),
+        });
+        const text = await res.text().then((t) => t.slice(0, 10_000));
+        return { ok: res.ok, status: res.status, text };
+      } catch (err) {
+        return { networkError: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    isFetchTransient,
+    3,
+    1000,
+  );
+
+  if ('networkError' in outcome) {
+    return { status: 'failed', detail: { url, error: outcome.networkError } };
   }
+  return {
+    status: outcome.ok ? 'ok' : 'failed',
+    detail: {
+      url,
+      statusCode: outcome.status,
+      ok: outcome.ok,
+      responseSnippet: outcome.text.slice(0, 500),
+      ...(outcome.ok ? {} : { error: `HTTP ${outcome.status}` }),
+    },
+  };
+}
+
+/**
+ * iterate: loop over an array and run an AI instruction for each item.
+ * Equivalent to Zapier's "Looping by Zapier". Resolves the source to an array
+ * (via dot-path in context or JSON parse), calls runAutonomousInstruction for
+ * each element up to `limit`, and stashes results in context[outputField].
+ */
+async function runIterate(
+  action: Extract<WorkflowAction, { type: 'iterate' }>,
+  context: WorkflowContext,
+  spaceId: string,
+): Promise<ActionStepResult> {
+  const { source, instruction, limit = 10, outputField = 'iterate' } = action.config;
+
+  // Resolve source: try dot-path first, then JSON parse of a resolved token.
+  const resolvedSource = resolveTokens(source, context);
+  let items: unknown[] = [];
+  const fieldVal = resolveField(context, resolvedSource);
+  if (Array.isArray(fieldVal)) {
+    items = fieldVal;
+  } else {
+    try {
+      const parsed = JSON.parse(resolvedSource);
+      if (Array.isArray(parsed)) items = parsed;
+      else if (parsed != null) items = [parsed];
+    } catch {
+      if (fieldVal != null) items = [fieldVal];
+    }
+  }
+
+  if (items.length === 0) {
+    return { status: 'ok', detail: { source: resolvedSource, processed: 0, total: 0, results: [] } };
+  }
+
+  const capped = items.slice(0, limit);
+  const summaries: string[] = [];
+  let failedCount = 0;
+
+  for (const item of capped) {
+    const itemStr = typeof item === 'object' ? JSON.stringify(item) : String(item ?? '');
+    const itemInstruction = resolveTokens(instruction, { ...context, item }).replace(/\{\{item\}\}/g, itemStr);
+    try {
+      const result = await runAutonomousInstruction({ spaceId, instruction: itemInstruction });
+      summaries.push(result.summary ?? '');
+      if (!result.ok) failedCount++;
+    } catch (err) {
+      summaries.push('');
+      failedCount++;
+      logger.error('[workflows.iterate] item failed', { spaceId }, err);
+    }
+  }
+
+  // Stash results into context so subsequent steps can reference them.
+  (context as Record<string, unknown>)[outputField] = summaries;
+
+  const allFailed = failedCount === capped.length && capped.length > 0;
+  return {
+    status: allFailed ? 'failed' : 'ok',
+    detail: {
+      source: resolvedSource,
+      processed: capped.length,
+      total: items.length,
+      capped: items.length > limit,
+      failed: failedCount,
+      results: summaries.slice(0, 5).map((s) => ({ responseSnippet: s.slice(0, 200) })),
+    },
+  };
 }
 
 /**
@@ -785,6 +890,8 @@ export async function executeAction(
         return await runUpdateLead(action, context, opts.spaceId);
       case 'notify_agent':
         return await runNotifyAgent(action, context, opts.spaceId);
+      case 'iterate':
+        return await runIterate(action, context, opts.spaceId);
       default: {
         // Exhaustiveness guard — an unknown action type fails closed.
         const _never: never = action;

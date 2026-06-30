@@ -173,6 +173,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   formatter: 'Format data',
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
+  iterate: 'Loop over a list',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [

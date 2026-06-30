@@ -238,6 +238,7 @@ const ACTION_LABELS: Record<WorkflowActionType, string> = {
   webhook_post: 'POST to a webhook URL',
   update_lead: 'Update this lead',
   notify_agent: 'Notify me — send a push alert',
+  iterate: 'Loop / Iterate',
 };
 
 const ACTION_ORDER: WorkflowActionType[] = [
@@ -251,6 +252,7 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'filter',
   'formatter',
   'delay',
+  'iterate',
   'webhook_post',
 ];
 
@@ -261,7 +263,7 @@ const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   },
   {
     label: 'Logic',
-    keys: ['filter', 'formatter', 'delay'],
+    keys: ['filter', 'formatter', 'delay', 'iterate'],
   },
 ];
 
@@ -277,6 +279,7 @@ const ACTION_ICONS: Record<WorkflowActionType, LucideIcon> = {
   webhook_post: Send,
   update_lead: UserCog,
   notify_agent: BellRing,
+  iterate: RotateCcw,
 };
 
 const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
@@ -291,6 +294,7 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   webhook_post: 'POST JSON to any HTTPS endpoint — CRMs, Slack, or custom backends',
   update_lead: 'Set the score tier, follow-up date, or tags on this lead',
   notify_agent: 'Push a personal alert to your phone or browser — stay in the loop',
+  iterate: 'Run steps for each item in a list',
 };
 
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
@@ -970,6 +974,10 @@ function actionSummary(row: ActionRowState): string {
     }
     case 'notify_agent':
       return row.notifyTitle ? `"${trunc(row.notifyTitle)}"` : 'No title set';
+    case 'iterate':
+      return row.instruction
+        ? `Loop: ${row.instruction.slice(0, 60)}${row.instruction.length > 60 ? '…' : ''}`
+        : 'Loop over a list';
     default:
       return '';
   }
@@ -1017,6 +1025,13 @@ function actionAccent(type: WorkflowActionType) {
       border: 'border-l-rose-400 dark:border-l-rose-500/70',
       badge: 'bg-rose-500',
       icon: 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400',
+    };
+  }
+  if (type === 'iterate') {
+    return {
+      border: 'border-l-teal-400 dark:border-l-teal-500/70',
+      badge: 'bg-teal-500',
+      icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
     };
   }
   return {
@@ -1723,6 +1738,7 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   update_lead: 'Update lead',
   notify_agent: 'Push alert',
   condition: 'Condition check',
+  iterate: 'Loop / Iterate',
 };
 
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
@@ -1737,6 +1753,7 @@ const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }>
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
   notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+  iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -4160,6 +4177,82 @@ function NotifyAgentActionConfig({
   );
 }
 
+function IterateActionConfig({
+  row,
+  onChange,
+  triggerType,
+  prevSteps = [],
+}: {
+  row: ActionRowState;
+  onChange: (next: Partial<ActionRowState>) => void;
+  triggerType: TriggerType;
+  prevSteps?: ActionRowState[];
+}) {
+  // Field mapping (pragmatic reuse of existing ActionRowState fields):
+  //   row.filterField  = array source path  e.g. "{{step1.result.items}}"
+  //   row.instruction  = per-item instruction text (use {{item}} as the element)
+  //   row.delayMinutes = max items limit (stored as string, default "10")
+  function insertSource(token: string) {
+    onChange({ filterField: (row.filterField ?? '') + token });
+  }
+  function insertInstruction(token: string) {
+    onChange({ instruction: (row.instruction ?? '') + token });
+  }
+  return (
+    <div className="space-y-3">
+      <p className={CAPTION}>Loop over every element in an array. Use <code>{'{{item}}'}</code> in your instruction to reference the current element.</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-iter-src-${row.id}`} className="text-[12px] text-muted-foreground">
+            Array source <span className="text-red-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertSource} />
+        </div>
+        <Input
+          id={`act-iter-src-${row.id}`}
+          value={row.filterField ?? ''}
+          onChange={(e) => onChange({ filterField: e.target.value })}
+          placeholder="e.g. {{step1.result.items}} or lead.tags"
+          className="h-8"
+        />
+        <p className={CAPTION}>The array to loop over.</p>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor={`act-iter-inst-${row.id}`} className="text-[12px] text-muted-foreground">
+            Instruction for each item <span className="text-red-500">*</span>
+          </Label>
+          <TokenPicker triggerType={triggerType} prevSteps={prevSteps} onInsert={insertInstruction} />
+        </div>
+        <Textarea
+          id={`act-iter-inst-${row.id}`}
+          value={row.instruction ?? ''}
+          onChange={(e) => onChange({ instruction: e.target.value })}
+          placeholder="Use {{item}} to reference each element…"
+          rows={3}
+          className="text-[12px]"
+        />
+        <p className={CAPTION}>What Chippi should do for each item. Use <code>{'{{item}}'}</code> for the current element.</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`act-iter-max-${row.id}`} className="text-[12px] text-muted-foreground">
+          Max items
+        </Label>
+        <Input
+          id={`act-iter-max-${row.id}`}
+          type="number"
+          min={1}
+          max={50}
+          value={row.delayMinutes || '10'}
+          onChange={(e) => onChange({ delayMinutes: e.target.value })}
+          className="h-8 w-24"
+        />
+        <p className={CAPTION}>Stops after this many items (1–50, default 10).</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Key-value params editor (call_integration) ───────────────────────────────
 
 function parseParamsToRows(json: string): { id: string; key: string; val: string }[] {
@@ -4521,6 +4614,10 @@ function ActionConfig({
 
   if (row.type === 'notify_agent') {
     return <NotifyAgentActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
+  }
+
+  if (row.type === 'iterate') {
+    return <IterateActionConfig row={row} onChange={onChange} triggerType={triggerType} prevSteps={prevSteps} />;
   }
 
   // call_integration — app + action picker; key-value params editor.
