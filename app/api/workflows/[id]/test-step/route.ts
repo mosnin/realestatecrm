@@ -99,6 +99,23 @@ export async function POST(
   }
 
   const action = parseResult.data;
+
+  // run_workflow would synchronously execute the target workflow for real
+  // (sending messages, creating tasks, etc.). A "test this step" must never
+  // have those side effects, so we short-circuit with a descriptive result
+  // instead of dispatching it.
+  if (action.type === 'run_workflow') {
+    return NextResponse.json({
+      status: 'ok',
+      detail: {
+        skipped: true,
+        reason: 'Sub-workflow steps are not executed during a single-step test to avoid real side effects.',
+        workflowId: action.config.workflowId,
+      },
+      durationMs: 0,
+    });
+  }
+
   const context = sampleContextFor(stored.trigger);
 
   const start = Date.now();
