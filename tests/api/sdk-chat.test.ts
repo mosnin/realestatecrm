@@ -317,12 +317,23 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('explicit mode:chat forces the direct path even for an action verb', async () => {
+  it('explicit mode:chat still routes action verbs to the agent path', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
-    // "send Preston a follow-up" is an action verb the heuristic router would
-    // send to the agent. The composer's explicit Chat pick overrides it — the
-    // realtor asked for a fast answer, not the tool loop.
+    // "send Preston a follow-up" has an action verb — mode:chat does NOT
+    // override that. Workspace mutations must always reach the tool-capable
+    // agent regardless of which UI toggle the realtor had set. The direct
+    // (toolless) path would only deflect or hallucinate.
     await POST(makeRequest({ message: 'send Preston a follow-up', mode: 'chat' }));
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('explicit mode:chat keeps pure Q&A on the direct path', async () => {
+    delete process.env.CHIPPI_CHAT_RUNTIME;
+    // No action verb, no workspace noun → heuristic says direct, and
+    // mode:chat agrees. Fast path should be taken.
+    await POST(makeRequest({ message: 'what is a cap rate?', mode: 'chat' }));
     expect(directStreamMock).toHaveBeenCalledTimes(1);
     expect(tsStreamMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
