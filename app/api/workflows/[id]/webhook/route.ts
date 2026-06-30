@@ -5,9 +5,15 @@
  * fires immediately. The workflow id is the secret — it's a UUID (128 bits of
  * randomness), giving the same security posture as Zapier webhook catch hooks.
  *
+ * Optional HMAC-SHA256 signature validation: when the workflow's trigger config
+ * includes a `webhookSecret`, every incoming request must carry an
+ * `X-Webhook-Signature` header with value `sha256=<hex-digest>`. Requests
+ * whose signature doesn't match are rejected 401. Mirrors GitHub/Zapier
+ * webhook signing conventions exactly.
+ *
  * The incoming JSON body becomes `event.payload` in the WorkflowContext so the
- * realtor's actions/instructions can reference it. No auth header is required;
- * the UUID alone is the credential.
+ * realtor's actions/instructions can reference it. No auth header is required
+ * when no webhookSecret is set; the UUID alone is the credential.
  *
  * Safety gates:
  *  - The workflow must exist and be ENABLED. Disabled webhooks return 404 (not
@@ -19,9 +25,9 @@
  *    gets a fast 200 instead of waiting for the full workflow execution.
  */
 
+import crypto from 'crypto';
 import { NextRequest, NextResponse, after } from 'next/server';
 import { logger } from '@/lib/logger';
-import { getWorkflow } from '@/lib/workflows/store';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { supabase } from '@/lib/supabase';
 
@@ -29,6 +35,20 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 const MAX_BODY_BYTES = 256 * 1024; // 256 KB
+
+/** Verify HMAC-SHA256 signature in constant time. Header format: `sha256=<hex>` */
+function verifySignature(rawBody: string, secret: string, header: string | null): boolean {
+  if (!header) return false;
+  const prefix = 'sha256=';
+  if (!header.startsWith(prefix)) return false;
+  const provided = header.slice(prefix.length);
+  const expected = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(provided, 'hex'), Buffer.from(expected, 'hex'));
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -42,15 +62,16 @@ export async function POST(
     return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   }
 
-  // Parse body — undefined is fine (empty POST).
+  // Read raw body text — needed for HMAC validation before JSON parsing.
+  let rawBody = '';
   let payload: unknown = {};
   try {
-    const text = await req.text();
-    if (text.length > MAX_BODY_BYTES) {
+    rawBody = await req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
     }
-    if (text.trim()) {
-      payload = JSON.parse(text);
+    if (rawBody.trim()) {
+      payload = JSON.parse(rawBody);
     }
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
@@ -76,9 +97,19 @@ export async function POST(
   }
 
   // Must be a webhook-triggered workflow.
-  const trigger = row.trigger as { type: string };
+  const trigger = row.trigger as { type: string; config?: { webhookSecret?: string } };
   if (trigger.type !== 'webhook') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // HMAC signature validation — required when the workflow has a webhookSecret.
+  const webhookSecret = trigger.config?.webhookSecret;
+  if (webhookSecret) {
+    const sigHeader = req.headers.get('x-webhook-signature');
+    if (!verifySignature(rawBody, webhookSecret, sigHeader)) {
+      logger.warn('[webhook] signature mismatch', { id });
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
   }
 
   const workflow: WorkflowRow = {

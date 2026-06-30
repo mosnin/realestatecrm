@@ -62,6 +62,8 @@ export interface TriggerFormState {
   cadence: 'hourly' | 'daily' | 'weekdays';
   /** schedule hour, 0-23 (string off a number input; blank = omit). */
   hour: string;
+  /** webhook: optional HMAC-SHA256 signing secret (min 8 chars). Blank = unsigned. */
+  webhookSecret?: string;
 }
 
 export interface ConditionRowState {
@@ -264,8 +266,10 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
             ? { cadence: t.cadence }
             : { cadence: t.cadence, hour: toNumber(t.hour) },
       };
-    case 'webhook':
-      return { type: 'webhook', config: {} };
+    case 'webhook': {
+      const secret = t.webhookSecret?.trim();
+      return { type: 'webhook', config: secret && secret.length >= 8 ? { webhookSecret: secret } : {} };
+    }
     default: {
       // Exhaustiveness guard — an unknown type still produces SOMETHING the
       // schema will reject rather than throwing here.

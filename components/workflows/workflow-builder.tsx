@@ -21,7 +21,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown } from 'lucide-react';
+import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -2318,6 +2318,7 @@ export function WorkflowBuilder({
   const [showHistory, setShowHistory] = useState(false);
   const [historyRuns, setHistoryRuns] = useState<BuilderRunRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'completed' | 'failed' | 'skipped'>('all');
 
   useEffect(() => {
     if (!showHistory || !workflowId) return;
@@ -3073,6 +3074,36 @@ export function WorkflowBuilder({
               Refresh
             </button>
           </div>
+          {/* Status filter tabs */}
+          {historyRuns.length > 0 && (
+            <div className="flex gap-1 border-b border-border/40 px-3 py-1.5">
+              {(['all', 'completed', 'failed', 'skipped'] as const).map((f) => {
+                const count = f === 'all' ? historyRuns.length : historyRuns.filter((r) => r.status === f).length;
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setHistoryStatusFilter(f)}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize transition-colors',
+                      historyStatusFilter === f
+                        ? f === 'failed'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                          : f === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : f === 'skipped'
+                              ? 'bg-muted text-foreground'
+                              : 'bg-foreground/10 text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="p-3">
             {historyLoading ? (
               <div className="flex items-center gap-2 py-3">
@@ -3085,11 +3116,21 @@ export function WorkflowBuilder({
                 <p className="text-[12px] text-muted-foreground">No runs yet — this workflow hasn&apos;t fired.</p>
               </div>
             ) : (
-              <ul className="space-y-1.5">
-                {historyRuns.map((run) => (
-                  <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-1.5">
+                  {historyRuns
+                    .filter((r) => historyStatusFilter === 'all' || r.status === historyStatusFilter)
+                    .map((run) => (
+                      <BuilderRunItem key={run.id} run={run} workflowId={workflowId!} />
+                    ))}
+                </ul>
+                {historyStatusFilter !== 'all' &&
+                  historyRuns.filter((r) => r.status === historyStatusFilter).length === 0 && (
+                    <p className="py-3 text-center text-[12px] text-muted-foreground">
+                      No {historyStatusFilter} runs.
+                    </p>
+                  )}
+              </>
             )}
           </div>
         </div>
@@ -3217,9 +3258,19 @@ export function WorkflowBuilder({
  * workflow's id routed through the webhook endpoint — the UUID randomness is
  * the auth token (128 bits, same security posture as Zapier webhook URLs).
  * For new (unsaved) workflows, a "save first" prompt.
+ * Optionally shows a signing secret field for HMAC-SHA256 payload verification.
  */
-function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
+function WebhookTriggerDisplay({
+  workflowId,
+  webhookSecret,
+  onSecretChange,
+}: {
+  workflowId?: string;
+  webhookSecret?: string;
+  onSecretChange?: (v: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const url = workflowId
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/workflows/${workflowId}/webhook`
     : null;
@@ -3232,8 +3283,10 @@ function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
     });
   }
 
+  const secretSet = (webhookSecret?.trim().length ?? 0) >= 8;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <p className={CAPTION}>
         POST any JSON payload to this URL and the workflow fires immediately. The URL is your secret — keep it private.
       </p>
@@ -3256,6 +3309,42 @@ function WebhookTriggerDisplay({ workflowId }: { workflowId?: string }) {
         <p className={CAPTION}>
           <span className="font-medium text-foreground">Save this workflow first</span> — your unique webhook URL will appear here.
         </p>
+      )}
+      {/* Signing secret — optional HMAC-SHA256 payload verification (like Zapier) */}
+      {onSecretChange && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="wf-webhook-secret" className="text-[12px] text-muted-foreground">
+              Signing secret <span className="text-muted-foreground/50">(optional)</span>
+            </Label>
+            {secretSet && (
+              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓ Signature verification enabled</span>
+            )}
+          </div>
+          <div className="relative flex items-center">
+            <Input
+              id="wf-webhook-secret"
+              type={showSecret ? 'text' : 'password'}
+              value={webhookSecret ?? ''}
+              onChange={(e) => onSecretChange(e.target.value)}
+              placeholder="Min 8 characters — leave blank to skip verification"
+              className="h-8 pr-9 font-mono text-[12px]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSecret((v) => !v)}
+              aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+              className="absolute right-2 text-muted-foreground/60 hover:text-foreground"
+            >
+              {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+          {secretSet && (
+            <p className="text-[11px] text-muted-foreground">
+              Send <code className="rounded bg-muted px-1">X-Webhook-Signature: sha256=&lt;hmac&gt;</code> with each request.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -3408,7 +3497,13 @@ function TriggerConfig({
   }
 
   if (t.type === 'webhook') {
-    return <WebhookTriggerDisplay workflowId={workflowId} />;
+    return (
+      <WebhookTriggerDisplay
+        workflowId={workflowId}
+        webhookSecret={t.webhookSecret ?? ''}
+        onSecretChange={(v) => patchTrigger({ webhookSecret: v || undefined })}
+      />
+    );
   }
 
   // lead_created, tour_completed — no config.

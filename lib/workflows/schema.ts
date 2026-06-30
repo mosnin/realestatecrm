@@ -88,8 +88,15 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
   // contact_updated: fires when an existing contact record is edited.
   z.object({ type: z.literal('contact_updated'), config: z.object({}).strict() }),
   // webhook: fires when an HTTP POST arrives at /api/workflows/[id]/webhook.
-  // config is empty — the URL is derived from the workflow id at display time.
-  z.object({ type: z.literal('webhook'), config: z.object({}).strict() }),
+  // When webhookSecret is set, the route validates the HMAC-SHA256 signature in
+  // the X-Webhook-Signature header (hex-encoded sha256=<sig> format like Zapier).
+  z.object({
+    type: z.literal('webhook'),
+    config: z.object({
+      /** Optional signing secret for HMAC-SHA256 payload verification. */
+      webhookSecret: z.string().min(8).max(128).optional(),
+    }).strict(),
+  }),
 ]);
 
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;

@@ -190,7 +190,10 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         t.type === 'schedule' && typeof t.config.hour === 'number'
           ? String(t.config.hour)
           : '',
-      // webhook trigger has no config fields
+      webhookSecret:
+        t.type === 'webhook'
+          ? ((t.config as { webhookSecret?: string }).webhookSecret ?? '')
+          : '',
     },
     conditionOp: w.conditions.op,
     conditions: w.conditions.rules.flatMap((r) => {
