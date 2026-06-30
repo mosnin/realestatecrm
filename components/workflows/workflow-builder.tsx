@@ -508,6 +508,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
   return {
     id: nextRowId('act'),
     type,
+    stepEnabled: true,
     channel: 'email',
     instruction: '',
     delayMinutes: '',
@@ -609,6 +610,7 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       type: a.type,
       label: a.label,
       note: a.note,
+      stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message' ? a.config.channel : 'email',
       instruction:
@@ -1577,8 +1579,9 @@ function ActionZapCard({
   const Icon = ACTION_ICONS[row.type] ?? Sparkles;
   const cl = actionAccent(row.type);
   const summary = collapsed ? actionSummary(row) : null;
+  const isDisabled = row.stepEnabled === false;
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
+    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card transition-opacity', cl.border, isDisabled && 'opacity-60')}>
       <div className={cn('flex items-center gap-3 bg-muted/20 px-4 py-3', !collapsed && 'border-b border-border/40')}>
         {showDragHandle && (
           <GripVertical
@@ -1645,7 +1648,12 @@ function ActionZapCard({
             </div>
           )}
         </div>
-        {incomplete ? (
+        {isDisabled ? (
+          <span className="flex items-center gap-1 rounded-full bg-muted/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <Power size={10} aria-hidden />
+            Disabled
+          </span>
+        ) : incomplete ? (
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
             <AlertCircle size={11} aria-hidden />
             Incomplete
@@ -1655,6 +1663,21 @@ function ActionZapCard({
             <CheckIcon size={11} strokeWidth={3} aria-hidden />
           </span>
         )}
+        {/* Enable/disable step toggle — Zapier-style per-step on/off */}
+        <button
+          type="button"
+          onClick={() => onChange({ stepEnabled: !row.stepEnabled })}
+          aria-label={isDisabled ? 'Enable this step' : 'Disable this step'}
+          title={isDisabled ? 'Enable step' : 'Disable step (skip at runtime)'}
+          className={cn(
+            'flex-shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+            isDisabled
+              ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30'
+              : 'text-muted-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground',
+          )}
+        >
+          <Power size={13} aria-hidden />
+        </button>
         {/* Collapse / expand toggle */}
         <button
           type="button"
@@ -2308,6 +2331,7 @@ export function WorkflowBuilder({
 
   function actionIncomplete(row: ActionRowState): boolean {
     if (!dirty) return false;
+    if (row.stepEnabled === false) return false;
     if (row.type === 'draft_message' || row.type === 'schedule_message' || row.type === 'run_chippi')
       return !row.instruction.trim();
     if (row.type === 'create_task') return !row.title.trim();

@@ -212,6 +212,7 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       label: a.label,
       note: a.note,
       onError: a.onError,
+      stepEnabled: a.enabled !== false,
       channel:
         a.type === 'draft_message' || a.type === 'schedule_message'
           ? a.config.channel
@@ -3121,6 +3122,7 @@ function AIWorkflowGenerator({
           id: aiGenRowId(),
           type: (typeof a.type === 'string' ? a.type : 'draft_message') as WorkflowFormState['actions'][number]['type'],
           label: typeof a.label === 'string' ? a.label : undefined,
+          stepEnabled: true,
           channel: (typeof a.channel === 'string' ? a.channel : 'email') as 'sms' | 'email',
           instruction: typeof a.instruction === 'string' ? a.instruction : '',
           delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',

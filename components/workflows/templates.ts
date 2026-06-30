@@ -72,6 +72,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
   return {
     id: rowId('act'),
     type: 'draft_message',
+    stepEnabled: true,
     channel: 'email',
     instruction: '',
     delayMinutes: '',

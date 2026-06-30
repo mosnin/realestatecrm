@@ -268,6 +268,8 @@ const stepNote = z.string().trim().max(500).optional();
  * effects (Slack pings, CRM log notes) that shouldn't derail the whole run.
  */
 const stepOnError = z.enum(['stop', 'skip']).optional();
+/** When false, the step is skipped at runtime (like Zapier's step disable toggle). */
+const stepEnabled = z.boolean().optional();
 
 /**
  * All action schemas EXCEPT branch — used as the element type for nested
@@ -279,6 +281,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({ channel: channelSchema, instruction: instructionField })
       .strict(),
@@ -288,6 +291,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         channel: channelSchema,
@@ -301,6 +305,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         title: shortText,
@@ -313,6 +318,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         toolkit: shortText,
@@ -326,6 +332,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z.object({ instruction: instructionField }).strict(),
   }),
   // delay: pause execution before the next step.
@@ -337,6 +344,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         delayMode: z.enum(['relative', 'until_weekday']).optional(),
@@ -366,6 +374,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         field: z.string().trim().min(1).max(SHORT_TEXT),
@@ -380,6 +389,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         input: z.string().trim().min(1).max(SHORT_TEXT),
@@ -402,6 +412,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         url: z.string().url().max(2000).refine((u) => u.startsWith('https://'), {
@@ -419,6 +430,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         field: z.enum(UPDATE_LEAD_FIELDS),
@@ -433,6 +445,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         title: z.string().trim().min(1).max(SHORT_TEXT),
@@ -446,6 +459,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     label: stepLabel,
     note: stepNote,
     onError: stepOnError,
+    enabled: stepEnabled,
     config: z
       .object({
         source: z.string().trim().min(1).max(SHORT_TEXT),
@@ -479,6 +493,7 @@ export const branchActionSchema = z.object({
   label: stepLabel,
   note: stepNote,
   onError: stepOnError,
+  enabled: stepEnabled,
   config: z
     .object({
       paths: z.array(branchPathSchema).min(1).max(4),

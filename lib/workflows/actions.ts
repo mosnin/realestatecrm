@@ -920,6 +920,9 @@ export async function executeAction(
   context: WorkflowContext,
   opts: ExecuteActionOptions,
 ): Promise<ActionStepResult> {
+  if (action.enabled === false) {
+    return { status: 'skipped', detail: { reason: 'step disabled', type: action.type } };
+  }
   try {
     switch (action.type) {
       case 'draft_message':

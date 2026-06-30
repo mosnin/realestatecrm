@@ -105,6 +105,8 @@ export interface ActionRowState {
   note?: string;
   /** What to do if this step errors: 'stop' (default) or 'skip' and continue. */
   onError?: 'stop' | 'skip';
+  /** When false, this step is skipped at runtime (Zapier-style step disable). Defaults to true. */
+  stepEnabled: boolean;
   /** draft_message / schedule_message. */
   channel: 'sms' | 'email';
   /** draft_message / schedule_message / run_chippi. */
@@ -298,6 +300,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
   const label = row.label?.trim() || undefined;
   const note = row.note?.trim() || undefined;
   const onError = row.onError === 'skip' ? 'skip' : undefined;
+  const enabledProp = row.stepEnabled === false ? { enabled: false as const } : {};
   switch (row.type) {
     case 'draft_message':
       return {
@@ -305,6 +308,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: { channel: row.channel, instruction: row.instruction.trim() },
       };
     case 'schedule_message': {
@@ -314,6 +318,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: {
           channel: row.channel,
           instruction: row.instruction.trim(),
@@ -327,6 +332,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config:
           row.dueInDays.trim() === ''
             ? { title: row.title.trim() }
@@ -338,6 +344,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: {
           toolkit: row.toolkit.trim(),
           action: row.action.trim(),
@@ -350,6 +357,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: { instruction: row.instruction.trim() },
       };
     case 'delay': {
@@ -360,6 +368,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: isUntil
           ? {
               delayMode: 'until_weekday' as const,
@@ -379,6 +388,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: VALUELESS_OPERATORS.has(row.filterOperator)
           ? base
           : { ...base, value: coerceConditionValue(row.filterValue) },
@@ -393,6 +403,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: { url, ...(bodyJson ? { bodyJson } : {}), ...(headersJson ? { headersJson } : {}) },
       };
     }
@@ -402,6 +413,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: { field: row.updateField, value: row.updateValue.trim() },
       };
     case 'notify_agent': {
@@ -411,6 +423,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: { title: row.notifyTitle.trim(), ...(body ? { body } : {}) },
       };
     }
@@ -421,6 +434,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: {
           source: row.filterField.trim() || 'lead.tags',
           instruction: row.instruction.trim() || 'Process {{item}}',
@@ -434,6 +448,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: {
           paths: (row.branchPaths ?? []).map((p) => ({
             ...(p.label.trim() ? { label: p.label.trim() } : {}),
@@ -483,6 +498,7 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
+        ...enabledProp,
         config: cfg,
       };
     }
