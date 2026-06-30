@@ -49,6 +49,7 @@ function baseTrigger(): WorkflowFormState['trigger'] {
     toStage: '',
     cadence: 'daily',
     hour: '',
+    timezone: '',
   };
 }
 
@@ -101,6 +102,8 @@ function blankAction(): WorkflowFormState['actions'][number] {
     formatterTruncateSuffix: '',
     formatterSplitSeparator: '',
     formatterSplitIndex: '',
+    formatterRegexPattern: '',
+    formatterRegexFlags: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',

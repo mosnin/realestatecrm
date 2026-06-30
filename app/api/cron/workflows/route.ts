@@ -38,28 +38,54 @@ const MAX_CONCURRENCY = 5;
 interface ScheduleConfig {
   cadence: 'hourly' | 'daily' | 'weekdays';
   hour?: number;
+  timezone?: string;
 }
 
 /**
- * Decide whether a schedule workflow is DUE in the UTC hour of `now`.
+ * Derive the local hour and weekday of `now` in the given IANA timezone.
+ * Falls back to UTC on any error (unsupported or mis-spelled TZ name).
+ */
+function localHourAndDay(now: Date, timezone?: string): { hour: number; dow: number } {
+  if (!timezone) {
+    return { hour: now.getUTCHours(), dow: now.getUTCDay() };
+  }
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      weekday: 'short',
+      hour12: false,
+    }).formatToParts(now);
+    const hourStr = parts.find((p) => p.type === 'hour')?.value ?? String(now.getUTCHours());
+    const weekdayStr = parts.find((p) => p.type === 'weekday')?.value ?? 'Mon';
+    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    // hour12:false returns '24' for midnight in some locales — normalise to 0.
+    const hour = parseInt(hourStr, 10) % 24;
+    const dow = dayMap[weekdayStr] ?? now.getUTCDay();
+    return { hour, dow };
+  } catch {
+    return { hour: now.getUTCHours(), dow: now.getUTCDay() };
+  }
+}
+
+/**
+ * Decide whether a schedule workflow is DUE in the current tick.
  *
  * Pure + exported so the cadence logic is unit-testable without HTTP:
  *   - hourly   → always due (it fires every tick).
- *   - daily    → due only when the current UTC hour === config.hour.
- *   - weekdays → that AND the day is Mon–Fri (UTC).
+ *   - daily    → due only when the LOCAL hour (per timezone, default UTC) equals config.hour.
+ *   - weekdays → that AND the LOCAL day is Mon–Fri.
  *
- * A `daily`/`weekdays` config with no `hour` defaults to hour 0, so it still
- * has a single deterministic slot rather than firing every tick.
+ * A `daily`/`weekdays` config with no `hour` defaults to hour 0.
  */
 export function isScheduleDue(config: ScheduleConfig, now: Date): boolean {
   if (config.cadence === 'hourly') return true;
 
+  const { hour: currentHour, dow } = localHourAndDay(now, config.timezone);
   const targetHour = config.hour ?? 0;
-  const currentUtcHour = now.getUTCHours();
-  if (currentUtcHour !== targetHour) return false;
+  if (currentHour !== targetHour) return false;
 
   if (config.cadence === 'weekdays') {
-    const dow = now.getUTCDay(); // 0 = Sun, 6 = Sat
     return dow >= 1 && dow <= 5;
   }
 

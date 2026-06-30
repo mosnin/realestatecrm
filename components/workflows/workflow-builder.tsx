@@ -305,19 +305,26 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
 const FORMATTER_OPERATION_LABELS: Record<FormatterOperation, string> = {
   uppercase: 'Uppercase',
   lowercase: 'Lowercase',
-  capitalize: 'Capitalize',
+  capitalize: 'Capitalize first',
+  title_case: 'Title Case',
   trim: 'Trim whitespace',
   replace: 'Find & replace',
+  regex_extract: 'Regex extract',
   number_format: 'Format number',
   date_format: 'Format date',
   extract_number: 'Extract number',
   extract_email: 'Extract email',
   extract_phone: 'Extract phone',
+  extract_url: 'Extract URL',
   default_value: 'Default value',
   truncate: 'Truncate text',
   length: 'Text length',
+  count_words: 'Count words',
   split: 'Split text',
   url_encode: 'URL encode',
+  url_decode: 'URL decode',
+  remove_html: 'Remove HTML tags',
+  reverse: 'Reverse text',
 };
 
 const DATE_FORMAT_OPTIONS = [
@@ -479,6 +486,7 @@ export function emptyFormState(): WorkflowFormState {
       toStage: '',
       cadence: 'daily',
       hour: '',
+      timezone: '',
     },
     conditionOp: 'and',
     conditions: [],
@@ -537,6 +545,8 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     formatterTruncateSuffix: '',
     formatterSplitSeparator: '',
     formatterSplitIndex: '',
+    formatterRegexPattern: '',
+    formatterRegexFlags: '',
     webhookUrl: '',
     webhookBody: '',
     webhookHeaders: '',
@@ -660,6 +670,8 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
       formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
       formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
       formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
+      formatterRegexPattern: a.type === 'formatter' ? (a.config.regexPattern ?? '') : '',
+      formatterRegexFlags: a.type === 'formatter' ? (a.config.regexFlags ?? '') : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -3486,10 +3498,20 @@ function TriggerConfig({
             />
           </FieldRow>
         )}
+        <FieldRow label="Timezone" htmlFor="wf-tz">
+          <Input
+            id="wf-tz"
+            value={t.timezone ?? ''}
+            onChange={(e) => patchTrigger({ timezone: e.target.value })}
+            placeholder="America/New_York (default: UTC)"
+            className="h-8"
+          />
+        </FieldRow>
         <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
           <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
           <span className="text-[12px] text-amber-700 dark:text-amber-300">
             Next run: <span className="font-medium">{computeNextRun(t.cadence, t.hour || '9')}</span>
+            {t.timezone && <span className="ml-1 text-amber-600/70"> ({t.timezone})</span>}
           </span>
         </div>
       </div>
@@ -3875,7 +3897,7 @@ function computeFormatterPreview(
       case 'uppercase': return sample.toUpperCase();
       case 'lowercase': return sample.toLowerCase();
       case 'capitalize':
-        return sample.replace(/\b\w/g, (c) => c.toUpperCase());
+        return sample.charAt(0).toUpperCase() + sample.slice(1).toLowerCase();
       case 'trim': return sample.trim();
       case 'replace': {
         if (!row.formatterFind) return sample;
@@ -3928,6 +3950,10 @@ function computeFormatterPreview(
       }
       case 'length':
         return String(sample.length);
+      case 'count_words':
+        return String(sample.trim() === '' ? 0 : sample.trim().split(/\s+/).length);
+      case 'title_case':
+        return sample.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
       case 'split': {
         const sep = row.formatterSplitSeparator || ',';
         const idx = (parseInt(row.formatterSplitIndex, 10) || 1) - 1;
@@ -3936,6 +3962,26 @@ function computeFormatterPreview(
       }
       case 'url_encode':
         return encodeURIComponent(sample);
+      case 'url_decode': {
+        try { return decodeURIComponent(sample); } catch { return sample; }
+      }
+      case 'remove_html':
+        return sample.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      case 'reverse':
+        return sample.split('').reverse().join('');
+      case 'regex_extract': {
+        if (!row.formatterRegexPattern) return null;
+        try {
+          const flags = (row.formatterRegexFlags ?? '').replace(/[^gimsuy]/g, '');
+          const re = new RegExp(row.formatterRegexPattern, flags);
+          const m = sample.match(re);
+          return m ? (m[1] ?? m[0]) : '';
+        } catch { return null; }
+      }
+      case 'extract_url': {
+        const m = sample.match(/https?:\/\/[^\s"'<>]+/);
+        return m ? m[0] : null;
+      }
       default: return null;
     }
   } catch { return null; }
@@ -3978,6 +4024,7 @@ function FormatterActionConfig({
 
   const op = row.formatterOperation;
   const needsReplace = op === 'replace';
+  const needsRegex = op === 'regex_extract';
   const needsFormat = op === 'date_format';
   const needsToFixed = op === 'number_format';
   const needsFallback = op === 'default_value';
@@ -4035,6 +4082,28 @@ function FormatterActionConfig({
               onChange={(e) => onChange({ formatterReplace: e.target.value })}
               placeholder="(leave blank to delete)"
               className="h-8"
+            />
+          </FieldRow>
+        </>
+      )}
+      {needsRegex && (
+        <>
+          <FieldRow label="Pattern" htmlFor={`fmt-rx-${row.id}`}>
+            <Input
+              id={`fmt-rx-${row.id}`}
+              value={row.formatterRegexPattern ?? ''}
+              onChange={(e) => onChange({ formatterRegexPattern: e.target.value })}
+              placeholder="(\d{3}-\d{4})"
+              className="h-8 font-mono text-[12px]"
+            />
+          </FieldRow>
+          <FieldRow label="Flags (optional)" htmlFor={`fmt-rxf-${row.id}`}>
+            <Input
+              id={`fmt-rxf-${row.id}`}
+              value={row.formatterRegexFlags ?? ''}
+              onChange={(e) => onChange({ formatterRegexFlags: e.target.value })}
+              placeholder="i"
+              className="h-8 w-20 font-mono text-[12px]"
             />
           </FieldRow>
         </>

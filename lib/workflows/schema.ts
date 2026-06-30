@@ -80,6 +80,8 @@ export const workflowTriggerSchema = z.discriminatedUnion('type', [
       .object({
         cadence: z.enum(['hourly', 'daily', 'weekdays']),
         hour: z.number().int().min(0).max(23).optional(),
+        /** IANA timezone name, e.g. "America/New_York". Defaults to UTC. */
+        timezone: z.string().max(50).optional(),
       })
       .strict(),
   }),
@@ -230,35 +232,49 @@ export type FormatterOperation =
   | 'uppercase'
   | 'lowercase'
   | 'capitalize'
+  | 'title_case'
   | 'trim'
   | 'replace'
+  | 'regex_extract'
   | 'number_format'
   | 'date_format'
   | 'extract_number'
   | 'extract_email'
   | 'extract_phone'
+  | 'extract_url'
   | 'default_value'
   | 'truncate'
   | 'length'
+  | 'count_words'
   | 'split'
-  | 'url_encode';
+  | 'url_encode'
+  | 'url_decode'
+  | 'remove_html'
+  | 'reverse';
 
 export const FORMATTER_OPERATIONS = [
   'uppercase',
   'lowercase',
   'capitalize',
+  'title_case',
   'trim',
   'replace',
+  'regex_extract',
   'number_format',
   'date_format',
   'extract_number',
   'extract_email',
   'extract_phone',
+  'extract_url',
   'default_value',
   'truncate',
   'length',
+  'count_words',
   'split',
   'url_encode',
+  'url_decode',
+  'remove_html',
+  'reverse',
 ] as const satisfies readonly FormatterOperation[];
 
 const channelSchema = z.enum(['sms', 'email']);
@@ -425,6 +441,8 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
         operation: z.enum(FORMATTER_OPERATIONS),
         find: z.string().max(200).optional(),
         replacement: z.string().max(200).optional(),
+        regexPattern: z.string().max(500).optional(),
+        regexFlags: z.string().max(10).optional(),
         format: z.string().max(100).optional(),
         toFixed: z.number().int().min(0).max(20).optional(),
         fallback: z.string().max(500).optional(),

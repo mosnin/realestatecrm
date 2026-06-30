@@ -190,6 +190,10 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
         t.type === 'schedule' && typeof t.config.hour === 'number'
           ? String(t.config.hour)
           : '',
+      timezone:
+        t.type === 'schedule'
+          ? ((t.config as { timezone?: string }).timezone ?? '')
+          : '',
       webhookSecret:
         t.type === 'webhook'
           ? ((t.config as { webhookSecret?: string }).webhookSecret ?? '')
@@ -264,6 +268,8 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       formatterTruncateSuffix: a.type === 'formatter' ? (a.config.truncateSuffix ?? '') : '',
       formatterSplitSeparator: a.type === 'formatter' ? (a.config.splitSeparator ?? '') : '',
       formatterSplitIndex: a.type === 'formatter' && a.config.splitIndex !== undefined ? String(a.config.splitIndex) : '',
+      formatterRegexPattern: a.type === 'formatter' ? (a.config.regexPattern ?? '') : '',
+      formatterRegexFlags: a.type === 'formatter' ? (a.config.regexFlags ?? '') : '',
       webhookUrl: a.type === 'webhook_post' ? a.config.url : '',
       webhookBody: a.type === 'webhook_post' ? (a.config.bodyJson ?? '') : '',
       webhookHeaders: a.type === 'webhook_post' ? (a.config.headersJson ?? '') : '',
@@ -3115,6 +3121,7 @@ function AIWorkflowGenerator({
           toStage: typeof t.toStage === 'string' ? t.toStage : '',
           cadence: (typeof t.cadence === 'string' ? t.cadence : 'daily') as 'hourly' | 'daily' | 'weekdays',
           hour: typeof t.hour === 'string' ? t.hour : typeof t.hour === 'number' ? String(t.hour) : '',
+          timezone: typeof t.timezone === 'string' ? t.timezone : '',
         },
         conditionOp: raw.conditionOp === 'or' ? 'or' : 'and',
         conditions: rawConditions.map((c) => ({
@@ -3156,6 +3163,8 @@ function AIWorkflowGenerator({
           formatterTruncateSuffix: typeof a.truncateSuffix === 'string' ? a.truncateSuffix : '',
           formatterSplitSeparator: typeof a.splitSeparator === 'string' ? a.splitSeparator : '',
           formatterSplitIndex: typeof a.splitIndex === 'number' ? String(a.splitIndex) : '',
+          formatterRegexPattern: typeof a.regexPattern === 'string' ? a.regexPattern : '',
+          formatterRegexFlags: typeof a.regexFlags === 'string' ? a.regexFlags : '',
           webhookUrl: typeof a.webhookUrl === 'string' ? a.webhookUrl : '',
           webhookBody: typeof a.webhookBody === 'string' ? a.webhookBody : '',
           webhookHeaders: typeof a.webhookHeaders === 'string' ? a.webhookHeaders : '',

@@ -62,6 +62,8 @@ export interface TriggerFormState {
   cadence: 'hourly' | 'daily' | 'weekdays';
   /** schedule hour, 0-23 (string off a number input; blank = omit). */
   hour: string;
+  /** schedule: IANA timezone name, e.g. "America/New_York". Blank/omit = UTC. */
+  timezone?: string;
   /** webhook: optional HMAC-SHA256 signing secret (min 8 chars). Blank = unsigned. */
   webhookSecret?: string;
 }
@@ -163,6 +165,10 @@ export interface ActionRowState {
   formatterSplitSeparator: string;
   /** formatter: 1-based part index for 'split'. */
   formatterSplitIndex: string;
+  /** formatter: regex pattern for 'regex_extract'. */
+  formatterRegexPattern: string;
+  /** formatter: regex flags for 'regex_extract' (e.g. 'i'). */
+  formatterRegexFlags: string;
   /** webhook_post: target HTTPS URL. */
   webhookUrl: string;
   /** webhook_post: JSON body template (optional, {{tokens}} supported). */
@@ -258,14 +264,11 @@ function buildTrigger(t: TriggerFormState): WorkflowTrigger {
         type: 'integration_event',
         config: { toolkit: t.toolkit.trim(), event: t.event.trim() },
       };
-    case 'schedule':
-      return {
-        type: 'schedule',
-        config:
-          t.hour.trim() === ''
-            ? { cadence: t.cadence }
-            : { cadence: t.cadence, hour: toNumber(t.hour) },
-      };
+    case 'schedule': {
+      const tz = (t.timezone ?? '').trim();
+      const baseConfig = t.hour.trim() === '' ? { cadence: t.cadence } : { cadence: t.cadence, hour: toNumber(t.hour) };
+      return { type: 'schedule', config: tz ? { ...baseConfig, timezone: tz } : baseConfig };
+    }
     case 'webhook': {
       const secret = t.webhookSecret?.trim();
       return { type: 'webhook', config: secret && secret.length >= 8 ? { webhookSecret: secret } : {} };
@@ -484,6 +487,8 @@ export function buildAction(row: ActionRowState): WorkflowAction {
         operation: FormatterOperation;
         find?: string;
         replacement?: string;
+        regexPattern?: string;
+        regexFlags?: string;
         format?: string;
         toFixed?: number;
         fallback?: string;
@@ -496,6 +501,10 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       if (op === 'replace') {
         if (row.formatterFind) cfg.find = row.formatterFind;
         cfg.replacement = row.formatterReplace;
+      }
+      if (op === 'regex_extract') {
+        if (row.formatterRegexPattern) cfg.regexPattern = row.formatterRegexPattern;
+        if (row.formatterRegexFlags) cfg.regexFlags = row.formatterRegexFlags;
       }
       if (op === 'date_format' && row.formatterFormat.trim()) cfg.format = row.formatterFormat.trim();
       if (op === 'number_format' && row.formatterToFixed.trim() !== '') {

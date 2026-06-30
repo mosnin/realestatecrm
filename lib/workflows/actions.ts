@@ -136,6 +136,14 @@ function resolveTokens(template: string, context: WorkflowContext): string {
       if (fmtData && typeof fmtData === 'object') {
         value = resolveField(fmtData as Record<string, unknown>, rest);
       }
+    } else if (ns === 'item') {
+      // Inside iterate loops the context carries `item`, `item.index`, `item.count`.
+      const itemData = (context as Record<string, unknown>).item;
+      if (rest === 'index' || rest === 'count') {
+        value = (context as Record<string, unknown>)[`item.${rest}`];
+      } else if (itemData !== undefined && itemData !== null) {
+        value = typeof itemData === 'object' ? resolveField(itemData as Record<string, unknown>, rest) : itemData;
+      }
     }
 
     if (value === undefined || value === null) return _match;
@@ -498,7 +506,7 @@ function runFormatter(
   action: Extract<WorkflowAction, { type: 'formatter' }>,
   context: WorkflowContext,
 ): ActionStepResult {
-  const { input, operation, find, replacement, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
+  const { input, operation, find, replacement, regexPattern, regexFlags, format, toFixed, fallback, truncateLength, truncateSuffix, splitSeparator, splitIndex } = action.config;
   const resolved = resolveField(context as Record<string, unknown>, input);
   const strValue = String(resolved !== undefined && resolved !== null ? resolved : input);
 
@@ -507,12 +515,26 @@ function runFormatter(
     case 'uppercase': output = strValue.toUpperCase(); break;
     case 'lowercase': output = strValue.toLowerCase(); break;
     case 'capitalize': output = strValue.charAt(0).toUpperCase() + strValue.slice(1).toLowerCase(); break;
+    case 'title_case': {
+      output = strValue.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      break;
+    }
     case 'trim': output = strValue.trim(); break;
     case 'replace': {
       const needle = find ?? '';
       if (!needle) { output = strValue; break; }
       const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       output = strValue.replace(new RegExp(escaped, 'g'), replacement ?? '');
+      break;
+    }
+    case 'regex_extract': {
+      if (!regexPattern) { output = ''; break; }
+      try {
+        const flags = (regexFlags ?? '').replace(/[^gimsuy]/g, '');
+        const re = new RegExp(regexPattern, flags);
+        const m = strValue.match(re);
+        output = m ? (m[1] ?? m[0]) : '';
+      } catch { output = ''; }
       break;
     }
     case 'number_format': {
@@ -542,6 +564,11 @@ function runFormatter(
       output = m ? m[0] : '';
       break;
     }
+    case 'extract_url': {
+      const m = strValue.match(/https?:\/\/[^\s"'<>]+/);
+      output = m ? m[0] : '';
+      break;
+    }
     case 'default_value': {
       output = strValue.trim() !== '' ? strValue : (fallback ?? '');
       break;
@@ -557,6 +584,10 @@ function runFormatter(
       output = String(strValue.length);
       break;
     }
+    case 'count_words': {
+      output = String(strValue.trim() === '' ? 0 : strValue.trim().split(/\s+/).length);
+      break;
+    }
     case 'split': {
       const sep = splitSeparator ?? ',';
       const idx = (splitIndex ?? 1) - 1; // 1-based in config, 0-based internally
@@ -566,6 +597,18 @@ function runFormatter(
     }
     case 'url_encode': {
       output = encodeURIComponent(strValue);
+      break;
+    }
+    case 'url_decode': {
+      try { output = decodeURIComponent(strValue); } catch { output = strValue; }
+      break;
+    }
+    case 'remove_html': {
+      output = strValue.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+      break;
+    }
+    case 'reverse': {
+      output = strValue.split('').reverse().join('');
       break;
     }
     default: output = strValue;
@@ -828,9 +871,12 @@ async function runIterate(
   const summaries: string[] = [];
   let failedCount = 0;
 
-  for (const item of capped) {
+  for (let itemIdx = 0; itemIdx < capped.length; itemIdx++) {
+    const item = capped[itemIdx];
     const itemStr = typeof item === 'object' ? JSON.stringify(item) : String(item ?? '');
-    const itemInstruction = resolveTokens(instruction, { ...context, item }).replace(/\{\{item\}\}/g, itemStr);
+    // Expose {{item}}, {{item.index}} (1-based), {{item.count}} (total items).
+    const itemCtx = { ...context, item, 'item.index': itemIdx + 1, 'item.count': capped.length };
+    const itemInstruction = resolveTokens(instruction, itemCtx).replace(/\{\{item\}\}/g, itemStr);
     try {
       const result = await runAutonomousInstruction({ spaceId, instruction: itemInstruction });
       summaries.push(result.summary ?? '');
