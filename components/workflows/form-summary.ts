@@ -190,5 +190,5 @@ export function summarizeFormState(state: WorkflowFormState): FormSummary {
 /** Flatten a FormSummary into one sentence (tests + plain-text consumers). */
 export function summaryToSentence(s: FormSummary): string {
   const cond = s.conditions ? `, ${s.conditions}` : '';
-  return `When ${s.when}${cond}, I’ll ${s.then}. ${s.autonomy}`;
+  return `When ${s.when}${cond}, I'll ${s.then}. ${s.autonomy}`;
 }

@@ -53,12 +53,12 @@ describe('buildDefinition — hot lead template (filled form)', () => {
       { field: 'lead.score', operator: 'gte', value: 80 },
     ]);
 
-    // Actions — one draft_message over SMS with the template instruction.
+    // Actions — one draft_message over email with the template instruction.
     expect(parsed.actions).toHaveLength(1);
     const action = parsed.actions[0];
     expect(action.type).toBe('draft_message');
     if (action.type === 'draft_message') {
-      expect(action.config.channel).toBe('sms');
+      expect(action.config.channel).toBe('email');
       expect(action.config.instruction).toMatch(/warm, personal intro/);
     }
 
