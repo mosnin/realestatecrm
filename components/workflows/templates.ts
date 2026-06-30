@@ -80,6 +80,7 @@ function blankAction(): WorkflowFormState['actions'][number] {
     delayMode: 'relative',
     untilWeekday: '1',
     untilHour: '9',
+    untilDate: '',
     title: '',
     dueInDays: '',
     toolkit: '',

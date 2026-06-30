@@ -347,10 +347,12 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     enabled: stepEnabled,
     config: z
       .object({
-        delayMode: z.enum(['relative', 'until_weekday']).optional(),
+        delayMode: z.enum(['relative', 'until_weekday', 'until_date']).optional(),
         delayMinutes: z.number().int().min(1).optional(),
         untilWeekday: z.number().int().min(0).max(6).optional(),
         untilHour: z.number().int().min(0).max(23).optional(),
+        /** ISO date string (YYYY-MM-DD) for until_date mode. */
+        untilDate: z.string().optional(),
       })
       .superRefine((cfg, ctx) => {
         const mode = cfg.delayMode ?? 'relative';
@@ -364,6 +366,10 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
           }
           if (cfg.untilHour === undefined) {
             ctx.addIssue({ code: 'custom', path: ['untilHour'], message: 'untilHour required.' });
+          }
+        } else if (mode === 'until_date') {
+          if (!cfg.untilDate) {
+            ctx.addIssue({ code: 'custom', path: ['untilDate'], message: 'untilDate (YYYY-MM-DD) required for until_date delay.' });
           }
         }
       }),

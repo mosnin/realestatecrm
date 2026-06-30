@@ -526,6 +526,7 @@ function newActionRow(type: WorkflowActionType = 'draft_message'): ActionRowStat
     delayMode: 'relative',
     untilWeekday: '1',
     untilHour: '9',
+    untilDate: '',
     formatterFind: '',
     formatterReplace: '',
     formatterFormat: 'MM/DD/YYYY',
@@ -626,9 +627,10 @@ function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
             ? String(a.config.limit)
             : '',
       delayUnit: delayDisplay?.unit ?? 'hours',
-      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday' | 'until_date',
       untilWeekday: a.type === 'delay' && isDelayUntil && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
       untilHour: a.type === 'delay' && isDelayUntil && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
+      untilDate: a.type === 'delay' && 'untilDate' in a.config && typeof a.config.untilDate === 'string' ? a.config.untilDate : '',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -968,6 +970,9 @@ function actionSummary(row: ActionRowState): string {
         const ampm = h < 12 ? 'AM' : 'PM';
         const h12 = ((h + 11) % 12) + 1;
         return `Wait until ${day} at ${h12}:00 ${ampm}`;
+      }
+      if (row.delayMode === 'until_date') {
+        return row.untilDate ? `Wait until ${row.untilDate}` : 'Wait until date (not set)';
       }
       return `Wait ${row.delayMinutes || '?'} ${row.delayUnit}`;
     }
@@ -1610,6 +1615,9 @@ function ActionZapCard({
               </p>
               {summary && (
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{summary}</p>
+              )}
+              {row.note && (
+                <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/50">{row.note}</p>
               )}
             </button>
           ) : (
@@ -2338,6 +2346,7 @@ export function WorkflowBuilder({
     if (row.type === 'call_integration') return !row.toolkit || !row.action;
     if (row.type === 'delay') {
       if (row.delayMode === 'until_weekday') return row.untilWeekday === '' || row.untilHour === '';
+      if (row.delayMode === 'until_date') return !row.untilDate.trim();
       return !row.delayMinutes.trim() || Number(row.delayMinutes) < 1;
     }
     if (row.type === 'filter') return !row.filterField.trim();
@@ -4850,9 +4859,9 @@ function ActionConfig({
     return (
       <div className="space-y-2.5">
         <p className={CAPTION}>Pause the automation before the next step runs.</p>
-        {/* Mode toggle: relative vs until weekday */}
+        {/* Mode toggle: relative / until weekday / until date */}
         <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 w-fit">
-          {(['relative', 'until_weekday'] as const).map((m) => (
+          {(['relative', 'until_weekday', 'until_date'] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -4863,7 +4872,7 @@ function ActionConfig({
                 mode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {m === 'relative' ? 'Wait duration' : 'Wait until day'}
+              {m === 'relative' ? 'Wait duration' : m === 'until_weekday' ? 'Wait until day' : 'Wait until date'}
             </button>
           ))}
         </div>
@@ -4894,7 +4903,7 @@ function ActionConfig({
               ]}
             />
           </div>
-        ) : (
+        ) : mode === 'until_weekday' ? (
           <div className="flex flex-wrap items-center gap-2">
             <Label className="text-[12px] text-muted-foreground">Until next</Label>
             <MiniSelect
@@ -4913,6 +4922,19 @@ function ActionConfig({
                 const h12 = ((h + 11) % 12) + 1;
                 return { value: String(h), label: `${h12}:00 ${ampm}` };
               })}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Label htmlFor={`act-delay-date-${row.id}`} className="text-[12px] text-muted-foreground">
+              Wait until
+            </Label>
+            <Input
+              id={`act-delay-date-${row.id}`}
+              type="date"
+              value={row.untilDate}
+              onChange={(e) => onChange({ untilDate: e.target.value })}
+              className="h-8 w-40"
             />
           </div>
         )}
@@ -4935,6 +4957,14 @@ function ActionConfig({
                 const ampm = h < 12 ? 'AM' : 'PM';
                 return `${((h + 11) % 12) + 1}:00 ${ampm}`;
               })()}</span>
+            </span>
+          </div>
+        )}
+        {mode === 'until_date' && row.untilDate && (
+          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
+            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+              Pauses until <span className="font-medium">{new Date(row.untilDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
             </span>
           </div>
         )}

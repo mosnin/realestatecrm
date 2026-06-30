@@ -115,12 +115,14 @@ export interface ActionRowState {
   delayMinutes: string;
   /** delay: the display unit. Converted to minutes by buildAction. */
   delayUnit: 'minutes' | 'hours' | 'days' | 'weeks';
-  /** delay: mode — 'relative' (wait N units) or 'until_weekday' (wait until day+time). */
-  delayMode: 'relative' | 'until_weekday';
+  /** delay: mode — 'relative', 'until_weekday', or 'until_date'. */
+  delayMode: 'relative' | 'until_weekday' | 'until_date';
   /** delay (until_weekday mode): 0=Sun … 6=Sat. */
   untilWeekday: string;
   /** delay (until_weekday mode): 0-23 hour. */
   untilHour: string;
+  /** delay (until_date mode): ISO date string YYYY-MM-DD. */
+  untilDate: string;
   /** create_task. */
   title: string;
   dueInDays: string;
@@ -362,24 +364,20 @@ export function buildAction(row: ActionRowState): WorkflowAction {
       };
     case 'delay': {
       const multiplier = row.delayUnit === 'weeks' ? 10080 : row.delayUnit === 'days' ? 1440 : row.delayUnit === 'hours' ? 60 : 1;
-      const isUntil = row.delayMode === 'until_weekday';
-      return {
-        type: 'delay',
+      const delayMeta = {
+        type: 'delay' as const,
         ...(label ? { label } : {}),
         ...(note ? { note } : {}),
         ...(onError ? { onError } : {}),
         ...enabledProp,
-        config: isUntil
-          ? {
-              delayMode: 'until_weekday' as const,
-              untilWeekday: toNumber(row.untilWeekday),
-              untilHour: toNumber(row.untilHour),
-            }
-          : {
-              delayMode: 'relative' as const,
-              delayMinutes: toNumber(row.delayMinutes) * multiplier,
-            },
       };
+      if (row.delayMode === 'until_weekday') {
+        return { ...delayMeta, config: { delayMode: 'until_weekday' as const, untilWeekday: toNumber(row.untilWeekday), untilHour: toNumber(row.untilHour) } } as WorkflowAction;
+      }
+      if (row.delayMode === 'until_date') {
+        return { ...delayMeta, config: { delayMode: 'until_date' as const, untilDate: row.untilDate.trim() } } as WorkflowAction;
+      }
+      return { ...delayMeta, config: { delayMode: 'relative' as const, delayMinutes: toNumber(row.delayMinutes) * multiplier } } as WorkflowAction;
     }
     case 'filter': {
       const base = { field: row.filterField.trim(), operator: row.filterOperator };

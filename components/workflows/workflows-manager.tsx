@@ -230,9 +230,10 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
             ? String(a.config.delayMinutes ?? '')
             : '',
       delayUnit: 'minutes' as const,
-      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday',
+      delayMode: (a.type === 'delay' ? (a.config.delayMode ?? 'relative') : 'relative') as 'relative' | 'until_weekday' | 'until_date',
       untilWeekday: a.type === 'delay' && a.config.untilWeekday !== undefined ? String(a.config.untilWeekday) : '1',
       untilHour: a.type === 'delay' && a.config.untilHour !== undefined ? String(a.config.untilHour) : '9',
+      untilDate: a.type === 'delay' && 'untilDate' in a.config && typeof a.config.untilDate === 'string' ? a.config.untilDate : '',
       title: a.type === 'create_task' ? a.config.title : '',
       dueInDays:
         a.type === 'create_task' && typeof a.config.dueInDays === 'number'
@@ -3127,9 +3128,10 @@ function AIWorkflowGenerator({
           instruction: typeof a.instruction === 'string' ? a.instruction : '',
           delayMinutes: typeof a.delayMinutes === 'string' ? a.delayMinutes : typeof a.delayMinutes === 'number' ? String(a.delayMinutes) : '',
           delayUnit: 'minutes' as const,
-          delayMode: (typeof a.delayMode === 'string' ? a.delayMode : 'relative') as 'relative' | 'until_weekday',
+          delayMode: (typeof a.delayMode === 'string' ? a.delayMode : 'relative') as 'relative' | 'until_weekday' | 'until_date',
           untilWeekday: typeof a.untilWeekday === 'number' ? String(a.untilWeekday) : '1',
           untilHour: typeof a.untilHour === 'number' ? String(a.untilHour) : '9',
+          untilDate: typeof a.untilDate === 'string' ? a.untilDate : '',
           title: typeof a.title === 'string' ? a.title : '',
           dueInDays: typeof a.dueInDays === 'string' ? a.dueInDays : typeof a.dueInDays === 'number' ? String(a.dueInDays) : '',
           toolkit: typeof a.toolkit === 'string' ? a.toolkit : '',

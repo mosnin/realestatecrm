@@ -417,12 +417,14 @@ function minutesUntilWeekdayHour(weekday: number, hour: number): number {
 function runDelay(
   action: Extract<WorkflowAction, { type: 'delay' }>,
 ): ActionStepResult {
-  const { delayMode, delayMinutes, untilWeekday, untilHour } = action.config;
+  const { delayMode, delayMinutes, untilWeekday, untilHour, untilDate } = action.config;
   const mode = delayMode ?? 'relative';
   const computedMinutes =
     mode === 'until_weekday' && untilWeekday !== undefined && untilHour !== undefined
       ? minutesUntilWeekdayHour(untilWeekday, untilHour)
-      : (delayMinutes ?? 1);
+      : mode === 'until_date' && untilDate
+        ? Math.max(1, Math.round((new Date(untilDate).getTime() - Date.now()) / 60_000))
+        : (delayMinutes ?? 1);
 
   return {
     status: 'ok',
