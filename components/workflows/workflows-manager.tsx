@@ -15,7 +15,7 @@
  * delete-with-confirm.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -65,6 +65,14 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { CAPTION, SECTION_LABEL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
@@ -85,6 +93,17 @@ import type { TemplateCategory } from './templates';
 import { WorkflowCanvasLazy } from './workflow-canvas-lazy';
 import { highlightsFromSteps } from './run-highlights';
 import { useHashHighlight } from '@/hooks/use-hash-highlight';
+
+// ── Sort labels — mirrors People's "Sort:" dropdown vocabulary ───────────────
+
+const WORKFLOW_SORT_LABELS = {
+  created: 'Newest first',
+  name: 'Name A–Z',
+  lastRun: 'Last run',
+  modified: 'Last modified',
+} as const;
+
+type WorkflowSortKey = keyof typeof WORKFLOW_SORT_LABELS;
 
 // ── The record shape the API returns (subset we render) ──────────────────────
 
@@ -362,24 +381,24 @@ export function WorkflowsManager() {
   // Deep-link target: the activity feed links a workflow_run to #workflow-<id>.
   const highlightedAnchor = useHashHighlight();
 
+  const loadWorkflows = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await fetch(API_BASE);
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setWorkflows(Array.isArray(data.workflows) ? data.workflows : []);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch(API_BASE);
-        if (!res.ok) throw new Error('load failed');
-        const data = await res.json();
-        if (!active) return;
-        setWorkflows(Array.isArray(data.workflows) ? data.workflows : []);
-      } catch {
-        if (active) setLoadError(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+    void loadWorkflows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function openBlank() {
@@ -742,19 +761,37 @@ export function WorkflowsManager() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <div className="h-9 w-36 animate-pulse rounded-md bg-muted" />
-        <div className="h-24 animate-pulse rounded-xl bg-muted" />
-        <div className="h-24 animate-pulse rounded-xl bg-muted" />
-      </div>
+      <ul className="divide-y divide-border/60">
+        {[1, 2, 3, 4].map((i) => (
+          <li key={i} className="flex items-center gap-3 py-3">
+            <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-3 w-56" />
+            </div>
+          </li>
+        ))}
+      </ul>
     );
   }
 
   if (loadError) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">Couldn&apos;t load your workflows.</p>
-        <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
+          <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
+        </div>
+        <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+          Couldn&apos;t load your workflows.
+        </p>
+        <p className="text-sm text-muted-foreground">Usually temporary.</p>
+        <button
+          type="button"
+          onClick={() => void loadWorkflows()}
+          className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+        >
+          Try again
+        </button>
       </div>
     );
   }
@@ -780,163 +817,227 @@ export function WorkflowsManager() {
         </div>
       ) : workflows.length > 0 ? (
         <div className="space-y-2">
-          {/* Tab bar — Workflows / History */}
-          <div className="flex items-center gap-0 border-b border-border/60">
+          {/* Tab bar — Workflows / History (People's tablist treatment) */}
+          <div role="tablist" aria-label="Automations view" className="flex items-center gap-5 border-b border-border/70 -mt-1">
             {(
               [
                 { value: 'workflows' as const, label: 'Workflows', count: workflows.length },
                 { value: 'history' as const, label: 'History', count: null },
               ]
-            ).map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => {
-                  switchTab(tab.value);
-                  setActionError('');
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 border-b-2 pb-2 pr-4 text-sm font-medium transition-colors',
-                  activeTab === tab.value
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {tab.label}
-                {tab.count !== null && (
-                  <span className={cn(
-                    'rounded-full px-1.5 py-px text-[10px] tabular-nums font-medium',
-                    activeTab === tab.value ? 'bg-foreground/10 text-foreground' : 'bg-muted text-muted-foreground',
-                  )}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
+            ).map((tab) => {
+              const active = activeTab === tab.value;
+              return (
+                <button
+                  key={tab.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    switchTab(tab.value);
+                    setActionError('');
+                  }}
+                  className={cn(
+                    'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
+                    active
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground font-normal',
+                  )}
+                >
+                  {tab.label}
+                  {tab.count !== null && (
+                    <span
+                      className={cn(
+                        'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
+                        active
+                          ? 'bg-foreground/[0.06] text-foreground/70'
+                          : 'bg-foreground/[0.04] text-muted-foreground',
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full bg-foreground"
+                    />
+                  )}
+                </button>
+              );
+            })}
             <button
               type="button"
               onClick={() => setShowShortcuts(true)}
               title="Keyboard shortcuts (?)"
-              className="ml-auto mb-1.5 flex h-5 w-5 items-center justify-center rounded border border-border/60 text-[10px] font-semibold text-muted-foreground/60 hover:border-border hover:text-foreground transition-colors"
+              className="ml-auto mb-2.5 flex h-5 w-5 items-center justify-center rounded border border-border/60 text-[10px] font-semibold text-muted-foreground/60 hover:border-border hover:text-foreground transition-colors"
             >
               ?
             </button>
           </div>
 
           {activeTab === 'workflows' && (<>
-          {/* Row 1: search + buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[180px]">
-              <Search
-                size={14}
-                aria-hidden
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                ref={searchInputRef}
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}... (press / to focus)`}
-                className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setComposer('templates');
-                setActionError('');
-              }}
-            >
-              <Sparkles size={14} />
-              Templates
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => importFileRef.current?.click()}
-              title="Import a workflow from a JSON file"
-            >
-              <Upload size={14} />
-              Import
-            </Button>
-            <input
-              ref={importFileRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void importWorkflowFile(file);
-                e.target.value = '';
-              }}
-            />
-            <Button
-              size="sm"
-              onClick={openBlank}
-              className="bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-500/90 dark:hover:bg-orange-600"
-            >
-              <Plus size={14} />
-              New workflow
-            </Button>
-          </div>
-          {/* Row 2: status filter pills + sort */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1.5">
-              {(
-                [
-                  { value: 'all', label: 'All' },
-                  { value: 'on', label: 'On' },
-                  { value: 'off', label: 'Off' },
-                  { value: 'failed', label: 'Failed' },
-                ] as const
-              ).map((f) => (
+          {/* Status chip strip — People's leadTypeChips pattern */}
+          <div role="tablist" aria-label="Filter workflows" className="flex items-center gap-5 border-b border-border/70 -mt-1">
+            {(
+              [
+                { value: 'all' as const, label: 'All', count: workflows.length },
+                { value: 'on' as const, label: 'On', count: workflows.filter((w) => w.enabled).length },
+                { value: 'off' as const, label: 'Off', count: workflows.filter((w) => !w.enabled).length },
+                { value: 'failed' as const, label: 'Failed', count: workflows.filter((w) => w.lastRunStatus === 'error').length },
+              ]
+            ).map((chip) => {
+              const active = statusFilter === chip.value;
+              return (
                 <button
-                  key={f.value}
+                  key={chip.value}
                   type="button"
-                  onClick={() => setStatusFilter(f.value)}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setStatusFilter(chip.value)}
                   className={cn(
-                    'rounded-full px-3 py-0.5 text-xs font-medium transition-colors',
-                    statusFilter === f.value
-                      ? f.value === 'failed'
-                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                        : 'bg-foreground text-background'
-                      : 'bg-muted text-muted-foreground hover:bg-foreground/10 hover:text-foreground',
+                    'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
+                    active
+                      ? chip.value === 'failed'
+                        ? 'text-rose-600 dark:text-rose-400 font-medium'
+                        : 'text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground font-normal',
                   )}
                 >
-                  {f.label}
+                  {chip.label}
+                  <span
+                    className={cn(
+                      'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
+                      active
+                        ? chip.value === 'failed'
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                          : 'bg-foreground/[0.06] text-foreground/70'
+                        : 'bg-foreground/[0.04] text-muted-foreground',
+                    )}
+                  >
+                    {chip.count}
+                  </span>
+                  {active && (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'absolute left-0 right-0 -bottom-px h-[2px] rounded-full',
+                        chip.value === 'failed' ? 'bg-rose-500' : 'bg-foreground',
+                      )}
+                    />
+                  )}
                 </button>
-              ))}
+              );
+            })}
+          </div>
+
+          {/* Filter row — search + dropdowns + actions, mirroring People's layout */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative flex-1 sm:flex-initial min-w-[160px]">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+              <Input
+                ref={searchInputRef}
+                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}…`}
+                className="pl-9 h-9 w-full sm:w-64 bg-background border-border/70"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            {/* Trigger type filter — only shown when 2+ types exist */}
-            {triggerTypes.length > 1 && (
-              <select
-                value={triggerFilter}
-                onChange={(e) => setTriggerFilter(e.target.value)}
-                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Trigger type filter — only shown when 2+ types exist */}
+              {triggerTypes.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+                    >
+                      <span className="text-muted-foreground">Trigger:</span>
+                      {triggerFilter === 'all' ? 'All triggers' : triggerFilter.replace(/_/g, ' ')}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      onSelect={() => setTriggerFilter('all')}
+                      className={cn(triggerFilter === 'all' && 'font-semibold')}
+                    >
+                      All triggers
+                    </DropdownMenuItem>
+                    {triggerTypes.map((t) => (
+                      <DropdownMenuItem
+                        key={t}
+                        onSelect={() => setTriggerFilter(t)}
+                        className={cn('capitalize', triggerFilter === t && 'font-semibold')}
+                      >
+                        {t.replace(/_/g, ' ')}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* Sort */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  >
+                    <span className="text-muted-foreground">Sort:</span>
+                    {WORKFLOW_SORT_LABELS[sortBy]}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {(Object.keys(WORKFLOW_SORT_LABELS) as WorkflowSortKey[]).map((key) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onSelect={() => setSortBy(key)}
+                      className={cn(sortBy === key && 'font-semibold')}
+                    >
+                      {WORKFLOW_SORT_LABELS[key]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setComposer('templates');
+                  setActionError('');
+                }}
               >
-                <option value="all">All triggers</option>
-                {triggerTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            )}
-            {/* Sort */}
-            <div className="ml-auto flex items-center gap-1.5">
-              <ArrowUpDown size={12} className="text-muted-foreground/60" aria-hidden />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="h-6 rounded border border-border bg-background px-1.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+                <Sparkles size={14} />
+                Templates
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => importFileRef.current?.click()}
+                title="Import a workflow from a JSON file"
               >
-                <option value="created">Newest first</option>
-                <option value="name">Name A–Z</option>
-                <option value="lastRun">Last run</option>
-                <option value="modified">Last modified</option>
-              </select>
+                <Upload size={14} />
+                Import
+              </Button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void importWorkflowFile(file);
+                  e.target.value = '';
+                }}
+              />
+              <Button size="sm" onClick={openBlank}>
+                <Plus size={14} />
+                New workflow
+              </Button>
             </div>
           </div>
           </>)}
@@ -986,75 +1087,30 @@ export function WorkflowsManager() {
             ) : null;
           })()}
 
-          {/* Stats summary bar */}
-          {filteredWorkflows.length > 0 && (() => {
-            const onCount = filteredWorkflows.filter((w) => w.enabled).length;
-            const offCount = filteredWorkflows.filter((w) => !w.enabled).length;
-            const failedCount = filteredWorkflows.filter((w) => w.lastRunStatus === 'error').length;
-            return (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-0.5 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-                  {onCount} on
-                </span>
-                {offCount > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" aria-hidden />
-                    {offCount} paused
-                  </span>
-                )}
-                {failedCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-rose-500 dark:text-rose-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden />
-                    {failedCount} failing
-                  </span>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Table container */}
-          <div className="rounded-xl border border-border/60 overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] border-b border-border/60 bg-muted/40 px-3 py-2">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  aria-label="Select all"
-                  checked={filteredWorkflows.length > 0 && filteredWorkflows.every((w) => selectedIds.has(w.id))}
-                  ref={(el) => {
-                    if (el) el.indeterminate = selectedIds.size > 0 && !filteredWorkflows.every((w) => selectedIds.has(w.id));
-                  }}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedIds(new Set(filteredWorkflows.map((w) => w.id)));
-                    } else {
-                      setSelectedIds(new Set());
-                    }
-                  }}
-                  className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
-                />
-              </div>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Workflow
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Trigger
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Last run
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-center">
-                On/Off
-              </span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
-                Actions
-              </span>
+          {/* Select-all — quiet text affordance, replaces the old table-header checkbox */}
+          {filteredWorkflows.length > 0 && (
+            <div className="flex items-center justify-end px-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (filteredWorkflows.every((w) => selectedIds.has(w.id))) {
+                    setSelectedIds(new Set());
+                  } else {
+                    setSelectedIds(new Set(filteredWorkflows.map((w) => w.id)));
+                  }
+                }}
+                className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
+              >
+                {filteredWorkflows.every((w) => selectedIds.has(w.id)) ? 'Deselect all' : 'Select all'}
+              </button>
             </div>
+          )}
 
-            {/* Table rows */}
+          {/* Workflow list — People's divide-y row pattern, no table chrome */}
+          <>
+            {/* Rows */}
             {filteredWorkflows.length > 0 ? (
-              <div className="divide-y divide-border/60">
+              <ul className="divide-y divide-border/60">
                 {filteredWorkflows.map((workflow) => (
                   <WorkflowRow
                     key={workflow.id}
@@ -1086,15 +1142,32 @@ export function WorkflowsManager() {
                     onRename={(name) => renameWorkflow(workflow.id, name)}
                   />
                 ))}
-              </div>
+              </ul>
             ) : (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No workflows match <span className="font-medium text-foreground">{searchQuery}</span>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+                  <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+                </div>
+                <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+                  No matches.
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  Try a shorter query or clear filters.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setStatusFilter('all');
+                    setTriggerFilter('all');
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                >
+                  <X size={13} /> Clear filters
+                </button>
               </div>
             )}
-          </div>
+          </>
 
           {/* Bulk action bar — appears when items are selected */}
           {selectedIds.size > 0 && (
@@ -1460,156 +1533,154 @@ function WorkflowRow({
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
   const hasExpansion = !!(testResult || showHistory);
 
+  const ti = TRIGGER_ICON_MAP[workflow.trigger.type];
+  const TriggerIcon = ti?.icon ?? WorkflowIcon;
+
   return (
-    // Wrapper div — not a <li> anymore; the parent is a plain <div> container.
-    <div
+    <li
       id={`workflow-${workflow.id}`}
       className={cn(
-        'group/row transition-colors scroll-mt-24',
+        'group/row py-3 px-2 -mx-2 rounded-md transition-colors scroll-mt-24',
+        'hover:bg-muted/30',
         !workflow.enabled && 'opacity-60',
         highlighted && 'bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
-        // Highlight the row if it is being edited (builder is above the table).
+        // Highlight the row if it is being edited (builder is above the list).
         editing && 'bg-muted/30',
       )}
     >
-      {/* Main grid row */}
-      <div className="grid grid-cols-[32px_1fr_160px_140px_60px_128px] items-center gap-0 px-3 py-2.5">
+    <div className="flex items-start gap-3">
+      {/* Checkbox — quiet, always present, mirrors People's left-edge affordances */}
+      <div className="flex items-center pt-2 flex-shrink-0">
+        <input
+          type="checkbox"
+          aria-label={`Select ${workflow.name}`}
+          checked={selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
+        />
+      </div>
 
-        {/* Col 0 — Checkbox */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            aria-label={`Select ${workflow.name}`}
-            checked={selected}
-            onChange={(e) => onSelect(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
-          />
-        </div>
+      {/* Trigger-icon circle — People's avatar slot */}
+      <span
+        className={cn(
+          'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+          ti?.cls ?? 'bg-muted/40 text-muted-foreground',
+        )}
+      >
+        <TriggerIcon size={14} aria-hidden />
+      </span>
 
-        {/* Col 1 — Name + visual flow */}
-        <div className="min-w-0 pr-3">
-          <div className="flex items-center gap-2">
-            {renamingName !== null ? (
-              <input
-                ref={renameInputRef}
-                type="text"
-                value={renamingName}
-                onChange={(e) => setRenamingName(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
-                  if (e.key === 'Escape') setRenamingName(null);
-                }}
-                maxLength={120}
-                className="min-w-0 flex-1 rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
-                autoFocus
-              />
-            ) : (
-              <p
-                className="truncate text-sm font-medium leading-snug text-foreground cursor-text"
-                onDoubleClick={startRename}
-                title="Double-click to rename"
-              >
-                {workflow.name}
-              </p>
-            )}
-            {workflow.enabled && (
-              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
-            )}
-            {!workflow.enabled && (
-              <span className="inline-flex items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
-                Paused
-              </span>
-            )}
-            {workflow.actions.length > 0 && (
-              <span className="inline-flex flex-shrink-0 items-center rounded-full bg-muted/60 px-1.5 py-px text-[10px] tabular-nums text-muted-foreground/60">
-                {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
-              </span>
-            )}
-            {workflow.enabled &&
-              workflow.actions.length === 0 &&
-              (!workflow.graph || workflow.graph.nodes.every((n) => n.kind !== 'action')) && (
-              <span
-                title="Workflow is on but has no actions — add at least one step"
-                className="inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"
-              >
-                <AlertTriangle size={9} aria-hidden />
-                No steps
-              </span>
-            )}
-          </div>
-          <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
-          {workflow.description ? (
-            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/80 italic">
-              {workflow.description}
-            </p>
-          ) : workflow.trigger.type === 'webhook' ? (
-            <WebhookUrlChip workflowId={workflow.id} />
+      {/* Name + pills + secondary line — flex-1, People's middle column */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0">
+          {renamingName !== null ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renamingName}
+              onChange={(e) => setRenamingName(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                if (e.key === 'Escape') setRenamingName(null);
+              }}
+              maxLength={120}
+              className="min-w-0 flex-1 rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
+              autoFocus
+            />
           ) : (
-            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
-              {summary}
-            </p>
+            <span
+              className="truncate text-sm font-medium text-foreground cursor-text"
+              onDoubleClick={startRename}
+              title="Double-click to rename"
+            >
+              {workflow.name}
+            </span>
+          )}
+          {workflow.enabled ? (
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
+          ) : (
+            <span className="inline-flex flex-shrink-0 items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
+              Paused
+            </span>
+          )}
+          {workflow.actions.length > 0 && (
+            <span className="hidden sm:inline-flex flex-shrink-0 items-center rounded-full bg-muted/60 px-1.5 py-px text-[10px] tabular-nums text-muted-foreground/60">
+              {workflow.actions.length} {workflow.actions.length === 1 ? 'step' : 'steps'}
+            </span>
+          )}
+          {workflow.enabled &&
+            workflow.actions.length === 0 &&
+            (!workflow.graph || workflow.graph.nodes.every((n) => n.kind !== 'action')) && (
+            <span
+              title="Workflow is on but has no actions — add at least one step"
+              className="hidden sm:inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"
+            >
+              <AlertTriangle size={9} aria-hidden />
+              No steps
+            </span>
           )}
         </div>
 
-        {/* Col 2 — Trigger label + icon */}
-        <div className="flex min-w-0 items-center gap-1.5 pr-2">
-          {(() => {
-            const ti = TRIGGER_ICON_MAP[workflow.trigger.type];
-            if (!ti) return null;
-            const TIcon = ti.icon;
-            return (
-              <span className={cn('flex h-5 w-5 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
-                <TIcon size={11} aria-hidden />
-              </span>
-            );
-          })()}
-          <span className="truncate text-[13px] text-muted-foreground">
-            {triggerLabel(workflow.trigger)}
-          </span>
+        {/* Trigger label · description/summary — single truncating line, like People's email·phone line */}
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground truncate">
+          <span className="truncate">{triggerLabel(workflow.trigger)}</span>
+          {workflow.description ? (
+            <>
+              <span className="text-muted-foreground/40 flex-shrink-0">·</span>
+              <span className="truncate italic">{workflow.description}</span>
+            </>
+          ) : workflow.trigger.type !== 'webhook' ? (
+            <>
+              <span className="text-muted-foreground/40 flex-shrink-0">·</span>
+              <span className="truncate">{summary}</span>
+            </>
+          ) : null}
         </div>
+        {!workflow.description && workflow.trigger.type === 'webhook' && (
+          <div className="mt-0.5">
+            <WebhookUrlChip workflowId={workflow.id} />
+          </div>
+        )}
+        <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
 
-        {/* Col 3 — Run health + time + total runs + modified */}
-        <div className="flex flex-col gap-0.5 pr-2">
-          <div className="flex items-center gap-1.5">
+        {/* Run health + counts — secondary metadata line, People's realtor-byline slot */}
+        <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5">
             <RunHealthChip status={workflow.lastRunStatus} />
             {workflow.lastRunAt ? (
               <span className="tabular-nums text-[11px] text-muted-foreground/70">
                 {timeAgo(workflow.lastRunAt)}
               </span>
             ) : (
-              <span className="text-[11px] text-muted-foreground/40">Never</span>
+              <span className="text-[11px] text-muted-foreground/40">Never run</span>
             )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {typeof workflow.runCount === 'number' && workflow.runCount > 0 && (
-              <span
-                title={`${workflow.runCount.toLocaleString()} total run${workflow.runCount === 1 ? '' : 's'}`}
-                className="inline-flex items-center gap-0.5 rounded bg-muted/70 px-1 py-px text-[10px] tabular-nums text-muted-foreground/70"
-              >
-                <Activity size={8} aria-hidden />
-                {workflow.runCount.toLocaleString()}
-              </span>
-            )}
-            {workflow.updatedAt !== workflow.createdAt && (
-              <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
-                Edited {timeAgo(workflow.updatedAt)}
-              </span>
-            )}
-          </div>
+          </span>
+          {typeof workflow.runCount === 'number' && workflow.runCount > 0 && (
+            <span
+              title={`${workflow.runCount.toLocaleString()} total run${workflow.runCount === 1 ? '' : 's'}`}
+              className="inline-flex items-center gap-0.5 rounded bg-muted/70 px-1 py-px text-[10px] tabular-nums text-muted-foreground/70"
+            >
+              <Activity size={8} aria-hidden />
+              {workflow.runCount.toLocaleString()}
+            </span>
+          )}
+          {workflow.updatedAt !== workflow.createdAt && (
+            <span className="text-[10px] text-muted-foreground/40" title={`Modified: ${new Date(workflow.updatedAt).toLocaleString()}`}>
+              Edited {timeAgo(workflow.updatedAt)}
+            </span>
+          )}
         </div>
+      </div>
 
-        {/* Col 4 — Toggle */}
-        <div className="flex justify-center">
-          <Switch
-            checked={workflow.enabled}
-            onCheckedChange={onToggle}
-            aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
-          />
-        </div>
-
-        {/* Col 5 — Actions */}
-        <div className="flex items-center justify-end gap-0.5">
+      {/* Right cluster: toggle + actions — People's metadata-on-the-right slot */}
+      <div className="flex items-center gap-2 flex-shrink-0 pt-1">
+        <Switch
+          checked={workflow.enabled}
+          onCheckedChange={onToggle}
+          aria-label={workflow.enabled ? 'Pause workflow' : 'Resume workflow'}
+        />
+        <div className="flex items-center gap-0.5">
           {confirmingDelete ? (
             // Inline delete confirmation — stays within the row so layout stays clean.
             <div className="flex items-center gap-1">
@@ -1678,10 +1749,11 @@ function WorkflowRow({
           )}
         </div>
       </div>
+    </div>
 
-      {/* Full-width expansion panels — span all columns below the grid row */}
+      {/* Full-width expansion panels — span the row below the flex layout */}
       {hasExpansion && (
-        <div className="border-t border-border/40 px-3 pb-3 pt-2 space-y-2">
+        <div className="border-t border-border/40 px-3 pb-3 pt-2 mt-2 space-y-2">
           {/* Test-run result — the "prove it works" panel. */}
           {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
 
@@ -1691,7 +1763,7 @@ function WorkflowRow({
           )}
         </div>
       )}
-    </div>
+    </li>
   );
 }
 
@@ -2084,12 +2156,11 @@ function GlobalHistoryPanel({
         {/* Search */}
         <div className="relative flex-1 min-w-[180px]">
           <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
+          <Input
+            placeholder="Search by workflow name…"
+            className="pl-9 h-9 w-full bg-background border-border/70"
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
-            placeholder="Search by workflow name..."
-            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
           />
         </div>
         <div className="flex gap-1.5">
@@ -2926,12 +2997,11 @@ function TemplateGallery({
             aria-hidden
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
-          <input
-            type="search"
+          <Input
+            placeholder="Search templates…"
+            className="pl-9 h-9 w-full bg-background border-border/70"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search templates…"
-            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -3323,12 +3393,11 @@ function TemplatePicker({
             aria-hidden
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
-          <input
-            type="search"
+          <Input
+            placeholder="Search templates…"
+            className="pl-9 h-9 w-full bg-background border-border/70"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search templates…"
-            className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/40 dark:bg-input/30"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">

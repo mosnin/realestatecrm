@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Background-readiness panel.
+ * Background-readiness panel — admin-only (mounted on /admin/observability).
  *
  * Fetches /api/diagnostics/background on mount and renders a calm, scannable
  * checklist of background-execution prerequisites: an overall status pill plus
@@ -9,10 +9,14 @@
  * present). Reuses the house style from connected-apps-section — muted text,
  * small status dots, green/amber/red colour vocabulary.
  *
+ * This names internal vendors (Modal, Inngest, Composio) and env var names —
+ * ops detail with no business being shown to end users, so the underlying API
+ * route is requireAdmin()-gated. Do not mount this on a customer-facing page.
+ *
  * The point of this surface is reassurance as much as diagnosis: when the
  * executor is on the in-process fallback it reads as 'degraded' (amber, "works,
- * just bounded"), never as broken — so the realtor knows the background work
- * still happens.
+ * just bounded"), never as broken — so an admin reading it knows the background
+ * work still happens for realtors even on the fallback path.
  */
 
 import { useEffect, useState } from 'react';

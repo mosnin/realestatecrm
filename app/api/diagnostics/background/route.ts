@@ -1,28 +1,26 @@
 /**
- * GET /api/diagnostics/background — the background-readiness report for the
- * caller's workspace.
+ * GET /api/diagnostics/background — platform-admin-only infra readiness report.
  *
- * Owner-scoped (NOT platform-admin): mirrors app/api/routines/route.ts — Clerk
- * auth via requireAuth, then resolve the caller's own space with
- * getSpaceForUser. The report names env prerequisites (presence only, never
- * secret values) plus a per-space "recent activity" check, so it's scoped to
- * the space the realtor owns.
+ * Admin-guarded: this names internal env var prerequisites and third-party
+ * vendors (Modal, Inngest, Composio, the cron secret) — presence only, never
+ * secret values, but still infrastructure detail that has no business being
+ * visible to end users. requireAdmin() throws for non-admins, mirroring
+ * app/api/admin/observability/route.ts.
  */
 
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
-import { getSpaceForUser } from '@/lib/space';
+import { requireAdmin } from '@/lib/admin';
 import { getBackgroundReadiness } from '@/lib/diagnostics/background-readiness';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  const report = await getBackgroundReadiness(space.id);
+  const report = await getBackgroundReadiness();
   return NextResponse.json(report);
 }

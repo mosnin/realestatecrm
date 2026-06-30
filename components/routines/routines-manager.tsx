@@ -13,13 +13,14 @@
  * stays timezone-agnostic and the realtor never thinks about UTC.
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Repeat2, Play, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Loader2, Plus, Repeat2, Play, Pencil, Trash2, AlertTriangle, Inbox } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -28,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { CAPTION, PRIMARY_PILL } from '@/lib/typography';
+import { PRIMARY_PILL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
 import { useHashHighlight } from '@/hooks/use-hash-highlight';
 
@@ -175,24 +176,24 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
   // Deep-link target: the activity feed links a routine_run to #routine-<id>.
   const highlightedAnchor = useHashHighlight();
 
+  const loadRoutines = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await fetch(apiBase);
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setRoutines(Array.isArray(data.routines) ? data.routines : []);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase]);
+
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch(apiBase);
-        if (!res.ok) throw new Error('load failed');
-        const data = await res.json();
-        if (!active) return;
-        setRoutines(Array.isArray(data.routines) ? data.routines : []);
-      } catch {
-        if (active) setLoadError(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+    void loadRoutines();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
 
   async function createRoutine(payload: ComposerValue) {
@@ -299,19 +300,37 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <div className="h-9 w-32 animate-pulse rounded-md bg-muted" />
-        <div className="h-28 animate-pulse rounded-xl bg-muted" />
-        <div className="h-28 animate-pulse rounded-xl bg-muted" />
-      </div>
+      <ul className="divide-y divide-border/60">
+        {[1, 2, 3].map((i) => (
+          <li key={i} className="flex items-center gap-3 py-3">
+            <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <Skeleton className="h-3.5 w-48" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </li>
+        ))}
+      </ul>
     );
   }
 
   if (loadError) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-        <p className="text-sm text-foreground">Couldn’t load your routines.</p>
-        <p className={cn(CAPTION, 'mt-1')}>Usually temporary — refresh to try again.</p>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
+          <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
+        </div>
+        <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+          Couldn&apos;t load your routines.
+        </p>
+        <p className="text-sm text-muted-foreground">Usually temporary.</p>
+        <button
+          type="button"
+          onClick={() => void loadRoutines()}
+          className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
+        >
+          Try again
+        </button>
       </div>
     );
   }
@@ -335,16 +354,22 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
           />
         </div>
       ) : (
-        <Button variant="outline" size="sm" onClick={() => setComposerOpen(true)}>
+        <Button size="sm" onClick={() => setComposerOpen(true)}>
           <Plus size={14} />
           New routine
         </Button>
       )}
 
       {routines.length === 0 && !composerOpen ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
+            <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
+          </div>
+          <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
+            Nothing on a schedule yet.
+          </p>
           <p className="text-sm text-muted-foreground">
-            Nothing on a schedule yet. Set one up to give me a recurring beat.
+            Set one up to give me a recurring beat.
           </p>
         </div>
       ) : (
@@ -450,11 +475,15 @@ function RoutineRow({
           'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
       )}
     >
+      {/* Cadence-icon circle — mirrors People's avatar / Workflows' trigger-icon slot */}
+      <span className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center flex-shrink-0">
+        <Repeat2 size={14} aria-hidden />
+      </span>
+
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug text-foreground">{routine.instruction}</p>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <Repeat2 size={11} />
             {scheduleLabel(routine.cadence, routine.hour, routine.dayOfMonth, routine.daysOfWeek)}
           </span>
           <span className="text-muted-foreground/40">·</span>
