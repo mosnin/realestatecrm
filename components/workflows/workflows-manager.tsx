@@ -791,7 +791,7 @@ export function WorkflowsManager() {
 
   if (loading) {
     return (
-      <ul className="divide-y divide-border/60">
+      <ul className="mx-auto w-full max-w-5xl divide-y divide-border/60">
         {[1, 2, 3, 4].map((i) => (
           <li key={i} className="flex items-center gap-3 py-3">
             <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
@@ -828,7 +828,9 @@ export function WorkflowsManager() {
 
   return (
     <div className="space-y-6">
-      {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+      {actionError && (
+        <p className="mx-auto w-full max-w-5xl text-sm text-destructive">{actionError}</p>
+      )}
 
       {/* Composer area: the builder for a new workflow, the template picker, or
           the New / From a template buttons. */}
@@ -846,7 +848,9 @@ export function WorkflowsManager() {
           <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
         </div>
       ) : workflows.length > 0 ? (
-        <div className="space-y-2">
+        // Browse chrome reads at People's column width; only the builder and
+        // canvas (working surfaces) span the full 1500px frame.
+        <div className="mx-auto w-full max-w-5xl space-y-2">
           {/* Tab bar — Workflows / History (People's tablist treatment) */}
           <div role="tablist" aria-label="Automations view" className="flex items-center gap-5 border-b border-border/70 -mt-1">
             {(
@@ -1075,29 +1079,33 @@ export function WorkflowsManager() {
       ) : null}
 
       {workflows.length === 0 && composer === null ? (
-        <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
+        <div className="mx-auto w-full max-w-5xl">
+          <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
+        </div>
       ) : workflows.length === 0 ? null : activeTab === 'history' ? (
-        <GlobalHistoryPanel
-          runs={globalRuns}
-          loading={globalRunsLoading}
-          error={globalRunsError}
-          statusFilter={globalRunsStatusFilter}
-          onStatusFilter={setGlobalRunsStatusFilter}
-          onRefresh={() => void loadGlobalHistory()}
-          onNavigate={(workflowId) => {
-            setActiveTab('workflows');
-            // Clear list filters first — the target row doesn't exist in the DOM
-            // if the active search/status/trigger filter hides it, and the
-            // scroll would silently no-op.
-            setSearchQuery('');
-            setStatusFilter('all');
-            setTriggerFilter('all');
-            setActionError('');
-            setTimeout(() => {
-              document.getElementById(`workflow-${workflowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 50);
-          }}
-        />
+        <div className="mx-auto w-full max-w-5xl">
+          <GlobalHistoryPanel
+            runs={globalRuns}
+            loading={globalRunsLoading}
+            error={globalRunsError}
+            statusFilter={globalRunsStatusFilter}
+            onStatusFilter={setGlobalRunsStatusFilter}
+            onRefresh={() => void loadGlobalHistory()}
+            onNavigate={(workflowId) => {
+              setActiveTab('workflows');
+              // Clear list filters first — the target row doesn't exist in the DOM
+              // if the active search/status/trigger filter hides it, and the
+              // scroll would silently no-op.
+              setSearchQuery('');
+              setStatusFilter('all');
+              setTriggerFilter('all');
+              setActionError('');
+              setTimeout(() => {
+                document.getElementById(`workflow-${workflowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 50);
+            }}
+          />
+        </div>
       ) : (
         <>
           {/* Editing builder — floats above the row list so the list rhythm stays intact */}
@@ -1123,6 +1131,9 @@ export function WorkflowsManager() {
             ) : null;
           })()}
 
+          {/* Browse column — list + selection chrome at People's width; the
+              editing builder above intentionally spans the full frame. */}
+          <div className="mx-auto w-full max-w-5xl space-y-6">
           {/* Select-all — quiet text affordance, replaces the old table-header checkbox */}
           {filteredWorkflows.length > 0 && (
             <div className="flex items-center justify-end px-0.5">
@@ -1251,6 +1262,7 @@ export function WorkflowsManager() {
               {bulkBusy && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
             </div>
           )}
+          </div>
         </>
       )}
 

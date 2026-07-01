@@ -29,9 +29,11 @@ export default async function WorkflowsPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  // Header shares People's centered max-w-5xl column; the manager caps its own
+  // browse chrome to match and lets the builder/canvas span the full frame.
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
+      <header className="mx-auto w-full max-w-5xl space-y-1.5">
         <p className={BODY_MUTED}>Workflows.</p>
         <h1 className={H1} style={TITLE_FONT}>
           Workflows

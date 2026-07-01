@@ -300,7 +300,7 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
 
   if (loading) {
     return (
-      <ul className="divide-y divide-border/60">
+      <ul className="mx-auto w-full max-w-5xl divide-y divide-border/60">
         {[1, 2, 3].map((i) => (
           <li key={i} className="flex items-center gap-3 py-3">
             <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
@@ -336,7 +336,9 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
   }
 
   return (
-    <div className="space-y-6">
+    // Routines have no wide working surface (the composer is a simple form) —
+    // the whole section reads at People's column width.
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
       {/* The composer is an input surface — it stays a discrete card.

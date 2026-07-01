@@ -28,9 +28,11 @@ export default async function RoutinesPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  // No wide working surface on this page — everything reads at People's
+  // centered max-w-5xl column (the manager caps itself to match).
   return (
     <div className="space-y-8 pb-12">
-      <header className="space-y-1.5">
+      <header className="mx-auto w-full max-w-5xl space-y-1.5">
         <p className={BODY_MUTED}>Routines.</p>
         <h1 className={H1} style={TITLE_FONT}>
           Routines
