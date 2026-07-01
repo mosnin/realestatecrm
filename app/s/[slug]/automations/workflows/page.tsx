@@ -3,8 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { WorkflowsManager } from '@/components/workflows/workflows-manager';
+import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Workflows — Chippi' };
@@ -30,10 +30,17 @@ export default async function WorkflowsPage({
   if (!spaceOwner) notFound();
 
   return (
-    <ChippiPageShell greeting="Workflows." title="Workflows" subtitle="When something happens — react to an event.">
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Workflows.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Workflows
+        </h1>
+        <p className={BODY_MUTED}>When something happens — react to an event.</p>
+      </header>
       <Suspense fallback={null}>
         <WorkflowsManager />
       </Suspense>
-    </ChippiPageShell>
+    </div>
   );
 }

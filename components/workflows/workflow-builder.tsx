@@ -2662,7 +2662,7 @@ export function WorkflowBuilder({
             }}
             placeholder="Name your workflow…"
             maxLength={120}
-            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-orange-400 pb-0.5 placeholder:text-muted-foreground/40 caret-orange-500"
+            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-foreground/40 pb-0.5 placeholder:text-muted-foreground/40 caret-foreground focus:border-foreground transition-colors"
             aria-label="Workflow name"
           />
         ) : (
@@ -3326,7 +3326,7 @@ export function WorkflowBuilder({
             type="button"
             onClick={submit}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-full h-9 px-5 text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+            className={cn(PRIMARY_PILL, 'disabled:cursor-not-allowed disabled:opacity-60')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving…' : 'Save workflow'}

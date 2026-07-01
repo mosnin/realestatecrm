@@ -2,8 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { RoutinesManager } from '@/components/routines/routines-manager';
+import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Routines — Chippi' };
@@ -29,8 +29,15 @@ export default async function RoutinesPage({
   if (!spaceOwner) notFound();
 
   return (
-    <ChippiPageShell greeting="Routines." title="Routines" subtitle="On a schedule — a recurring beat.">
+    <div className="space-y-8 pb-12">
+      <header className="space-y-1.5">
+        <p className={BODY_MUTED}>Routines.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Routines
+        </h1>
+        <p className={BODY_MUTED}>On a schedule — a recurring beat.</p>
+      </header>
       <RoutinesManager apiBase="/api/routines" />
-    </ChippiPageShell>
+    </div>
   );
 }
