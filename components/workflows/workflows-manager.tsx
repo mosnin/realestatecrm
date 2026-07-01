@@ -61,6 +61,8 @@ import {
   Eye,
   Building2,
   RefreshCw,
+  Table2,
+  Variable,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -405,6 +407,10 @@ export function WorkflowsManager() {
     setComposerInitial(undefined);
     setEditingId(null);
     setComposer('new');
+    // The composer + saved result live on the Workflows tab — snap back so a
+    // builder opened from History isn't stacked over the runs table, and the
+    // saved workflow is visible after Save.
+    setActiveTab('workflows');
     setActionError('');
   }
 
@@ -623,6 +629,14 @@ export function WorkflowsManager() {
       const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete failed');
       setWorkflows((ws) => ws.filter((w) => w.id !== id));
+      // Drop the deleted row from any bulk selection so the sticky bar can't
+      // keep counting (and operating on) a workflow that no longer exists.
+      setSelectedIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       if (editingId === id) setEditingId(null);
       toast.success('Workflow deleted');
     } catch {
@@ -637,22 +651,31 @@ export function WorkflowsManager() {
     if (ids.length === 0) return;
     setBulkBusy(true);
     try {
-      await Promise.all(
+      // Track per-id outcome — an HTTP error is a failure even though fetch
+      // resolves, so a 500 must not read as "N workflows turned on".
+      const results = await Promise.all(
         ids.map((id) =>
           fetch(`${API_BASE}/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled }),
           }).then(async (res) => {
-            if (res.ok) {
-              const data = await res.json();
-              setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
-            }
-          }),
+            if (!res.ok) return { id, ok: false };
+            const data = await res.json();
+            setWorkflows((ws) => ws.map((w) => (w.id === id ? (data as WorkflowRecord) : w)));
+            return { id, ok: true };
+          }).catch(() => ({ id, ok: false })),
         ),
       );
-      setSelectedIds(new Set());
-      toast.success(enabled ? `${ids.length} workflow${ids.length > 1 ? 's' : ''} turned on` : `${ids.length} workflow${ids.length > 1 ? 's' : ''} paused`);
+      const failed = results.filter((r) => !r.ok);
+      // Keep only the failed rows selected so a retry targets exactly them.
+      setSelectedIds(new Set(failed.map((r) => r.id)));
+      const okCount = ids.length - failed.length;
+      if (failed.length === 0) {
+        toast.success(enabled ? `${okCount} workflow${okCount > 1 ? 's' : ''} turned on` : `${okCount} workflow${okCount > 1 ? 's' : ''} paused`);
+      } else {
+        setActionError(`${failed.length} of ${ids.length} couldn't be updated — they're still selected, try again.`);
+      }
     } catch {
       setActionError('Bulk action failed. Try again.');
     } finally {
@@ -665,18 +688,24 @@ export function WorkflowsManager() {
     if (ids.length === 0) return;
     setBulkBusy(true);
     try {
-      await Promise.all(
+      const results = await Promise.all(
         ids.map((id) =>
           fetch(`${API_BASE}/${id}`, { method: 'DELETE' }).then((res) => {
-            if (res.ok) {
-              setWorkflows((ws) => ws.filter((w) => w.id !== id));
-              if (editingId === id) setEditingId(null);
-            }
-          }),
+            if (!res.ok) return { id, ok: false };
+            setWorkflows((ws) => ws.filter((w) => w.id !== id));
+            if (editingId === id) setEditingId(null);
+            return { id, ok: true };
+          }).catch(() => ({ id, ok: false })),
         ),
       );
-      setSelectedIds(new Set());
-      toast.success(`${ids.length} workflow${ids.length > 1 ? 's' : ''} deleted`);
+      const failed = results.filter((r) => !r.ok);
+      setSelectedIds(new Set(failed.map((r) => r.id)));
+      const okCount = ids.length - failed.length;
+      if (failed.length === 0) {
+        toast.success(`${okCount} workflow${okCount > 1 ? 's' : ''} deleted`);
+      } else {
+        setActionError(`${failed.length} of ${ids.length} couldn't be deleted — they're still selected, try again.`);
+      }
     } catch {
       setActionError('Bulk delete failed. Try again.');
     } finally {
@@ -752,12 +781,13 @@ export function WorkflowsManager() {
       } else if (e.key === 'Escape') {
         if (showShortcuts) setShowShortcuts(false);
         else if (composer !== null) closeComposer();
+        else if (editingId !== null) setEditingId(null);
       }
     }
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [composer, showShortcuts]);
+  }, [composer, showShortcuts, editingId]);
 
   if (loading) {
     return (
@@ -1056,6 +1086,12 @@ export function WorkflowsManager() {
           onRefresh={() => void loadGlobalHistory()}
           onNavigate={(workflowId) => {
             setActiveTab('workflows');
+            // Clear list filters first — the target row doesn't exist in the DOM
+            // if the active search/status/trigger filter hides it, and the
+            // scroll would silently no-op.
+            setSearchQuery('');
+            setStatusFilter('all');
+            setTriggerFilter('all');
             setActionError('');
             setTimeout(() => {
               document.getElementById(`workflow-${workflowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1064,7 +1100,7 @@ export function WorkflowsManager() {
         />
       ) : (
         <>
-          {/* Editing builder — floats above the table so the table layout stays intact */}
+          {/* Editing builder — floats above the row list so the list rhythm stays intact */}
           {editingId && (() => {
             const editing = workflows.find((w) => w.id === editingId);
             return editing ? (
@@ -1136,6 +1172,11 @@ export function WorkflowsManager() {
                     onSave={(payload) => saveEdit(workflow.id, payload)}
                     onToggle={() => toggleWorkflow(workflow)}
                     onTest={() => testWorkflow(workflow.id)}
+                    onDismissTest={() => setTestResults((r) => {
+                      const next = { ...r };
+                      delete next[workflow.id];
+                      return next;
+                    })}
                     onDuplicate={() => duplicateWorkflow(workflow)}
                     onExport={() => exportWorkflow(workflow)}
                     onDelete={() => deleteWorkflow(workflow.id)}
@@ -1317,6 +1358,12 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   webhook_post: 'Send webhook',
   update_lead: 'Update contact',
   notify_agent: 'Push notification',
+  iterate: 'Loop / Iterate',
+  branch: 'Paths (branch)',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 // ── Action type → icon ───────────────────────────────────────────────────────
@@ -1333,6 +1380,12 @@ const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
   webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
   update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
   notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
+  iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
+  branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
+  run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
+  lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
+  set_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
+  get_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
 };
 
 /**
@@ -1360,8 +1413,9 @@ function WorkflowFlowLine({
         </>
       )}
       {visibleActions.map((a, i) => {
-        const ai = ACTION_ICON_MAP[a.type];
-        if (!ai) return null;
+        // Fallback keeps the icon chain intact for any type missing from the
+        // map — a dropped icon would leave the preceding arrow dangling.
+        const ai = ACTION_ICON_MAP[a.type] ?? { icon: Zap, cls: 'bg-muted/60 text-muted-foreground' };
         return (
           <div key={i} className="flex items-center gap-1">
             <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai.cls)}>
@@ -1462,6 +1516,7 @@ function WorkflowRow({
   onSave: _onSave,
   onToggle,
   onTest,
+  onDismissTest,
   onDuplicate,
   onExport,
   onDelete,
@@ -1480,6 +1535,7 @@ function WorkflowRow({
   onSave: (payload: { name: string; description?: string; definition: WorkflowDefinition; enabled: boolean; notifyOnError?: boolean }) => void;
   onToggle: () => void;
   onTest: () => void;
+  onDismissTest: () => void;
   onDuplicate: () => void;
   onExport: () => void;
   onDelete: () => void;
@@ -1538,7 +1594,10 @@ function WorkflowRow({
 
   return (
     <li
-      id={`workflow-${workflow.id}`}
+      // While editing, the floating builder card above the list carries this id —
+      // suppress it here so the document never has two identical ids and deep-link
+      // scroll/highlight resolves to the builder (the active surface).
+      id={editing ? undefined : `workflow-${workflow.id}`}
       className={cn(
         'group/row py-3 px-2 -mx-2 rounded-md transition-colors scroll-mt-24',
         'hover:bg-muted/30',
@@ -1656,6 +1715,9 @@ function WorkflowRow({
               <span className="text-[11px] text-muted-foreground/40">Never run</span>
             )}
           </span>
+          {/* Autonomy — shown only when it departs from the safe default, so a
+              workflow that sends without review is visibly different at a glance. */}
+          {workflow.autonomy !== 'draft' && <AutonomyPill autonomy={workflow.autonomy} />}
           {typeof workflow.runCount === 'number' && workflow.runCount > 0 && (
             <span
               title={`${workflow.runCount.toLocaleString()} total run${workflow.runCount === 1 ? '' : 's'}`}
@@ -1755,7 +1817,7 @@ function WorkflowRow({
       {hasExpansion && (
         <div className="border-t border-border/40 px-3 pb-3 pt-2 mt-2 space-y-2">
           {/* Test-run result — the "prove it works" panel. */}
-          {testResult && <TestResultPanel result={testResult} workflow={workflow} />}
+          {testResult && <TestResultPanel result={testResult} workflow={workflow} onDismiss={onDismissTest} />}
 
           {/* Run history (audit trail) — what fired, when, and what each step did. */}
           {showHistory && (
@@ -1826,6 +1888,12 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   update_lead: 'Update lead',
   notify_agent: 'Push alert',
   condition: 'Condition check',
+  iterate: 'Loop / Iterate',
+  branch: 'Paths (branch)',
+  run_workflow: 'Run sub-workflow',
+  lookup_table: 'Lookup table',
+  set_variable: 'Set variable',
+  get_variable: 'Get variable',
 };
 
 function RunHistoryItem({ run, workflowId }: { run: WorkflowRun; workflowId: string }) {
@@ -2100,6 +2168,27 @@ function StepDetailTable({ detail, actionType }: { detail: unknown; actionType: 
     if (obj.body) add('body', obj.body);
     add('sent', obj.sent !== undefined ? `${obj.sent} device${obj.sent === 1 ? '' : 's'}` : undefined);
     if (obj.note) add('note', obj.note);
+  } else if (actionType === 'iterate') {
+    add('processed', obj.processed !== undefined ? `${obj.processed} of ${obj.total}` : undefined);
+    if (obj.failed) add('failed', obj.failed);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'branch') {
+    add('path taken', obj.pathTaken != null ? String(obj.pathTaken) : 'none matched');
+    if (obj.stepsRun !== undefined) add('steps run', obj.stepsRun);
+    if (obj.reason) add('reason', obj.reason);
+  } else if (actionType === 'run_workflow') {
+    add('workflow', obj.workflowId);
+    add('run', obj.runId);
+    add('status', obj.status);
+    if (obj.error) add('error', obj.error);
+  } else if (actionType === 'lookup_table') {
+    add('input', obj.input);
+    add('matched', obj.matched !== undefined ? (obj.matched ? `yes (${obj.matchedKey})` : 'no') : undefined);
+    add('output', obj.output);
+  } else if (actionType === 'set_variable' || actionType === 'get_variable') {
+    add('name', obj.name);
+    add('value', obj.value);
+    if (obj.found !== undefined) add('found', obj.found ? 'yes' : 'no (default used)');
   } else {
     for (const [k, v] of Object.entries(obj).slice(0, 4)) {
       if (typeof v !== 'object') add(k, v);
@@ -2360,9 +2449,11 @@ function detailLine(detail: unknown): string {
 function TestResultPanel({
   result,
   workflow,
+  onDismiss,
 }: {
   result: TestResult;
   workflow: WorkflowRecord;
+  onDismiss: () => void;
 }) {
   const ok = result.status === 'ok' || result.status === 'success';
   // For a branching workflow, derive which nodes ran so the canvas can light up
@@ -2385,6 +2476,15 @@ function TestResultPanel({
         <p className="text-xs font-medium text-foreground">
           Test run {ok ? 'completed' : `finished — ${result.status}`}
         </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss test result"
+          title="Dismiss"
+          className="ml-auto flex h-5 w-5 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          <X size={12} aria-hidden />
+        </button>
       </div>
       {result.steps.length === 0 ? (
         <p className={cn(CAPTION, 'mt-2')}>
@@ -2399,7 +2499,7 @@ function TestResultPanel({
             >
               <StepStatusDot status={step.status} />
               <span className="font-medium text-foreground">
-                {step.actionType ?? step.kind}
+                {ACTION_TYPE_LABELS[step.actionType ?? step.kind] ?? (step.actionType ?? step.kind)}
               </span>
               <span className="text-muted-foreground">{step.status}</span>
               {detailLine(step.detail) && (
