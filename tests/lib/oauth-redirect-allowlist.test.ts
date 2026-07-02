@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
 
 /**
@@ -7,10 +7,10 @@ import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
  * These cases pin the invariant both legs of the flow depend on.
  */
 describe('isAllowedOAuthRedirect', () => {
-  const originalEnv = process.env.NODE_ENV;
   afterEach(() => {
-    // Restore whatever the runner set; NODE_ENV is read inside the function.
-    process.env.NODE_ENV = originalEnv;
+    // NODE_ENV is read inside the function; vi.stubEnv keeps tsc happy (direct
+    // assignment to process.env.NODE_ENV is a compile error — it's read-only).
+    vi.unstubAllEnvs();
   });
 
   it('allows the Claude callback hosts over https', () => {
@@ -29,7 +29,7 @@ describe('isAllowedOAuthRedirect', () => {
   });
 
   it('rejects non-https schemes in production', () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     expect(isAllowedOAuthRedirect('http://claude.ai/callback')).toBe(false);
     expect(isAllowedOAuthRedirect('javascript:alert(1)')).toBe(false);
   });
