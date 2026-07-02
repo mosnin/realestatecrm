@@ -63,9 +63,12 @@ const brokerTaskBodySchema = z.object({
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
-// kills the stream mid-turn and the assistant message is lost.
+// kills the stream mid-turn and the assistant message is lost. maxDuration was
+// 300 — below Modal's 600s — so a long turn got cut at 300s (same bug as the
+// realtor /api/ai/task route). Set to outlive Modal; Vercel clamps to the
+// plan's real max, so it's a no-op below that and removes truncation above it.
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 660;
 
 interface HistoryRow {
   role: 'user' | 'assistant';

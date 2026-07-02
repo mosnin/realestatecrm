@@ -84,8 +84,16 @@ import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
 // the stream mid-turn and the assistant message is lost. nodejs runtime is
 // required — this route streams and uses Node `crypto`.
+//
+// maxDuration was 300 — LESS than Modal's 600s ceiling, directly contradicting
+// the requirement above: a turn running 300–600s got guillotined by Vercel at
+// 300s, truncating the response (and a hard function kill can skip the
+// persist-in-finally). Set to outlive Modal. Vercel silently clamps this to the
+// plan's real maximum, so on a plan capped below 660 it's a no-op (no worse
+// than before) and the client now lands a "cut off — retry" notice either way
+// (see use-agent-task.ts); on a capable plan it removes the truncation entirely.
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 660;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
