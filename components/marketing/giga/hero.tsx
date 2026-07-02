@@ -13,10 +13,11 @@
  */
 
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { BlurRise, EyebrowPill, Mono, PillPrimary } from './primitives';
 import { LiveProductIsland } from '@/components/experience/live-product-island';
+import { ShimmeringText } from '@/components/ui/shimmering-text';
+import { LogosCarousel } from '@/components/ui/logos-carousel';
 
 /* Brokerage wordmarks for the social-proof marquee. Rendered as uniform styled
  * text so every mark reads at the same size/weight (image logos had wildly
@@ -26,7 +27,6 @@ const LOGOS = ['Compass', 'RE/MAX', 'Coldwell Banker', 'Keller Williams', 'eXp R
 const DEMO = '/demo';
 
 export function Hero() {
-  const reduce = useReducedMotion();
   return (
     <section className="relative isolate min-h-[100svh] overflow-hidden bg-black">
       {/* Full-bleed background photo + scrims */}
@@ -47,7 +47,15 @@ export function Hero() {
       {/* Centered headline stack */}
       <div className="mx-auto flex min-h-[100svh] max-w-4xl flex-col items-center justify-center px-5 pb-44 pt-28 text-center sm:px-8">
         <BlurRise trigger="load" delay={0.05}>
-          <EyebrowPill>Introducing Chippi</EyebrowPill>
+          <EyebrowPill>
+            {/* Slow light-sweep across the eyebrow — the one place the hero
+                shimmers. Tuned quiet: white-on-white/50, 2.4s cycle. */}
+            <ShimmeringText
+              text="Introducing Chippi"
+              duration={2.4}
+              className="[--color:rgba(255,255,255,0.55)] [--shimmering-color:#ffffff]"
+            />
+          </EyebrowPill>
         </BlurRise>
 
         <BlurRise trigger="load" delay={0.15}>
@@ -160,24 +168,23 @@ export function Hero() {
       >
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-6 sm:px-8">
           <Mono className="text-[10px] text-white/40">Trusted across modern brokerages</Mono>
-          {/* Marquee: a w-max track holding two copies of the logos, animated
-              x: 0 → -50% (exactly one copy) for a seamless infinite scroll. */}
-          <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)]">
-            <motion.div
-              className="flex w-max items-center gap-x-12 sm:gap-x-16"
-              animate={reduce ? undefined : { x: ['0%', '-50%'] }}
-              transition={reduce ? undefined : { duration: 28, ease: 'linear', repeat: Infinity }}
-            >
-              {[...LOGOS, ...LOGOS].map((name, i) => (
-                <span
-                  key={`${name}-${i}`}
-                  className="shrink-0 whitespace-nowrap text-[17px] font-semibold tracking-tight text-white/40"
-                >
-                  {name}
-                </span>
-              ))}
-            </motion.div>
-          </div>
+          {/* Staggered-wave logos carousel (replaces the linear marquee): marks
+              cycle column by column in a ripple — calmer than a conveyor belt
+              and each name gets a still moment to be read. Handles reduced
+              motion internally (renders static). */}
+          <LogosCarousel
+            columnCount={3}
+            className="w-full max-w-3xl place-items-center gap-x-10"
+          >
+            {LOGOS.map((name) => (
+              <span
+                key={name}
+                className="whitespace-nowrap text-[17px] font-semibold tracking-tight text-white/40"
+              >
+                {name}
+              </span>
+            ))}
+          </LogosCarousel>
         </div>
       </BlurRise>
     </section>

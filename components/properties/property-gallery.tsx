@@ -16,6 +16,7 @@ import { Building2, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_APPLE } from '@/lib/motion';
 import { FocusView } from '@/components/experience/focus-view';
+import { ScrollFadeEffect } from '@/components/ui/scroll-fade-effect';
 
 export function PropertyGallery({ photos, alt }: { photos: string[]; alt: string }) {
   const [active, setActive] = useState(0);
@@ -74,9 +75,11 @@ export function PropertyGallery({ photos, alt }: { photos: string[]; alt: string
       </FocusView>
 
       {/* Thumbnail rail — only when there's more than one photo. The active
-          tile carries a foreground ring; the rest are quiet until hovered. */}
+          tile carries a foreground ring; the rest are quiet until hovered.
+          ScrollFadeEffect soft-masks the clipped edge so overflow reads as
+          "more photos this way" instead of a hard cut. */}
       {photos.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <ScrollFadeEffect orientation="horizontal" className="flex gap-2 pb-1">
           {photos.map((url, i) => {
             const isActive = i === safeActive;
             return (
@@ -99,7 +102,7 @@ export function PropertyGallery({ photos, alt }: { photos: string[]; alt: string
               </button>
             );
           })}
-        </div>
+        </ScrollFadeEffect>
       )}
     </div>
   );

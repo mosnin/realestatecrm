@@ -76,24 +76,40 @@ const trimColorString = (color: string, maxLength: number = 20): string => {
   return `${color.slice(0, maxLength - 3)}...`
 }
 
+/**
+ * Adapted from the cult-ui registry drop:
+ *   - Emits 6-digit HEX (not hsl strings) — every color column in this app
+ *     (DealStage.color etc.) validates /^#[0-9a-f]{6}$/i server-side, so an
+ *     hsl() emission would be silently discarded and reset to the default.
+ *   - No onChange on mount: the upstream useEffect re-emitted the incoming
+ *     prop through onChange, which loops when the parent stores the value.
+ *     We only emit on user interaction; the prop just seeds internal state.
+ *   - Theme tokens instead of hardcoded bg-white/gray borders.
+ */
 export function ColorPicker({
   color,
   onChange,
+  children,
 }: {
   color: string
   onChange: (color: string) => void
+  /** Optional custom trigger element; defaults to the labeled swatch button. */
+  children?: React.ReactNode
 }) {
-  const [hsl, setHsl] = useState<[number, number, number]>([0, 0, 0])
+  const [hsl, setHsl] = useState<[number, number, number]>(() =>
+    color.startsWith("#") ? hexToHsl(color) : [0, 0, 0]
+  )
   const [colorInput, setColorInput] = useState(color)
   const [isOpen, setIsOpen] = useState(false)
 
+  // Sync internal state when the parent changes the color from outside.
   useEffect(() => {
-    handleColorChange(color)
+    setColorInput((prev) => (prev === color ? prev : color))
+    if (color.startsWith("#")) setHsl(hexToHsl(color))
   }, [color])
 
   const handleColorChange = (newColor: string) => {
     const normalizedColor = normalizeColor(newColor)
-    setColorInput(normalizedColor)
 
     let h, s, l
     if (normalizedColor.startsWith("#")) {
@@ -105,7 +121,9 @@ export function ColorPicker({
     }
 
     setHsl([h, s, l])
-    onChange(`hsl(${h.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`)
+    const hex = hslToHex(h, s, l)
+    setColorInput(hex)
+    onChange(hex)
   }
 
   const handleHueChange = (hue: number) => {
@@ -134,7 +152,7 @@ export function ColorPicker({
     setColorInput(newColor)
     if (
       /^#[0-9A-Fa-f]{6}$/.test(newColor) ||
-      /^hsl$$\d+,\s*\d+%,\s*\d+%$$$/.test(newColor)
+      /^hsl\(\d+(\.\d+)?,\s*\d+(\.\d+)?%,\s*\d+(\.\d+)?%\)$/.test(newColor)
     ) {
       handleColorChange(newColor)
     }
@@ -158,17 +176,19 @@ export function ColorPicker({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-[200px] justify-start text-left font-normal"
-        >
-          <div
-            className="w-4 h-4 rounded-full mr-2 shadow-sm"
-            style={{ backgroundColor: colorInput }}
-          />
-          <span className="flex-grow">{trimColorString(colorInput)}</span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
+        {children ?? (
+          <Button
+            variant="outline"
+            className="w-[200px] justify-start text-left font-normal"
+          >
+            <div
+              className="w-4 h-4 rounded-full mr-2 shadow-sm"
+              style={{ backgroundColor: colorInput }}
+            />
+            <span className="flex-grow">{trimColorString(colorInput)}</span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-[240px] p-3">
         <motion.div
@@ -225,7 +245,7 @@ export function ColorPicker({
               type="text"
               value={colorInput}
               onChange={handleColorInputChange}
-              className="flex-grow bg-white border border-gray-300 rounded-md text-sm h-8 px-2"
+              className="flex-grow rounded-md border border-input bg-background text-sm h-8 px-2"
               placeholder="#RRGGBB or hsl(h, s%, l%)"
             />
             <motion.div
