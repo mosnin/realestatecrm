@@ -231,3 +231,21 @@ earlier curation:
 - **dot-grid-spotlight caveat**: it listens on its own canvas — layered behind
   clickable content it either never lights or blocks clicks. Only place it
   where it IS the surface.
+
+## Wave 5 — dashboard power + integrations rail
+
+- **Contacts right-click ContextMenu** (sharkui) — Open / Log a note / Call /
+  Email / Edit / Delete on every People row; left-click still navigates.
+- **metrics-01 aesthetic on analytics StatCells** — mono uppercase micro-label
+  above tabular counting numbers; the marketing eyebrow voice inside the app.
+- **IntegrationsDrift** on the /integrations marketing page — the REAL catalog
+  as a drifting rail. The registry scroll-direction-carousel was a rainbow
+  demo that preventDefault'd wheel (scroll trap); rewritten generic with
+  passive listeners + reduced-motion fallback.
+- **line-nav — skipped**: the configure page stacks sections without a
+  vertical section nav; no natural home today. Revisit if settings grows one.
+- **social-proof band — skipped for sub-pages**: the homepage hero already
+  carries the wordmark wave; /realtors + /brokerages use the older
+  marketing/site language where a giga band would clash.
+- **Next focus**: dashboard sidebar leveling (shark sidebar patterns applied
+  to the existing nav without behavior changes) — single-focus pass.
