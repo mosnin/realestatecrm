@@ -390,7 +390,7 @@ function StepContent({
               htmlFor="skipNextTime"
               className="text-sm text-muted-foreground"
             >
-              Don't show this again
+              Don&apos;t show this again
             </label>
           </div>
         </motion.div>
@@ -432,10 +432,6 @@ export function IntroDisclosure({
     }
   }, [open, currentStep])
 
-  // Early return if feature should be hidden
-  if (!isVisible || !open) {
-    return null
-  }
 
   const handleNext = () => {
     setDirection(1)
@@ -495,6 +491,12 @@ export function IntroDisclosure({
   }
 
   const { handleDragEnd } = useSwipe(handleSwipe)
+
+  // Early return if the feature should be hidden — placed after every hook
+  // call (upstream had it above useSwipe, a rules-of-hooks violation).
+  if (!isVisible || !open) {
+    return null
+  }
 
   if (isDesktop) {
     return (
@@ -662,7 +664,7 @@ export function IntroDisclosure({
                   htmlFor="skipNextTime"
                   className="text-sm text-muted-foreground"
                 >
-                  Don't show this again
+                  Don&apos;t show this again
                 </label>
               </div>
             </div>
