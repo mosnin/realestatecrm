@@ -388,6 +388,21 @@ export function selectMatchingWorkflows(
     });
   }
 
+  // inbound_message: if a workflow scopes its trigger to a channel (sms|email),
+  // only run it when the message arrived on that channel. 'any' (or unset) fires
+  // for every inbound channel. The event carries the channel the message came in
+  // on. An event channel of 'any'/unknown matches only unscoped workflows.
+  if (input.triggerType === 'inbound_message') {
+    const evChannelRaw = (input.context.event as Record<string, unknown> | undefined)?.channel;
+    const evChannel = typeof evChannelRaw === 'string' ? evChannelRaw.toLowerCase() : '';
+    matching = candidates.filter((w) => {
+      const wantRaw = (w.trigger?.config as Record<string, unknown> | undefined)?.channel;
+      const want = typeof wantRaw === 'string' ? wantRaw.toLowerCase() : '';
+      if (!want || want === 'any') return true; // no scope → any channel
+      return want === evChannel;
+    });
+  }
+
   // integration_event: narrow to the workflow keyed to this exact toolkit+event.
   if (input.triggerType === 'integration_event') {
     const ev = input.context.event as Record<string, unknown> | undefined;
