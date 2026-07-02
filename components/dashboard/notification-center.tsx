@@ -105,28 +105,34 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
     router.push(n.href);
   }
 
-  // X on a row → dismiss it (persisted) without navigating.
+  // X on a row → dismiss it (persisted) without navigating. Optimistic, but we
+  // restore the row if the server rejects so a failed dismiss doesn't silently
+  // "stick" and then reappear on the next poll with no explanation.
   function handleDismiss(n: Notification, e: React.MouseEvent) {
     e.stopPropagation();
+    const prevList = notifications;
     setNotifications((prev) => prev.filter((x) => x.id !== n.id));
     const params = new URLSearchParams({
       slug,
       key: n.id,
       sourceCreatedAt: n.createdAt,
     });
-    void fetch(`/api/notifications?${params.toString()}`, {
-      method: 'DELETE',
-    }).catch(() => {});
+    fetch(`/api/notifications?${params.toString()}`, { method: 'DELETE' })
+      .then((res) => { if (!res.ok) setNotifications(prevList); })
+      .catch(() => setNotifications(prevList));
   }
 
   function handleMarkAllRead() {
     if (notifications.length === 0) return;
+    const prevList = notifications;
     setNotifications([]);
-    void fetch(`/api/notifications?slug=${encodeURIComponent(slug)}`, {
+    fetch(`/api/notifications?slug=${encodeURIComponent(slug)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ all: true }),
-    }).catch(() => {});
+    })
+      .then((res) => { if (!res.ok) setNotifications(prevList); })
+      .catch(() => setNotifications(prevList));
   }
 
   const highCount = notifications.filter((n) => n.priority === 'high').length;
