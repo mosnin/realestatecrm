@@ -113,7 +113,7 @@ registry loses them.
 | --- | --- | --- | --- |
 | `color-picker.tsx` | cult-ui | **Emits 6-digit hex** (APIs validate `/^#[0-9a-f]{6}$/i`; upstream emitted `hsl()`); removed mount-time `onChange` loop; fixed broken hsl regex; themed input; optional custom `children` trigger | Live — deals add-stage |
 | `typewriter.tsx` | cult-ui | none | Available |
-| `intro-disclosure.tsx` | cult-ui | none — but its internal visibility force-closes on mount; **wrappers must own first-visit gating** (see `AutomationsIntro`) | Live — Automations tour |
+| `intro-disclosure.tsx` | cult-ui | **rules-of-hooks fix** (upstream early-returns before its `useSwipe` call — eslint error; return moved below hooks) + escaped entities. Also: its internal visibility force-closes on mount, so **wrappers must own first-visit gating** (see `AutomationsIntro`) | Live — Automations tour |
 | `code-block.tsx` | cult-ui | none | Live — webhook test request |
 | `gradient-button-group.tsx` | cult-ui | rewired next-themes → app ThemeProvider | Available |
 | `cosmic-button.tsx` | cult-ui | none | Available |
