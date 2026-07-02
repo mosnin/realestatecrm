@@ -61,6 +61,9 @@ interface MorphSurfaceProps {
   triggerIcon?: React.ReactNode
   placeholder?: string
   submitLabel?: string
+  // Label shown in the collapsed dock next to the status dot. Adapted from the
+  // upstream hardcoded "Morph Surface" so the primitive can brand itself.
+  dockLabel?: string
 
   // Callbacks
   onSubmit?: (data: FormData) => void | Promise<void>
@@ -93,6 +96,7 @@ interface MorphSurfaceContextValue {
   triggerIcon?: React.ReactNode
   placeholder: string
   submitLabel: string
+  dockLabel: string
   onSubmit?: (data: FormData) => void | Promise<void>
   onOpen?: () => void
   onClose?: () => void
@@ -194,6 +198,7 @@ export function MorphSurface({
   triggerIcon,
   placeholder = "What's on your mind?",
   submitLabel,
+  dockLabel = "Morph Surface",
   onSubmit,
   onOpen,
   onClose,
@@ -254,6 +259,7 @@ export function MorphSurface({
       triggerIcon,
       placeholder,
       submitLabel: submitLabel || "⌘ Enter",
+      dockLabel,
       onSubmit,
       onOpen,
       onClose,
@@ -277,6 +283,7 @@ export function MorphSurface({
       triggerIcon,
       placeholder,
       submitLabel,
+      dockLabel,
       onSubmit,
       onOpen,
       onClose,
@@ -350,6 +357,7 @@ function MorphSurfaceDock() {
     triggerLabel,
     triggerIcon,
     triggerClassName,
+    dockLabel,
     renderTrigger,
     renderIndicator,
     animationSpeed,
@@ -442,7 +450,7 @@ function MorphSurfaceDock() {
       <div className="flex items-center justify-center gap-6 px-3">
         <div className="flex items-center gap-2 w-fit">
           {indicatorElement}
-          <div className="text-sm text-foreground">Morph Surface</div>
+          <div className="text-sm text-foreground">{dockLabel}</div>
         </div>
         {triggerElement}
       </div>

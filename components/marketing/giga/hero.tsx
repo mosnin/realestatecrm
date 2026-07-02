@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { BlurRise, EyebrowPill, Mono, PillPrimary } from './primitives';
+import { LiveProductIsland } from '@/components/experience/live-product-island';
 
 /* Brokerage wordmarks for the social-proof marquee. Rendered as uniform styled
  * text so every mark reads at the same size/weight (image logos had wildly
@@ -137,6 +138,17 @@ export function Hero() {
             </span>
           </span>
         </Link>
+      </BlurRise>
+
+      {/* Bottom-right: the live product island — Chippi working in real time.
+          Desktop-only (mirrors the bottom-left clip card) so it never collides
+          with the centered headline stack on narrow viewports. */}
+      <BlurRise
+        trigger="load"
+        delay={0.6}
+        className="pointer-events-none absolute bottom-32 right-8 z-10 hidden lg:block"
+      >
+        <LiveProductIsland />
       </BlurRise>
 
       {/* Logo cloud, fading in along the bottom */}
