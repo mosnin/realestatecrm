@@ -24,6 +24,13 @@ vi.hoisted(() => {
   process.env.AGENT_INTERNAL_SECRET = 'test-secret';
 });
 
+// next/server's `after()` requires a real request scope and throws in Vitest.
+// The route now dispatches the inbound_message workflow via after(); stub it to
+// a no-op so the handler reaches its response (dispatch covered elsewhere).
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return { ...actual, after: vi.fn() };
+});
 vi.mock('@/lib/agent/fire-trigger', () => ({
   fireAgentTrigger: vi.fn(async () => ({ fired: true })),
 }));
