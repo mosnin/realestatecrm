@@ -64,7 +64,7 @@ export const DialogOverlay = (
 ) => {
   const { className, ...rest } = props;
 
-  const { modal } = _useDialog();
+  const { modal } = useDialogInternal();
 
   if (!modal) {
     return null;
@@ -335,7 +335,7 @@ export const DialogFooter = (props: React.ComponentProps<typeof ark.div>) => {
   );
 };
 
-const _useDialog = () => {
+const useDialogInternal = () => {
   const context = React.useContext(DialogContext);
 
   if (!context) {

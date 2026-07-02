@@ -170,7 +170,7 @@ export const ChartTooltipContent = (props: CustomTooltipProps) => {
     payload,
   } = props;
 
-  const { config } = _useChart();
+  const { config } = useChartInternal();
 
   const tooltipLabel = React.useMemo(() => {
     if (hideLabel || !payload?.length) {
@@ -314,7 +314,7 @@ export const ChartLegendContent = (props: ChartLegendContentProps) => {
     verticalAlign = "bottom",
   } = props;
 
-  const { config } = _useChart();
+  const { config } = useChartInternal();
 
   if (!payload?.length) {
     return null;
@@ -392,7 +392,7 @@ const getPayload = (config: ChartConfig, payload: unknown, key: string) => {
     : config[key as keyof typeof config];
 };
 
-export const _useChart = () => {
+export const useChartInternal = () => {
   const context = React.useContext(ChartContext);
 
   if (!context) {
