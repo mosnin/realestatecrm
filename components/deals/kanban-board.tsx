@@ -9,13 +9,14 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  KeyboardSensor,
   useDndContext,
   useSensor,
   useSensors,
   closestCorners,
   type DropAnimation,
 } from '@dnd-kit/core';
-import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
@@ -476,6 +477,9 @@ export function KanbanBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Keyboard drag support so the pipeline is reorderable without a pointer
+    // (accessibility): focus a card, Space to lift, arrows to move, Space to drop.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   // Initial mount fetch doesn't need to fire `onDataChanged` — the sibling

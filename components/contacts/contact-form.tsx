@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -388,9 +389,10 @@ export function ContactForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
-        {/* Header */}
+        {/* Header — DialogTitle (not a bare h2) so Radix labels the dialog for
+            screen readers and doesn't emit its missing-title console error. */}
         <div className="px-6 py-4 border-b border-border/60">
-          <h2 className={H2}>{displayTitle}</h2>
+          <DialogTitle className={H2}>{displayTitle}</DialogTitle>
         </div>
 
         {/* Mode toggle — only when "Type it" is available (add + slug present) */}
