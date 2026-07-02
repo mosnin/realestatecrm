@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
 
 async function resolveTour(userId: string, tourId: string) {
@@ -198,6 +199,36 @@ export async function PATCH(
     } catch (e) {
       console.error('[tours/PATCH] agent trigger failed:', e);
     }
+    // Also dispatch the tour_completed WORKFLOW trigger — previously a dead
+    // trigger (offered in the builder but never emitted, so "after a tour is
+    // completed" automations never ran). Runs post-response via after(); the
+    // context carries the tour's guest so a draft_message can address them even
+    // when the tour isn't linked to a Contact row.
+    const spaceId = ctx.space.id;
+    const tourContact = {
+      id: data.contactId ?? undefined,
+      name: data.guestName ?? undefined,
+      email: data.guestEmail ?? undefined,
+      phone: data.guestPhone ?? undefined,
+    };
+    const tourInfo = { id: data.id, propertyAddress: data.propertyAddress ?? undefined };
+    after(async () => {
+      try {
+        await runWorkflowsForEvent({
+          spaceId,
+          triggerType: 'tour_completed',
+          context: {
+            event: { type: 'tour_completed', tourId: data.id },
+            contact: tourContact,
+            lead: tourContact,
+            tour: tourInfo,
+          },
+          triggerEvent: { type: 'tour_completed', tourId: data.id, contactId: data.contactId ?? null },
+        });
+      } catch (e) {
+        console.error('[tours/PATCH] tour_completed workflow dispatch failed', e);
+      }
+    });
   }
 
   // Tour was cancelled — drop the mirrored Google Calendar event so the
