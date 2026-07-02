@@ -63,6 +63,22 @@ export function SidebarCollapseProvider({ children }: { children: React.ReactNod
     window.setTimeout(() => setAnimating(false), 220);
   }, []);
 
+  // ⌘B / Ctrl+B toggles the rail — the shadcn/shark sidebar convention, and
+  // the one capability this sidebar lacked vs. the shark reference. Skipped
+  // while an input/textarea/contenteditable has focus so a form shortcut
+  // never yanks the layout mid-typing.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'b' || (!e.metaKey && !e.ctrlKey) || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      e.preventDefault();
+      toggle();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [toggle]);
+
   return (
     <TooltipProvider delayDuration={120}>
       <SidebarCollapseContext.Provider value={{ collapsed, animating, toggle }}>
@@ -114,6 +130,9 @@ export function SidebarCollapseToggle() {
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>
           {label}
+          <kbd className="ml-1.5 rounded border border-border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+            ⌘B
+          </kbd>
         </TooltipContent>
       </Tooltip>
     </div>

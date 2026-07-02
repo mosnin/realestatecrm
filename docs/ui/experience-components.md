@@ -249,3 +249,24 @@ earlier curation:
   marketing/site language where a giga band would clash.
 - **Next focus**: dashboard sidebar leveling (shark sidebar patterns applied
   to the existing nav without behavior changes) — single-focus pass.
+
+## Wave 6 — sidebar leveling + final audit (loop close)
+
+**Sidebar comparison (existing vs shark reference):** the existing dashboard
+sidebar already implements collapsed-rail tooltips (`CollapsedTooltip`),
+persisted collapse with SSR-flash prevention, and a 200ms width transition —
+ahead of the shark sidebar on those axes. The one missing capability was the
+⌘B/Ctrl+B toggle shortcut (the shadcn/shark convention): added to
+`SidebarCollapseProvider` (input/textarea/contenteditable-safe) with a ⌘B kbd
+hint in the toggle tooltip. Structure and nav behavior untouched — the shark
+sidebar stays a reference, not a replacement.
+
+**Final audit results:**
+- Fixed widths vs containers: circuit (860 in 880) ✓; island (371px, lg-only
+  corner) ✓; testimonial cards + drift tiles live inside scrolling rails ✓.
+- Accent-per-section: homepage = island/shimmer/wave (hero, separate zones) →
+  stats → canvas → circuit → showcases → testimonial marquee → CTA flip+bloom.
+  One motion identity per band.
+- Monochrome icon discipline: island + circuit + quote monograms all neutral.
+- Dark-cinematic consistency: new bands all speak white/[0.02] cards +
+  hairline borders + mono eyebrow + serif pull-quotes.
