@@ -852,7 +852,28 @@ export const workflowDefinitionSchema = z
     autonomy: workflowAutonomySchema,
     graph: workflowGraphSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((def, ctx) => {
+    // A public webhook is triggerable by anyone who learns the UUID, with a
+    // fully attacker-controlled payload. Autonomous send ('notify'/'auto') on
+    // such a trigger is a weaponizable primitive, so require an HMAC signing
+    // secret before a webhook workflow may act without human review. Draft
+    // autonomy (stage for approval) stays allowed unsigned — the Zapier-style
+    // catch-hook convenience — and the webhook route enforces the same rule at
+    // runtime for rows saved before this check existed.
+    if (
+      def.trigger.type === 'webhook' &&
+      def.autonomy !== 'draft' &&
+      !def.trigger.config?.webhookSecret
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['trigger', 'config', 'webhookSecret'],
+        message:
+          'Set a webhook signing secret to let this workflow send automatically. Without one it can only draft for your review.',
+      });
+    }
+  });
 
 /**
  * Error thrown by parseWorkflowDefinition on invalid input. Named so callers

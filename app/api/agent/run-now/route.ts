@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
@@ -27,36 +28,19 @@ export async function POST() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  // Rate limit: max 5 runs per space per minute
+  // Rate limit: max 5 runs per space per minute. Routed through the shared
+  // helper so it fails CLOSED to an in-memory counter when KV is unconfigured,
+  // rather than skipping the limit entirely.
+  const { allowed } = await checkRateLimit(`agent:runnow-rate:${space.id}`, 5, 60);
+  if (!allowed) {
+    return NextResponse.json(
+      { triggered: false, reason: 'Rate limit exceeded — try again in a minute' },
+      { status: 429 }
+    );
+  }
+
   const kvUrl = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
-  if (kvUrl && kvToken) {
-    const rateLimitKey = `agent:runnow-rate:${space.id}:${Math.floor(Date.now() / 60_000)}`;
-    try {
-      const incrRes = await fetch(`${kvUrl}/incr/${encodeURIComponent(rateLimitKey)}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${kvToken}` },
-      });
-      if (incrRes.ok) {
-        const { result: count } = await incrRes.json() as { result: number };
-        if (count === 1) {
-          // Set expiry of 90 seconds on first increment
-          await fetch(`${kvUrl}/expire/${encodeURIComponent(rateLimitKey)}/90`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${kvToken}` },
-          });
-        }
-        if (count > 5) {
-          return NextResponse.json(
-            { triggered: false, reason: 'Rate limit exceeded — try again in a minute' },
-            { status: 429 }
-          );
-        }
-      }
-    } catch {
-      // If Redis is unavailable, allow the run (fail open)
-    }
-  }
 
   // Always queue the trigger to Redis first when Redis is available — that is
   // the DURABLE record. The old code only queued when Modal was unconfigured,

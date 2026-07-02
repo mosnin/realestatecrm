@@ -1,4 +1,4 @@
-import { redis } from '@/lib/redis';
+import { redis, isRedisConfigured } from '@/lib/redis';
 
 // ── IP extraction helper ────────────────────────────────────────────────────
 // On Vercel, X-Forwarded-For is set by the edge network and cannot be spoofed
@@ -79,6 +79,17 @@ export async function checkRateLimit(
   max: number,
   windowSeconds: number,
 ): Promise<{ allowed: boolean }> {
+  // FAIL CLOSED when Redis isn't configured. The no-op proxy returns 0 for
+  // `incr` (a benign shape for arithmetic), which is INDISTINGUISHABLE from a
+  // real first-increment and would make `0 <= max` always true — i.e. every
+  // limit silently disabled on any deploy missing KV env (local, previews, an
+  // env rotation). Branch on configuration, not on the return value, and use
+  // the bounded in-memory limiter instead.
+  if (!isRedisConfigured()) {
+    const count = memIncr(key, windowSeconds);
+    return { allowed: count <= max };
+  }
+
   // If Redis has failed repeatedly, use in-memory directly
   if (redisFailCount >= 3) {
     const count = memIncr(key, windowSeconds);
@@ -87,7 +98,7 @@ export async function checkRateLimit(
 
   try {
     const count = await redis.incr(key);
-    // null is returned by the no-op proxy when Redis env vars are missing.
+    // Defensive: a null slips through only if a future no-op shape changes.
     // Treat it as a Redis failure and fall through to in-memory.
     if (count === null) {
       redisFailCount++;

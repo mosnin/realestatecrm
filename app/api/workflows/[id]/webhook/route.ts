@@ -112,13 +112,32 @@ export async function POST(
     }
   }
 
+  // Autonomy guard: an UNSIGNED webhook is triggerable by anyone who learns the
+  // UUID, with a fully attacker-controlled payload. If such a workflow ran at
+  // 'notify'/'auto' autonomy it would let a stranger fire real outbound sends,
+  // webhook_post (SSRF surface), and inject the payload into the AI agent's
+  // instructions. So when there's no secret we force 'draft' — every action is
+  // staged for human review, nothing goes out on an unauthenticated trigger.
+  // Signed webhooks keep their configured autonomy. (Save-time validation also
+  // blocks creating a non-draft webhook workflow without a secret; this is the
+  // runtime backstop for rows created before that rule.)
+  const configuredAutonomy = row.autonomy as WorkflowRow['autonomy'];
+  const effectiveAutonomy: WorkflowRow['autonomy'] =
+    !webhookSecret && configuredAutonomy !== 'draft' ? 'draft' : configuredAutonomy;
+  if (effectiveAutonomy !== configuredAutonomy) {
+    logger.warn('[webhook] unsigned webhook forced to draft autonomy', {
+      id,
+      configuredAutonomy,
+    });
+  }
+
   const workflow: WorkflowRow = {
     id: row.id,
     spaceId: row.spaceId,
     trigger: row.trigger as WorkflowRow['trigger'],
     conditions: row.conditions as WorkflowRow['conditions'],
     actions: row.actions as WorkflowRow['actions'],
-    autonomy: row.autonomy as WorkflowRow['autonomy'],
+    autonomy: effectiveAutonomy,
     graph: (row.graph as WorkflowRow['graph']) ?? null,
   };
 
