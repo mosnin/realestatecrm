@@ -12,9 +12,10 @@
 
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Building2 } from 'lucide-react';
+import { Building2, Maximize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_APPLE } from '@/lib/motion';
+import { FocusView } from '@/components/experience/focus-view';
 
 export function PropertyGallery({ photos, alt }: { photos: string[]; alt: string }) {
   const [active, setActive] = useState(0);
@@ -35,21 +36,42 @@ export function PropertyGallery({ photos, alt }: { photos: string[]; alt: string
   return (
     <div className="space-y-2.5">
       {/* Stage — the active photo. Cross-fades on swap; entrance is a tiny
-          1.02 → 1 settle so the photo lands rather than zooms. */}
-      <div className="overflow-hidden rounded-xl border border-border/70 bg-muted">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.img
-            key={current}
-            src={current}
-            alt={alt}
-            className="aspect-video w-full object-cover"
-            initial={{ opacity: 0, scale: 1.02 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: EASE_APPLE }}
-          />
-        </AnimatePresence>
-      </div>
+          1.02 → 1 settle so the photo lands rather than zooms. Clicking it
+          morphs the photo to a full-screen focus view (FocusView) — real
+          estate is sold on the image, so give the realtor a way to see it big.
+          layoutId is namespaced to the active index so it stays page-unique. */}
+      <FocusView
+        layoutId={`property-photo-${safeActive}`}
+        contentClassName="max-w-6xl bg-black p-0"
+        triggerClassName="block w-full cursor-pointer"
+        trigger={
+          <div className="group relative overflow-hidden rounded-xl border border-border/70 bg-muted">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.img
+                key={current}
+                src={current}
+                alt={alt}
+                className="aspect-video w-full object-cover"
+                initial={{ opacity: 0, scale: 1.02 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.28, ease: EASE_APPLE }}
+              />
+            </AnimatePresence>
+            {/* Affordance: a maximize chip that surfaces on hover. */}
+            <span className="pointer-events-none absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100">
+              <Maximize2 className="h-4 w-4" />
+            </span>
+          </div>
+        }
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={current}
+          alt={alt}
+          className="mx-auto max-h-[85vh] w-auto max-w-full rounded-lg object-contain"
+        />
+      </FocusView>
 
       {/* Thumbnail rail — only when there's more than one photo. The active
           tile carries a foreground ring; the rest are quiet until hovered. */}
