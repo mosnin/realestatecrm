@@ -130,6 +130,21 @@ registry loses them.
 | `progressive-blur.tsx` | pixel-perfect | none | Available |
 | `gradient-glow-fade.tsx` | pixel-perfect | none | Available |
 | `checkbox/progress/aspect-ratio/drawer.tsx` | shadcn standard | built on installed `radix-ui` umbrella + `vaul` | Support files |
+| `decrypted-text.tsx` | react-bits (idea) | **lean typed reimplementation** — view-triggered sequential decrypt only; adds reduced-motion, SSR-safe first paint, sr-only real text. The 11KB registry JSX (hover/click modes, five directions) was not ported. | Live — /chippi "Reads" headline |
+
+### react-bits decisions
+
+- **StaggeredMenu / FlowingMenu — skipped.** The marketing header's mobile menu
+  already implements staggered item choreography (`staggerChildren`) in the
+  established frosted-panel language; swapping in react-bits' own visual
+  language (colored layers, numbered items) would be a rebuild, not an
+  improvement.
+- **CardSwap — available, not placed.** A fixed-size absolutely-positioned
+  card stack needs a bespoke hero-side slot; every current showcase already
+  has a composed visual. Placing it without a slot would be stuffing. Revisit
+  if a new marketing section calls for a stacked-cards motif.
+- **cosmic-button — available, not placed.** Marketing CTAs speak a strict
+  white-pill language; a rainbow gradient border deviates. Founder taste call.
 
 ## Where they're used (keep current)
 

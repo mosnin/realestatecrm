@@ -32,6 +32,7 @@ import {
   Send,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { DecryptedText } from '@/components/ui/decrypted-text';
 import {
   FeatureShowcase,
   Frost,
@@ -188,7 +189,10 @@ export function ChippiReadsShowcase() {
       eyebrow="Reads everything"
       headline={
         <>
-          It sees every signal,
+          {/* The headline decrypts into place — meaning resolving out of
+              noise, which is literally what this section claims Chippi does
+              with inbound signals. One accent; the second line stays still. */}
+          <DecryptedText text="It sees every signal," />
           <br className="hidden sm:block" /> the moment it arrives.
         </>
       }
