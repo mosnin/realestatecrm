@@ -203,3 +203,31 @@ registry loses them.
    table) — check `git diff` before committing a re-pull.
 6. Deps: `motion`, `lucide-react`, `react-use-measure` (all already in
    `package.json`). No new dependency is required by these components.
+
+## Wave 4 — full-adoption directive (founder override)
+
+The founder directed full adoption of the component list. Changes from the
+earlier curation:
+
+- **`components/sharkui/` (44 files)** — the complete @shark ark-ui suite in a
+  parallel namespace with imports rewritten (`@/components/sharkui/*`). The
+  radix core in `components/ui/` remains the app's primitive layer; sharkui is
+  adopted per-surface where it adds capability (first: `qr-code` in the
+  property share dialog). Deps: `@ark-ui/react`, `tailwind-variants`.
+  Local fixes: internal `_useChart/_useDialog/_useHint` hooks renamed
+  (eslint rules-of-hooks).
+- **New ui/ pieces**: card-animation, logo-animation, scroll-direction +
+  radial carousels, text-burn-neon, text-matrix-rain, border-2, pixel-canvas,
+  magnetic-dock, line-nav, elastic-slider (+ `hooks/use-controllable-state`),
+  marquee (kibo, `react-fast-marquee`), testimonial primitives.
+- **@bklit chart chain dropped** (8 registry deps on alpha visx): metrics-01's
+  aesthetic gets applied to the existing recharts system instead.
+- **Live placements this wave**: homepage `TestimonialsBand` (marquee quote
+  rows, giga language, monogram avatars — copy is SAMPLE, marked
+  TODO(founder)); 404 PixelCanvas play surface (brand hues); CTA brand bloom
+  (glow-fade adapted: behind content, brand colors); property-share QR.
+- **Formatting fixes**: ChippiCircuit 860px board vs 760px wrapper overflow;
+  LiveProductIsland icons → monochrome.
+- **dot-grid-spotlight caveat**: it listens on its own canvas — layered behind
+  clickable content it either never lights or blocks clicks. Only place it
+  where it IS the surface.
