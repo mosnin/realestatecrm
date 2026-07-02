@@ -94,6 +94,37 @@ describe('selectMatchingWorkflows — lead_score_threshold', () => {
   });
 });
 
+describe('selectMatchingWorkflows — deal_stage_changed', () => {
+  const workflows = [
+    wf('under_contract', { type: 'deal_stage_changed', config: { toStage: 'Under Contract' } }),
+    wf('any_stage', { type: 'deal_stage_changed', config: {} }),
+  ];
+
+  it('runs a toStage-scoped workflow only when the deal moved INTO that stage (case-insensitive)', () => {
+    const { matching } = selectMatchingWorkflows(workflows, {
+      triggerType: 'deal_stage_changed',
+      context: { event: { type: 'deal_stage_changed', toStage: 'under contract' } },
+    });
+    expect(matching.map((w) => w.id).sort()).toEqual(['any_stage', 'under_contract']);
+  });
+
+  it('excludes a toStage-scoped workflow when the deal moved into a different stage', () => {
+    const { matching } = selectMatchingWorkflows(workflows, {
+      triggerType: 'deal_stage_changed',
+      context: { event: { type: 'deal_stage_changed', toStage: 'Closed Won' } },
+    });
+    expect(matching.map((w) => w.id)).toEqual(['any_stage']);
+  });
+
+  it('an unscoped (blank toStage) workflow fires on every stage change', () => {
+    const { matching } = selectMatchingWorkflows([workflows[1]], {
+      triggerType: 'deal_stage_changed',
+      context: { event: { type: 'deal_stage_changed', toStage: 'Anything' } },
+    });
+    expect(matching.map((w) => w.id)).toEqual(['any_stage']);
+  });
+});
+
 describe('selectMatchingWorkflows — trigger-type filter', () => {
   it('only considers workflows of the event trigger type', () => {
     const workflows = [

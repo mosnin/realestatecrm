@@ -374,6 +374,20 @@ export function selectMatchingWorkflows(
     }
   }
 
+  // deal_stage_changed: if a workflow scopes its trigger to a specific
+  // `toStage`, only run it when the deal actually moved INTO that stage. A
+  // workflow with no toStage (blank) fires on every stage change. Matching is
+  // case-insensitive on the stage name carried in the event.
+  if (input.triggerType === 'deal_stage_changed') {
+    const evStage = (input.context.event as Record<string, unknown> | undefined)?.toStage;
+    const evStageNorm = typeof evStage === 'string' ? evStage.trim().toLowerCase() : '';
+    matching = candidates.filter((w) => {
+      const want = (w.trigger?.config as Record<string, unknown> | undefined)?.toStage;
+      if (typeof want !== 'string' || !want.trim()) return true; // no scope → any stage
+      return want.trim().toLowerCase() === evStageNorm;
+    });
+  }
+
   // integration_event: narrow to the workflow keyed to this exact toolkit+event.
   if (input.triggerType === 'integration_event') {
     const ev = input.context.event as Record<string, unknown> | undefined;
