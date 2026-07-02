@@ -7,7 +7,7 @@
  *   - BrokerageRoutingShowcase  : how a lead is routed on arrival (decision flow
  *                                 with per-agent load bars and an audit line).
  *   - BrokerageFloorShowcase    : the live floor (metric tiles + a leaderboard).
- *   - BrokerageApprovalsShowcase: approval-first sends (approval queue + a
+ *   - BrokerageApprovalsShowcase: accountable sends (live send feed + a
  *                                 vertical audit timeline).
  *
  * All three reuse the FeatureShowcase shell and the Frost/Row mockup kit, and
@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   UserCog,
   ScrollText,
-  Pencil,
   Send,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -334,30 +333,24 @@ export function BrokerageFloorShowcase() {
   );
 }
 
-/* ── 3) Approvals ──────────────────────────────────────────────────────────── */
+/* ── 3) Oversight & audit ──────────────────────────────────────────────────── */
 
-const ApproveBtn = () => (
+const SentBtn = () => (
   <span className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-[#ff7a45] to-[#ff5fa2] px-2 py-1 text-[10px] font-semibold text-black">
-    <Check className="h-3 w-3" /> Approve
-  </span>
-);
-
-const EditBtn = () => (
-  <span className="flex items-center gap-1 rounded-lg border border-white/12 bg-white/[0.04] px-2 py-1 text-[10px] font-medium text-white/70">
-    <Pencil className="h-3 w-3" /> Edit
+    <Check className="h-3 w-3" /> Sent
   </span>
 );
 
 const APPROVALS_STEPS: ShowcaseStep[] = [
   {
-    key: 'queue',
-    title: 'Drafts awaiting review',
-    desc: 'Every drafted send queues for the right approver, with who wrote it and what it does in one line.',
+    key: 'feed',
+    title: 'Every send, on the record',
+    desc: 'Every send lands on one live feed with who it came from and what it did, in one line.',
     mockup: (
-      <Frost title="Approvals" badge="3 pending">
+      <Frost title="Sends" badge="Live">
         {[
           { initials: 'AR', who: 'Alex', action: 'reply to Sarah Chen', meta: 'email · drafted in voice' },
-          { initials: 'JK', who: 'Jordan', action: 'price update, 88 Pine', meta: 'SMS to seller' },
+          { initials: 'JK', who: 'Jordan', action: 'price update, 88 Pine', meta: 'email to seller' },
         ].map((q) => (
           <motion.div
             key={q.action}
@@ -374,8 +367,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
               </span>
             </div>
             <div className="mt-2.5 flex justify-end gap-1.5">
-              <EditBtn />
-              <ApproveBtn />
+              <SentBtn />
             </div>
           </motion.div>
         ))}
@@ -383,11 +375,11 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
     ),
   },
   {
-    key: 'approve',
-    title: 'Approve in a tap',
-    desc: 'Open a draft, read it in full, and send it as-is or tweak first, no copy-paste, no leaving the queue.',
+    key: 'read',
+    title: 'Read any send in full',
+    desc: 'Open any send and read exactly what went out, word for word, without chasing screenshots.',
     mockup: (
-      <Frost title="Review">
+      <Frost title="On the record">
         <motion.div
           variants={rowV}
           className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
@@ -396,7 +388,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
             <Avatar initials="AR" />
             <span className="min-w-0 flex-1">
               <span className="block text-[12.5px] font-medium text-white">Alex → reply to Sarah Chen</span>
-              <span className="block text-[11px] text-white/45">email · drafted in voice</span>
+              <span className="block text-[11px] text-white/45">email · sent in voice</span>
             </span>
           </div>
           <p className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5 text-[11.5px] leading-relaxed text-white/65">
@@ -405,7 +397,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
           </p>
           <div className="mt-3 flex justify-end">
             <span className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#ff7a45] to-[#ff5fa2] px-3 py-1.5 text-[11px] font-semibold text-black">
-              <Send className="h-3 w-3" /> Approve &amp; send
+              <Send className="h-3 w-3" /> Sent 2:14 PM
             </span>
           </div>
         </motion.div>
@@ -415,7 +407,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
   {
     key: 'roles',
     title: 'Roles, not a maze',
-    desc: 'Three clear roles instead of a permissions matrix, so everyone knows exactly what they can approve.',
+    desc: 'Three clear roles instead of a permissions matrix, so everyone knows exactly what they can see and run.',
     mockup: (
       <Frost title="Access">
         <motion.div variants={rowV} className="flex flex-wrap gap-1.5 px-1 py-1">
@@ -431,7 +423,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
             <UserCog className="h-3.5 w-3.5" />
           </span>
           <span className="min-w-0 flex-1 text-[12px] text-white/75">
-            Owners and admins approve sends, agents draft and request.
+            Owners and admins see the whole floor, agents run their own book.
           </span>
         </motion.div>
       </Frost>
@@ -448,7 +440,7 @@ const APPROVALS_STEPS: ShowcaseStep[] = [
           {[
             { action: 'Owner approved reply to Sarah Chen', meta: '2:14 PM', accent: true },
             { action: 'Alex drafted price update, 88 Pine', meta: '1:58 PM', accent: false },
-            { action: 'Jordan requested approval', meta: '1:40 PM', accent: false },
+            { action: 'Jordan sent price update, 88 Pine', meta: '1:40 PM', accent: false },
             { action: 'Lead assigned to Alex Rivera', meta: '1:22 PM', accent: false },
           ].map((e, i) => (
             <span key={i} className="relative mb-3 block last:mb-0">
@@ -482,13 +474,13 @@ export function BrokerageApprovalsShowcase() {
         </>
       }
       product={{
-        name: 'Approvals & Audit',
+        name: 'Oversight & Audit',
         icon: ShieldCheck,
-        desc: 'Chippi drafts; every send routes to the right person to approve, and the audit log keeps the whole floor honest.',
+        desc: 'Chippi works every book on the floor, and every send lands on the record with a name, a timestamp, and the words that went out.',
         cta: { label: 'See it work', href: '/demo' },
       }}
       topFeatures={[
-        { icon: ShieldCheck, title: 'Approval-first', desc: 'Every send reviewed before it goes.' },
+        { icon: ShieldCheck, title: 'Accountable', desc: 'Every send carries a name and time.' },
         { icon: UserCog, title: 'Three clear roles', desc: 'Owner, admin, agent. No maze.' },
         { icon: ScrollText, title: 'Full audit log', desc: 'Every action, timestamped.' },
       ]}

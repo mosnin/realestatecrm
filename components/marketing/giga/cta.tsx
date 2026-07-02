@@ -55,7 +55,7 @@ export function CtaSection() {
         <motion.div {...reveal} transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.1 }} className="lg:pt-3">
           <p className="max-w-sm text-[13.5px] leading-relaxed text-neutral-600 dark:text-white/55">
             Chippi works your whole book, reading leads, drafting in your voice, booking tours, and
-            clearing the busywork, with every send approved by you.
+            clearing the busywork, so your hours go to closing.
           </p>
           <Link
             href="/demo"

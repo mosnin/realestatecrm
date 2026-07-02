@@ -61,7 +61,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
   {
     n: '03',
     title: 'Data flows both ways',
-    body: 'Chippi pulls what it needs out of your tools and writes results back in. Anything that posts or sends waits for your approval first.',
+    body: 'Chippi pulls what it needs out of your tools and writes results back in, keeping every system current as it works.',
   },
 ];
 

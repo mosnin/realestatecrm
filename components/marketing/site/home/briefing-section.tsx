@@ -3,7 +3,7 @@
  * name-drops it, then the story drops it).
  *
  * Grounded in the real /api/cron/daily-briefing job: a digest of hot leads,
- * stalled deals, today's tours, and follow-ups due, delivered email + SMS +
+ * stalled deals, today's tours, and follow-ups due, delivered email +
  * push at the realtor's local 7am. It triages the day; it does not claim to
  * have done the work overnight. Dark contrast band (the only dark beat on the
  * page) with a skeleton "brief" card. Two-tone headline written inline

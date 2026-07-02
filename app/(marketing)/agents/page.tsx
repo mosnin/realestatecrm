@@ -13,7 +13,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'For agents · Chippi',
   description:
-    'Chippi works your book while you close: reading the inbox, drafting replies in your voice, and booking tours against your real calendar. Nothing sends without your tap.',
+    'Chippi works your book while you close: reading the inbox, sending replies in your voice, and booking tours against your real calendar.',
 };
 
 export default function AgentsPage() {

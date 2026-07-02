@@ -80,7 +80,7 @@ export function FeaturesSplit() {
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">100%</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-white/60">Approval-first, nothing sends without you</p>
+                  <p className="text-xs text-slate-600 dark:text-white/60">Sent in your voice, logged in plain words</p>
                 </div>
               </div>
             </div>
@@ -195,7 +195,7 @@ export function FeaturesSplit() {
                     </div>
                     <div className="mt-1 flex justify-between text-[9px] text-neutral-500">
                       <span>9 leads worked</span>
-                      <span>2 awaiting approval</span>
+                      <span>2 sent this hour</span>
                     </div>
                   </div>
                 </div>
@@ -214,10 +214,10 @@ export function FeaturesSplit() {
               {/* Features grid */}
               <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                  <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Approval-first Drafts</h4>
+                  <h4 className="text-lg font-semibold tracking-tight text-zinc-950">Replies, In Your Voice</h4>
                   <p className="mt-2 text-sm text-neutral-500">
-                    Every reply waits for your tap. Edit, send, or skip, the
-                    decision stays yours on every thread.
+                    Written from how you actually write and sent the moment
+                    the lead lands, on every thread.
                   </p>
                 </div>
                 <div>

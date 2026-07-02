@@ -19,7 +19,7 @@ import { HowItWorksCircuit } from '@/components/marketing/giga/how-it-works-circ
 export const metadata = {
   title: 'Meet Chippi',
   description:
-    'Chippi is the AI teammate that works your whole book: reading every lead, drafting in your voice, booking tours against your real calendar, and keeping the deal current. Nothing sends without your approval.',
+    'Chippi is the AI teammate that works your whole book: reading every lead, replying in your voice, booking tours against your real calendar, and keeping the deal current.',
 };
 
 export default function MeetChippiPage() {

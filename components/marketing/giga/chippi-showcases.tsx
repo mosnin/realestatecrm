@@ -3,7 +3,7 @@
 /**
  * Chippi product-story showcases, the three sections that walk through how the
  * agent works end to end: it READS every signal, DECIDES what matters, then
- * ACTS with your approval. Each reuses the FeatureShowcase shell but ships its
+ * ACTS on its own. Each reuses the FeatureShowcase shell but ships its
  * own custom frosted metaphor mockups (multi-source ingestion, scoring + ranked
  * list, action card + approval gate) so the panels stay visually distinct from
  * each other and from BrokerageShowcase.
@@ -67,7 +67,7 @@ const READS_TOP = [
   { icon: ScanSearch, title: 'Nothing missed', desc: 'Round the clock coverage.' },
 ];
 
-/** One labeled source tile (Email / SMS / Zillow) with a live dot. */
+/** One labeled source tile (Email / WhatsApp / Zillow) with a live dot. */
 const SourceTile = ({ icon: Icon, label, tone }: { icon: React.ElementType; label: string; tone: string }) => (
   <div className="relative flex flex-col items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-2 py-3">
     <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
@@ -87,7 +87,7 @@ const READS_STEPS: ShowcaseStep[] = [
       <Frost title="Sources" badge="Live">
         <motion.div variants={rowV} className="grid grid-cols-3 gap-2 px-1">
           <SourceTile icon={Mail} label="Email" tone="text-sky-300/80" />
-          <SourceTile icon={MessageSquare} label="SMS" tone="text-[#ff9a6e]" />
+          <SourceTile icon={MessageSquare} label="WhatsApp" tone="text-[#ff9a6e]" />
           <SourceTile icon={Home} label="Zillow" tone="text-emerald-300/80" />
         </motion.div>
         <motion.div variants={rowV} className="flex justify-center py-0.5 text-white/25">
@@ -338,16 +338,16 @@ export function ChippiDecidesShowcase() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 3) ACTS, metaphor = proposed action card + approval gate + log.
+ * 3) ACTS, metaphor = action card + execution + log.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 const ACTS_TOP = [
-  { icon: PenLine, title: 'It proposes', desc: 'Drafts and bookings ready to go.' },
-  { icon: ShieldCheck, title: 'You approve', desc: 'Approve, edit, or skip in a tap.' },
+  { icon: PenLine, title: 'It writes', desc: 'Replies and bookings, in your voice.' },
+  { icon: ShieldCheck, title: 'It acts', desc: 'Sent, booked, and updated on its own.' },
   { icon: ScrollText, title: 'Logged in plain words', desc: 'Every action you can audit.' },
 ];
 
-/** A pill-style action button row, the approval gate. */
+/** A pill-style action button row. */
 const ActionBtn = ({ icon: Icon, label, focused }: { icon: React.ElementType; label: string; focused?: boolean }) => (
   <span
     className={
@@ -399,11 +399,11 @@ const ACTS_STEPS: ShowcaseStep[] = [
     ),
   },
   {
-    key: 'approve',
-    title: 'You approve',
-    desc: 'Nothing leaves without your nod. Approve to send, edit a word, or skip it, your call, every time.',
+    key: 'act',
+    title: 'It acts',
+    desc: 'The reply goes out, the tour lands on the calendar, the deal moves, while you are with a client.',
     mockup: (
-      <Frost title="Your call">
+      <Frost title="In motion">
         <motion.div variants={rowV} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#ff7a45] to-[#ff5fa2] text-black">
             <CalendarDays className="h-4 w-4" />
@@ -414,9 +414,8 @@ const ACTS_STEPS: ShowcaseStep[] = [
           </span>
         </motion.div>
         <motion.div variants={rowV} className="flex gap-2 px-1 pt-1">
-          <ActionBtn icon={Check} label="Approve" focused />
-          <ActionBtn icon={Pencil} label="Edit" />
-          <ActionBtn icon={X} label="Skip" />
+          <ActionBtn icon={Check} label="Sent" focused />
+          <ActionBtn icon={Pencil} label="In your voice" />
         </motion.div>
       </Frost>
     ),
@@ -424,7 +423,7 @@ const ACTS_STEPS: ShowcaseStep[] = [
   {
     key: 'execute',
     title: 'It executes',
-    desc: 'The second you approve, Chippi sends the reply and books the tour, then sends the invite, no copy-paste, no follow-through forgotten.',
+    desc: 'Chippi sends the reply and books the tour, then sends the invite, no copy-paste, no follow-through forgotten.',
     mockup: (
       <Frost title="Done" badge="Sent">
         <StatusLine icon={Send} label="Reply sent to Sarah Chen" />
@@ -458,9 +457,9 @@ export function ChippiActsShowcase() {
         </>
       }
       product={{
-        name: 'Approval-First',
+        name: 'Autonomous',
         icon: ShieldCheck,
-        desc: 'Chippi drafts, books, and updates, then waits for your tap. Approve, edit, or skip, and every move lands on the log.',
+        desc: 'Chippi writes, books, and updates on its own, and every move lands on the log in plain words.',
         cta: { label: 'See it work', href: '/demo' },
       }}
       topFeatures={ACTS_TOP}

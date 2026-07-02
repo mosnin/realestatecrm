@@ -51,9 +51,9 @@ const ROWS: Row[] = [
     href: '/integrations',
   },
   {
-    title: 'Approval-first control',
-    label: 'You sign off',
-    desc: 'Nothing leaves without your tap, every action on the record.',
+    title: 'Accountable by design',
+    label: 'On the record',
+    desc: 'Every send in your voice, every action on the record.',
     href: '/chippi',
   },
 ];

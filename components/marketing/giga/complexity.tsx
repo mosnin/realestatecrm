@@ -22,8 +22,8 @@ const COLUMNS = [
   },
   {
     icon: ShieldCheck,
-    title: 'Approval-first by design',
-    desc: 'Chippi drafts and proposes; every send goes through a human. An audit log keeps the whole floor honest and reviewable.',
+    title: 'Audit-ready by design',
+    desc: 'Every action Chippi takes is logged with the reason behind it, so the whole floor stays honest and reviewable.',
   },
 ];
 

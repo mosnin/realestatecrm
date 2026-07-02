@@ -47,8 +47,8 @@ const BEATS: Beat[] = [
   {
     size: "long",
     icon: <Sparkles className="h-4 w-4 text-white/80" />,
-    title: "Reply drafted in your voice",
-    detail: "Ready to send",
+    title: "Reply sent, in your voice",
+    detail: "Seconds after the lead",
   },
   {
     size: "long",

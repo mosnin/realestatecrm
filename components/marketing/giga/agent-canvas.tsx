@@ -105,13 +105,12 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'comms',
     title: 'Communicate with clients',
-    desc: 'Replies drafted in your voice across email, text, and WhatsApp, sent the moment you approve.',
+    desc: 'Replies written in your voice across email and WhatsApp, sent the moment they are ready.',
     mockup: (
       <Frost title="Draft reply" badge="In your voice">
         <motion.div variants={rowV} className="flex gap-1.5 px-1 pb-1">
           {[
             { icon: Mail, label: 'Email', on: true },
-            { icon: MessageSquare, label: 'SMS', on: false },
             { icon: Phone, label: 'WhatsApp', on: false },
           ].map((t) => {
             const TIcon = t.icon;

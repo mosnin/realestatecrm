@@ -16,7 +16,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'For brokerages · Chippi',
   description:
-    'Give every agent on the floor a Chippi: leads routed to the right agent, approval-first drafts, and a live floor view with role-based controls and an audit log.',
+    'Give every agent on the floor a Chippi: leads routed to the right agent, replies in each agent\u2019s voice, and a live floor view with role-based controls and an audit log.',
 };
 
 export default function BrokeragesPage() {
@@ -32,11 +32,11 @@ export default function BrokeragesPage() {
               <br className="hidden sm:block" /> every desk on the floor.
             </>
           }
-          description="Give every agent a Chippi: leads routed, performance visible, and every send approval-first, from a solo desk to hundreds of agents."
+          description="Give every agent a Chippi: leads routed, performance visible, and every send on the record, from a solo desk to hundreds of agents."
           features={[
             { icon: 'ArrowRightLeft', title: 'Routing on arrival', desc: 'Leads auto-assigned by territory and load, logged with the reason.' },
             { icon: 'Users', title: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time.' },
-            { icon: 'ShieldCheck', title: 'Approval-first', desc: 'Every send reviewed, every action on the audit log.' },
+            { icon: 'ShieldCheck', title: 'Accountable', desc: 'Every send named, every action on the audit log.' },
           ]}
           image="/marketing/brokerages-hero.jpg"
           variant="floor"

@@ -45,7 +45,7 @@ const QUOTES: Quote[] = [
     tagline: 'Residential · Austin',
   },
   {
-    quote: 'The drafts actually sound like me. My clients can’t tell — and I read every one before it sends.',
+    quote: 'It actually sounds like me. My clients can’t tell the difference — the follow-ups just happen.',
     name: 'Team lead',
     tagline: 'Buyer team of 4 · Phoenix',
   },

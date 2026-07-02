@@ -35,7 +35,7 @@ export function HowItWorksCircuit() {
           </span>
           <h2 className="mt-5 max-w-2xl text-[clamp(1.75rem,3.2vw,2.75rem)] leading-[1.08] tracking-[-0.02em] text-white">
             Every lead flows through Chippi.
-            <span className="text-white/55"> Nothing sends without you.</span>
+            <span className="text-white/55"> The work comes back done.</span>
           </h2>
         </motion.div>
 
@@ -46,7 +46,7 @@ export function HowItWorksCircuit() {
         >
           {/* min-w keeps the board legible on phones — it scrolls sideways
               rather than shrinking labels into confetti. */}
-          <div className="min-w-[880px]">
+          <div className="min-w-[740px]">
             <ChippiCircuit variant="dark" className="mx-auto" />
           </div>
         </motion.div>

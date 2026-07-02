@@ -199,7 +199,7 @@ export default function StudioPage() {
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
-                  <p className="mt-1 text-xs text-neutral-600">Approval-first, nothing posts without you</p>
+                  <p className="mt-1 text-xs text-neutral-600">Posted in your voice, on the record</p>
                 </div>
               </div>
             </div>
