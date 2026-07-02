@@ -356,7 +356,7 @@ export async function POST(req: NextRequest) {
     const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
     const dcInserts = (contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId, contactId: cId }));
     if (dcInserts.length > 0) {
-      const { error: dcError } = await supabase.from('DealContact').insert(dcInserts);
+      const { error: dcError } = await supabase.from('DealContact').upsert(dcInserts, { onConflict: 'dealId,contactId', ignoreDuplicates: true });
       if (dcError) throw dcError;
     }
   }
