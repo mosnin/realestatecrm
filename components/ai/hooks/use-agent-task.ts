@@ -640,6 +640,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         setIsStreaming(false);
         setLiveCallIds(new Set());
         setStreamingReasoning('');
+        // Reset the reasoning buffer + turn start here too, not only in
+        // turn_complete: after a Stop or a stream that drops without a terminal
+        // frame, these would otherwise carry the prior turn's trace and a bogus
+        // "Thought for Xs" duration into the next answer.
+        reasoningBufferRef.current = '';
+        turnStartedAtRef.current = null;
       }
     },
     [abort, applyEvent, landChippiError],
