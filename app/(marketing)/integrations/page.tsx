@@ -9,6 +9,7 @@
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { IntegrationsShowcase } from '@/components/marketing/giga/integrations-showcase';
+import { IntegrationsDrift } from '@/components/marketing/giga/integrations-drift';
 import {
   IntegrationsSetupShowcase,
   IntegrationsAutomationShowcase,
@@ -45,6 +46,7 @@ export default function IntegrationsPage() {
           variant="integrations"
         />
         <IntegrationsShowcase />
+        <IntegrationsDrift />
         <IntegrationsSetupShowcase />
         <IntegrationsAutomationShowcase />
         <PricingTeaser

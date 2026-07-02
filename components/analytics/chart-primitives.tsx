@@ -91,17 +91,26 @@ export function StatCell({
   format?: (n: number) => string;
 }) {
   return (
+    // metrics-01 aesthetic: the mono uppercase micro-label sits ABOVE the
+    // number — the same eyebrow voice the marketing site speaks, so the
+    // dashboard and the storefront read as one product. Number stays
+    // tabular and counts up via AnimatedNumber.
     <div className="bg-background p-5">
-      <p className={STAT_NUMBER} style={TITLE_FONT}>
+      <p
+        style={{ fontFamily: 'var(--font-mono)' }}
+        className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
+      >
+        {label}
+      </p>
+      <p className={`${STAT_NUMBER} mt-2 tabular-nums`} style={TITLE_FONT}>
         {typeof value === 'number' ? (
           <AnimatedNumber value={value} format={format} />
         ) : (
           value
         )}
       </p>
-      <p className={`${CAPTION} mt-1`}>{label}</p>
       {sub && (
-        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</p>
+        <p className="text-[11px] text-muted-foreground/70 mt-1">{sub}</p>
       )}
     </div>
   );
