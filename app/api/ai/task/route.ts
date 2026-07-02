@@ -85,7 +85,13 @@ import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 // the stream mid-turn and the assistant message is lost. nodejs runtime is
 // required — this route streams and uses Node `crypto`.
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+// Outlive Modal's own 600s per-turn ceiling (+ buffer) so the proxy never kills
+// a long agentic turn before Modal finishes. Vercel clamps this to the plan's
+// max, so it's a ceiling, not a guarantee — but 300 was BELOW Modal's timeout,
+// which meant a long turn could be cut on the proxy side even though Modal was
+// still working. Also gives the disconnect-survival drain (below) room to run
+// the turn to completion after the client leaves.
+export const maxDuration = 800;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -292,10 +298,23 @@ function proxyModalStream({
 }: ProxyModalStreamInput): Response {
   const encoder = new TextEncoder();
   let seq = 0;
+  // Set when the browser disconnects (tab/app closed, navigated away). We do NOT
+  // abort the Modal run on disconnect — the turn keeps draining server-side to
+  // completion and is persisted, so the finished answer is there when the user
+  // returns (Claude/ChatGPT behaviour). This just stops us enqueueing into a
+  // torn-down controller (which would throw).
+  let clientGone = false;
 
   function push(controller: ReadableStreamDefaultController, event: Record<string, unknown>) {
+    if (clientGone) return;
     const line = `data: ${JSON.stringify({ seq: seq++, ts: new Date().toISOString(), ...event })}\n\n`;
-    controller.enqueue(encoder.encode(line));
+    try {
+      controller.enqueue(encoder.encode(line));
+    } catch {
+      // Controller already closed/errored (client vanished between the check and
+      // the enqueue) — treat as gone and keep draining Modal for persistence.
+      clientGone = true;
+    }
   }
 
   const stream = new ReadableStream({
@@ -475,7 +494,10 @@ function proxyModalStream({
           }
         }
       } catch (err) {
-        if (!abortController.signal.aborted) {
+        // A genuine read error (Modal crash/network). If the client already
+        // left there's no one to tell — just fall through to persist. We no
+        // longer abort on disconnect, so this is a real error, not our own abort.
+        if (!clientGone) {
           logger.error('[ai/task] modal stream read error', { spaceId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
           sentTerminal = true;
@@ -483,21 +505,29 @@ function proxyModalStream({
       } finally {
         // Safety net — the stream ended with no `done`/`error` event (Modal
         // crash, dropped connection, 600s container kill mid-stream). Persist
-        // whatever streamed (idempotent via `persisted`) AND guarantee the
-        // browser sees exactly one terminal frame so its EventSource closes
-        // instead of hanging open forever. Skip when the client aborted —
-        // there's no one listening.
+        // whatever streamed (idempotent via `persisted`) AND guarantee a still-
+        // connected browser sees exactly one terminal frame so its EventSource
+        // closes instead of hanging open forever. When the client is gone the
+        // persist is the whole point — the finished turn lands in history.
         await persistOnce();
-        if (!sentTerminal && !abortController.signal.aborted) {
+        if (!sentTerminal && !clientGone) {
           logger.warn('[ai/task] modal stream ended with no terminal event', { spaceId });
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
         }
-        controller.close();
+        // controller may already be torn down if the client disconnected —
+        // closing a cancelled controller throws, so guard it.
+        try { controller.close(); } catch { /* already closed by cancel() */ }
         reader.releaseLock();
       }
     },
+    // Client disconnected (tab/app closed, navigation). Mark it so we stop
+    // enqueueing, but DO NOT abort — the start() loop keeps draining Modal to
+    // completion and persistOnce() saves the finished turn, so the answer is
+    // waiting when the user comes back. The run stays bounded by Modal's own
+    // 600s timeout, the SDK maxTurns, and lib/ai-tools/loop-guard, so "keep
+    // running" can't become "run forever".
     cancel() {
-      abortController.abort();
+      clientGone = true;
     },
   });
 
