@@ -5,6 +5,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { WorkflowsManager } from '@/components/workflows/workflows-manager';
+import { AutomationsIntro } from '@/components/workflows/automations-intro';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Workflows — Chippi' };
@@ -34,6 +35,8 @@ export default async function WorkflowsPage({
       <Suspense fallback={null}>
         <WorkflowsManager />
       </Suspense>
+      {/* First-visit feature tour — self-dismissing, persisted per browser. */}
+      <AutomationsIntro />
     </ChippiPageShell>
   );
 }
