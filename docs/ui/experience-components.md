@@ -1,10 +1,29 @@
 # Experience components
 
-Branded, motion-rich UI built on the [cult-ui](https://cult-ui.com) primitives.
-These take the product "to the next level" — full-screen focus morphs, a
-compose surface that grows out of a pill, a contextual side rail, and a live
-status island. This doc is the **source of truth** so we don't regress: what
-each one is, where it's used, and the footguns.
+Branded, motion-rich UI built on curated registry primitives — cult-ui,
+ncdai (chanhdai.com), componentry, pixel-perfect, react-bits. This doc is the
+**source of truth** so we don't regress: what was adopted and why, what was
+deliberately skipped and why, where each piece is used, and the footguns.
+
+## Curation principles (read before adding more)
+
+1. **One primitive framework.** The design system is radix-based. The @shark
+   suite (ark-ui) was skipped wholesale — parallel primitive frameworks for
+   identical controls (checkbox, menu, toast…) fragment styling and a11y
+   behavior. If a control is missing, add the standard shadcn/radix version.
+2. **No heavy deps for accents.** react-bits Dither / FaultyTerminal
+   (three.js/ogl) and fluid-cube-scroll (three) were skipped: WebGL runtimes
+   for background flourishes fight the photography-led marketing aesthetic
+   and the bundle.
+3. **Don't duplicate a working system.** ncdai metrics-01 (new chart lib) was
+   skipped — analytics has a deliberate recharts system
+   (`components/analytics/chart-primitives`). ncdai theme-switcher was
+   skipped — the app has its own ThemeProvider + toggle.
+4. **Content is not yours to invent.** ncdai testimonials-02 /
+   social-proof-01 need real quotes and logos — flagged to the founder, not
+   faked.
+5. **Registry drops are starting points.** Several were adapted (see tables);
+   re-installing from the registry clobbers those adaptations.
 
 ## Layers
 
@@ -85,14 +104,58 @@ Built on `DynamicIsland`. Display-only; cycles through Chippi's activity beats
   marketing homepage hero (`components/marketing/giga/hero.tsx`, bottom-right,
   desktop-only).
 
+## The wider registry set (`components/ui/`)
+
+Adopted in the second wave. Adaptations are load-bearing — re-pulling from the
+registry loses them.
+
+| Primitive | Source | Adaptation | Status |
+| --- | --- | --- | --- |
+| `color-picker.tsx` | cult-ui | **Emits 6-digit hex** (APIs validate `/^#[0-9a-f]{6}$/i`; upstream emitted `hsl()`); removed mount-time `onChange` loop; fixed broken hsl regex; themed input; optional custom `children` trigger | Live — deals add-stage |
+| `typewriter.tsx` | cult-ui | none | Available |
+| `intro-disclosure.tsx` | cult-ui | none — but its internal visibility force-closes on mount; **wrappers must own first-visit gating** (see `AutomationsIntro`) | Live — Automations tour |
+| `code-block.tsx` | cult-ui | none | Live — webhook test request |
+| `gradient-button-group.tsx` | cult-ui | rewired next-themes → app ThemeProvider | Available |
+| `cosmic-button.tsx` | cult-ui | none | Available |
+| `popover-form.tsx` | cult-ui | none | Available |
+| `minimal-card.tsx` | cult-ui | none | Available |
+| `onboarding.tsx` | cult-ui | (pre-existing, identical to registry) | Pre-existing |
+| `logos-carousel.tsx` | ncdai | none | Live — hero logo wave |
+| `shimmering-text.tsx` | ncdai | none | Live — hero eyebrow |
+| `scroll-fade-effect.tsx` | ncdai | required `@utility`/`@property` CSS added to `app/globals.css` | Live — gallery thumb rail |
+| `text-flip.tsx` | ncdai | none | Live — CTA headline |
+| `dot-grid-spotlight.tsx` | ncdai | none | Available |
+| `circuit-board.tsx` | componentry | import alias fixed | Live via `ChippiCircuit` |
+| `footer-reveal.tsx` | pixel-perfect | **rewritten** from demo scaffold into a generic `{children, footer}` primitive | Live — marketing layout |
+| `progressive-blur.tsx` | pixel-perfect | none | Available |
+| `gradient-glow-fade.tsx` | pixel-perfect | none | Available |
+| `checkbox/progress/aspect-ratio/drawer.tsx` | shadcn standard | built on installed `radix-ui` umbrella + `vaul` | Support files |
+
 ## Where they're used (keep current)
 
 | Component | Location |
 | --- | --- |
 | `LiveProductIsland` | Marketing hero (`components/marketing/giga/hero.tsx`) |
+| `ShimmeringText` | Hero eyebrow ("Introducing Chippi") |
+| `LogosCarousel` | Hero logo cloud (replaced the linear marquee) |
+| `TextFlip` | `CtaSection` headline second line |
+| `ChippiCircuit` (`components/experience/chippi-circuit.tsx`) | Homepage after AgentCanvas; `/chippi` page after showcases |
+| `FooterReveal` | Marketing layout (`app/(marketing)/layout.tsx`) |
 | `QuickCaptureDock` via `ContactsQuickCapture` | People page (`app/s/[slug]/contacts/page.tsx`) |
-| `FocusView` | Available; adopt for KPI/report/property expansions |
+| `FocusView` | Property gallery stage photo (`components/properties/property-gallery.tsx`) |
+| `ScrollFadeEffect` | Property gallery thumbnail rail |
+| `ColorPicker` | Deals board add-stage (`components/deals/kanban-board.tsx`) |
+| `CodeBlock` | Webhook trigger panel (`components/workflows/workflow-builder.tsx`) |
+| `AutomationsIntro` (IntroDisclosure) | Workflows page (`app/s/[slug]/automations/workflows/page.tsx`) |
 | `ContextPanel` | Available; adopt for contextual detail rails |
+
+## Needs real content before shipping (do NOT fake)
+
+- **Testimonials** (ncdai testimonials-02): real customer quotes + names.
+- **Social proof logos** (ncdai social-proof-01): licensed partner marks (the
+  hero currently uses styled text wordmarks as documented placeholders).
+- **Intro tour media**: `AutomationsIntro` steps are text-only; slot real
+  product screenshots into each step's `media` when captured.
 
 ## Regression guardrails
 
