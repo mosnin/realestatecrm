@@ -24,6 +24,7 @@ import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions, resolveField } from './conditions';
+import { assertPublicHttpTarget } from '@/lib/net/ssrf-guard';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
@@ -743,37 +744,11 @@ async function runNotifyAgent(
 }
 
 /**
- * SSRF guard — returns true if the hostname appears to be a private/internal
- * address that should never be the target of an outbound webhook. Only applied
- * in the executor; the Zod schema already enforces HTTPS.
- */
-function isPrivateHost(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    const h = hostname.toLowerCase();
-    if (h === 'localhost' || h === '0.0.0.0') return true;
-    // IPv4 private ranges
-    const ipv4 = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-    if (ipv4) {
-      const [, a, b] = ipv4.map(Number);
-      if (a === 10) return true;
-      if (a === 127) return true;
-      if (a === 172 && b >= 16 && b <= 31) return true;
-      if (a === 192 && b === 168) return true;
-      if (a === 169 && b === 254) return true; // link-local (AWS metadata etc.)
-    }
-    // IPv6 loopback / link-local
-    if (h === '::1' || h.startsWith('fe80:') || h.startsWith('[::1]') || h.startsWith('[fe80:')) return true;
-    return false;
-  } catch {
-    return true;
-  }
-}
-
-/**
  * webhook_post — POST JSON to an external HTTPS URL. The body and URL are
- * interpolated ({{token}} replaced). SSRF is guarded by blocking private IPs.
- * Response body is read up to 10 KB and returned in the detail for audit.
+ * interpolated ({{token}} replaced). SSRF is guarded by assertPublicHttpTarget
+ * (normalizes every IP encoding, resolves DNS names, blocks private/loopback/
+ * link-local/ULA/reserved ranges) PLUS redirect: 'manual' so a 3xx can't hop
+ * into an internal host. Response body is read up to 10 KB for audit.
  */
 async function runWebhookPost(
   action: Extract<WorkflowAction, { type: 'webhook_post' }>,
@@ -781,8 +756,9 @@ async function runWebhookPost(
 ): Promise<ActionStepResult> {
   const { url: rawUrl, bodyJson, headersJson } = action.config;
   const url = resolveTokens(rawUrl, context);
-  if (isPrivateHost(url)) {
-    return { status: 'failed', detail: { error: 'Webhook URL targets a private or loopback address.', url } };
+  const targetCheck = await assertPublicHttpTarget(url);
+  if (!targetCheck.ok) {
+    return { status: 'failed', detail: { error: `Webhook target rejected: ${targetCheck.reason}`, url } };
   }
 
   let body: string | undefined;
@@ -817,6 +793,10 @@ async function runWebhookPost(
           headers,
           body: body ?? '{}',
           signal: AbortSignal.timeout(10_000),
+          // Do NOT follow redirects: assertPublicHttpTarget only vetted the
+          // initial host, so a 3xx into 169.254.169.254 / an internal service
+          // would bypass the SSRF guard. A redirect is surfaced as a non-2xx.
+          redirect: 'manual',
         });
         const text = await res.text().then((t) => t.slice(0, 10_000));
         return { ok: res.ok, status: res.status, text };
