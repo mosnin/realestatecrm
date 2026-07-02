@@ -14,6 +14,7 @@ import {
 } from '@/components/marketing/giga/chippi-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { HowItWorksCircuit } from '@/components/marketing/giga/how-it-works-circuit';
 
 export const metadata = {
   title: 'Meet Chippi',
@@ -48,6 +49,7 @@ export default function MeetChippiPage() {
         <ChippiReadsShowcase />
         <ChippiDecidesShowcase />
         <ChippiActsShowcase />
+        <HowItWorksCircuit />
         <PricingTeaser
           headline={
             <>

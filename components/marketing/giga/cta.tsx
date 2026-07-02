@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { EASE_OUT } from '@/lib/motion';
+import { TextFlip } from '@/components/ui/text-flip';
 
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
 const reveal = {
@@ -32,7 +33,15 @@ export function CtaSection() {
           </span>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3.5rem)] leading-[1.04] tracking-[-0.02em] text-neutral-900 dark:text-white">
             Ready to see Chippi
-            <br className="hidden sm:block" /> in action?
+            {/* The second line flips through what "action" actually means.
+                Left-aligned headline, punctuation inside each item — no
+                trailing-character jitter as widths change. */}
+            <TextFlip as={motion.span} interval={2.8} className="block">
+              <>in action?</>
+              <>draft in your voice?</>
+              <>book the tour?</>
+              <>work your whole book?</>
+            </TextFlip>
           </h2>
         </motion.div>
 
