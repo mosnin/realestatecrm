@@ -490,7 +490,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       byStage.set(type, arr);
     }
     try {
-      await Promise.allSettled(
+      const settled = await Promise.allSettled(
         [...byStage.entries()].map(([type, ids]) =>
           fetch('/api/contacts/bulk', {
             method: 'POST',
@@ -499,7 +499,18 @@ export function ContactTable({ slug }: ContactTableProps) {
           }),
         ),
       );
-      toast.success('Moved back.');
+      // Promise.allSettled never rejects, so we must inspect each result AND
+      // each response's ok status — otherwise a fully-failed undo still shows
+      // "Moved back." Report the true outcome instead of an optimistic lie.
+      const allOk = settled.every((r) => r.status === 'fulfilled' && r.value.ok);
+      const anyOk = settled.some((r) => r.status === 'fulfilled' && r.value.ok);
+      if (allOk) {
+        toast.success('Moved back.');
+      } else if (anyOk) {
+        toast.error('Only some moved back. Check the list and retry the rest.');
+      } else {
+        toast.error("Couldn't undo. Try moving them manually.");
+      }
     } catch {
       toast.error("Couldn't undo. Try moving them manually.");
     } finally {
