@@ -21,7 +21,14 @@ const reveal = {
 
 export function CtaSection() {
   return (
-    <section className="px-5 py-24 sm:px-8 sm:py-28">
+    <section className="relative overflow-hidden px-5 py-24 sm:px-8 sm:py-28">
+      {/* Brand bloom (adapted from pixel-perfect gradient-glow-fade: behind
+          content, brand hues, both themes) — a soft radial lift under the
+          closing ask so the page ends warm instead of flat. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 [background:radial-gradient(90%_70%_at_50%_110%,rgba(255,122,69,0.12),transparent_65%)] dark:[background:radial-gradient(90%_70%_at_50%_110%,rgba(255,122,69,0.10),transparent_65%)]"
+      />
       <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <motion.div {...reveal} transition={{ duration: 0.7, ease: EASE_OUT }}>
           <span

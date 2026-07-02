@@ -46,7 +46,7 @@ export function HowItWorksCircuit() {
         >
           {/* min-w keeps the board legible on phones — it scrolls sideways
               rather than shrinking labels into confetti. */}
-          <div className="min-w-[760px]">
+          <div className="min-w-[880px]">
             <ChippiCircuit variant="dark" className="mx-auto" />
           </div>
         </motion.div>

@@ -24,6 +24,7 @@ import { HowItWorksCircuit } from '@/components/marketing/giga/how-it-works-circ
 import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
 import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
 import { Complexity } from '@/components/marketing/giga/complexity';
+import { TestimonialsBand } from '@/components/marketing/giga/testimonials';
 import { ResearchSection } from '@/components/marketing/giga/research';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -44,6 +45,7 @@ export default async function MarketingHomePage() {
         <RealtorShowcase />
         <BrokerageShowcase />
         <Complexity />
+        <TestimonialsBand />
       </div>
       {/* Light/dark-adaptive closing sections */}
       <ResearchSection />

@@ -40,25 +40,25 @@ interface Beat {
 const BEATS: Beat[] = [
   {
     size: "long",
-    icon: <Mail className="h-4 w-4 text-sky-400" />,
+    icon: <Mail className="h-4 w-4 text-white/80" />,
     title: "New lead read",
     detail: "Sarah • 3BR in Oak Hill",
   },
   {
     size: "long",
-    icon: <Sparkles className="h-4 w-4 text-violet-400" />,
+    icon: <Sparkles className="h-4 w-4 text-white/80" />,
     title: "Reply drafted in your voice",
     detail: "Ready to send",
   },
   {
     size: "long",
-    icon: <CalendarCheck className="h-4 w-4 text-emerald-400" />,
+    icon: <CalendarCheck className="h-4 w-4 text-white/80" />,
     title: "Tour booked",
     detail: "Saturday, 2:00 PM",
   },
   {
     size: "long",
-    icon: <TrendingUp className="h-4 w-4 text-amber-400" />,
+    icon: <TrendingUp className="h-4 w-4 text-white/80" />,
     title: "Deal advanced",
     detail: "Under contract",
   },
