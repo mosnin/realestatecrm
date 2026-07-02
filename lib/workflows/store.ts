@@ -199,17 +199,22 @@ export async function countWorkflows(spaceId: string): Promise<number> {
   return count ?? 0;
 }
 
-/** Return a map of workflowId → total run count for the space's workflows. */
+/**
+ * Return a map of workflowId → total run count for the space's workflows.
+ *
+ * Uses a grouped-COUNT RPC (count_runs_per_workflow) so the aggregation happens
+ * in Postgres and only one row per workflow crosses the wire — the previous
+ * implementation SELECTed every WorkflowRun row for the space and counted in
+ * JS, an unbounded transfer that grew with run history. Degrades gracefully:
+ * any error (e.g. the migration not yet applied) yields an empty map, and the
+ * caller renders a 0 count rather than failing the whole workflow list.
+ */
 export async function countRunsPerWorkflow(spaceId: string): Promise<Map<string, number>> {
-  const { data, error } = await supabase
-    .from('WorkflowRun')
-    .select('workflowId')
-    .eq('spaceId', spaceId);
-  if (error) throw error;
   const counts = new Map<string, number>();
-  for (const row of data ?? []) {
-    const id = (row as { workflowId: string }).workflowId;
-    counts.set(id, (counts.get(id) ?? 0) + 1);
+  const { data, error } = await supabase.rpc('count_runs_per_workflow', { p_space_id: spaceId });
+  if (error || !Array.isArray(data)) return counts;
+  for (const row of data as { workflowId: string; run_count: number }[]) {
+    if (row?.workflowId != null) counts.set(row.workflowId, Number(row.run_count) || 0);
   }
   return counts;
 }
