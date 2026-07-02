@@ -146,6 +146,26 @@ registry loses them.
 - **cosmic-button — available, not placed.** Marketing CTAs speak a strict
   white-pill language; a rainbow gradient border deviates. Founder taste call.
 
+### Other available-not-placed (each needs a genuine home, not a forced one)
+
+- **dot-grid-spotlight** — candidate: a future light-background section or the
+  404 page; current marketing sections are photography-led.
+- **popover-form** — candidate: inline quick-create forms; current flows use
+  the established dialog/panel language.
+- **minimal-card** — candidate: a future gallery/directory grid.
+- **progressive-blur / gradient-glow-fade** — background accents; add only
+  when a section design calls for them, not as decoration.
+
+### Final mix audit (recorded)
+
+- One motion accent per section is the rule — verified across hero (shimmer /
+  island / logo wave in separate zones), homepage and /chippi (circuit,
+  decrypt, flip each own their section).
+- **FooterReveal flex regression caught + fixed**: the wrapper broke the
+  layout's `flex-1` chain, un-pinning the footer on short pages (legal/terms).
+  FooterReveal now accepts `className`; the marketing layout passes flex
+  classes through both wrapper and content.
+
 ## Where they're used (keep current)
 
 | Component | Location |

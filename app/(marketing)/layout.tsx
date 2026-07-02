@@ -61,7 +61,8 @@ export default function MarketingLayout({
           wrapper carries the shell background so it occludes the pinned footer
           mid-page. */}
       <FooterReveal
-        contentClassName="bg-white dark:bg-[#0a0a0a]"
+        className="flex flex-1 flex-col"
+        contentClassName="flex flex-1 flex-col bg-white dark:bg-[#0a0a0a]"
         footer={<SiteFooter />}
       >
         <main className="flex-1">{children}</main>

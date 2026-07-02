@@ -20,17 +20,25 @@ import { cn } from "@/lib/utils";
 export function FooterReveal({
   children,
   footer,
+  className,
   contentClassName,
 }: {
   /** The page content that slides up to uncover the footer. */
   children: ReactNode;
   /** The footer that stays pinned and gets revealed. */
   footer: ReactNode;
+  /**
+   * Classes for the outer wrapper. When this sits inside a flex column that
+   * previously stretched the content (e.g. a `flex-1` main), pass the flex
+   * classes through here AND via contentClassName — otherwise short pages
+   * lose the "footer pinned to viewport bottom" behavior.
+   */
+  className?: string;
   /** Must include an opaque background matching the page shell. */
   contentClassName?: string;
 }) {
   return (
-    <div className="relative w-full">
+    <div className={cn("relative w-full", className)}>
       <div className={cn("relative z-10", contentClassName)}>{children}</div>
       <div className="sticky bottom-0 z-0">{footer}</div>
     </div>
