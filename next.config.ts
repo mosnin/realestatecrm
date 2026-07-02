@@ -2,11 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * Security response headers applied to every route.
- *
- * Stripe domains are now included in the allowlists below (connect-src,
- * frame-src, script-src) via the CSP header — once a full CSP is added.
- * For now the CSP is omitted (see note below), but the domains are documented.
+ * Security response headers applied to every route. The CSP (below) carries a
+ * complete third-party allowlist and ships report-only; see the note on that
+ * header for why it isn't enforced yet and how to flip it on.
  */
 const securityHeaders = [
   // Prevent embedding in iframes from other origins (clickjacking)
@@ -19,20 +17,42 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), geolocation=()' },
   // Force HTTPS for 2 years (only active when served over TLS)
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  // Content Security Policy (report-only — enforcing breaks Clerk auth components)
+  // Content Security Policy.
+  //
+  // Shipped as report-only (not enforced) on purpose. The allowlist below is
+  // deliberately COMPLETE — every third party the app actually loads is
+  // enumerated: Clerk (auth), Stripe (checkout), Supabase (data + realtime),
+  // Sentry (errors), Calendly (embeds), Google Maps (property maps), Ably
+  // (realtime notifications), and the full set of public-page marketing/
+  // analytics pixels (Meta, TikTok, Google Ads/Analytics, X/Twitter, LinkedIn,
+  // Snapchat — see components/tracking-pixels.tsx). That makes the policy
+  // "enforce-ready": flip the header key to `Content-Security-Policy` to turn
+  // it on.
+  //
+  // It is NOT flipped here because enforcement can only be validated against a
+  // running deploy (Clerk's auth widgets, Stripe's iframe, Maps, and realtime
+  // all fail silently-then-loudly if a directive is a hair too tight), and this
+  // build environment can't exercise those flows. Report-only lets the browser
+  // POST violations without breaking anything, so the remaining gaps surface as
+  // telemetry rather than as an outage for a paying realtor mid-checkout.
+  // ENFORCEMENT IS THE #1 PREVIEW-VERIFICATION ITEM: on the PR's Vercel
+  // preview, exercise sign-in, checkout, a property map, and live
+  // notifications, confirm the report-only console is clean, then swap the key.
   {
     key: 'Content-Security-Policy-Report-Only',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://assets.calendly.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com https://assets.calendly.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com https://images.unsplash.com https://*.calendly.com",
-      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://calendly.com https://*.calendly.com",
-      "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://calendly.com https://*.calendly.com",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://assets.calendly.com https://maps.googleapis.com https://connect.facebook.net https://analytics.tiktok.com https://www.googletagmanager.com https://www.google-analytics.com https://static.ads-twitter.com https://snap.licdn.com https://sc-static.net https://cdn.amplitude.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.com https://assets.calendly.com https://fonts.gstatic.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.com https://*.stripe.com https://images.unsplash.com https://*.calendly.com https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://www.facebook.com https://www.google-analytics.com https://analytics.tiktok.com https://px.ads.linkedin.com https://t.co",
+      "connect-src 'self' https://api.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://calendly.com https://*.calendly.com https://maps.googleapis.com https://*.ably.io wss://*.ably.io https://*.ably-realtime.com wss://*.ably-realtime.com https://connect.facebook.net https://www.facebook.com https://analytics.tiktok.com https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com https://static.ads-twitter.com https://analytics.twitter.com https://px.ads.linkedin.com https://tr.snapchat.com https://api2.amplitude.com",
+      "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://calendly.com https://*.calendly.com https://td.doubleclick.net https://www.facebook.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
     ].join('; '),
   },
 ];

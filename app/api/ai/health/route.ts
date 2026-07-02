@@ -7,6 +7,7 @@ import {
   isOpenRouterConfigured,
   resolveChatModel,
 } from '@/lib/llm';
+import { requireAuth } from '@/lib/api-auth';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 
 /**
@@ -20,10 +21,18 @@ import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
  * Secrets are NEVER returned. Env vars are reported only as booleans
  * (present/absent); the only strings exposed are non-secret config values
  * (model slugs, runtime flag) derived from the shared `@/lib/llm` helpers.
+ *
+ * AUTH-GATED: even booleans map our backend topology (which LLM provider,
+ * whether Modal/Composio are wired) — useful reconnaissance for an attacker.
+ * A signed-in realtor is all we require; that keeps the diagnostic usable for
+ * support while denying anonymous fingerprinting.
  */
 export const runtime = 'nodejs';
 
 export async function GET() {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const provider = isOpenRouterConfigured()
       ? 'openrouter'
