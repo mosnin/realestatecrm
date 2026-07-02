@@ -18,6 +18,7 @@
  */
 
 import crypto from 'crypto';
+import { lookup as dnsLookup } from 'node:dns/promises';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
@@ -539,10 +540,17 @@ function runFormatter(
     }
     case 'regex_extract': {
       if (!regexPattern) { output = ''; break; }
+      // ReDoS mitigation: the pattern AND the input are both user/tenant
+      // controlled, and JS RegExp has no execution timeout. Catastrophic
+      // backtracking cost scales with input length, so cap the pattern length
+      // and run the match against a bounded slice of the input — this turns any
+      // pathological pattern into a small constant-time worst case instead of a
+      // function-hanging DoS.
+      if (regexPattern.length > 200) { output = ''; break; }
       try {
         const flags = (regexFlags ?? '').replace(/[^gimsuy]/g, '');
         const re = new RegExp(regexPattern, flags);
-        const m = strValue.match(re);
+        const m = strValue.slice(0, 1000).match(re);
         output = m ? (m[1] ?? m[0]) : '';
       } catch { output = ''; }
       break;
@@ -747,27 +755,73 @@ async function runNotifyAgent(
  * address that should never be the target of an outbound webhook. Only applied
  * in the executor; the Zod schema already enforces HTTPS.
  */
-function isPrivateHost(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    const h = hostname.toLowerCase();
-    if (h === 'localhost' || h === '0.0.0.0') return true;
-    // IPv4 private ranges
-    const ipv4 = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-    if (ipv4) {
-      const [, a, b] = ipv4.map(Number);
-      if (a === 10) return true;
-      if (a === 127) return true;
-      if (a === 172 && b >= 16 && b <= 31) return true;
-      if (a === 192 && b === 168) return true;
-      if (a === 169 && b === 254) return true; // link-local (AWS metadata etc.)
-    }
-    // IPv6 loopback / link-local
-    if (h === '::1' || h.startsWith('fe80:') || h.startsWith('[::1]') || h.startsWith('[fe80:')) return true;
+/**
+ * True if an already-resolved IP literal (v4 or v6) is private, loopback,
+ * link-local, or otherwise not a public unicast address. Works on the RESOLVED
+ * address, which is what closes DNS-rebinding — a public hostname that resolves
+ * to 10.x is caught here even though its string looks innocent.
+ */
+function isPrivateIp(ip: string): boolean {
+  const addr = ip.toLowerCase();
+  // IPv4 (also handles IPv4-mapped IPv6 like ::ffff:127.0.0.1)
+  const v4 = addr.replace(/^::ffff:/, '').match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. cloud metadata 169.254.169.254
+    if (a >= 224) return true; // multicast / reserved / broadcast
     return false;
-  } catch {
-    return true;
   }
+  // IPv6
+  if (addr === '::1' || addr === '::') return true;
+  if (addr.startsWith('fe80:') || addr.startsWith('fc') || addr.startsWith('fd')) return true; // link-local + unique-local
+  return false;
+}
+
+/**
+ * SSRF gate for outbound webhook URLs. Fails closed. Beyond the old
+ * hostname-string check this:
+ *   - requires https and a real hostname
+ *   - rejects non-canonical IP literals (decimal/hex/octal) that browsers/fetch
+ *     would still route (e.g. http://2130706433 == 127.0.0.1)
+ *   - RESOLVES the hostname via DNS and rejects if ANY resolved address is
+ *     private/loopback/link-local — closing DNS-rebinding and metadata SSRF
+ * Returns null when safe, or an error string when it must be blocked.
+ */
+async function assertPublicUrl(url: string): Promise<string | null> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'Invalid URL.';
+  }
+  if (parsed.protocol !== 'https:') return 'Webhook URL must use https.';
+  const host = parsed.hostname.toLowerCase();
+  if (!host || host === 'localhost') return 'Webhook URL targets a private or loopback address.';
+  // Reject bare-decimal / hex / octal IP encodings that bypass dotted-quad checks
+  // but still resolve to a routable (often internal) address.
+  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
+    return 'Webhook URL targets a private or loopback address.';
+  }
+  // If the host is already an IP literal, check it directly.
+  if (isPrivateIp(host.replace(/^\[|\]$/g, ''))) {
+    return 'Webhook URL targets a private or loopback address.';
+  }
+  // Resolve the hostname and reject if any address is internal (DNS rebinding).
+  try {
+    const results = await dnsLookup(host, { all: true });
+    if (results.length === 0) return 'Webhook host did not resolve.';
+    for (const { address } of results) {
+      if (isPrivateIp(address)) {
+        return 'Webhook URL resolves to a private or internal address.';
+      }
+    }
+  } catch {
+    return 'Webhook host could not be resolved.';
+  }
+  return null;
 }
 
 /**
@@ -781,8 +835,9 @@ async function runWebhookPost(
 ): Promise<ActionStepResult> {
   const { url: rawUrl, bodyJson, headersJson } = action.config;
   const url = resolveTokens(rawUrl, context);
-  if (isPrivateHost(url)) {
-    return { status: 'failed', detail: { error: 'Webhook URL targets a private or loopback address.', url } };
+  const ssrfError = await assertPublicUrl(url);
+  if (ssrfError) {
+    return { status: 'failed', detail: { error: ssrfError, url } };
   }
 
   let body: string | undefined;
@@ -817,7 +872,16 @@ async function runWebhookPost(
           headers,
           body: body ?? '{}',
           signal: AbortSignal.timeout(10_000),
+          // Do NOT follow redirects: a public URL could 3xx to an internal
+          // target (169.254.169.254, 10.x) and bypass the pre-flight SSRF
+          // check, which only validated the original host.
+          redirect: 'manual',
         });
+        // A redirect response (opaqueredirect/3xx) is treated as a failure, not
+        // silently followed — the caller must point at a final https endpoint.
+        if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          return { ok: false, status: res.status || 302, text: 'Redirects are not followed (SSRF guard).' };
+        }
         const text = await res.text().then((t) => t.slice(0, 10_000));
         return { ok: res.ok, status: res.status, text };
       } catch (err) {

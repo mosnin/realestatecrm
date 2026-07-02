@@ -156,6 +156,23 @@ export async function POST(req: NextRequest) {
   const safePipelineId = typeof pipelineId === 'string' && pipelineId.trim().length > 0
     ? pipelineId.trim()
     : null;
+
+  // Validate the client-supplied pipelineId belongs to THIS space before
+  // writing it onto the new stage — the FK alone only checks existence, so
+  // without this a caller could attach their stage to another space's pipeline
+  // id (corrupting grouping / surfacing a foreign id). Mirrors the deals POST
+  // ownership checks.
+  if (safePipelineId) {
+    const { data: ownPipeline } = await supabase
+      .from('Pipeline')
+      .select('id')
+      .eq('id', safePipelineId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (!ownPipeline) {
+      return NextResponse.json({ error: 'Pipeline not found' }, { status: 400 });
+    }
+  }
   const VALID_PIPELINE_TYPES = ['rental', 'buyer', 'seller'] as const;
   const safePipelineType = safePipelineId
     ? (pipelineType ?? null)

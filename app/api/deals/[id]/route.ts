@@ -470,6 +470,11 @@ export async function PATCH(
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
+      // CAS on space ownership — TOCTOU-safe, matching the Contact PATCH route.
+      // The existence check above confirmed the deal is in-space; scoping the
+      // write too means it lands atomically on the caller's own row even if the
+      // row were reassigned between the check and the write.
+      .eq('spaceId', space.id)
       .select()
       .single();
     if (updateError) {
