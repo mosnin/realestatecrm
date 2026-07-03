@@ -95,7 +95,7 @@ export function formatRelative(iso: string): string {
 const statusBadgeClass = (status: ReviewStatus): string => {
   switch (status) {
     case 'open':
-      return 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15';
+      return 'text-foreground bg-muted';
     case 'approved':
       return 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15';
     case 'closed':

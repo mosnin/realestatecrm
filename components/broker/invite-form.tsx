@@ -170,7 +170,7 @@ export function InviteForm({ isOwner = true, seatUsage }: InviteFormProps) {
       {message && (
         <div
           className={`text-xs ${
-            message.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'
+            message.type === 'success' ? 'text-foreground' : 'text-destructive'
           }`}
         >
           <p>{message.text}</p>

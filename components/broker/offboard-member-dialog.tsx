@@ -329,7 +329,7 @@ export function OffboardMemberDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 size={18} className="text-muted-foreground" />
                 Offboarded {leavingName}
               </DialogTitle>
               <DialogDescription>
