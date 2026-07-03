@@ -86,10 +86,10 @@ export function ChippiAssessmentCard({ entityType, entityId, entityName, slug }:
 
   if (!data.isLoaded) {
     return (
-      <div className="rounded-2xl border border-orange-200/60 dark:border-orange-900/30 p-4 animate-pulse">
+      <div className="rounded-2xl border border-border/60 p-4 animate-pulse">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-lg bg-orange-200/60 dark:bg-orange-900/40" />
-          <div className="h-4 w-32 bg-orange-100 dark:bg-orange-900/30 rounded" />
+          <div className="w-6 h-6 rounded-lg bg-muted" />
+          <div className="h-4 w-32 bg-muted rounded" />
         </div>
         <div className="space-y-2">
           <div className="h-3 bg-muted rounded w-full" />
@@ -101,8 +101,8 @@ export function ChippiAssessmentCard({ entityType, entityId, entityName, slug }:
 
   if (!hasContent) {
     return (
-      <div className="rounded-2xl border border-dashed border-orange-200 dark:border-orange-900/30 p-4 flex items-center gap-3">
-        <Bot size={14} className="text-orange-400 flex-shrink-0" />
+      <div className="rounded-2xl border border-dashed border-border/60 p-4 flex items-center gap-3">
+        <Bot size={14} className="text-muted-foreground flex-shrink-0" />
         <p className="text-xs text-muted-foreground">
           Chippi hasn't assessed {entityName} yet. Run the agent to generate insights.
         </p>
@@ -111,26 +111,25 @@ export function ChippiAssessmentCard({ entityType, entityId, entityName, slug }:
   }
 
   const scoreColor = data.explainedScore !== null
-    ? data.explainedScore >= 70 ? 'text-orange-600 dark:text-orange-400'
-    : data.explainedScore >= 40 ? 'text-amber-600 dark:text-amber-400'
+    ? data.explainedScore >= 40 ? 'text-foreground'
     : 'text-muted-foreground'
     : '';
 
   return (
-    <div className="rounded-2xl border border-orange-200 dark:border-orange-900/40 bg-gradient-to-br from-orange-50/80 to-white dark:from-orange-950/15 dark:to-transparent overflow-hidden">
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-            <Bot size={12} className="text-white" />
+          <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+            <Bot size={12} className="text-muted-foreground" />
           </div>
           <div className="text-left">
-            <p className="text-xs font-semibold text-orange-700 dark:text-orange-300">Chippi's Assessment</p>
+            <p className="text-xs font-semibold text-foreground">Chippi's Assessment</p>
             {data.briefUpdatedAt && (
-              <p className="text-[10px] text-orange-400/70">Updated {timeAgo(data.briefUpdatedAt)}</p>
+              <p className="text-[10px] text-muted-foreground">Updated {timeAgo(data.briefUpdatedAt)}</p>
             )}
           </div>
         </div>
@@ -153,11 +152,11 @@ export function ChippiAssessmentCard({ entityType, entityId, entityName, slug }:
 
       {/* Expanded content */}
       {expanded && (
-        <div className="border-t border-orange-100 dark:border-orange-900/30 px-4 py-3 space-y-3">
+        <div className="border-t border-border/60 px-4 py-3 space-y-3">
           {/* Score explanation */}
           {data.scoreExplanation && (
             <div className="space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-500">Score reasoning</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Score reasoning</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{data.scoreExplanation}</p>
             </div>
           )}
@@ -165,12 +164,12 @@ export function ChippiAssessmentCard({ entityType, entityId, entityName, slug }:
           {/* Active goals */}
           {data.goals.length > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-500">Active goals</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Active goals</p>
               {data.goals.map(g => (
                 <div key={g.id} className="flex items-start gap-2">
-                  <Target size={11} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                  <Target size={11} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-orange-700 dark:text-orange-300">
+                    <p className="text-[11px] font-medium text-foreground">
                       {GOAL_LABELS[g.goalType] ?? g.goalType}
                     </p>
                     <p className="text-[11px] text-muted-foreground truncate">{g.description}</p>

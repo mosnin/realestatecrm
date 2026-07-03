@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pause, Play, X, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,10 +56,7 @@ export function TaskControls({
           <Button
             variant="outline"
             size="sm"
-            className={cn(
-              'gap-1.5 border-yellow-300 text-yellow-700 hover:bg-yellow-50 hover:text-yellow-800',
-              'dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950/40 dark:hover:text-yellow-300',
-            )}
+            className="gap-1.5"
             disabled={loading !== null}
             onClick={() => void handleAction('paused')}
           >
@@ -78,10 +74,7 @@ export function TaskControls({
           <Button
             variant="outline"
             size="sm"
-            className={cn(
-              'gap-1.5 border-green-300 text-green-700 hover:bg-green-50 hover:text-green-800',
-              'dark:border-green-700 dark:text-green-400 dark:hover:bg-green-950/40 dark:hover:text-green-300',
-            )}
+            className="gap-1.5"
             disabled={loading !== null}
             onClick={() => void handleAction('running')}
           >
@@ -117,10 +110,7 @@ export function TaskControls({
           <Button
             variant="outline"
             size="sm"
-            className={cn(
-              'gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800',
-              'dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300',
-            )}
+            className="gap-1.5"
             disabled={loading !== null}
             onClick={() => void handleAction('queued')}
           >

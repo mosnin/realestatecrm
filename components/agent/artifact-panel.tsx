@@ -26,20 +26,17 @@ function getTypeBadge(type: string): { label: string; className: string } {
     case 'email':
       return {
         label: 'Email',
-        className:
-          'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60',
+        className: 'bg-muted text-muted-foreground border-border',
       };
     case 'draft':
       return {
         label: 'Draft',
-        className:
-          'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/60',
+        className: 'bg-muted text-muted-foreground border-border',
       };
     case 'report':
       return {
         label: 'Report',
-        className:
-          'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800/60',
+        className: 'bg-muted text-muted-foreground border-border',
       };
     default:
       return {

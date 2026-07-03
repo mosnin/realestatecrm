@@ -56,9 +56,9 @@ interface AgentContactData {
 }
 
 const CHANNEL_PILL: Record<string, string> = {
-  sms: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
-  email: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-  note: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+  sms: 'bg-muted text-muted-foreground',
+  email: 'bg-muted text-muted-foreground',
+  note: 'bg-muted text-muted-foreground',
 };
 
 const AGENT_LABELS: Record<string, string> = {

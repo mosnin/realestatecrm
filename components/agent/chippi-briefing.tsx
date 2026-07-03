@@ -76,10 +76,10 @@ export function ChippiBriefing({ slug }: { slug: string }) {
 
   if (!data.isLoaded) {
     return (
-      <div className="rounded-2xl border border-orange-200 dark:border-orange-900/40 bg-orange-50 dark:bg-orange-950/20 p-4 sm:p-5 animate-pulse">
-        <div className="h-5 bg-orange-200/60 dark:bg-orange-900/40 rounded w-40 mb-3" />
+      <div className="rounded-2xl border border-border/60 bg-muted/40 p-4 sm:p-5 animate-pulse">
+        <div className="h-5 bg-muted rounded w-40 mb-3" />
         <div className="space-y-2">
-          {[1,2,3].map(i => <div key={i} className="h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl" />)}
+          {[1,2,3].map(i => <div key={i} className="h-10 bg-muted rounded-xl" />)}
         </div>
       </div>
     );
@@ -88,8 +88,8 @@ export function ChippiBriefing({ slug }: { slug: string }) {
   if (!hasAnything && data.isLoaded) {
     return (
       <div className="rounded-2xl border border-border bg-muted/20 p-4 sm:p-5 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-950/40 flex items-center justify-center flex-shrink-0">
-          <Bot size={15} className="text-orange-500" />
+        <div className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+          <Bot size={15} className="text-muted-foreground" />
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium">You&apos;re ahead of it</p>
@@ -100,17 +100,17 @@ export function ChippiBriefing({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-orange-200 dark:border-orange-900/40 bg-gradient-to-br from-orange-50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 overflow-hidden">
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-orange-100 dark:border-orange-900/30">
+      <div className="flex items-center justify-between px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/60">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center flex-shrink-0">
-            <Bot size={14} className="text-white" />
+          <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+            <Bot size={14} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">From Chippi&apos;s desk</p>
+            <p className="text-sm font-semibold text-foreground">From Chippi&apos;s desk</p>
             {data.generatedAt && (
-              <p className="text-[10px] text-orange-500/70 dark:text-orange-400/60">
+              <p className="text-[10px] text-muted-foreground">
                 Updated {timeAgo(data.generatedAt)}
               </p>
             )}
@@ -118,7 +118,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
         </div>
         <Link
           href={agentHref}
-          className="text-[11px] font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 flex items-center gap-0.5 flex-shrink-0"
+          className="text-[11px] font-medium text-muted-foreground hover:text-foreground flex items-center gap-0.5 flex-shrink-0"
         >
           View all <ChevronRight size={11} />
         </Link>
@@ -131,7 +131,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
             {data.pendingDrafts > 0 && (
               <Link
                 href={agentHref}
-                className="inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                className="inline-flex items-center gap-1.5 bg-foreground hover:bg-foreground/90 text-background text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
               >
                 <Inbox size={11} />
                 {data.pendingDrafts} draft{data.pendingDrafts !== 1 ? 's' : ''} to review
@@ -140,14 +140,14 @@ export function ChippiBriefing({ slug }: { slug: string }) {
             {data.pendingQuestions > 0 && (
               <Link
                 href={agentHref}
-                className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                className="inline-flex items-center gap-1.5 border border-border text-foreground hover:bg-muted/40 text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
               >
                 <HelpCircle size={11} />
                 {data.pendingQuestions} question{data.pendingQuestions !== 1 ? 's' : ''}
               </Link>
             )}
             {data.activeGoals > 0 && (
-              <span className="inline-flex items-center gap-1.5 bg-white dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/40 text-orange-700 dark:text-orange-300 text-xs font-medium px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1.5 bg-card border border-border text-foreground text-xs font-medium px-2.5 py-1 rounded-full">
                 <Target size={11} />
                 {data.activeGoals} active goal{data.activeGoals !== 1 ? 's' : ''}
               </span>
@@ -158,7 +158,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
         {/* Priority contacts */}
         {data.priorityItems.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
               Today's focus
             </p>
             <div className="space-y-1">
@@ -166,10 +166,10 @@ export function ChippiBriefing({ slug }: { slug: string }) {
                 <Link
                   key={item.contactId}
                   href={`/s/${slug}/contacts/${item.contactId}`}
-                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white/60 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 border border-orange-100/80 dark:border-orange-900/30 transition-colors group"
+                  className="flex items-center gap-3 p-2.5 rounded-xl bg-card hover:bg-muted/40 border border-border/60 transition-colors group"
                 >
                   {/* Avatar */}
-                  <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-muted-foreground">
                     {item.name.charAt(0).toUpperCase()}
                   </div>
 
@@ -181,7 +181,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
                         <span className={cn(
                           'text-[10px] font-semibold px-1 py-0.5 rounded flex-shrink-0',
                           item.leadScore >= HOT_LEAD_THRESHOLD
-                            ? 'text-orange-600 dark:text-orange-400'
+                            ? 'text-foreground'
                             : 'text-muted-foreground',
                         )}>
                           {item.leadScore}

@@ -422,7 +422,7 @@ function DraftRow({
           <span
             className={cn(
               'text-[11px] tabular-nums',
-              overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
+              overLimit ? 'text-destructive font-medium' : nearLimit ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
             {editedContent.length}{meta.charLimit ? ` / ${meta.charLimit}` : ''} chars
@@ -663,7 +663,7 @@ function DeliveryBanner({ feedback, onClose }: { feedback: DeliveryFeedback; onC
   }
 
   return (
-    <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 py-2">
+    <div className="flex items-start gap-2 text-xs text-destructive py-2">
       <TriangleAlert size={12} className="flex-shrink-0 mt-0.5" />
       <span>
         <span className="font-medium">Delivery failed</span> — draft approved but {methodLabel} not sent.

@@ -56,9 +56,9 @@ function StatusDot({ status }: { status: string }) {
     <span
       className={cn(
         'flex-shrink-0 w-2 h-2 rounded-full',
-        status === 'running' && 'bg-blue-500 animate-pulse',
-        status === 'completed' && 'bg-green-500',
-        status === 'failed' && 'bg-red-500',
+        status === 'running' && 'bg-amber-500 animate-pulse',
+        status === 'completed' && 'bg-emerald-500',
+        status === 'failed' && 'bg-rose-500',
         status === 'queued' && 'bg-muted-foreground/40',
         !['running', 'completed', 'failed', 'queued'].includes(status) &&
           'bg-muted-foreground/40',
@@ -106,7 +106,7 @@ function StepRow({ step }: { step: Step }) {
             </span>
           )}
           {step.costUsd != null && step.costUsd > 0 && (
-            <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded">
+            <span className="text-[11px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
               ${step.costUsd.toFixed(4)}
             </span>
           )}

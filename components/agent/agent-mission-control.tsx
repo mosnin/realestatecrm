@@ -200,10 +200,10 @@ export function AgentMissionControl({ slug }: { slug: string }) {
           <span className={cn(
             'inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full flex-shrink-0',
             enabled
-              ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-400'
+              ? 'bg-foreground/[0.06] text-foreground'
               : 'bg-muted text-muted-foreground',
           )}>
-            <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', enabled ? 'bg-orange-500' : 'bg-muted-foreground/40')} />
+            <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', enabled ? 'bg-foreground' : 'bg-muted-foreground/40')} />
             {enabled ? 'Active' : 'Off'}
           </span>
           {lastRanAt && (
@@ -245,10 +245,10 @@ export function AgentMissionControl({ slug }: { slug: string }) {
       {pendingDrafts > 0 && (
         <Link
           href={`/s/${slug}/chippi`}
-          className="flex items-center justify-between gap-3 px-5 py-3 bg-orange-500/5 border-b border-border hover:bg-orange-500/10 transition-colors"
+          className="flex items-center justify-between gap-3 px-5 py-3 bg-muted/30 border-b border-border hover:bg-muted/50 transition-colors"
         >
           <div className="flex items-center gap-2.5">
-            <span className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <span className="w-6 h-6 rounded-full bg-foreground flex items-center justify-center text-background text-xs font-bold shrink-0">
               {pendingDrafts > 9 ? '9+' : pendingDrafts}
             </span>
             <div>
@@ -304,7 +304,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                   {entry.Contact && (
                     <Link
                       href={`/s/${slug}/contacts/${entry.Contact.id}`}
-                      className="inline-flex items-center gap-0.5 text-xs text-orange-500 dark:text-orange-400 hover:underline underline-offset-2 flex-shrink-0"
+                      className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex-shrink-0"
                     >
                       <User size={10} />
                       <span className="max-w-[120px] truncate">{entry.Contact.name}</span>
@@ -313,7 +313,7 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                   {!entry.Contact && entry.Deal && (
                     <Link
                       href={`/s/${slug}/deals`}
-                      className="inline-flex items-center gap-0.5 text-xs text-orange-500 dark:text-orange-400 hover:underline underline-offset-2 flex-shrink-0"
+                      className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2 flex-shrink-0"
                     >
                       <Briefcase size={10} />
                       <span className="max-w-[120px] truncate">{entry.Deal.title}</span>
@@ -340,8 +340,8 @@ export function AgentMissionControl({ slug }: { slug: string }) {
       {/* Agent is on but nothing happened yet */}
       {enabled && !hasActivity && !hasInsights && pendingDrafts === 0 && (
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-          <div className="w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-            <Bot size={14} className="text-orange-500" />
+          <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+            <Bot size={14} className="text-muted-foreground" />
           </div>
           <div>
             <p className="text-sm font-medium">Chippi is settling in</p>
@@ -372,8 +372,8 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                 >
                   <span className={cn(
                     'w-1.5 h-1.5 rounded-full mt-[5px] flex-shrink-0',
-                    insight.importance >= 0.7 ? 'bg-red-500' :
-                    insight.importance >= 0.4 ? 'bg-amber-400' :
+                    insight.importance >= 0.7 ? 'bg-foreground' :
+                    insight.importance >= 0.4 ? 'bg-muted-foreground/60' :
                     'bg-muted-foreground/30',
                   )} />
                   <div className="flex-1 min-w-0">
@@ -382,9 +382,9 @@ export function AgentMissionControl({ slug }: { slug: string }) {
                       <span className={cn(
                         'mt-1 inline-flex text-[11px] font-medium rounded px-1.5 py-0.5',
                         insight.entityType === 'contact'
-                          ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400'
+                          ? 'bg-muted text-muted-foreground'
                           : insight.entityType === 'deal'
-                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400'
+                            ? 'bg-muted text-muted-foreground'
                             : 'bg-muted text-muted-foreground',
                       )}>
                         {insight.entityName}
