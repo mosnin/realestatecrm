@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, MessageSquare, Mail, FileText, Loader2, Check, Pencil } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
 import {
@@ -11,10 +11,10 @@ import {
   type MessageTemplate,
 } from '@/lib/message-templates';
 
-const CHANNEL_META: Record<MessageChannel, { label: string; icon: typeof MessageSquare }> = {
-  sms: { label: 'SMS', icon: MessageSquare },
-  email: { label: 'Email', icon: Mail },
-  note: { label: 'Note', icon: FileText },
+const CHANNEL_META: Record<MessageChannel, { label: string }> = {
+  sms: { label: 'SMS' },
+  email: { label: 'Email' },
+  note: { label: 'Note' },
 };
 
 interface Props {
@@ -129,7 +129,6 @@ export function TemplatesEditor({ initial }: Props) {
         ) : (
           <ul className="divide-y divide-border max-h-[60vh] overflow-y-auto">
             {items.map((t) => {
-              const Icon = CHANNEL_META[t.channel].icon;
               const active = !creating && selectedId === t.id;
               return (
                 <li key={t.id}>
@@ -141,14 +140,12 @@ export function TemplatesEditor({ initial }: Props) {
                       active ? 'bg-muted' : 'hover:bg-muted/40',
                     )}
                   >
-                    <Icon size={13} className="text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{t.name}</p>
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                         {CHANNEL_META[t.channel].label}
                       </p>
                     </div>
-                    {active && <Check size={12} className="text-foreground flex-shrink-0" />}
                   </button>
                 </li>
               );
@@ -161,7 +158,6 @@ export function TemplatesEditor({ initial }: Props) {
       <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         {!creating && !selected ? (
           <div className="text-center py-10">
-            <Pencil size={22} className="mx-auto text-muted-foreground mb-3" />
             <p className="text-sm font-semibold">Pick a template or create a new one</p>
             <p className="text-xs text-muted-foreground mt-1">They show up wherever you compose a message.</p>
           </div>

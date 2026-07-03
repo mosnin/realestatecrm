@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import {
   CreditCard,
-  Check,
   Zap,
   Shield,
   Bot,
@@ -27,12 +26,7 @@ import {
   Download,
   DownloadCloud,
   RefreshCw,
-  Clock,
-  HelpCircle,
-  FileText,
   RotateCcw,
-  Handshake,
-  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
@@ -136,8 +130,8 @@ function SectionBlock({
 
 function StatusBadge({ status }: { status: BillingPageProps['subscriptionStatus'] }) {
   const map = {
-    active:   { label: 'Active',   className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    trialing: { label: 'Trial',    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+    active:   { label: 'Active',   className: 'bg-foreground/[0.06] text-foreground' },
+    trialing: { label: 'Trial',    className: 'bg-muted text-muted-foreground' },
     past_due: { label: 'Past due', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
     canceled: { label: 'Canceled', className: 'bg-muted text-muted-foreground' },
     inactive: { label: 'Inactive', className: 'bg-muted text-muted-foreground' },
@@ -151,7 +145,7 @@ function StatusBadge({ status }: { status: BillingPageProps['subscriptionStatus'
       )}
     >
       {status === 'active' && (
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
       )}
       {label}
     </span>
@@ -159,7 +153,7 @@ function StatusBadge({ status }: { status: BillingPageProps['subscriptionStatus'
 }
 
 function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
-  if (status === 'paid') return <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-900/30 dark:text-emerald-400">Paid</Badge>;
+  if (status === 'paid') return <Badge className="bg-foreground/[0.06] text-foreground border-0">Paid</Badge>;
   if (status === 'open') return <Badge variant="outline">Open</Badge>;
   return <Badge variant="outline" className="text-muted-foreground">Void</Badge>;
 }
@@ -333,15 +327,14 @@ export function BillingPage({
 
       {/* ── Trial countdown banner ── */}
       {subscriptionStatus === 'trialing' && trialInfo && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-5 py-4">
+        <div className="rounded-lg border border-border/60 bg-muted/40 px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <Clock size={16} className="text-blue-600 dark:text-blue-400" />
-              <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+              <p className="text-sm font-semibold text-foreground">
                 {countLabel(trialInfo.daysLeft, 'day')} left in your trial
               </p>
             </div>
-            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 flex-shrink-0">
+            <p className="text-xs text-muted-foreground flex-shrink-0">
               Ends{' '}
               {trialInfo.endDate.toLocaleDateString('en-US', {
                 month: 'short',
@@ -353,13 +346,13 @@ export function BillingPage({
           {/* Progress bar */}
           <div className="mt-3">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] text-blue-600/60 dark:text-blue-400/60">
+              <span className="text-[11px] text-muted-foreground">
                 Day {trialInfo.daysPassed} of {trialInfo.totalDays}
               </span>
             </div>
-            <div className="h-2 rounded-full bg-blue-200/60 dark:bg-blue-900/40 overflow-hidden">
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
+                className="h-full rounded-full bg-foreground transition-all duration-500"
                 style={{ width: `${trialInfo.progressPercent}%` }}
               />
             </div>
@@ -400,11 +393,6 @@ export function BillingPage({
               </p>
             )}
           </div>
-
-          {/* Plan icon */}
-          <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Zap size={22} className="text-primary" />
-          </div>
         </div>
 
         {(isActive || !hideSubscribe) && (
@@ -442,29 +430,14 @@ export function BillingPage({
         >
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users size={14} className="text-primary" />
-                </div>
-              </div>
               <p className="text-2xl font-bold tabular-nums">{usageStats.contacts.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-0.5">People</p>
             </div>
             <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Handshake size={14} className="text-primary" />
-                </div>
-              </div>
               <p className="text-2xl font-bold tabular-nums">{usageStats.deals.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Deals</p>
             </div>
             <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
-              <div className="flex items-center justify-center mb-2">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <MapPin size={14} className="text-primary" />
-                </div>
-              </div>
               <p className="text-2xl font-bold tabular-nums">{usageStats.tours.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Tours</p>
             </div>
@@ -478,13 +451,9 @@ export function BillingPage({
         description={`Everything in the ${PLAN_NAME} plan`}
       >
         <ul className="space-y-3">
-          {PLAN_FEATURES.map(({ icon: Icon, label }) => (
+          {PLAN_FEATURES.map(({ label }) => (
             <li key={label} className="flex items-center gap-3 text-sm">
-              <span className="flex-shrink-0 w-6 h-6 rounded-md bg-primary/8 flex items-center justify-center">
-                <Icon size={13} className="text-primary" />
-              </span>
               {label}
-              <Check size={13} className="ml-auto text-emerald-500 flex-shrink-0" />
             </li>
           ))}
         </ul>
@@ -607,9 +576,6 @@ export function BillingPage({
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
-                <FileText size={20} className="text-muted-foreground/40" />
-              </div>
               <p className="text-sm font-medium text-muted-foreground">No invoices yet</p>
               <p className="text-xs text-muted-foreground/60 mt-1 max-w-[220px]">
                 Once you subscribe, your invoices and receipts will appear here for easy download.
@@ -621,16 +587,11 @@ export function BillingPage({
 
       {/* ── Need help? footer ── */}
       <div className="rounded-lg border border-dashed border-border px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-            <HelpCircle size={16} className="text-muted-foreground" />
-          </div>
-          <div>
-            <p className="text-sm font-medium">Need help with billing?</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Our support team is here to help with any questions.
-            </p>
-          </div>
+        <div>
+          <p className="text-sm font-medium">Need help with billing?</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Our support team is here to help with any questions.
+          </p>
         </div>
         <a href={supportUrl} target="_blank" rel="noopener noreferrer">
           <Button variant="outline" size="sm" className="gap-1.5">

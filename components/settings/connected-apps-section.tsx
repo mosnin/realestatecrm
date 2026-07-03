@@ -4,7 +4,7 @@
  * Connected apps panel for /settings.
  *
  * Lists every integration in the catalog with one of three states:
- *   - active   → green dot + "Disconnect" link
+ *   - active   → neutral dot + "Disconnect" link
  *   - expired  → amber dot + "Reconnect" link
  *   - none     → "Connect" pill
  *
@@ -94,9 +94,9 @@ function IntegrationHealthBadge({
 
   const dotClass =
     status === 'healthy'
-      ? 'bg-green-500'
+      ? 'bg-foreground'
       : status === 'expired'
-        ? 'bg-yellow-500'
+        ? 'bg-amber-500'
         : status === 'error'
           ? 'bg-red-500'
           : 'bg-muted-foreground/40'; // disconnected
@@ -112,9 +112,9 @@ function IntegrationHealthBadge({
 
   const textClass =
     status === 'healthy'
-      ? 'text-green-600 dark:text-green-400'
+      ? 'text-muted-foreground'
       : status === 'expired'
-        ? 'text-yellow-600 dark:text-yellow-400'
+        ? 'text-amber-600 dark:text-amber-400'
         : status === 'error'
           ? 'text-red-600 dark:text-red-400'
           : 'text-muted-foreground';
@@ -477,7 +477,7 @@ export function ConnectedAppsSection({
 
   return (
     <div className="space-y-8">
-      {/* OAuth callback banner — green on success, amber on failure. The
+      {/* OAuth callback banner — neutral on success, amber on failure. The
           previous build silently dropped these results so the realtor never
           knew the connection had failed; now the failure reason gets
           translated to a sentence they can act on. */}
@@ -488,7 +488,7 @@ export function ConnectedAppsSection({
           className={cn(
             'rounded-lg border px-4 py-3 flex items-start gap-3',
             callbackResult!.ok
-              ? 'border-green-300/60 bg-green-50 text-green-900 dark:border-green-900/60 dark:bg-green-950/40 dark:text-green-100'
+              ? 'border-border bg-muted/40 text-foreground'
               : 'border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100',
           )}
         >
@@ -496,7 +496,7 @@ export function ConnectedAppsSection({
             aria-hidden
             className={cn(
               'mt-1 w-2 h-2 rounded-full flex-shrink-0',
-              callbackResult!.ok ? 'bg-green-500' : 'bg-amber-500',
+              callbackResult!.ok ? 'bg-foreground' : 'bg-amber-500',
             )}
           />
           <div className="flex-1 min-w-0 text-sm">
@@ -633,7 +633,7 @@ function StatusPill({
   if (comingSoon) return null;
   if (status === 'active')
     return (
-      <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+      <span className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 bg-foreground/[0.06] text-foreground">
         Connected
       </span>
     );
