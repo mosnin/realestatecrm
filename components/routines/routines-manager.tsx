@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Repeat2, Play, Pencil, Trash2, AlertTriangle, Inbox } from 'lucide-react';
+import { Loader2, Plus, Play, Pencil, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -317,9 +317,6 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
   if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
-          <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
-        </div>
         <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
           Couldn&apos;t load your routines.
         </p>
@@ -364,9 +361,6 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
 
       {routines.length === 0 && !composerOpen ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
-            <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
-          </div>
           <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
             Nothing on a schedule yet.
           </p>
@@ -474,14 +468,9 @@ function RoutineRow({
         // Deep-link flash from the activity feed. ring-inset keeps the flash
         // within the row box so the divide-y divider stays aligned.
         highlighted &&
-          'rounded-lg bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
+          'rounded-lg bg-muted/40 ring-2 ring-inset ring-foreground/20',
       )}
     >
-      {/* Cadence-icon circle — mirrors People's avatar / Workflows' trigger-icon slot */}
-      <span className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center flex-shrink-0">
-        <Repeat2 size={14} aria-hidden />
-      </span>
-
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug text-foreground">{routine.instruction}</p>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -492,10 +481,9 @@ function RoutineRow({
           <span
             className={cn(
               'inline-flex items-center gap-1',
-              failed && 'text-amber-600 dark:text-amber-500',
+              failed && 'text-muted-foreground',
             )}
           >
-            {failed && <AlertTriangle size={11} />}
             {runLabel}
             {routine.lastRunAt && (
               <span className="tabular-nums text-muted-foreground/70">
