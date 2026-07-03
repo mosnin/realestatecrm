@@ -44,7 +44,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
   events.push({
     label: 'Booked',
     icon: CalendarDays,
-    color: 'text-blue-500',
+    color: 'text-muted-foreground',
     time: createdAt ? new Date(createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : undefined,
     active: status === 'scheduled',
     completed: status !== 'scheduled',
@@ -55,7 +55,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
     events.push({
       label: 'Confirmed',
       icon: UserCheck,
-      color: 'text-emerald-500',
+      color: 'text-muted-foreground',
       active: status === 'confirmed',
       completed: ['completed', 'no_show'].includes(status),
     });
@@ -66,7 +66,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
     events.push({
       label: 'Completed',
       icon: CheckCircle2,
-      color: 'text-emerald-500',
+      color: 'text-muted-foreground',
       time: new Date(startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' }),
       active: !sourceDealId && feedbackRating == null,
       completed: true,
@@ -75,7 +75,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
       events.push({
         label: `Feedback (${feedbackRating}/5)`,
         icon: Star,
-        color: 'text-amber-500',
+        color: 'text-muted-foreground',
         active: false,
         completed: true,
       });
@@ -84,7 +84,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
       events.push({
         label: 'Deal created',
         icon: Briefcase,
-        color: 'text-primary',
+        color: 'text-muted-foreground',
         active: false,
         completed: true,
       });
@@ -93,7 +93,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
     events.push({
       label: 'Cancelled',
       icon: XCircle,
-      color: 'text-red-500',
+      color: 'text-muted-foreground',
       active: true,
       completed: false,
     });
@@ -101,7 +101,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
     events.push({
       label: 'No show',
       icon: AlertTriangle,
-      color: 'text-amber-500',
+      color: 'text-muted-foreground',
       active: true,
       completed: false,
     });
@@ -142,7 +142,7 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
               }
               className={cn(
                 'w-1.5 h-1.5 rounded-full',
-                e.completed ? 'bg-emerald-500' : e.active ? 'bg-primary' : 'bg-muted-foreground/30'
+                e.completed ? 'bg-foreground' : e.active ? 'bg-foreground/50' : 'bg-muted-foreground/30'
               )}
             />
           ))}
@@ -175,19 +175,19 @@ export function TourTimeline({ status, createdAt, startsAt, googleEventId, sourc
                 <div className="flex flex-col items-center">
                   <div className={cn(
                     'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0',
-                    event.completed ? 'bg-emerald-100 dark:bg-emerald-900/30' :
-                    event.active ? 'bg-primary/10' : 'bg-muted'
+                    event.completed ? 'bg-foreground/10' :
+                    event.active ? 'bg-foreground/[0.06]' : 'bg-muted'
                   )}>
-                    <Icon size={10} className={cn(event.completed ? 'text-emerald-600 dark:text-emerald-400' : event.active ? 'text-primary' : 'text-muted-foreground/50')} />
+                    <Icon size={10} className={cn(event.completed ? 'text-foreground' : event.active ? 'text-foreground' : 'text-muted-foreground/50')} />
                   </div>
                   {!isLast && (
-                    <div className={cn('w-px h-3', event.completed ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-border')} />
+                    <div className={cn('w-px h-3', event.completed ? 'bg-foreground/20' : 'bg-border')} />
                   )}
                 </div>
                 <div className="flex items-center gap-2 -mt-0.5 pb-1">
                   <span className={cn(
                     'text-[11px] font-medium',
-                    event.completed ? 'text-foreground' : event.active ? 'text-primary' : 'text-muted-foreground/50'
+                    event.completed ? 'text-foreground' : event.active ? 'text-foreground' : 'text-muted-foreground/50'
                   )}>
                     {event.label}
                   </span>

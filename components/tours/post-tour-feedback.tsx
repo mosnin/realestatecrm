@@ -74,9 +74,9 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
           initial={reduce ? false : { scale: 0 }}
           animate={{ scale: 1 }}
           transition={reduce ? undefined : { delay: 0.1, type: 'spring', stiffness: 200, damping: 15 }}
-          className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10"
+          className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.06]"
         >
-          <Check size={18} className="text-emerald-600 dark:text-emerald-400" />
+          <Check size={18} className="text-foreground" />
         </motion.div>
         <h3 className="mt-4 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
           Thank you, {guestName.split(' ')[0] || guestName}.
@@ -192,9 +192,9 @@ export function PostTourFeedback({ token, guestName, businessName }: PostTourFee
   );
 }
 
-/** Star glyph — amber when filled (the universal rating signal), a quiet
- *  hairline outline when not. Drawn inline so the fill/stroke transition is
- *  a single element rather than two stacked lucide icons. */
+/** Star glyph — foreground when filled, a quiet hairline outline when not.
+ *  Drawn inline so the fill/stroke transition is a single element rather than
+ *  two stacked lucide icons. */
 function StarGlyph({ filled }: { filled: boolean }) {
   return (
     <svg
@@ -204,7 +204,7 @@ function StarGlyph({ filled }: { filled: boolean }) {
       aria-hidden
       className={cn(
         'transition-colors duration-150',
-        filled ? 'text-amber-400' : 'text-muted-foreground/25',
+        filled ? 'text-foreground' : 'text-muted-foreground/25',
       )}
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"

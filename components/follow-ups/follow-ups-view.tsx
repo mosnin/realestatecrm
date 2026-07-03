@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { H1, TITLE_FONT } from '@/lib/typography';
 import {
-  CheckCircle2, Phone, Mail, Briefcase, Timer,
+  CheckCircle2, Briefcase, Timer,
 } from 'lucide-react';
 
 type ContactFollowUp = {
@@ -55,10 +55,10 @@ export function snoozeDateFromHours(hours: number): string {
 function getScoreBadge(scoreLabel: string | null) {
   if (!scoreLabel) return null;
   const colors: Record<string, string> = {
-    hot: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
-    warm: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
-    cold: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
-    unqualified: 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400',
+    hot: 'bg-muted text-muted-foreground',
+    warm: 'bg-muted text-muted-foreground',
+    cold: 'bg-muted text-muted-foreground',
+    unqualified: 'bg-muted text-muted-foreground',
   };
   return colors[scoreLabel] ?? colors.unqualified;
 }
@@ -268,7 +268,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     'w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0',
                     overdueBool
                       ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                      : 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
                   )}>
                     {contact.name.charAt(0).toUpperCase()}
                   </div>
@@ -278,7 +278,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/s/${slug}/contacts/${contact.id}`}
-                        className="text-sm font-medium hover:text-primary transition-colors truncate"
+                        className="text-sm font-medium hover:text-foreground transition-colors truncate"
                       >
                         {contact.name}
                       </Link>
@@ -294,12 +294,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       {contact.phone && (
                         <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
-                          <Phone size={10} /> {contact.phone}
+                          {contact.phone}
                         </a>
                       )}
                       {contact.email && (
                         <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground truncate max-w-[180px]">
-                          <Mail size={10} /> {contact.email}
+                          {contact.email}
                         </a>
                       )}
                     </div>
@@ -310,7 +310,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     'text-[11px] font-semibold rounded-md px-2 py-0.5 flex-shrink-0 hidden sm:inline',
                     overdueBool
                       ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      : 'bg-muted text-muted-foreground'
                   )}>
                     {formatDate(contact.followUpAt)}
                   </span>
@@ -324,7 +324,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                         title="Snooze"
                         disabled={isBusy}
                         onClick={() => setSnoozeOpen(snoozeOpen === contact.id ? null : contact.id)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/15 transition-colors"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
                         <Timer size={14} />
                       </button>
@@ -348,7 +348,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                       title="Mark done"
                       disabled={isBusy}
                       onClick={() => handleMarkDone(contact.id)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/15 transition-colors"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       <CheckCircle2 size={14} />
                     </button>
@@ -376,12 +376,12 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     'w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0',
                     overdueBool
                       ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                      : 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
                   )}>
                     <Briefcase size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <Link href={`/s/${slug}/deals/${deal.id}`} className="text-sm font-medium hover:text-primary transition-colors truncate block">
+                    <Link href={`/s/${slug}/deals/${deal.id}`} className="text-sm font-medium hover:text-foreground transition-colors truncate block">
                       {deal.title}
                     </Link>
                     {deal.address && <p className="text-[11px] text-muted-foreground truncate">{deal.address}</p>}
@@ -390,7 +390,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                     'text-[11px] font-semibold rounded-md px-2 py-0.5 flex-shrink-0 hidden sm:inline',
                     overdueBool
                       ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      : 'bg-muted text-muted-foreground'
                   )}>
                     {formatDate(deal.followUpAt)}
                   </span>
@@ -401,7 +401,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                         title="Snooze"
                         disabled={isBusy}
                         onClick={() => setSnoozeOpen(snoozeOpen === `deal-${deal.id}` ? null : `deal-${deal.id}`)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/15 transition-colors"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
                         <Timer size={14} />
                       </button>
@@ -424,7 +424,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
                       title="Mark done"
                       disabled={isBusy}
                       onClick={() => handleMarkDealDone(deal.id)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/15 transition-colors"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     >
                       <CheckCircle2 size={14} />
                     </button>

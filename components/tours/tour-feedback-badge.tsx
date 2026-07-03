@@ -45,7 +45,7 @@ export function TourFeedbackBadge({ tourId, slug, status }: TourFeedbackBadgePro
           >
             <Star
               size={10}
-              className={cn(filled ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground/20')}
+              className={cn(filled ? 'text-foreground fill-foreground' : 'text-muted-foreground/20')}
             />
           </motion.span>
         );
