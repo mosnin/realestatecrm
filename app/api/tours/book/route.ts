@@ -236,5 +236,20 @@ export async function POST(req: NextRequest) {
   // Notify the space owner (email + SMS via unified dispatcher)
   try { await notifyNewTour({ spaceId: space.id, tourData: emailData }); } catch (e) { console.error('[tours] owner notification failed:', e); }
 
-  return NextResponse.json(tour, { status: 201 });
+  // Return a DTO, not the raw row. This is an UNAUTHENTICATED public endpoint;
+  // the full Tour row carries internal identifiers (spaceId, contactId,
+  // propertyProfileId, googleEventId, reminder timestamps) a booker never needs.
+  // manageToken IS returned — the guest needs it to self-serve manage the tour.
+  return NextResponse.json(
+    {
+      id: tour.id,
+      guestName: tour.guestName,
+      propertyAddress: tour.propertyAddress,
+      startsAt: tour.startsAt,
+      endsAt: tour.endsAt,
+      status: tour.status,
+      manageToken: tour.manageToken,
+    },
+    { status: 201 },
+  );
 }

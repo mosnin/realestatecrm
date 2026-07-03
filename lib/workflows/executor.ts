@@ -374,6 +374,35 @@ export function selectMatchingWorkflows(
     }
   }
 
+  // deal_stage_changed: if a workflow scopes its trigger to a specific
+  // `toStage`, only run it when the deal actually moved INTO that stage. A
+  // workflow with no toStage (blank) fires on every stage change. Matching is
+  // case-insensitive on the stage name carried in the event.
+  if (input.triggerType === 'deal_stage_changed') {
+    const evStage = (input.context.event as Record<string, unknown> | undefined)?.toStage;
+    const evStageNorm = typeof evStage === 'string' ? evStage.trim().toLowerCase() : '';
+    matching = candidates.filter((w) => {
+      const want = (w.trigger?.config as Record<string, unknown> | undefined)?.toStage;
+      if (typeof want !== 'string' || !want.trim()) return true; // no scope → any stage
+      return want.trim().toLowerCase() === evStageNorm;
+    });
+  }
+
+  // inbound_message: if a workflow scopes its trigger to a channel (sms|email),
+  // only run it when the message arrived on that channel. 'any' (or unset) fires
+  // for every inbound channel. The event carries the channel the message came in
+  // on. An event channel of 'any'/unknown matches only unscoped workflows.
+  if (input.triggerType === 'inbound_message') {
+    const evChannelRaw = (input.context.event as Record<string, unknown> | undefined)?.channel;
+    const evChannel = typeof evChannelRaw === 'string' ? evChannelRaw.toLowerCase() : '';
+    matching = candidates.filter((w) => {
+      const wantRaw = (w.trigger?.config as Record<string, unknown> | undefined)?.channel;
+      const want = typeof wantRaw === 'string' ? wantRaw.toLowerCase() : '';
+      if (!want || want === 'any') return true; // no scope → any channel
+      return want === evChannel;
+    });
+  }
+
   // integration_event: narrow to the workflow keyed to this exact toolkit+event.
   if (input.triggerType === 'integration_event') {
     const ev = input.context.event as Record<string, unknown> | undefined;
@@ -440,6 +469,18 @@ export async function runWorkflowsForEvent(
 ): Promise<RunWorkflowsForEventResult> {
   const workflows = await loadEnabledWorkflows(input.spaceId);
   const { matching, unmatched } = selectMatchingWorkflows(workflows, input);
+
+  // Most callers dispatch this inside a post-response after(), which has a
+  // bounded execution budget on Vercel. A very large fan-out for a single event
+  // could see its LATE runs truncated. We don't cap (that would silently DROP a
+  // configured workflow); instead surface it so a real fan-out problem is
+  // observable rather than a mystery. A durable queue is the structural fix.
+  if (matching.length > 20) {
+    logger.warn(
+      '[workflows.executor] large workflow fan-out for one event; post-response budget may truncate late runs',
+      { spaceId: input.spaceId, triggerType: input.triggerType, matched: matching.length },
+    );
+  }
 
   // A delivery with candidate workflows but no slug match is the classic
   // "my workflow won't fire" — surface it (wrong/typo'd slug, etc.).

@@ -56,8 +56,18 @@ export async function POST(req: NextRequest) {
   }
   if (sigResult === 'unconfigured') {
     // No public key set (e.g. preview without Telnyx). Fall through to the
-    // shared-secret gate so the route still has *a* gate when configured.
-    logger.warn('[telnyx-voice] TELNYX_PUBLIC_KEY unset — skipping signature check');
+    // shared-secret gate so the route still has *a* gate when configured — but
+    // if NO shared secret is set either, the route would be a fully anonymous
+    // endpoint that writes CallLog rows and fetches attacker-supplied recording
+    // URLs. Fail CLOSED in that case, matching the Stripe/Clerk/Composio
+    // webhooks which reject when their secret is missing.
+    if (!process.env.TELNYX_WEBHOOK_SECRET) {
+      logger.error(
+        '[telnyx-voice] rejected — neither TELNYX_PUBLIC_KEY nor TELNYX_WEBHOOK_SECRET is configured; refusing to process an unauthenticated webhook',
+      );
+      return ok();
+    }
+    logger.warn('[telnyx-voice] TELNYX_PUBLIC_KEY unset — relying on shared-secret gate');
   }
 
   // ── Auth: legacy shared-secret gate (second factor when configured) ─────────

@@ -31,6 +31,42 @@ function hotLeadState(): WorkflowFormState {
   return cloneTemplateState(template);
 }
 
+describe('buildDefinition — branch workflow paths survive the round-trip', () => {
+  // Regression for the CRITICAL data-loss bug: recordToFormState dropped
+  // branchPaths, so editing/duplicating a branch workflow re-serialized
+  // paths: [] and then failed parse (paths.min(1)). This locks the contract
+  // that a branch form-state with paths round-trips, and that an empty one is
+  // rejected (proving why the drop was fatal, not silent).
+  function routingState(): WorkflowFormState {
+    const template = WORKFLOW_TEMPLATES.find((t) => t.id === 'score-based-routing');
+    if (!template) throw new Error('score-based-routing template missing');
+    return cloneTemplateState(template);
+  }
+
+  it('preserves every branch path through build → parse', () => {
+    const state = routingState();
+    const branchRow = state.actions.find((a) => a.type === 'branch');
+    expect(branchRow, 'template must contain a branch action').toBeTruthy();
+    const expectedPaths = branchRow!.branchPaths?.length ?? 0;
+    expect(expectedPaths).toBeGreaterThan(0);
+
+    const parsed = parseWorkflowDefinition(buildDefinition(state));
+    const branch = parsed.actions.find((a) => a.type === 'branch');
+    expect(branch).toBeTruthy();
+    if (branch && branch.type === 'branch') {
+      expect(branch.config.paths).toHaveLength(expectedPaths);
+    }
+  });
+
+  it('rejects a branch stripped of its paths (the pre-fix data-loss shape)', () => {
+    const state = routingState();
+    for (const a of state.actions) {
+      if (a.type === 'branch') a.branchPaths = [];
+    }
+    expect(() => parseWorkflowDefinition(buildDefinition(state))).toThrow();
+  });
+});
+
 describe('buildDefinition — hot lead template (filled form)', () => {
   it('produces a definition parseWorkflowDefinition accepts', () => {
     const def = buildDefinition(hotLeadState());

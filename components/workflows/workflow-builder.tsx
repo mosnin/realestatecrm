@@ -628,7 +628,7 @@ function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours
   return { amount: String(m), unit: 'minutes' };
 }
 
-function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
+export function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
   return actions.map((a) => {
     const isDelayUntil = a.type === 'delay' && a.config.delayMode === 'until_weekday';
     const relativeDelayMinutes =

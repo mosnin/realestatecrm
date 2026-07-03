@@ -63,9 +63,15 @@ const brokerTaskBodySchema = z.object({
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel
-// kills the stream mid-turn and the assistant message is lost.
+// kills the stream mid-turn and the assistant message is lost. maxDuration was
+// 300 — below Modal's 600s — so a long turn got cut at 300s (same bug as the
+// realtor /api/ai/task route). Set to outlive Modal; Vercel clamps to the
+// plan's real max, so it's a no-op below that and removes truncation above it.
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+// Outlive Modal's 600s per-turn ceiling (+ buffer) so the proxy never cuts a
+// long turn, and give the disconnect-survival drain room to finish. Vercel
+// clamps to the plan max.
+export const maxDuration = 800;
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -178,10 +184,20 @@ function proxyModalStream({
 }: ProxyModalStreamInput): Response {
   const encoder = new TextEncoder();
   let seq = 0;
+  // See the realtor task route: on client disconnect we keep draining Modal to
+  // completion + persist rather than aborting, so the finished turn is waiting
+  // when the broker returns. clientGone just stops us enqueueing into a torn-
+  // down controller.
+  let clientGone = false;
 
   function push(controller: ReadableStreamDefaultController, event: Record<string, unknown>) {
+    if (clientGone) return;
     const line = `data: ${JSON.stringify({ seq: seq++, ts: new Date().toISOString(), ...event })}\n\n`;
-    controller.enqueue(encoder.encode(line));
+    try {
+      controller.enqueue(encoder.encode(line));
+    } catch {
+      clientGone = true;
+    }
   }
 
   const stream = new ReadableStream({
@@ -316,7 +332,8 @@ function proxyModalStream({
           }
         }
       } catch (err) {
-        if (!abortController.signal.aborted) {
+        // We no longer abort on disconnect, so a thrown read is a real error.
+        if (!clientGone) {
           logger.error('[ai/broker-task] modal stream read error', { brokerageId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
           sentTerminal = true;
@@ -325,21 +342,23 @@ function proxyModalStream({
         // Safety net — ported from the realtor route: a Modal crash / dropped
         // connection / container kill mid-stream previously ended this stream
         // with NO terminal frame, so the broker's EventSource hung open
-        // forever. Persist whatever streamed and guarantee exactly one
-        // terminal frame unless the client itself aborted.
+        // forever. Persist whatever streamed and guarantee exactly one terminal
+        // frame unless the client is gone (then the persist is the point).
         await persistOnce();
-        if (!sentTerminal && !abortController.signal.aborted) {
+        if (!sentTerminal && !clientGone) {
           logger.warn('[ai/broker-task] modal stream ended with no terminal event', {
             brokerageId,
           });
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
         }
-        controller.close();
+        try { controller.close(); } catch { /* already closed by cancel() */ }
         reader.releaseLock();
       }
     },
+    // Client disconnected: keep draining Modal to completion + persist (don't
+    // abort). Bounded by Modal's 600s timeout, SDK maxTurns, and loop-guard.
     cancel() {
-      abortController.abort();
+      clientGone = true;
     },
   });
 

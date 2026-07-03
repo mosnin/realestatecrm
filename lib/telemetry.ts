@@ -39,6 +39,28 @@ export interface EmitArgs {
 }
 
 /**
+ * Cap on the serialized payload we'll persist per telemetry row. The
+ * `agent_tool_called` event snapshots tool arguments, which can carry
+ * arbitrary user text (a pasted email body, a long note) — left unbounded, one
+ * row can balloon to megabytes, bloating the table and slowing the analytics
+ * reads that scan it. When a payload exceeds this, we drop it and store a
+ * marker plus the byte count so the signal (the event fired) survives without
+ * the bulk. 16KB is generous for the structured fields we actually query on.
+ */
+const MAX_PAYLOAD_BYTES = 16 * 1024;
+
+function capPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  try {
+    const serialized = JSON.stringify(payload);
+    if (serialized.length <= MAX_PAYLOAD_BYTES) return payload;
+    return { _truncated: true, _originalBytes: serialized.length };
+  } catch {
+    // Non-serializable payload (cycle, BigInt) — never let it reach the insert.
+    return { _unserializable: true };
+  }
+}
+
+/**
  * Insert one telemetry row. Awaitable so callers can `void emit(...)` to
  * detach explicitly, but callers SHOULD treat it as fire-and-forget — never
  * gate user-visible behavior on the result.
@@ -50,7 +72,7 @@ export async function emit(args: EmitArgs): Promise<void> {
       spaceId: args.spaceId ?? null,
       userId: args.userId ?? null,
       event: args.event,
-      payload: args.payload ?? {},
+      payload: capPayload(args.payload ?? {}),
     });
     if (error) {
       logger.warn('[telemetry] emit failed', { event: args.event }, error);
