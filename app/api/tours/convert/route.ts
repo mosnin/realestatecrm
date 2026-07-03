@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   // Link contact to deal
   if (contactId) {
-    const { error: dcError } = await supabase.from('DealContact').insert({ dealId, contactId });
+    const { error: dcError } = await supabase.from('DealContact').upsert({ dealId, contactId }, { onConflict: 'dealId,contactId', ignoreDuplicates: true });
     if (dcError) console.error('[convert] DealContact link failed:', dcError);
     // Update tour with contact link if it wasn't set
     if (!tour.contactId) {

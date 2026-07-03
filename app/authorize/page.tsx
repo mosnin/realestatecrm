@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
 import { AuthorizeClient } from './authorize-client';
 
 /**
@@ -38,6 +39,22 @@ export default async function AuthorizePage({
         <div className="text-center space-y-3 p-8">
           <h1 className="text-xl font-semibold">Invalid Request</h1>
           <p className="text-sm text-muted-foreground">Missing required OAuth parameters.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Validate redirect_uri against the same allowlist the token route enforces —
+  // BEFORE rendering the consent screen. Without this, both the Deny button
+  // (which navigates the browser to redirect_uri with the state) and a later
+  // Approve (which ships a live auth code) would trust an attacker-supplied
+  // origin. Reject up front so a forged authorize link can't render at all.
+  if (!isAllowedOAuthRedirect(params.redirect_uri)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-3 p-8">
+          <h1 className="text-xl font-semibold">Invalid Request</h1>
+          <p className="text-sm text-muted-foreground">The redirect URL is not permitted.</p>
         </div>
       </div>
     );

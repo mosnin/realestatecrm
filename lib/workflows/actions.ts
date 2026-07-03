@@ -24,6 +24,7 @@ import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions, resolveField } from './conditions';
+import { assertPublicHttpTarget, getSafeDispatcher } from '@/lib/net/ssrf-guard';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
@@ -95,12 +96,28 @@ export interface ExecuteActionOptions {
  * length — defusing prompt injection while leaving clean names untouched.
  */
 function sanitizeRecipientText(name: string): string {
-  return name
+  return sanitizeInterpolatedValue(name).slice(0, 80);
+}
+
+/**
+ * Sanitize a value substituted into a `{{token}}` slot. Like
+ * `sanitizeRecipientText` it strips control chars (so untrusted lead data can't
+ * smuggle a second "instruction" via newlines) and collapses runs of
+ * whitespace — the prompt-injection defense — but it does NOT cap the length.
+ *
+ * The 80-char cap belongs to a recipient *display name* only. Applying it to
+ * every interpolated value silently truncated real data: a lead's notes in a
+ * draft instruction, an auth token in a webhook URL, a formatter/variable value
+ * over 80 chars in a webhook JSON body — all corrupted mid-string. Length is
+ * not a security control (injection strings are short), so the cap is dropped
+ * here and kept only where a short bounded name is genuinely wanted.
+ */
+function sanitizeInterpolatedValue(value: string): string {
+  return value
     // eslint-disable-next-line no-control-regex -- intentionally stripping control chars (incl. newlines)
     .replace(/[\x00-\x1f\x7f]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
 }
 
 /**
@@ -109,8 +126,10 @@ function sanitizeRecipientText(name: string): string {
  * by the builder's TokenPicker. Unknown tokens are left as-is so the LLM
  * sees them (rather than a blank) and can handle them gracefully.
  *
- * All resolved values are sanitized through sanitizeRecipientText to prevent
- * prompt injection via untrusted lead data.
+ * All resolved values are sanitized through sanitizeInterpolatedValue to
+ * prevent prompt injection via untrusted lead data (control chars stripped,
+ * whitespace collapsed) — without truncating, so full-length data (webhook
+ * payloads, formatter/variable values, long notes) survives interpolation.
  */
 function resolveTokens(template: string, context: WorkflowContext): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
@@ -158,7 +177,7 @@ function resolveTokens(template: string, context: WorkflowContext): string {
 
     if (value === undefined || value === null) return _match;
     const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    return sanitizeRecipientText(str);
+    return sanitizeInterpolatedValue(str);
   });
 }
 
@@ -539,10 +558,17 @@ function runFormatter(
     }
     case 'regex_extract': {
       if (!regexPattern) { output = ''; break; }
+      // ReDoS mitigation: the pattern AND the input are both user/tenant
+      // controlled, and JS RegExp has no execution timeout. Catastrophic
+      // backtracking cost scales with input length, so cap the pattern length
+      // and run the match against a bounded slice of the input — this turns any
+      // pathological pattern into a small constant-time worst case instead of a
+      // function-hanging DoS.
+      if (regexPattern.length > 200) { output = ''; break; }
       try {
         const flags = (regexFlags ?? '').replace(/[^gimsuy]/g, '');
         const re = new RegExp(regexPattern, flags);
-        const m = strValue.match(re);
+        const m = strValue.slice(0, 1000).match(re);
         output = m ? (m[1] ?? m[0]) : '';
       } catch { output = ''; }
       break;
@@ -743,37 +769,11 @@ async function runNotifyAgent(
 }
 
 /**
- * SSRF guard — returns true if the hostname appears to be a private/internal
- * address that should never be the target of an outbound webhook. Only applied
- * in the executor; the Zod schema already enforces HTTPS.
- */
-function isPrivateHost(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    const h = hostname.toLowerCase();
-    if (h === 'localhost' || h === '0.0.0.0') return true;
-    // IPv4 private ranges
-    const ipv4 = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-    if (ipv4) {
-      const [, a, b] = ipv4.map(Number);
-      if (a === 10) return true;
-      if (a === 127) return true;
-      if (a === 172 && b >= 16 && b <= 31) return true;
-      if (a === 192 && b === 168) return true;
-      if (a === 169 && b === 254) return true; // link-local (AWS metadata etc.)
-    }
-    // IPv6 loopback / link-local
-    if (h === '::1' || h.startsWith('fe80:') || h.startsWith('[::1]') || h.startsWith('[fe80:')) return true;
-    return false;
-  } catch {
-    return true;
-  }
-}
-
-/**
  * webhook_post — POST JSON to an external HTTPS URL. The body and URL are
- * interpolated ({{token}} replaced). SSRF is guarded by blocking private IPs.
- * Response body is read up to 10 KB and returned in the detail for audit.
+ * interpolated ({{token}} replaced). SSRF is guarded by assertPublicHttpTarget
+ * (normalizes every IP encoding, resolves DNS names, blocks private/loopback/
+ * link-local/ULA/reserved ranges) PLUS redirect: 'manual' so a 3xx can't hop
+ * into an internal host. Response body is read up to 10 KB for audit.
  */
 async function runWebhookPost(
   action: Extract<WorkflowAction, { type: 'webhook_post' }>,
@@ -781,8 +781,9 @@ async function runWebhookPost(
 ): Promise<ActionStepResult> {
   const { url: rawUrl, bodyJson, headersJson } = action.config;
   const url = resolveTokens(rawUrl, context);
-  if (isPrivateHost(url)) {
-    return { status: 'failed', detail: { error: 'Webhook URL targets a private or loopback address.', url } };
+  const targetCheck = await assertPublicHttpTarget(url);
+  if (!targetCheck.ok) {
+    return { status: 'failed', detail: { error: `Webhook target rejected: ${targetCheck.reason}`, url } };
   }
 
   let body: string | undefined;
@@ -812,12 +813,23 @@ async function runWebhookPost(
   const outcome = await withRetry<FetchOutcome>(
     async () => {
       try {
-        const res = await fetch(url, {
+        // `dispatcher` is an undici RequestInit extension not present in
+        // lib.dom's RequestInit — carry it through a widened type.
+        const fetchInit: RequestInit & { dispatcher?: unknown } = {
           method: 'POST',
           headers,
           body: body ?? '{}',
           signal: AbortSignal.timeout(10_000),
-        });
+          // Do NOT follow redirects: assertPublicHttpTarget only vetted the
+          // initial host, so a 3xx into 169.254.169.254 / an internal service
+          // would bypass the SSRF guard. A redirect is surfaced as a non-2xx.
+          redirect: 'manual',
+          // Re-validate the resolved IP at connect time to close the DNS-
+          // rebinding TOCTOU the pre-flight check can't. Strictly additive —
+          // undefined when undici is unavailable, leaving pre-flight in force.
+          dispatcher: getSafeDispatcher(),
+        };
+        const res = await fetch(url, fetchInit);
         const text = await res.text().then((t) => t.slice(0, 10_000));
         return { ok: res.ok, status: res.status, text };
       } catch (err) {

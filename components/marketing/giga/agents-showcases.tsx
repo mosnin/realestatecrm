@@ -109,7 +109,7 @@ const STEPS_INBOX: ShowcaseStep[] = [
   {
     key: 'draft',
     title: 'A reply, in your voice',
-    desc: 'Chippi writes the reply the way you would, ready to go. Nothing sends without your tap, so you approve, edit, or skip.',
+    desc: 'Chippi writes the reply the way you would and sends it the moment the lead lands, logged in plain words.',
     mockup: (
       <Frost title="Draft" badge="In your voice">
         <motion.div
@@ -188,7 +188,7 @@ export function AgentInboxShowcase() {
       product={{
         name: 'Smart Inbox',
         icon: Inbox,
-        desc: 'Chippi reads each inbound, scores it against your live pipeline, and writes the reply in your voice. Nothing sends without your tap.',
+        desc: 'Chippi reads each inbound, scores it against your live pipeline, and sends the reply in your voice.',
         cta: { label: 'See it work', href: '/demo' },
       }}
       topFeatures={TOP_FEATURES_INBOX}

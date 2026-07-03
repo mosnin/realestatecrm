@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, Check, Loader2, Share2, Trash2, RefreshCw, X } from 'lucide-react';
+import { Copy, Check, Loader2, Share2, Trash2, RefreshCw, X, QrCode as QrCodeIcon } from 'lucide-react';
+import { QrCode, QrCodeFrame } from '@/components/sharkui/qr-code';
 import type { PropertyPacket } from '@/lib/types';
 import type { DealDocument } from '@/lib/deals/documents';
 import { documentKindLabel } from '@/lib/deals/documents';
@@ -30,6 +31,9 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Which packet is showing its QR — the open-house move: prop a phone or
+  // tablet by the door and visitors scan straight into the listing packet.
+  const [qrId, setQrId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,7 +216,28 @@ export function PropertyShareDialog({ propertyId, linkedDealIds, origin, onClose
                         {copiedId === p.id ? <Check size={11} /> : <Copy size={11} />}
                         {copiedId === p.id ? 'Copied' : 'Copy'}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setQrId(qrId === p.id ? null : p.id)}
+                        disabled={dead}
+                        aria-expanded={qrId === p.id}
+                        aria-label="Show QR code"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors px-2 py-1 disabled:opacity-50"
+                      >
+                        <QrCodeIcon size={11} />
+                        QR
+                      </button>
                     </div>
+                    {qrId === p.id && !dead && (
+                      <div className="flex flex-col items-center gap-1.5 rounded-lg bg-muted/50 py-3">
+                        <QrCode value={url}>
+                          <QrCodeFrame />
+                        </QrCode>
+                        <p className="text-[10px] text-muted-foreground">
+                          Scan to open the packet — perfect at an open house.
+                        </p>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>
                         {p.viewCount} {pluralize(p.viewCount, 'view')}

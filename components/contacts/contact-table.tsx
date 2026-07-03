@@ -36,6 +36,13 @@ import {
   ChevronRight,
   Users,
 } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from '@/components/sharkui/context-menu';
 import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 import Link from 'next/link';
@@ -355,26 +362,40 @@ export function ContactTable({ slug }: ContactTableProps) {
     fetchContacts();
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     const contact = contacts.find((c) => c.id === id);
-    const confirmed = await confirm({
-      title: 'Delete this client?',
-      description: contact
-        ? `"${contact.name}" will be gone. I can't bring them back.`
-        : "This client will be gone. I can't bring them back.",
-    });
-    if (!confirmed) return;
-    try {
-      const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        toast.success('Contact deleted.');
-      } else {
-        toast.error("Couldn't delete that contact. Try again.");
+    // Gmail-style undo: remove from the list immediately, but defer the real
+    // DELETE for a grace window so a mis-click is one tap to recover instead of
+    // a permanent, unrecoverable loss. No confirm modal — the Undo IS the
+    // safety net, and it's far less friction. If the window elapses without an
+    // undo, the delete commits; if the tab closes first, nothing is destroyed
+    // (the row simply reappears on reload — we fail toward keeping data).
+    setContacts((prev) => prev.filter((c) => c.id !== id));
+    let undone = false;
+    const commit = setTimeout(async () => {
+      if (undone) return;
+      try {
+        const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          toast.error("Couldn't delete that contact. It's back on your list.");
+          fetchContacts();
+        }
+      } catch {
+        toast.error("Couldn't delete that contact. It's back on your list.");
+        fetchContacts();
       }
-    } catch {
-      toast.error("Couldn't delete that contact. Try again.");
-    }
-    fetchContacts();
+    }, 5000);
+    toast(`${contact?.name ?? 'Contact'} deleted.`, {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          undone = true;
+          clearTimeout(commit);
+          fetchContacts(); // row still exists in the DB — re-sync to restore it
+        },
+      },
+    });
   }
 
   function toggleSelect(id: string) {
@@ -470,14 +491,23 @@ export function ContactTable({ slug }: ContactTableProps) {
       return;
     }
     const successes = result.applied;
-    const failures = result.results.length - successes;
+    const failedIds = result.results.filter((r) => !r.ok).map((r) => r.id);
+    const failures = failedIds.length;
     const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
     if (successes > 0) {
       toast.success(`Moved ${successes} to ${stageLabel}.`, {
         action: { label: 'Undo', onClick: () => undoBulkStageChange(prevTypes) },
       });
     }
-    if (failures > 0) toast.error(`${failures} got stuck. Try those again.`);
+    // Keep ONLY the failed rows selected so retrying is one tap on the same
+    // action — instead of the realtor hunting for which ones got stuck. A clean
+    // full success clears the selection.
+    if (failures > 0) {
+      toast.error(`${failures} got stuck — still selected. Try again.`);
+      setSelectedIds(new Set(failedIds));
+    } else {
+      setSelectedIds(new Set());
+    }
   }
 
   async function undoBulkStageChange(prevTypes: Map<string, Client['type']>) {
@@ -490,7 +520,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       byStage.set(type, arr);
     }
     try {
-      await Promise.allSettled(
+      const settled = await Promise.allSettled(
         [...byStage.entries()].map(([type, ids]) =>
           fetch('/api/contacts/bulk', {
             method: 'POST',
@@ -499,7 +529,18 @@ export function ContactTable({ slug }: ContactTableProps) {
           }),
         ),
       );
-      toast.success('Moved back.');
+      // Promise.allSettled never rejects, so we must inspect each result AND
+      // each response's ok status — otherwise a fully-failed undo still shows
+      // "Moved back." Report the true outcome instead of an optimistic lie.
+      const allOk = settled.every((r) => r.status === 'fulfilled' && r.value.ok);
+      const anyOk = settled.some((r) => r.status === 'fulfilled' && r.value.ok);
+      if (allOk) {
+        toast.success('Moved back.');
+      } else if (anyOk) {
+        toast.error('Only some moved back. Check the list and retry the rest.');
+      } else {
+        toast.error("Couldn't undo. Try moving them manually.");
+      }
     } catch {
       toast.error("Couldn't undo. Try moving them manually.");
     } finally {
@@ -1658,9 +1699,52 @@ function ContactRow({
           {body}
         </button>
       ) : (
-        <Link href={`/s/${slug}/contacts/${contact.id}`} className={rowClassName}>
-          {body}
-        </Link>
+        /* Right-click gets the power-user menu: everything you'd do to a
+           person without leaving the list. Left-click still navigates. */
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <Link
+              href={`/s/${slug}/contacts/${contact.id}`}
+              className={cn(rowClassName, 'cursor-pointer')}
+            >
+              {body}
+            </Link>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="min-w-48">
+            <ContextMenuItem value="open" asChild>
+              <Link href={`/s/${slug}/contacts/${contact.id}`}>
+                <ChevronRight /> Open
+              </Link>
+            </ContextMenuItem>
+            <ContextMenuItem value="log" asChild>
+              <Link href={`/s/${slug}/chippi/log?personId=${contact.id}`}>
+                <Mic /> Log a note
+              </Link>
+            </ContextMenuItem>
+            {(contact.phone || contact.email) && <ContextMenuSeparator />}
+            {contact.phone && (
+              <ContextMenuItem value="call" asChild>
+                <a href={`tel:${contact.phone}`}>
+                  <Phone /> Call {contact.phone}
+                </a>
+              </ContextMenuItem>
+            )}
+            {contact.email && (
+              <ContextMenuItem value="email" asChild>
+                <a href={`mailto:${contact.email}`}>
+                  <Mail /> Email
+                </a>
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem value="edit" onClick={onEdit}>
+              <Pencil /> Edit
+            </ContextMenuItem>
+            <ContextMenuItem value="delete" variant="destructive" onClick={onDelete}>
+              <Trash2 /> Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       )}
     </motion.li>
   );

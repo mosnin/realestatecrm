@@ -4,6 +4,7 @@ import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ContactTable } from '@/components/contacts/contact-table';
 import { PerformanceStrip } from '@/components/contacts/performance-strip';
+import { ContactsQuickCapture } from '@/components/experience/contacts-quick-capture';
 import type { DealMetricRow, StageMetricRow } from '@/lib/deal-metrics';
 
 /**
@@ -72,6 +73,8 @@ export default async function ContactsPage({
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <PerformanceStrip deals={deals} stages={stages} />
       <ContactTable slug={slug} />
+      {/* Floating quick-capture dock — jot a thought without leaving the list. */}
+      <ContactsQuickCapture slug={slug} />
     </div>
   );
 }

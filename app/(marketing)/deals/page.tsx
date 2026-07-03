@@ -127,7 +127,7 @@ const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
 /* Honest facts, no invented conversion metrics. */
 const FACTS: { value: string; label: string }[] = [
   { value: '24/7', label: 'The board stays current around the clock' },
-  { value: '100%', label: 'Approval-first, outreach never sends without you' },
+  { value: '100%', label: 'Every send in your voice, on the record' },
   { value: '50+', label: 'Integrations across email, calendar, and CRMs' },
 ];
 
@@ -377,7 +377,7 @@ export default function DealsPage() {
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                   <p className="mt-1 text-xs text-neutral-600">
-                    Approval-first, outreach never sends without you
+                    Every send in your voice, on the record
                   </p>
                 </div>
               </div>

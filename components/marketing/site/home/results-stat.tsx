@@ -103,7 +103,7 @@ export function ResultsStat() {
             <div className="mt-10">
               <p className="text-6xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-7xl">24/7</p>
               <p className="mt-2 max-w-xs text-base leading-snug text-neutral-600 dark:text-white/60">
-                Chippi works your book around the clock, approval-first, always.
+                Chippi works your book around the clock, in your voice, always.
               </p>
             </div>
           </div>
@@ -115,8 +115,8 @@ export function ResultsStat() {
             </div>
             <EventCard
               icon={<PenLine className="h-4 w-4" />}
-              title="Reply drafted, Maya"
-              meta="in your voice · awaiting approval"
+              title="Reply sent, Maya"
+              meta="in your voice · seconds after the lead"
               className="absolute -top-2 right-0 w-60 max-w-[80%]"
             />
             <EventCard

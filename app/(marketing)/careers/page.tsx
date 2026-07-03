@@ -42,7 +42,7 @@ const PRINCIPLES = [
     body: 'We sit with agents and brokers, watch the real day, and turn what we hear into product the same week. Short loops, real feedback, no theater.',
   },
   {
-    title: 'Approval-first, by design.',
+    title: 'Accountable, by design.',
     body: 'We are building an agent people trust with their book. That trust is a feature: nothing leaves without a name on it, and we hold that line in the code.',
   },
   {

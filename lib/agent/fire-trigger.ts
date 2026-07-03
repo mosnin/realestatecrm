@@ -28,6 +28,11 @@ import {
 const RATE_LIMIT = 20;
 const RATE_WINDOW_S = 60;
 const DEDUPE_WINDOW_S = Number(process.env.AGENT_TRIGGER_DEDUPE_WINDOW_S ?? '120');
+// Inbound messages come in bursts during a live conversation; the default 120s
+// window would collapse a genuine back-to-back follow-up into the first event
+// and the agent would never see it. Give inbound_message a much shorter window
+// so real follow-ups get through while still absorbing true duplicates.
+const INBOUND_DEDUPE_WINDOW_S = Number(process.env.AGENT_INBOUND_DEDUPE_WINDOW_S ?? '20');
 
 export interface FireTriggerInput {
   spaceId: string;
@@ -95,12 +100,14 @@ async function isDuplicate(
   input: FireTriggerInput,
 ): Promise<boolean> {
   const key = `agent:trigger-dedupe:${input.spaceId}:${input.event}:${input.contactId ?? 'none'}:${input.dealId ?? 'none'}`;
-  // SET NX EX in one atomic op. The key lives DEDUPE_WINDOW_S from THIS
-  // event, so it is a true sliding window. The old floor(now/window) bucket
-  // reset at fixed clock boundaries — two identical events that straddled a
-  // boundary both got through — and its INCR+EXPIRE was also non-atomic.
+  // SET NX EX in one atomic op. The key lives `windowS` from THIS event, so it
+  // is a true sliding window. The old floor(now/window) bucket reset at fixed
+  // clock boundaries — two identical events that straddled a boundary both got
+  // through — and its INCR+EXPIRE was also non-atomic. inbound_message uses a
+  // shorter window so live-conversation follow-ups aren't collapsed.
+  const windowS = input.event === 'inbound_message' ? INBOUND_DEDUPE_WINDOW_S : DEDUPE_WINDOW_S;
   const res = await fetch(
-    `${kvUrl}/set/${encodeURIComponent(key)}/1/EX/${Math.max(1, DEDUPE_WINDOW_S)}/NX`,
+    `${kvUrl}/set/${encodeURIComponent(key)}/1/EX/${Math.max(1, windowS)}/NX`,
     { method: 'POST', headers: { Authorization: `Bearer ${kvToken}` } },
   );
   if (!res.ok) return false; // fail open — never drop a real trigger

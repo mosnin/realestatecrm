@@ -24,6 +24,7 @@ import { useParams } from 'next/navigation';
 import { Loader2, Plus, X, Sparkles, PencilLine, BellRing, Zap, Filter, GitBranch, Clock, CheckSquare, Plug, AlertCircle, GripVertical, Webhook, Copy, Check as CheckIcon, Power, ChevronDown, ChevronRight, Wand2, Send, UserCog, UserPlus, Play, History, RotateCcw, ArrowUpDown, Eye, EyeOff, Workflow as WorkflowIcon, Table2, Variable } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { CodeBlock } from '@/components/ui/code-block';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -627,7 +628,7 @@ function minutesToDisplay(m: number): { amount: string; unit: 'minutes' | 'hours
   return { amount: String(m), unit: 'minutes' };
 }
 
-function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
+export function actionsToRows(actions: WorkflowAction[]): ActionRowState[] {
   return actions.map((a) => {
     const isDelayUntil = a.type === 'delay' && a.config.delayMode === 'until_weekday';
     const relativeDelayMinutes =
@@ -2662,7 +2663,7 @@ export function WorkflowBuilder({
             }}
             placeholder="Name your workflow…"
             maxLength={120}
-            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-orange-400 pb-0.5 placeholder:text-muted-foreground/40 caret-orange-500"
+            className="w-full bg-transparent text-xl font-semibold text-foreground outline-none border-b-2 border-foreground/40 pb-0.5 placeholder:text-muted-foreground/40 caret-foreground focus:border-foreground transition-colors"
             aria-label="Workflow name"
           />
         ) : (
@@ -3326,7 +3327,7 @@ export function WorkflowBuilder({
             type="button"
             onClick={submit}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-full h-9 px-5 text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+            className={cn(PRIMARY_PILL, 'disabled:cursor-not-allowed disabled:opacity-60')}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? 'Saving…' : 'Save workflow'}
@@ -3440,6 +3441,30 @@ function WebhookTriggerDisplay({
             </p>
           )}
         </div>
+      )}
+      {/* Ready-to-paste test request. Tabs cover both modes so the person
+          wiring this up (often not the realtor) never has to guess the
+          signature format — it mirrors the exact header the route verifies. */}
+      {url && (
+        <CodeBlock
+          className="text-[11px]"
+          tabs={[
+            {
+              label: 'Test request',
+              language: 'bash',
+              code: `curl -X POST '${url}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"name": "Jordan Lee", "email": "jordan@example.com"}'`,
+            },
+            ...(secretSet
+              ? [
+                  {
+                    label: 'Signed',
+                    language: 'bash',
+                    code: `BODY='{"name": "Jordan Lee", "email": "jordan@example.com"}'\nSIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$YOUR_SECRET" -hex | sed 's/^.* //')\ncurl -X POST '${url}' \\\n  -H 'Content-Type: application/json' \\\n  -H "X-Webhook-Signature: sha256=$SIG" \\\n  -d "$BODY"`,
+                  },
+                ]
+              : []),
+          ]}
+        />
       )}
     </div>
   );

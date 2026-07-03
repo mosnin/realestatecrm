@@ -22,8 +22,11 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
 
   // Try JWT first (OAuth flow)
   if (token.includes('.')) {
-    const secret = process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY;
-    if (!secret) return null; // No secret configured — cannot verify JWTs
+    // Dedicated secret only — never fall back to CLERK_SECRET_KEY. Signing MCP
+    // access tokens (which carry spaceId + grant CRM read) with the Clerk
+    // secret couples two trust domains: a flaw in either implicates both.
+    const secret = process.env.MCP_JWT_SECRET;
+    if (!secret) return null; // No dedicated MCP secret configured — cannot verify JWTs
     const JWT_SECRET = new TextEncoder().encode(secret);
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET);
@@ -106,9 +109,15 @@ function buildServer(spaceId: string): McpServer {
     'Get full details for a specific contact by ID.',
     { id: z.string().describe('Contact ID') },
     async ({ id }) => {
+      // Explicit column list — never `select('*')`. In particular exclude
+      // `applicationData` (full rental-application PII: SSN-adjacent fields,
+      // financials) which an MCP key holder (incl. third-party MCP clients)
+      // has no need for on a generic get_contact.
       const { data, error } = await supabase
         .from('Contact')
-        .select('*')
+        .select(
+          'id, name, email, phone, type, leadType, leadScore, scoreLabel, scoreSummary, budget, tags, sourceLabel, followUpAt, lastContactedAt, createdAt, updatedAt',
+        )
         .eq('id', id)
         .eq('spaceId', spaceId)
         .maybeSingle();

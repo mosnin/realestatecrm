@@ -160,7 +160,7 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
         .map((dealId) => ({ dealId, contactId: args.keepId }));
 
       if (toInsert.length > 0) {
-        const { error: dcInsertErr } = await supabase.from('DealContact').insert(toInsert);
+        const { error: dcInsertErr } = await supabase.from('DealContact').upsert(toInsert, { onConflict: 'dealId,contactId', ignoreDuplicates: true });
         if (dcInsertErr) {
           logger.error('[tools.merge_persons] deal-contact insert failed (PARTIAL MERGE)', { keep: args.keepId }, dcInsertErr);
           return {

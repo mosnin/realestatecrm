@@ -504,7 +504,7 @@ function IntegrationsPanel() {
     { icon: Database, n: 'HubSpot', d: 'contacts + deals, two-way' },
     { icon: FileSignature, n: 'DocuSign', d: 'send for signature' },
     { icon: MessageSquare, n: 'WhatsApp', d: 'send + follow up' },
-    { icon: Phone, n: 'SMS, via Twilio', d: 'send + follow up' },
+    { icon: Phone, n: 'WhatsApp', d: 'send + follow up' },
   ];
   return (
     <>

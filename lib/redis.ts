@@ -13,6 +13,19 @@ function createRedis(): Redis | null {
 }
 
 /**
+ * True when a real Upstash/KV connection is configured. Security-sensitive
+ * callers (rate limiting, idempotency, locks) MUST branch on this rather than
+ * inferring "unconfigured" from a return value: the no-op proxy returns benign
+ * shapes (0 / [] / null) that are indistinguishable from a real empty result,
+ * which previously let the rate limiter fail OPEN (count 0 ≤ max ⇒ always
+ * allowed) whenever env vars were missing. When this is false, fail closed to
+ * the in-memory limiter instead of trusting the proxy's `0`.
+ */
+export function isRedisConfigured(): boolean {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+}
+
+/**
  * Per-method no-op return value, picked so a caller using the result in
  * the natural way doesn't crash when env vars are missing (local dev,
  * preview deploys without Upstash configured).

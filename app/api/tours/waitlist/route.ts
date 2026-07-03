@@ -79,9 +79,11 @@ export async function POST(req: NextRequest) {
       preferredDate,
       notes: notes?.trim() || null,
     })
-    .select()
+    .select('id, preferredDate')
     .single();
   if (error) throw error;
 
-  return NextResponse.json(data, { status: 201 });
+  // Unauthenticated endpoint — echo only the caller's own inputs, never the
+  // full row (which carries spaceId and other internal ids).
+  return NextResponse.json({ ok: true, id: data.id, preferredDate: data.preferredDate }, { status: 201 });
 }

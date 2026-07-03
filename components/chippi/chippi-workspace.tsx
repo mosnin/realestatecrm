@@ -251,6 +251,8 @@ export function ChippiWorkspace({
     deny,
     alwaysAllow,
     abort,
+    retryLastMessage,
+    rateLimitSeconds,
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
@@ -287,48 +289,16 @@ export function ChippiWorkspace({
   });
 
   // ── Retry support ────────────────────────────────────────────────────────
-  // Store the last user message so the retry button can re-send it without
-  // the user having to retype. Populated on every send() call.
+  // Track whether the user has sent anything this session, purely to decide
+  // whether the tail "Try again" affordance is shown. The ACTUAL retry is the
+  // hook's retryLastMessage, which re-sends with the original attachmentIds —
+  // the old local retry re-sent text only and silently dropped attachments.
   const lastUserMsgRef = useRef<string>('');
 
-  // retryLastMessage — re-send the last user message. Falls back to the ref
-  // when the hook doesn't export retryLastMessage (current state of the hook).
-  const retryLastMessage = useCallback(async () => {
-    if (!lastUserMsgRef.current || isStreaming) return;
-    await send(lastUserMsgRef.current);
-  }, [send, isStreaming]);
-
-  // ── Rate-limit countdown ──────────────────────────────────────────────────
-  // When the hook surfaces a rate_limited error, start a local 60-second
-  // countdown so the composer shows "Ready in 0:59…" feedback.
-  const RATE_LIMIT_TEXT = "You've been moving fast";
-  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
-  const rateLimitTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (agentError && agentError.includes(RATE_LIMIT_TEXT)) {
-      // Clear any existing timer before starting a fresh one.
-      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-      setRateLimitSeconds(60);
-      rateLimitTimerRef.current = setInterval(() => {
-        setRateLimitSeconds((s) => {
-          if (s <= 1) {
-            if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-            rateLimitTimerRef.current = null;
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    }
-  }, [agentError]);
-
-  // Clean up the interval on unmount.
-  useEffect(() => {
-    return () => {
-      if (rateLimitTimerRef.current) clearInterval(rateLimitTimerRef.current);
-    };
-  }, []);
+  // Rate-limit countdown comes straight from the hook (rateLimitSeconds), which
+  // parses the server's real Retry-After (e.g. 600s) and counts it down. The
+  // old local timer hardcoded 60s off a brittle error-copy string-match, so the
+  // composer re-enabled ~9 minutes early and the user retried into another 429.
 
   // Wrap approve / alwaysAllow so the moment the realtor approves a
   // celebrate-able tool, the prompt's surface flips into the win sentence.

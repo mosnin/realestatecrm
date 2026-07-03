@@ -30,7 +30,7 @@ import { CloudCta } from '@/components/marketing/site/home/cloud-cta';
 export const metadata = {
   title: 'Your public bio · Chippi',
   description:
-    'One link with your bio, your listings, and tour booking built in. Every visitor who taps lands in the same loop, scored, with a reply drafted in your voice for your approval.',
+    'One link with your bio, your listings, and tour booking built in. Every visitor who taps lands in the same loop, scored, with a reply sent in your voice.',
 };
 
 /** ✦-glyph eyebrow chip, same treatment as the exemplar sub-pages. */
@@ -264,7 +264,7 @@ export default function BioPage() {
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
-                  <p className="mt-1 text-xs text-neutral-600">Approval-first on every drafted reply</p>
+                  <p className="mt-1 text-xs text-neutral-600">Every reply sent in your voice</p>
                 </div>
               </div>
             </div>

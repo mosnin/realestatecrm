@@ -181,7 +181,7 @@ const SETUP_STEPS: ShowcaseStep[] = [
     mockup: (
       <Frost title="Live" badge="Active">
         <StatusLine tone="bg-emerald-400" label="Reading new mail in Gmail" meta="sorted against your deals" />
-        <StatusLine tone="bg-emerald-400" label="Drafting replies in your voice" meta="nothing sends without your tap" />
+        <StatusLine tone="bg-emerald-400" label="Sending replies in your voice" meta="the moment a lead lands" />
         <StatusLine tone="bg-sky-400" label="Watching Google Calendar" meta="availability ready for tours" />
       </Frost>
     ),
@@ -306,7 +306,7 @@ const AUTOMATION_STEPS: ShowcaseStep[] = [
   {
     key: 'draft',
     title: 'Chippi drafts the reply',
-    desc: 'It reads the lead and drafts a first reply in your voice, ready in Gmail. Nothing sends without your approval.',
+    desc: 'It reads the lead and sends a first reply in your voice from your own Gmail.',
     mockup: (
       <Frost title="Recipe">
         <RecipeCard
@@ -328,13 +328,13 @@ const AUTOMATION_STEPS: ShowcaseStep[] = [
   {
     key: 'book',
     title: 'Books on Google Calendar',
-    desc: 'It proposes a real open slot and, on your approval, sends the calendar invite, all against your actual availability.',
+    desc: 'It finds a real open slot and sends the calendar invite, all against your actual availability.',
     mockup: (
       <Frost title="Recipe">
         <RecipeCard
           kind="THEN"
           badge={<AppBadge icon={Calendar} name="Google Calendar" />}
-          title="Propose Sat 2:00, send invite on approval"
+          title="Book Sat 2:00, send the invite"
           right={
             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-sky-400/15 text-sky-300">
               <CalendarCheck className="h-3.5 w-3.5" />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
 import crypto from 'crypto';
 
 /**
@@ -27,17 +28,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
   }
 
-  // Validate redirect_uri — must be a Claude callback
-  try {
-    const url = new URL(redirect_uri);
-    const allowedHosts = ['claude.ai', 'www.claude.ai'];
-    if (process.env.NODE_ENV === 'development') {
-      allowedHosts.push('localhost');
-    }
-    if (!allowedHosts.some(h => url.hostname === h)) {
-      return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
-    }
-  } catch {
+  // Validate redirect_uri — must be a Claude callback (shared allowlist so this
+  // leg and the consent screen never drift apart).
+  if (!isAllowedOAuthRedirect(redirect_uri)) {
     return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
   }
 

@@ -31,7 +31,7 @@ import {
 const TOP_FEATURES = [
   { icon: Waypoints, title: 'Routing on arrival', desc: 'Leads land with the right agent, every time.' },
   { icon: Activity, title: 'The floor, live', desc: "See every agent's pipeline in real time." },
-  { icon: ShieldCheck, title: 'Approval-first', desc: 'Every send reviewed, every action logged.' },
+  { icon: ShieldCheck, title: 'Audit-ready', desc: 'Every action logged with who and why.' },
 ];
 
 const Chip = ({ label, tone }: { label: string; tone: string }) => (
@@ -118,10 +118,10 @@ const STEPS: ShowcaseStep[] = [
     mockup: (
       <Frost title="Approvals" badge="Audit on">
         <motion.div variants={rowV} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12px] text-white/75">
-          3 drafts awaiting your approval
+          3 sends in the last hour
         </motion.div>
-        <Row icon={ShieldCheck} title="Alex → reply to Sarah Chen" meta="email · drafted in voice" tone="text-[#ff9a6e]" right={<Chip label="Review" tone="bg-[#ff7a45]/15 text-[#ff9a6e]" />} active />
-        <Row icon={ShieldCheck} title="Jordan → price update, 88 Pine" meta="SMS to seller" right={<Chip label="Review" tone="bg-white/10 text-white/60" />} />
+        <Row icon={ShieldCheck} title="Alex → reply to Sarah Chen" meta="email · in voice" tone="text-[#ff9a6e]" right={<Chip label="Sent" tone="bg-[#ff7a45]/15 text-[#ff9a6e]" />} active />
+        <Row icon={ShieldCheck} title="Jordan → price update, 88 Pine" meta="email to seller" right={<Chip label="Sent" tone="bg-white/10 text-white/60" />} />
         <motion.div variants={rowV} className="flex gap-1.5 px-1 pt-1">
           {['Owner', 'Admin', 'Agent'].map((r, i) => (
             <Chip key={r} label={r} tone={i === 0 ? 'bg-white/[0.1] text-white' : 'bg-white/[0.04] text-white/50'} />

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { EASE_OUT } from '@/lib/motion';
+import { TextFlip } from '@/components/ui/text-flip';
 
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
 const reveal = {
@@ -20,7 +21,14 @@ const reveal = {
 
 export function CtaSection() {
   return (
-    <section className="px-5 py-24 sm:px-8 sm:py-28">
+    <section className="relative overflow-hidden px-5 py-24 sm:px-8 sm:py-28">
+      {/* Brand bloom (adapted from pixel-perfect gradient-glow-fade: behind
+          content, brand hues, both themes) — a soft radial lift under the
+          closing ask so the page ends warm instead of flat. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 [background:radial-gradient(90%_70%_at_50%_110%,rgba(255,122,69,0.12),transparent_65%)] dark:[background:radial-gradient(90%_70%_at_50%_110%,rgba(255,122,69,0.10),transparent_65%)]"
+      />
       <div className="mx-auto grid w-full max-w-6xl items-start gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <motion.div {...reveal} transition={{ duration: 0.7, ease: EASE_OUT }}>
           <span
@@ -32,14 +40,22 @@ export function CtaSection() {
           </span>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3.5rem)] leading-[1.04] tracking-[-0.02em] text-neutral-900 dark:text-white">
             Ready to see Chippi
-            <br className="hidden sm:block" /> in action?
+            {/* The second line flips through what "action" actually means.
+                Left-aligned headline, punctuation inside each item — no
+                trailing-character jitter as widths change. */}
+            <TextFlip as={motion.span} interval={2.8} className="block">
+              <>in action?</>
+              <>draft in your voice?</>
+              <>book the tour?</>
+              <>work your whole book?</>
+            </TextFlip>
           </h2>
         </motion.div>
 
         <motion.div {...reveal} transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.1 }} className="lg:pt-3">
           <p className="max-w-sm text-[13.5px] leading-relaxed text-neutral-600 dark:text-white/55">
             Chippi works your whole book, reading leads, drafting in your voice, booking tours, and
-            clearing the busywork, with every send approved by you.
+            clearing the busywork, so your hours go to closing.
           </p>
           <Link
             href="/demo"

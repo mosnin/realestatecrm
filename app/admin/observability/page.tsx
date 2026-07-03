@@ -15,6 +15,7 @@ import {
   getEventStats,
 } from '@/lib/sentry-api';
 import { ObservabilityClient } from './observability-client';
+import { BackgroundReadinessPanel } from '@/components/diagnostics/background-readiness-panel';
 import { cn } from '@/lib/utils';
 import { pluralize } from '@/lib/formatting';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
@@ -57,6 +58,9 @@ export default async function ObservabilityPage() {
         stats={stats}
         fetchedAt={new Date().toISOString()}
       />
+
+      {/* ── Background-execution infra readiness (admin-only) ──────────── */}
+      <BackgroundReadinessPanel />
     </div>
   );
 }
