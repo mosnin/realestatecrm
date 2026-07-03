@@ -35,6 +35,7 @@ import {
   Compass,
   Microscope,
   Sprout,
+  LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
@@ -86,6 +87,7 @@ const MENUS: Record<MenuKey, MenuConfig> = {
     },
     items: [
       { icon: Compass, label: 'Our story', desc: 'The gap we set out to close, and the people closing it', href: '/company' },
+      { icon: LifeBuoy, label: 'Help Center', desc: 'Guides for every part of the workspace', href: '/help' },
       { icon: Microscope, label: 'Research', desc: 'The work that shaped every feature', href: '/research' },
       { icon: Sprout, label: 'Careers', desc: 'Help build the future of real estate', href: '/careers' },
     ],

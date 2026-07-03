@@ -22,6 +22,7 @@ const columns: Record<string, { label: string; href: string }[]> = {
     { label: 'Sign in', href: '/login/realtor' },
   ],
   Resources: [
+    { label: 'Help Center', href: '/help' },
     { label: 'Research', href: '/research' },
     { label: 'Status', href: '/status' },
     { label: 'Privacy', href: '/privacy' },
