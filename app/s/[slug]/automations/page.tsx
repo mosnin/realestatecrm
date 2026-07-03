@@ -3,11 +3,10 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { WorkflowsManager } from '@/components/workflows/workflows-manager';
 import { RoutinesManager } from '@/components/routines/routines-manager';
 import { TrustLadderBanner } from '@/components/workflows/trust-ladder-banner';
-import { SECTION_LABEL, CAPTION } from '@/lib/typography';
+import { BODY_MUTED, H1, TITLE_FONT, SECTION_LABEL, CAPTION } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Automations — Chippi' };
@@ -44,39 +43,55 @@ export default async function AutomationsPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  // Standard dashboard page frame — the outer LayoutShell already supplies the
+  // 1500px max width, horizontal padding, and scroll. This page renders a
+  // Deals/People-style header (serif H1 + muted status line) and its sections
+  // directly, so Automations sits in the same wide data surface as the rest of
+  // the app rather than the narrow chat-reading column ChippiPageShell imposes.
+  // Reading surfaces (header, section labels, lists) sit in People's centered
+  // max-w-5xl column; the managers themselves cap their browse chrome to the
+  // same column and let only the builder/canvas working surfaces span the
+  // full 1500px LayoutShell frame.
   return (
-    <ChippiPageShell
-      greeting="Automations."
-      title="Things I run on my own."
-      subtitle="Standing orders — every run drafts, nothing goes out without your tap. Set them to run when something happens, or on a schedule."
-    >
-      <div className="space-y-10">
-        {/* Earned-autonomy nudge — shows only when the realtor's real draft
-            track record has earned it; silent otherwise. */}
+    <div className="space-y-8 pb-12">
+      <header className="mx-auto w-full max-w-5xl space-y-1.5">
+        <p className={BODY_MUTED}>Automations.</p>
+        <h1 className={H1} style={TITLE_FONT}>
+          Things I run on my own
+        </h1>
+        <p className={BODY_MUTED}>
+          Standing orders — every run drafts, nothing goes out without your tap. Set them to run
+          when something happens, or on a schedule.
+        </p>
+      </header>
+
+      {/* Earned-autonomy nudge — shows only when the realtor's real draft
+          track record has earned it; silent otherwise. */}
+      <div className="mx-auto w-full max-w-5xl">
         <TrustLadderBanner />
-
-        <section className="space-y-3">
-          <div className="space-y-1">
-            <h2 className={SECTION_LABEL}>When something happens</h2>
-            <p className={CAPTION}>
-              React to an event — a new lead, a reply, a deal moving stage.
-            </p>
-          </div>
-          <Suspense fallback={null}>
-            <WorkflowsManager />
-          </Suspense>
-        </section>
-
-        <section className="space-y-3">
-          <div className="space-y-1">
-            <h2 className={SECTION_LABEL}>On a schedule</h2>
-            <p className={CAPTION}>
-              A recurring beat — every morning, every weekday, every hour.
-            </p>
-          </div>
-          <RoutinesManager apiBase="/api/routines" />
-        </section>
       </div>
-    </ChippiPageShell>
+
+      <section className="space-y-3">
+        <div className="mx-auto w-full max-w-5xl space-y-1">
+          <h2 className={SECTION_LABEL}>When something happens</h2>
+          <p className={CAPTION}>
+            React to an event — a new lead, a reply, a deal moving stage.
+          </p>
+        </div>
+        <Suspense fallback={null}>
+          <WorkflowsManager />
+        </Suspense>
+      </section>
+
+      <section className="space-y-3">
+        <div className="mx-auto w-full max-w-5xl space-y-1">
+          <h2 className={SECTION_LABEL}>On a schedule</h2>
+          <p className={CAPTION}>
+            A recurring beat — every morning, every weekday, every hour.
+          </p>
+        </div>
+        <RoutinesManager apiBase="/api/routines" />
+      </section>
+    </div>
   );
 }
