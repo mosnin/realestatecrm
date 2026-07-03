@@ -14,9 +14,10 @@
  * Secured with AGENT_INTERNAL_SECRET (not user auth — this is a webhook).
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { recordInboundMessage } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
 
@@ -147,6 +148,37 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error('[agent/inbound] agent trigger failed (non-fatal):', e);
   }
+
+  // Also dispatch the inbound_message WORKFLOW trigger. Previously this event
+  // only reached the agent runtime (above), never the workflow executor, so an
+  // "when an inbound message arrives" workflow never ran. Runs post-response via
+  // after(); the context carries the channel + message so a workflow scoped to a
+  // channel can gate on it and a draft can reference the inbound text. The
+  // contact is fetched here (not blocking the response) so a draft_message can
+  // address the sender by name.
+  after(async () => {
+    try {
+      const { data: contactRow } = await supabase
+        .from('Contact')
+        .select('id, name, email, phone')
+        .eq('id', contactId)
+        .eq('spaceId', spaceId)
+        .maybeSingle();
+      const contactCtx = contactRow ?? { id: contactId };
+      await runWorkflowsForEvent({
+        spaceId,
+        triggerType: 'inbound_message',
+        context: {
+          event: { type: 'inbound_message', channel, message: content },
+          contact: contactCtx,
+          lead: contactCtx,
+        },
+        triggerEvent: { type: 'inbound_message', contactId, channel },
+      });
+    } catch (e) {
+      logger.error('[agent/inbound] inbound_message workflow dispatch failed', { contactId, channel }, e);
+    }
+  });
 
   return NextResponse.json({ recorded: true, contactId, channel });
 }

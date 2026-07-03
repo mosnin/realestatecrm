@@ -261,6 +261,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const abortRef = useRef<AbortController | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
+  // True once the turn reaches a real terminal event (turn_complete or a
+  // landed error). If the SSE stream closes WITHOUT one — the serverless proxy
+  // hit its duration cap mid-response, the socket dropped, or Modal was killed
+  // — we must not leave the bubble blinking "streaming" forever with no word to
+  // the realtor. Reset at the start of every turn.
+  const turnTerminalRef = useRef(false);
   // Wall-clock when the assistant turn started. Set on the first event of
   // the turn; used to derive ReasoningBlock.durationMs at turn_complete.
   const turnStartedAtRef = useRef<number | null>(null);
@@ -288,6 +294,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
    * the inline assistant message.
    */
   const landChippiError = useCallback((message: string) => {
+    turnTerminalRef.current = true;
     setError(message);
     const targetId = streamingMsgIdRef.current;
     const errorBlock: MessageBlock = { type: 'text', content: message };
@@ -501,6 +508,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'turn_complete': {
+        turnTerminalRef.current = true;
         const targetId = streamingMsgIdRef.current;
         // Snapshot + reset the reasoning buffer + start time before any
         // async setState — we need both values inside the updater closure.
@@ -561,6 +569,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      turnTerminalRef.current = false;
       setIsStreaming(true);
       setError(null);
 
@@ -616,6 +625,30 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           for (const event of parser.feed(value)) applyEvent(event);
         }
         for (const event of parser.end()) applyEvent(event);
+
+        // The stream closed cleanly (no throw) but never delivered a
+        // turn_complete or error — the turn was cut off mid-response (proxy
+        // duration cap, dropped socket, Modal killed). Without this the bubble
+        // keeps blinking "streaming" forever and the realtor waits on output
+        // that will never arrive. Land the truth: stop the bubble and say so.
+        if (!turnTerminalRef.current) {
+          const targetId = streamingMsgIdRef.current;
+          if (targetId) {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== targetId) return m;
+                const cutOff: MessageBlock = {
+                  type: 'text',
+                  content:
+                    (m.blocks.length > 0 ? '\n\n' : '') +
+                    'The response was cut off before it finished. Tap retry to pick it back up.',
+                };
+                return { ...m, streaming: false, blocks: [...m.blocks, cutOff] };
+              }),
+            );
+          }
+          setError('The response was cut off before it finished.');
+        }
       } catch (err) {
         const aborted = (err as { name?: string }).name === 'AbortError';
         if (!aborted) {
@@ -640,6 +673,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         setIsStreaming(false);
         setLiveCallIds(new Set());
         setStreamingReasoning('');
+        // Reset the reasoning buffer + turn start here too, not only in
+        // turn_complete: after a Stop or a stream that drops without a terminal
+        // frame, these would otherwise carry the prior turn's trace and a bogus
+        // "Thought for Xs" duration into the next answer.
+        reasoningBufferRef.current = '';
+        turnStartedAtRef.current = null;
       }
     },
     [abort, applyEvent, landChippiError],

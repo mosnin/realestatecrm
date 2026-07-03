@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { syncDeal, deleteDealVector } from '@/lib/vectorize';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -411,7 +412,7 @@ export async function PATCH(
       }
       if (toAdd.length > 0) {
         const dcInserts = toAdd.map((cId) => ({ dealId: id, contactId: cId }));
-        const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+        const { error: insertError } = await supabase.from('DealContact').upsert(dcInserts, { onConflict: 'dealId,contactId', ignoreDuplicates: true });
         if (insertError) {
           console.error('[deals/PATCH] dealContact insert error:', insertError);
           return NextResponse.json({ error: 'Failed to link contacts' }, { status: 500 });
@@ -595,6 +596,29 @@ export async function PATCH(
       } catch (e) {
         console.error('[deals/PATCH] agent trigger failed:', e);
       }
+      // Also dispatch the deal_stage_changed WORKFLOW trigger. Without this a
+      // realtor's "when a deal moves to <stage>, do X" workflow never fired —
+      // the executor was only reachable from the deals POST (deal_created) and a
+      // handful of other routes, so stage-change automations were dead. Runs
+      // post-response via after() so it never delays the PATCH, and carries the
+      // new stage name so a workflow scoped to a specific toStage can gate on it.
+      const toStageName = stageRow?.name ?? null;
+      const dealForEvent = dealRow as Record<string, unknown>;
+      after(async () => {
+        try {
+          await runWorkflowsForEvent({
+            spaceId: space.id,
+            triggerType: 'deal_stage_changed',
+            context: {
+              event: { type: 'deal_stage_changed', toStage: toStageName },
+              deal: dealForEvent,
+            },
+            triggerEvent: { type: 'deal_stage_changed', dealId: id, toStage: toStageName },
+          });
+        } catch (e) {
+          logger.error('[deals/PATCH] deal_stage_changed workflow dispatch failed', { dealId: id }, e);
+        }
+      });
     }
 
     // Attach the non-blocking advisory ONLY when it's true, so the success

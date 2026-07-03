@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -32,9 +33,12 @@ export function StageProgression({ contactId, currentType }: StageProgressionPro
       });
       if (res.ok) {
         router.refresh();
+      } else {
+        toast.error('Could not update the stage. Please try again.');
       }
     } catch (err) {
       console.error('[stage] Update failed:', err);
+      toast.error('Could not update the stage. Please try again.');
     } finally {
       setUpdating(false);
     }

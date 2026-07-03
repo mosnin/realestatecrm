@@ -18,13 +18,13 @@
  */
 
 import crypto from 'crypto';
-import { lookup as dnsLookup } from 'node:dns/promises';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions, resolveField } from './conditions';
+import { assertPublicHttpTarget, getSafeDispatcher } from '@/lib/net/ssrf-guard';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
@@ -96,12 +96,28 @@ export interface ExecuteActionOptions {
  * length — defusing prompt injection while leaving clean names untouched.
  */
 function sanitizeRecipientText(name: string): string {
-  return name
+  return sanitizeInterpolatedValue(name).slice(0, 80);
+}
+
+/**
+ * Sanitize a value substituted into a `{{token}}` slot. Like
+ * `sanitizeRecipientText` it strips control chars (so untrusted lead data can't
+ * smuggle a second "instruction" via newlines) and collapses runs of
+ * whitespace — the prompt-injection defense — but it does NOT cap the length.
+ *
+ * The 80-char cap belongs to a recipient *display name* only. Applying it to
+ * every interpolated value silently truncated real data: a lead's notes in a
+ * draft instruction, an auth token in a webhook URL, a formatter/variable value
+ * over 80 chars in a webhook JSON body — all corrupted mid-string. Length is
+ * not a security control (injection strings are short), so the cap is dropped
+ * here and kept only where a short bounded name is genuinely wanted.
+ */
+function sanitizeInterpolatedValue(value: string): string {
+  return value
     // eslint-disable-next-line no-control-regex -- intentionally stripping control chars (incl. newlines)
     .replace(/[\x00-\x1f\x7f]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
 }
 
 /**
@@ -110,8 +126,10 @@ function sanitizeRecipientText(name: string): string {
  * by the builder's TokenPicker. Unknown tokens are left as-is so the LLM
  * sees them (rather than a blank) and can handle them gracefully.
  *
- * All resolved values are sanitized through sanitizeRecipientText to prevent
- * prompt injection via untrusted lead data.
+ * All resolved values are sanitized through sanitizeInterpolatedValue to
+ * prevent prompt injection via untrusted lead data (control chars stripped,
+ * whitespace collapsed) — without truncating, so full-length data (webhook
+ * payloads, formatter/variable values, long notes) survives interpolation.
  */
 function resolveTokens(template: string, context: WorkflowContext): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
@@ -159,7 +177,7 @@ function resolveTokens(template: string, context: WorkflowContext): string {
 
     if (value === undefined || value === null) return _match;
     const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    return sanitizeRecipientText(str);
+    return sanitizeInterpolatedValue(str);
   });
 }
 
@@ -751,83 +769,11 @@ async function runNotifyAgent(
 }
 
 /**
- * SSRF guard — returns true if the hostname appears to be a private/internal
- * address that should never be the target of an outbound webhook. Only applied
- * in the executor; the Zod schema already enforces HTTPS.
- */
-/**
- * True if an already-resolved IP literal (v4 or v6) is private, loopback,
- * link-local, or otherwise not a public unicast address. Works on the RESOLVED
- * address, which is what closes DNS-rebinding — a public hostname that resolves
- * to 10.x is caught here even though its string looks innocent.
- */
-function isPrivateIp(ip: string): boolean {
-  const addr = ip.toLowerCase();
-  // IPv4 (also handles IPv4-mapped IPv6 like ::ffff:127.0.0.1)
-  const v4 = addr.replace(/^::ffff:/, '').match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 0 || a === 10 || a === 127) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true; // link-local incl. cloud metadata 169.254.169.254
-    if (a >= 224) return true; // multicast / reserved / broadcast
-    return false;
-  }
-  // IPv6
-  if (addr === '::1' || addr === '::') return true;
-  if (addr.startsWith('fe80:') || addr.startsWith('fc') || addr.startsWith('fd')) return true; // link-local + unique-local
-  return false;
-}
-
-/**
- * SSRF gate for outbound webhook URLs. Fails closed. Beyond the old
- * hostname-string check this:
- *   - requires https and a real hostname
- *   - rejects non-canonical IP literals (decimal/hex/octal) that browsers/fetch
- *     would still route (e.g. http://2130706433 == 127.0.0.1)
- *   - RESOLVES the hostname via DNS and rejects if ANY resolved address is
- *     private/loopback/link-local — closing DNS-rebinding and metadata SSRF
- * Returns null when safe, or an error string when it must be blocked.
- */
-async function assertPublicUrl(url: string): Promise<string | null> {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return 'Invalid URL.';
-  }
-  if (parsed.protocol !== 'https:') return 'Webhook URL must use https.';
-  const host = parsed.hostname.toLowerCase();
-  if (!host || host === 'localhost') return 'Webhook URL targets a private or loopback address.';
-  // Reject bare-decimal / hex / octal IP encodings that bypass dotted-quad checks
-  // but still resolve to a routable (often internal) address.
-  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
-    return 'Webhook URL targets a private or loopback address.';
-  }
-  // If the host is already an IP literal, check it directly.
-  if (isPrivateIp(host.replace(/^\[|\]$/g, ''))) {
-    return 'Webhook URL targets a private or loopback address.';
-  }
-  // Resolve the hostname and reject if any address is internal (DNS rebinding).
-  try {
-    const results = await dnsLookup(host, { all: true });
-    if (results.length === 0) return 'Webhook host did not resolve.';
-    for (const { address } of results) {
-      if (isPrivateIp(address)) {
-        return 'Webhook URL resolves to a private or internal address.';
-      }
-    }
-  } catch {
-    return 'Webhook host could not be resolved.';
-  }
-  return null;
-}
-
-/**
  * webhook_post — POST JSON to an external HTTPS URL. The body and URL are
- * interpolated ({{token}} replaced). SSRF is guarded by blocking private IPs.
- * Response body is read up to 10 KB and returned in the detail for audit.
+ * interpolated ({{token}} replaced). SSRF is guarded by assertPublicHttpTarget
+ * (normalizes every IP encoding, resolves DNS names, blocks private/loopback/
+ * link-local/ULA/reserved ranges) PLUS redirect: 'manual' so a 3xx can't hop
+ * into an internal host. Response body is read up to 10 KB for audit.
  */
 async function runWebhookPost(
   action: Extract<WorkflowAction, { type: 'webhook_post' }>,
@@ -835,9 +781,9 @@ async function runWebhookPost(
 ): Promise<ActionStepResult> {
   const { url: rawUrl, bodyJson, headersJson } = action.config;
   const url = resolveTokens(rawUrl, context);
-  const ssrfError = await assertPublicUrl(url);
-  if (ssrfError) {
-    return { status: 'failed', detail: { error: ssrfError, url } };
+  const targetCheck = await assertPublicHttpTarget(url);
+  if (!targetCheck.ok) {
+    return { status: 'failed', detail: { error: `Webhook target rejected: ${targetCheck.reason}`, url } };
   }
 
   let body: string | undefined;
@@ -867,21 +813,23 @@ async function runWebhookPost(
   const outcome = await withRetry<FetchOutcome>(
     async () => {
       try {
-        const res = await fetch(url, {
+        // `dispatcher` is an undici RequestInit extension not present in
+        // lib.dom's RequestInit — carry it through a widened type.
+        const fetchInit: RequestInit & { dispatcher?: unknown } = {
           method: 'POST',
           headers,
           body: body ?? '{}',
           signal: AbortSignal.timeout(10_000),
-          // Do NOT follow redirects: a public URL could 3xx to an internal
-          // target (169.254.169.254, 10.x) and bypass the pre-flight SSRF
-          // check, which only validated the original host.
+          // Do NOT follow redirects: assertPublicHttpTarget only vetted the
+          // initial host, so a 3xx into 169.254.169.254 / an internal service
+          // would bypass the SSRF guard. A redirect is surfaced as a non-2xx.
           redirect: 'manual',
-        });
-        // A redirect response (opaqueredirect/3xx) is treated as a failure, not
-        // silently followed — the caller must point at a final https endpoint.
-        if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
-          return { ok: false, status: res.status || 302, text: 'Redirects are not followed (SSRF guard).' };
-        }
+          // Re-validate the resolved IP at connect time to close the DNS-
+          // rebinding TOCTOU the pre-flight check can't. Strictly additive —
+          // undefined when undici is unavailable, leaving pre-flight in force.
+          dispatcher: getSafeDispatcher(),
+        };
+        const res = await fetch(url, fetchInit);
         const text = await res.text().then((t) => t.slice(0, 10_000));
         return { ok: res.ok, status: res.status, text };
       } catch (err) {
