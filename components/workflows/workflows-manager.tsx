@@ -1167,7 +1167,8 @@ export function WorkflowsManager() {
             </div>
           )}
 
-          {/* Workflow list — People's divide-y row pattern, no table chrome */}
+          {/* Workflow list — People's divide-y row vocabulary: no icon chips, no
+              gradients, no colored accents. The flow reads as words. */}
           <>
             {/* Rows */}
             {filteredWorkflows.length > 0 ? (
@@ -1425,37 +1426,21 @@ function WorkflowFlowLine({
   trigger: WorkflowTrigger;
   actions: WorkflowAction[];
 }) {
-  const ti = TRIGGER_ICON_MAP[trigger.type];
+  void trigger; // the trigger reads on the line above; this shows the steps
+  if (actions.length === 0) return null;
   const visibleActions = actions.slice(0, 5);
   const overflow = actions.length - visibleActions.length;
   return (
-    <div className="mt-1 flex items-center gap-1">
-      {ti && (
-        <>
-          <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ti.cls)}>
-            <ti.icon size={9} aria-hidden />
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+      {visibleActions.map((a, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className="text-muted-foreground/40" aria-hidden>→</span>}
+          <span className="rounded border border-border/70 px-1.5 py-px">
+            {ACTION_TYPE_LABELS[a.type] ?? a.type.replace(/_/g, ' ')}
           </span>
-          <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
-        </>
-      )}
-      {visibleActions.map((a, i) => {
-        // Fallback keeps the icon chain intact for any type missing from the
-        // map — a dropped icon would leave the preceding arrow dangling.
-        const ai = ACTION_ICON_MAP[a.type] ?? { icon: Zap, cls: 'bg-muted/60 text-muted-foreground' };
-        return (
-          <div key={i} className="flex items-center gap-1">
-            <span className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded', ai.cls)}>
-              <ai.icon size={9} aria-hidden />
-            </span>
-            {i < visibleActions.length - 1 && (
-              <ArrowRight size={9} className="flex-shrink-0 text-muted-foreground/40" aria-hidden />
-            )}
-          </div>
-        );
-      })}
-      {overflow > 0 && (
-        <span className="text-[10px] text-muted-foreground/60">+{overflow}</span>
-      )}
+        </span>
+      ))}
+      {overflow > 0 && <span className="text-muted-foreground/60">+{overflow} more</span>}
     </div>
   );
 }
@@ -1615,9 +1600,6 @@ function WorkflowRow({
   const summary = summarizeWorkflow(workflow.trigger, workflow.conditions, workflow.actions);
   const hasExpansion = !!(testResult || showHistory);
 
-  const ti = TRIGGER_ICON_MAP[workflow.trigger.type];
-  const TriggerIcon = ti?.icon ?? WorkflowIcon;
-
   return (
     <li
       // While editing, the floating builder card above the list carries this id —
@@ -1628,14 +1610,14 @@ function WorkflowRow({
         'group/row py-3 px-2 -mx-2 rounded-md transition-colors scroll-mt-24',
         'hover:bg-muted/30',
         !workflow.enabled && 'opacity-60',
-        highlighted && 'bg-sky-50 ring-2 ring-inset ring-sky-400/60 dark:bg-sky-950/30',
-        // Highlight the row if it is being edited (builder is above the list).
+        highlighted && 'bg-muted/40 ring-2 ring-inset ring-foreground/20',
+        // Mark the row if it is being edited (builder is above the list).
         editing && 'bg-muted/30',
       )}
     >
     <div className="flex items-start gap-3">
       {/* Checkbox — quiet, always present, mirrors People's left-edge affordances */}
-      <div className="flex items-center pt-2 flex-shrink-0">
+      <div className="flex items-center pt-0.5 flex-shrink-0">
         <input
           type="checkbox"
           aria-label={`Select ${workflow.name}`}
@@ -1645,17 +1627,8 @@ function WorkflowRow({
         />
       </div>
 
-      {/* Trigger-icon circle — People's avatar slot */}
-      <span
-        className={cn(
-          'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-          ti?.cls ?? 'bg-muted/40 text-muted-foreground',
-        )}
-      >
-        <TriggerIcon size={14} aria-hidden />
-      </span>
-
-      {/* Name + pills + secondary line — flex-1, People's middle column */}
+      {/* Name + pills + secondary line — flex-1 (no icon chip: the card leads
+          with the name, and the flow below reads as words) */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
           {renamingName !== null ? (
@@ -1683,7 +1656,9 @@ function WorkflowRow({
             </span>
           )}
           {workflow.enabled ? (
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" aria-label="On" />
+            <span className="inline-flex flex-shrink-0 items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-foreground/70 bg-foreground/[0.06]">
+              On
+            </span>
           ) : (
             <span className="inline-flex flex-shrink-0 items-center rounded px-1 py-px text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/60">
               Paused
@@ -1699,9 +1674,8 @@ function WorkflowRow({
             (!workflow.graph || workflow.graph.nodes.every((n) => n.kind !== 'action')) && (
             <span
               title="Workflow is on but has no actions — add at least one step"
-              className="hidden sm:inline-flex flex-shrink-0 items-center gap-1 rounded border border-amber-300/60 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-400"
+              className="hidden sm:inline-flex flex-shrink-0 items-center rounded border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground"
             >
-              <AlertTriangle size={9} aria-hidden />
               No steps
             </span>
           )}
@@ -2910,11 +2884,8 @@ function TemplatePreviewModal({
       />
       {/* Panel */}
       <div className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        {/* Header with gradient accent */}
-        <div className={cn('flex items-center gap-4 px-5 py-5', meta.accent)}>
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-background/40 shadow-sm">
-            <Icon size={24} className={meta.dot} aria-hidden />
-          </div>
+        {/* Header — plain, no accent fill or icon */}
+        <div className="flex items-start gap-4 border-b border-border px-5 py-5">
           <div className="min-w-0">
             <p className="text-[13px] font-semibold leading-snug text-foreground">{template.name}</p>
             <p className="mt-0.5 text-[12px] text-muted-foreground leading-snug">{template.description}</p>
@@ -3178,55 +3149,28 @@ function TemplateGallery({
                   <button
                     type="button"
                     onClick={() => setPreviewTemplate(template)}
-                    className="group/card flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                    className="group/card flex h-full w-full flex-col gap-1.5 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-foreground/25"
                   >
-                    {/* Icon area */}
-                    <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-6', meta.accent)}>
-                      <Icon size={32} className={meta.dot} aria-hidden />
+                    <div className="flex items-start gap-2">
+                      <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                        {template.name}
+                      </span>
                       {template.popular && (
-                        <span className="absolute right-2.5 top-2.5 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        <span className="flex-shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Popular
                         </span>
                       )}
-                      {/* Step count badge (bottom-left) */}
-                      <span className="absolute bottom-2 left-2.5 flex items-center gap-1 rounded-full bg-background/60 px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 backdrop-blur-sm">
-                        {template.state.actions.length} step{template.state.actions.length !== 1 ? 's' : ''}
-                      </span>
                     </div>
-                    {/* Text area */}
-                    <div className="flex flex-1 flex-col gap-1.5 p-4">
-                      <div className="flex items-center gap-2">
-                        <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
-                          {template.name}
-                        </span>
-                        <span
-                          className={cn(
-                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                            CATEGORY_BADGE_CLS[template.category] ?? 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {template.category}
-                        </span>
-                      </div>
-                      <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
-                        {template.description}
+                    <span className="block flex-1 text-[13px] leading-relaxed text-muted-foreground">
+                      {template.description}
+                    </span>
+                    <div className="mt-2 flex items-center justify-between text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                      <span className="truncate">
+                        {triggerLabel} · {template.state.actions.length} step{template.state.actions.length !== 1 ? 's' : ''} · {template.category}
                       </span>
-                      <div className="mt-2 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          {triggerInfo && (
-                            <span className={cn('flex h-4 w-4 items-center justify-center rounded', triggerInfo.cls)}>
-                              <triggerInfo.icon size={9} aria-hidden />
-                            </span>
-                          )}
-                          <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wide">
-                            {triggerLabel}
-                          </span>
-                        </div>
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/50 transition-colors group-hover/card:text-foreground/70">
-                          <Eye size={10} aria-hidden />
-                          Preview
-                        </span>
-                      </div>
+                      <span className="flex-shrink-0 transition-colors group-hover/card:text-foreground/80">
+                        Preview
+                      </span>
                     </div>
                   </button>
                 </motion.li>
@@ -3405,13 +3349,10 @@ function AIWorkflowGenerator({
   ];
 
   return (
-    <div className="rounded-xl border border-orange-200/60 bg-gradient-to-br from-orange-50/80 to-amber-50/60 p-4 dark:border-orange-800/30 dark:from-orange-950/20 dark:to-amber-950/20">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-500 text-white">
-          <Sparkles size={12} aria-hidden />
-        </span>
         <p className="text-sm font-semibold text-foreground">Build with AI</p>
-        <span className="rounded-full bg-orange-100 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-orange-600 dark:bg-orange-950/40 dark:text-orange-400">
+        <span className="rounded-full border border-border px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
           Beta
         </span>
       </div>
@@ -3559,46 +3500,29 @@ function TemplatePicker({
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {visibleTemplates.map((template) => {
-            const meta = TEMPLATE_META[template.id] ?? TEMPLATE_META_DEFAULT;
-            const Icon = meta.icon;
             return (
               <li key={template.id} className="flex">
                 <button
                   type="button"
                   onClick={() => setPreviewTemplate(template)}
-                  className="group/tpl flex h-full w-full flex-col rounded-xl border border-border/60 bg-card text-left transition-colors hover:border-foreground/25 hover:shadow-sm"
+                  className="group/tpl flex h-full w-full flex-col gap-1 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/25"
                 >
-                  <div className={cn('relative flex items-center justify-center rounded-t-xl px-4 py-4', meta.accent)}>
-                    <Icon size={24} className={meta.dot} aria-hidden />
-                    {template.popular && (
-                      <span className="absolute right-2 top-2 rounded-full bg-orange-500 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-white">
-                        Popular
+                  <div className="flex items-start gap-2">
+                    <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
+                      {template.name}
+                    </span>
+                    {'category' in template && (
+                      <span className="flex-shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {template.category}
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-1 flex-col gap-1 p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="block flex-1 text-sm font-semibold leading-snug text-foreground">
-                        {template.name}
-                      </span>
-                      {'category' in template && (
-                        <span
-                          className={cn(
-                            'flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                            CATEGORY_BADGE_CLS[template.category as TemplateCategory] ?? 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {template.category}
-                        </span>
-                      )}
-                    </div>
-                    <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
-                      {template.description}
-                    </span>
-                    <div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                      <Eye size={10} aria-hidden />
-                      <span>Preview before using</span>
-                    </div>
+                  <span className="block flex-1 text-[12px] leading-relaxed text-muted-foreground">
+                    {template.description}
+                  </span>
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground/60">
+                    <span>{template.popular ? 'Popular' : 'Template'}</span>
+                    <span className="transition-colors group-hover/tpl:text-foreground/80">Preview</span>
                   </div>
                 </button>
               </li>
