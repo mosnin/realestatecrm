@@ -13,14 +13,12 @@ import {
   PawPrint,
   AlertTriangle,
   ArrowRight,
-  MessageCircle,
   LayoutGrid,
   List,
   UserCheck,
   Flame,
   Thermometer,
   Snowflake,
-  HelpCircle,
   CalendarDays,
   CheckCircle2,
   Tag,
@@ -28,7 +26,6 @@ import {
   Bookmark,
   X,
   CheckSquare,
-  Zap,
   Calendar,
   Home,
   BedDouble,
@@ -53,23 +50,21 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { TableRowSkeleton, CardSkeleton } from '@/components/ui/skeleton';
 
 /**
- * Lead-temperature avatar tint. The same red/amber/blue tier vocabulary the
- * rest of the surface uses, applied as a soft ring + initials color so the
- * heat of a lead reads from the avatar alone — no badge to parse. Unscored
- * stays neutral so the signal only appears when there's a signal to give.
+ * Monochrome initials avatar — one neutral surface for every lead. Heat is not
+ * encoded in the avatar; the tier label carries that in words.
  */
 const TIER_AVATAR: Record<TierKey, string> = {
-  hot: 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30',
-  warm: 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30',
-  cold: 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25',
-  unscored: 'bg-muted/60 text-muted-foreground ring-border/60',
+  hot: 'bg-muted text-muted-foreground ring-border/60',
+  warm: 'bg-muted text-muted-foreground ring-border/60',
+  cold: 'bg-muted text-muted-foreground ring-border/60',
+  unscored: 'bg-muted text-muted-foreground ring-border/60',
 };
 
-/** Hairline left-rail color for a list row, keyed to lead heat. */
+/** No decorative heat rail — rows read like People (monochrome). */
 const TIER_RAIL: Record<TierKey, string> = {
-  hot: 'bg-red-400/80 dark:bg-red-500/70',
-  warm: 'bg-amber-400/80 dark:bg-amber-500/70',
-  cold: 'bg-blue-400/70 dark:bg-blue-500/60',
+  hot: 'bg-transparent',
+  warm: 'bg-transparent',
+  cold: 'bg-transparent',
   unscored: 'bg-transparent',
 };
 
@@ -108,17 +103,16 @@ function ScoreHero({ lead }: { lead: Contact }) {
   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
   return (
-    <div className={cn('flex items-center gap-2.5 rounded-md bg-muted/40 pl-3 pr-4 py-2.5 border-l-2', tier.border)}>
-      <div className={cn('w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2', tier.ring, tier.scoreBg)}>
+    <div className="flex items-center gap-2.5 rounded-md bg-muted/40 pl-3 pr-4 py-2.5 border-l-2 border-border/60">
+      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-foreground">
         {score != null ? (
-          <span className="text-white font-bold text-lg tabular-nums leading-none">{score}</span>
+          <span className="text-background font-bold text-lg tabular-nums leading-none">{score}</span>
         ) : (
-          <TierIcon size={20} className="text-white opacity-80" />
+          <TierIcon size={20} className="text-background opacity-80" />
         )}
       </div>
       <div>
-        <div className={cn('flex items-center gap-1.5 font-semibold text-sm', tier.text)}>
-          <TierIcon size={14} />
+        <div className="flex items-center gap-1.5 font-semibold text-sm text-foreground">
           {tier.label} lead
           {lead.scoringStatus === 'pending' && (
             <span className="inline-flex items-center gap-1 text-xs font-normal opacity-70">
@@ -693,9 +687,6 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
           transition={{ duration: 0.22, ease: EASE_APPLE }}
           className="rounded-xl border border-dashed border-border/70 bg-card py-12 text-center px-6"
         >
-          <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mx-auto mb-4">
-            <Search size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
-          </div>
           <p className="font-semibold text-foreground mb-1">
             {search ? 'Nothing matches.' : tierFilter === 'needs-followup' ? "You're caught up." : tierFilter !== 'all' ? `Nothing in ${tierFilter}.` : 'No leads yet.'}
           </p>
@@ -734,12 +725,11 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
             const budgetDisplay = typeof rawBudget === 'string' ? rawBudget : rawBudget != null ? (isRental ? `${formatMoney(rawBudget)}/mo` : formatMoney(rawBudget)) : null;
             const incomeDisplay = typeof app?.monthlyGrossIncome === 'string' ? app.monthlyGrossIncome : app?.monthlyGrossIncome != null ? `${formatMoney(app.monthlyGrossIncome)} income` : null;
             const intentLabel = app?.leaseTermPreference;
-            const intentBadge = intentLabel === 'Yes, ready now' ? { text: 'Ready now', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' }
-              : intentLabel === 'Maybe' ? { text: 'Maybe', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' }
-              : intentLabel === 'Just exploring' ? { text: 'Exploring', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300' }
+            const intentBadge = intentLabel === 'Yes, ready now' ? { text: 'Ready now', cls: 'bg-muted text-muted-foreground' }
+              : intentLabel === 'Maybe' ? { text: 'Maybe', cls: 'bg-muted text-muted-foreground' }
+              : intentLabel === 'Just exploring' ? { text: 'Exploring', cls: 'bg-muted text-muted-foreground' }
               : null;
             const tierKey = getTierKey(lead);
-            const tier = TIERS[tierKey];
             const riskFlags = (details?.riskFlags ?? []).filter((f) => f !== 'none');
             const isSelected = selectedIds.has(lead.id);
 
@@ -750,10 +740,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                 whileHover={{ y: -2 }}
                 className={cn(
                   'group rounded-lg border bg-card overflow-hidden transition-shadow duration-200 hover:shadow-md hover:shadow-foreground/[0.04]',
-                  isSelected ? 'border-primary/40 bg-primary/5' :
-                  tierKey === 'hot' ? 'border-red-200/80 dark:border-red-800/50' :
-                  tierKey === 'warm' ? 'border-amber-200/80 dark:border-amber-800/50' :
-                  'border-border/70',
+                  isSelected ? 'border-border bg-foreground/[0.06]' : 'border-border/70',
                 )}
               >
                 {/* Header */}
@@ -784,13 +771,12 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                           {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
                         </span>
                         {isNew && (
-                          <span className="inline-flex text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-2 py-0.5 flex-shrink-0">
+                          <span className="inline-flex text-[10px] font-bold bg-foreground text-background rounded-md px-2 py-0.5 flex-shrink-0">
                             NEW
                           </span>
                         )}
                         {intentBadge && (
                           <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 flex-shrink-0', intentBadge.cls)}>
-                            <Zap size={9} />
                             {intentBadge.text}
                           </span>
                         )}
@@ -810,7 +796,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                         {lead.lastContactedAt && (
                           <>
                             <span className="opacity-40">·</span>
-                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center gap-1 text-muted-foreground">
                               <CheckCircle2 size={10} />
                               Contacted {timeAgo(new Date(lead.lastContactedAt))}
                             </span>
@@ -823,7 +809,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                               'inline-flex items-center gap-1',
                               new Date(lead.followUpAt) < new Date()
                                 ? 'text-destructive font-medium'
-                                : 'text-amber-600 dark:text-amber-400',
+                                : 'text-foreground',
                             )}>
                               <AlertCircle size={10} />
                               {new Date(lead.followUpAt) < new Date()
@@ -875,14 +861,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                       {/* Buyer/seller-specific fields */}
                       {budgetDisplay && <QChip icon={DollarSign} label={`Budget: ${budgetDisplay}`} highlight />}
                       {app?.preApprovalStatus && (
-                        <span className={cn(
-                          'inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5',
-                          app.preApprovalStatus === 'yes' || app.preApprovalStatus === 'Pre-Approved' || app.preApprovalStatus === 'Yes'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
-                            : app.preApprovalStatus === 'not-yet' || app.preApprovalStatus === 'Not Yet' || app.preApprovalStatus === 'In Progress'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300',
-                        )}>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-0.5 bg-muted text-muted-foreground">
                           <ShieldCheck size={9} />
                           {app.preApprovalStatus === 'yes' ? 'Pre-Approved' : app.preApprovalStatus === 'no' ? 'No Pre-Approval' : app.preApprovalStatus === 'not-yet' ? 'Not Yet' : app.preApprovalStatus}
                         </span>
@@ -917,7 +896,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                 {details?.explanationTags && details.explanationTags.length > 0 && (
                   <div className="px-4 pb-3 flex flex-wrap gap-1">
                     {details.explanationTags.slice(0, 5).map((tag) => (
-                      <span key={tag} className={cn('inline-flex items-center text-[10px] font-medium rounded-full px-2 py-0.5', tier.pill)}>
+                      <span key={tag} className="inline-flex items-center text-[10px] font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground">
                         {tag}
                       </span>
                     ))}
@@ -974,7 +953,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                       className={cn(
                         'inline-flex items-center gap-1 text-xs font-medium rounded-md px-2 py-1 transition-colors',
                         lead.lastContactedAt
-                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
+                          ? 'text-foreground bg-foreground/[0.06] hover:bg-foreground/[0.1]'
                           : 'text-muted-foreground bg-muted hover:text-foreground hover:bg-muted/80',
                       )}
                       title={lead.lastContactedAt ? 'Undo contacted status' : 'Mark as contacted now'}
@@ -1033,7 +1012,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                       {...rowEntrance(idx)}
                       className={cn(
                         'group relative transition-colors duration-150 hover:bg-muted/40',
-                        isSelected && 'bg-primary/5',
+                        isSelected && 'bg-foreground/[0.06]',
                       )}
                     >
                       <td className="px-4 py-3 relative">
@@ -1065,14 +1044,14 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
                                 {lead.leadType === 'buyer' ? 'Buyer' : lead.leadType === 'seller' ? 'Seller' : 'Rental'}
                               </span>
                               {isNew && (
-                                <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">NEW</span>
+                                <span className="text-[10px] font-bold bg-foreground text-background rounded-md px-1.5 py-0.5">NEW</span>
                               )}
                             </div>
                           </div>
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1', tier.pill)}>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1 bg-muted text-muted-foreground">
                           {score != null ? `${score} ·` : ''} {tier.label}
                         </span>
                       </td>

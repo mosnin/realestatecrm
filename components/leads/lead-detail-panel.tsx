@@ -43,12 +43,12 @@ function getTierKey(lead: Contact): TierKey {
   return 'unscored';
 }
 
-/** Avatar tint keyed to lead heat — same vocabulary the list rows use, so the
- *  panel reads as the same lead the realtor just tapped. */
+/** Monochrome initials avatar — one neutral surface for every lead, matching
+ *  the People list rows. Heat is carried by the tier label, not the avatar. */
 const TIER_AVATAR: Record<TierKey, string> = {
-  hot: 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30',
-  warm: 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30',
-  cold: 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25',
+  hot: 'bg-muted text-muted-foreground ring-border/60',
+  warm: 'bg-muted text-muted-foreground ring-border/60',
+  cold: 'bg-muted text-muted-foreground ring-border/60',
   unscored: 'bg-muted text-muted-foreground ring-border/60',
 };
 function tierAvatar(key: TierKey): string {
@@ -100,7 +100,6 @@ export function LeadDetailPanel({
   const details = lead.scoreDetails as LeadScoreDetails | null;
   const tierKey = getTierKey(lead);
   const tier = LEAD_TIERS[tierKey];
-  const TierIcon = tier.icon;
   const score = lead.leadScore != null ? Math.round(lead.leadScore) : null;
 
   const rawBudget = app?.monthlyRent ?? lead.budget;
@@ -127,11 +126,11 @@ export function LeadDetailPanel({
   const intentLabel = app?.leaseTermPreference;
   const intentBadge =
     intentLabel === 'Yes, ready now'
-      ? { text: 'Ready now', cls: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300' }
+      ? { text: 'Ready now', cls: 'bg-muted text-muted-foreground' }
       : intentLabel === 'Maybe'
-      ? { text: 'Maybe', cls: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' }
+      ? { text: 'Maybe', cls: 'bg-muted text-muted-foreground' }
       : intentLabel === 'Just exploring'
-      ? { text: 'Exploring', cls: 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300' }
+      ? { text: 'Exploring', cls: 'bg-muted text-muted-foreground' }
       : null;
 
   const hasApplicationData =
@@ -184,17 +183,11 @@ export function LeadDetailPanel({
               {lead.name}
             </p>
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5',
-                  tier.pill,
-                )}
-              >
-                <TierIcon size={9} />
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 bg-muted text-muted-foreground">
                 {tier.label}
               </span>
               {isNew && (
-                <span className="text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 rounded-md px-1.5 py-0.5">
+                <span className="text-[10px] font-bold bg-foreground text-background rounded-md px-1.5 py-0.5">
                   NEW
                 </span>
               )}
@@ -269,7 +262,7 @@ export function LeadDetailPanel({
               {lead.lastContactedAt && (
                 <>
                   <span className="opacity-40">·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <span className="text-muted-foreground flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     Contacted {timeAgo(new Date(lead.lastContactedAt))}
                   </span>
@@ -292,17 +285,16 @@ export function LeadDetailPanel({
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className={cn('text-xs font-semibold flex items-center gap-1 flex-shrink-0', tier.text)}>
-                      <TierIcon size={11} />
+                    <span className="text-xs font-semibold flex items-center gap-1 flex-shrink-0 text-foreground">
                       {tier.label}
                     </span>
                     <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className={cn('h-full rounded-full transition-all', tier.scoreBg)}
+                        className="h-full rounded-full transition-all bg-foreground"
                         style={{ width: `${score ?? 0}%` }}
                       />
                     </div>
-                    <span className={cn('text-sm font-bold tabular-nums flex-shrink-0', tier.text)}>
+                    <span className="text-sm font-bold tabular-nums flex-shrink-0 text-foreground">
                       {score ?? '—'}
                     </span>
                   </div>
@@ -316,10 +308,7 @@ export function LeadDetailPanel({
                       {details.explanationTags.map((tag) => (
                         <span
                           key={tag}
-                          className={cn(
-                            'inline-flex items-center text-[10px] font-medium rounded-full px-2 py-0.5',
-                            tier.pill,
-                          )}
+                          className="inline-flex items-center text-[10px] font-medium rounded-full px-2 py-0.5 bg-muted text-muted-foreground"
                         >
                           {tag}
                         </span>
@@ -360,20 +349,7 @@ export function LeadDetailPanel({
                 {(lead.leadType === 'buyer' || lead.leadType === 'seller') ? (
                   <>
                     {app?.preApprovalStatus && (
-                      <span
-                        className={cn(
-                          'inline-flex items-center gap-1.5 text-xs font-semibold rounded-md px-2.5 py-1.5',
-                          app.preApprovalStatus === 'yes' ||
-                          app.preApprovalStatus === 'Pre-Approved' ||
-                          app.preApprovalStatus === 'Yes'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
-                            : app.preApprovalStatus === 'not-yet' ||
-                              app.preApprovalStatus === 'Not Yet' ||
-                              app.preApprovalStatus === 'In Progress'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300',
-                        )}
-                      >
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-md px-2.5 py-1.5 bg-muted text-muted-foreground">
                         <ShieldCheck size={11} />
                         {app.preApprovalStatus === 'yes'
                           ? 'Pre-Approved'
@@ -491,7 +467,7 @@ export function LeadDetailPanel({
                 className={cn(
                   'inline-flex items-center gap-1.5 text-sm font-medium rounded-lg px-3 py-2 transition-colors',
                   lead.lastContactedAt
-                    ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'
+                    ? 'text-foreground bg-foreground/[0.06] hover:bg-foreground/[0.1]'
                     : 'text-muted-foreground bg-muted hover:text-foreground hover:bg-muted/80',
                 )}
               >

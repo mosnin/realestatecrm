@@ -16,7 +16,6 @@ import {
   Phone,
   Mail,
   Home,
-  MessageCircle,
   CircleAlert,
   Briefcase,
   DollarSign,
@@ -24,29 +23,6 @@ import {
   MapPin,
   Tag,
 } from 'lucide-react';
-
-function tierStyles(label: string | null) {
-  if (label === 'hot') return 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400';
-  if (label === 'warm') return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
-  return 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300';
-}
-
-/** Avatar tint keyed to lead heat — same red/amber/blue vocabulary the list
- *  uses, so the detail header reads as the same lead the realtor just tapped. */
-function tierAvatar(label: string | null) {
-  if (label === 'hot') return 'bg-red-50 text-red-700 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30';
-  if (label === 'warm') return 'bg-amber-50 text-amber-700 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30';
-  if (label === 'cold') return 'bg-blue-50 text-blue-700 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25';
-  return 'bg-muted/60 text-muted-foreground ring-border/60';
-}
-
-/** Hairline accent rail on the score card, keyed to lead heat. */
-function tierRail(label: string | null) {
-  if (label === 'hot') return 'before:bg-red-400/80 dark:before:bg-red-500/70';
-  if (label === 'warm') return 'before:bg-amber-400/80 dark:before:bg-amber-500/70';
-  if (label === 'cold') return 'before:bg-blue-400/70 dark:before:bg-blue-500/60';
-  return 'before:bg-border';
-}
 
 export default async function LeadDetailPage({
   params,
@@ -102,7 +78,7 @@ export default async function LeadDetailPage({
       <section className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-5 border-b border-border flex items-start justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
-            <div className={cn('w-12 h-12 rounded-xl font-bold flex items-center justify-center shrink-0 ring-1', tierAvatar(lead.scoreLabel))}>
+            <div className="w-12 h-12 rounded-xl font-bold flex items-center justify-center shrink-0 ring-1 bg-muted text-muted-foreground ring-border/60">
               {getInitials(lead.name)}
             </div>
             <div className="min-w-0">
@@ -141,13 +117,9 @@ export default async function LeadDetailPage({
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          <div className={cn(
-            'relative rounded-xl border border-border p-4 pl-5 overflow-hidden',
-            'before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-r-full',
-            tierRail(lead.scoreLabel),
-          )}>
-            <div className={cn(SECTION_LABEL, 'flex items-center gap-1.5 mb-2')}>
-              <MessageCircle size={12} className="text-orange-500 dark:text-orange-400" /> AI score
+          <div className="relative rounded-xl border border-border p-4 pl-5 overflow-hidden before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:rounded-r-full before:bg-border">
+            <div className={cn(SECTION_LABEL, 'mb-2')}>
+              AI score
             </div>
             <div className="flex items-baseline gap-3 flex-wrap">
               <span className="text-3xl tracking-tight text-foreground tabular-nums" style={TITLE_FONT}>
@@ -157,7 +129,7 @@ export default async function LeadDetailPage({
                   '—'
                 )}
               </span>
-              <span className={`inline-flex text-xs font-semibold rounded-full px-2.5 py-1 ${tierStyles(lead.scoreLabel)}`}>
+              <span className="inline-flex text-xs font-semibold rounded-full px-2.5 py-1 bg-muted text-muted-foreground">
                 {lead.scoreLabel ?? 'unscored'}
               </span>
             </div>
@@ -174,7 +146,7 @@ export default async function LeadDetailPage({
 
           {details?.recommendedNextAction && (
             <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground flex items-start gap-2">
-              <CircleAlert size={14} className="mt-0.5 text-amber-600" />
+              <CircleAlert size={14} className="mt-0.5 text-muted-foreground" />
               {details.recommendedNextAction}
             </div>
           )}
