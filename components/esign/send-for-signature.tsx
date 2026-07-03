@@ -87,12 +87,14 @@ const PILL_LABEL: Record<SignatureStatus, string> = {
   voided: 'Voided',
 };
 
+// Monochrome — the label carries the state. Declined keeps the rose error
+// token (a genuine negative outcome); everything else is neutral.
 const PILL_CLASS: Record<SignatureStatus, string> = {
   created: 'bg-muted text-muted-foreground',
-  sent: 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
-  delivered: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-  completed: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-  declined: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+  sent: 'bg-muted text-muted-foreground',
+  delivered: 'bg-muted text-muted-foreground',
+  completed: 'bg-foreground/[0.06] text-foreground',
+  declined: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
   voided: 'bg-muted text-muted-foreground line-through',
 };
 

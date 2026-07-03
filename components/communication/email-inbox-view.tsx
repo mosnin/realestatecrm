@@ -32,7 +32,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Mail, Plug, Plus, Search, Send, Star, X } from 'lucide-react';
+import { Plug, Plus, Search, Send, Star, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
@@ -666,7 +666,7 @@ function EmailRow({
             className={cn(
               'transition-colors duration-200',
               item.starred
-                ? 'fill-amber-500 text-amber-500'
+                ? 'fill-foreground text-foreground'
                 : 'text-muted-foreground hover:text-foreground',
             )}
             size={15}
@@ -685,9 +685,6 @@ function EmptyFeed({ filter, searchQuery }: { filter: EmailFilter; searchQuery: 
   if (searchQuery) {
     return (
       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 py-12 px-6 flex flex-col items-center text-center">
-        <div className="mb-3 w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center">
-          <Search size={16} strokeWidth={1.75} className="text-muted-foreground" />
-        </div>
         <p className="text-sm font-medium text-foreground">No results.</p>
         <p className="mt-1 text-[13px] text-muted-foreground max-w-[280px] leading-relaxed">
           Nothing matched that search. Try a different term.
@@ -703,9 +700,6 @@ function EmptyFeed({ filter, searchQuery }: { filter: EmailFilter; searchQuery: 
         : 'Inbox is quiet.';
   return (
     <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 py-12 px-6 flex flex-col items-center text-center">
-      <div className="mb-3 w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center">
-        <Mail size={16} strokeWidth={1.75} className="text-muted-foreground" />
-      </div>
       <p className="text-sm font-medium text-foreground">{title}</p>
       <p className="mt-1 text-[13px] text-muted-foreground max-w-[280px] leading-relaxed">
         Anything new will land here.
@@ -718,16 +712,11 @@ function DisconnectedState({ slug }: { slug: string }) {
   return (
     <Card>
       <CardContent className="p-6 space-y-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 w-9 h-9 rounded-lg bg-foreground/[0.04] flex items-center justify-center shrink-0">
-            <Mail size={16} strokeWidth={1.75} className="text-muted-foreground" />
-          </div>
-          <div className="space-y-1.5">
-            <p className={BODY}>
-              Bring your email here so the day&apos;s threads live in one place.
-            </p>
-            <p className={BODY_MUTED}>Gmail is the fast path.</p>
-          </div>
+        <div className="space-y-1.5">
+          <p className={BODY}>
+            Bring your email here so the day&apos;s threads live in one place.
+          </p>
+          <p className={BODY_MUTED}>Gmail is the fast path.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link

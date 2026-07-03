@@ -9,7 +9,6 @@ import {
   Phone,
   MapPin,
   ExternalLink,
-  MessageCircle,
   Calendar,
   ChevronDown,
   Users,
@@ -43,8 +42,7 @@ import {
 } from '@/lib/people-detail-actions';
 
 function tierBadgeClasses(label: string) {
-  if (label === 'hot') return 'text-red-700 dark:text-red-400';
-  if (label === 'warm') return 'text-amber-700 dark:text-amber-400';
+  if (label === 'hot' || label === 'warm') return 'text-foreground';
   return 'text-muted-foreground';
 }
 
@@ -288,7 +286,6 @@ export default async function ClientDetailPage({
         <details open className="group border-t border-border/60 pt-4">
           <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors">
             <span className="inline-flex items-center gap-2">
-              <MessageCircle size={13} className="text-orange-500 dark:text-orange-400" />
               Lead score
             </span>
             <span className="inline-flex items-center gap-2">
