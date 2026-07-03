@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
   Loader2, RefreshCw, Pencil, Copy, Check, CheckSquare,
-  AlertTriangle, Send, TriangleAlert, MessageCircle, Paperclip,
+  AlertTriangle, Send, TriangleAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -194,7 +194,6 @@ function DraftRow({
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const meta = CHANNEL_META[draft.channel];
-  const Icon = meta.icon;
   // A draft carrying a property packet — recognised by the secure
   // /packet/<token> path the agent's send_property_packet tool produces.
   // Subtle pill in the meta row so the realtor knows what they're approving
@@ -308,7 +307,7 @@ function DraftRow({
   // they just resolved as the others stagger up to fill the space.
   if (celebrationKind) {
     return (
-      <article className="group/row py-5 first:pt-0 last:pb-0">
+      <article className="group/row py-3 first:pt-0 last:pb-0">
         <div className="flex items-baseline gap-2 text-sm">
           {draft.Contact && (
             <span className="font-medium text-muted-foreground truncate">
@@ -325,7 +324,7 @@ function DraftRow({
   }
 
   return (
-    <article className="group/row py-5 first:pt-0 last:pb-0">
+    <article className="group/row py-3 first:pt-0 last:pb-0">
       {/* Meta line: checkbox · contact · channel · confidence · time */}
       <div className="flex items-center gap-3 text-sm">
         {/* Quiet checkbox — invisible until row hover or selected. Matches the
@@ -350,16 +349,14 @@ function DraftRow({
         )}
 
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Icon size={12} className="opacity-70" />
           {meta.label}
         </span>
 
         {hasPacket && (
           <span
-            className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400"
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
             title="Packet attached"
           >
-            <Paperclip size={11} className="opacity-80" />
             Packet
           </span>
         )}
@@ -381,10 +378,10 @@ function DraftRow({
               className={cn(
                 'inline-flex items-center gap-1 text-[11px]',
                 draft.confidence >= 80
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-muted-foreground'
                   : draft.confidence >= 50
                     ? 'text-muted-foreground'
-                    : 'text-amber-600 dark:text-amber-400',
+                    : 'text-muted-foreground',
               )}
               title={`${draft.confidence}% confidence`}
             >
@@ -392,10 +389,10 @@ function DraftRow({
                 className={cn(
                   'w-1.5 h-1.5 rounded-full',
                   draft.confidence >= 80
-                    ? 'bg-emerald-500'
+                    ? 'bg-muted-foreground/50'
                     : draft.confidence >= 50
                       ? 'bg-muted-foreground/50'
-                      : 'bg-amber-500',
+                      : 'bg-muted-foreground/50',
                 )}
               />
               {draft.confidence}%
@@ -495,18 +492,17 @@ function DraftRow({
           and the draft cleared the confidence bar. Cancel returns the row to
           the standard approve/dismiss workflow without firing anything. */}
       {autoSendRemainingMs !== null && autoSendRemainingMs > 0 && (
-        <div className="mt-3 flex items-center gap-2 text-[12px] text-emerald-700 dark:text-emerald-400">
+        <div className="mt-3 flex items-center gap-2 text-[12px] text-muted-foreground">
           <span className="relative inline-flex items-center justify-center w-4 h-4 flex-shrink-0">
             <span
               aria-hidden
-              className="absolute inset-0 rounded-full border border-emerald-500/30"
+              className="absolute inset-0 rounded-full border border-muted-foreground/30"
             />
             <span
               aria-hidden
-              className="absolute inset-0 rounded-full border-2 border-emerald-500 border-r-transparent border-b-transparent animate-spin"
+              className="absolute inset-0 rounded-full border-2 border-muted-foreground border-r-transparent border-b-transparent animate-spin"
               style={{ animationDuration: '1.2s' }}
             />
-            <MessageCircle size={9} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2.25} />
           </span>
           <span className="font-medium">
             Auto-sending in {Math.ceil(autoSendRemainingMs / 1000)}s
@@ -641,8 +637,7 @@ function DeliveryBanner({ feedback, onClose }: { feedback: DeliveryFeedback; onC
       ? contactName ? `Note logged for ${contactName}` : 'Note logged'
       : contactName ? `Sent to ${contactName} via ${methodLabel}` : `Sent via ${methodLabel}`;
     return (
-      <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 py-2">
-        <Send size={12} className="flex-shrink-0" />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
         <span>{msg}</span>
         <button onClick={onClose} className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Dismiss">
           <XCircle size={12} />
