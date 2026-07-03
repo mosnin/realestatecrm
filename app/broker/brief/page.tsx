@@ -801,7 +801,7 @@ export default async function BrokerBriefPage() {
                         <span className="font-medium text-foreground truncate">{name}</span>
                         <span className="text-[11px] text-muted-foreground whitespace-nowrap">{role}</span>
                         {!onboard && (
-                          <span className="text-[11px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                             invited — not joined
                           </span>
                         )}
@@ -824,7 +824,7 @@ export default async function BrokerBriefPage() {
                           </span>
                         )}
                         {drafts > 0 && (
-                          <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 tabular-nums font-medium whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-foreground tabular-nums font-medium whitespace-nowrap">
                             <Inbox size={10} />
                             {drafts} draft{drafts === 1 ? '' : 's'} pending
                           </span>

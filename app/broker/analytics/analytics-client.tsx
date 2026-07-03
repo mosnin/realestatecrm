@@ -102,8 +102,8 @@ function DeltaChip({ delta }: { delta: number }) {
       className={cn(
         'inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums',
         up
-          ? 'text-emerald-700 dark:text-emerald-400'
-          : 'text-amber-700 dark:text-amber-400',
+          ? 'text-foreground'
+          : 'text-muted-foreground',
       )}
     >
       {up ? <ArrowUp size={9} aria-hidden /> : <ArrowDown size={9} aria-hidden />}
@@ -169,7 +169,7 @@ function StepRate({
       <span
         className={cn(
           'text-[11px] tabular-nums',
-          weak ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground',
+          weak ? 'text-foreground font-medium' : 'text-muted-foreground',
         )}
       >
         {pct}% pass-through
@@ -595,9 +595,9 @@ export function AnalyticsClient({ agents }: Props) {
                     <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden sm:table-cell">{a.wonDeals}</td>
                     <td className="px-3 py-3 text-right tabular-nums text-sm text-muted-foreground hidden lg:table-cell">{formatCompact(a.wonValue)}</td>
                     {/* Rate columns — the weakest carrying step reads amber */}
-                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm', leak?.key === 'leadToTour' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.leadToTour}%</td>
-                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'tourToApp' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.tourToApp}%</td>
-                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'appToDeal' ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>{a.appToDeal}%</td>
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm', leak?.key === 'leadToTour' ? 'text-foreground font-medium' : 'text-muted-foreground')}>{a.leadToTour}%</td>
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'tourToApp' ? 'text-foreground font-medium' : 'text-muted-foreground')}>{a.tourToApp}%</td>
+                    <td className={cn('px-3 py-3 text-right tabular-nums text-sm hidden md:table-cell', leak?.key === 'appToDeal' ? 'text-foreground font-medium' : 'text-muted-foreground')}>{a.appToDeal}%</td>
                     {/* Overall conversion: tabular serif, the focal data point per row */}
                     <td className="px-3 py-3 text-right">
                       <span

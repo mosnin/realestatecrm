@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { RealtorStats } from './page';
-import { Trophy, Zap, Flame, Medal } from 'lucide-react';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { AnimatedNumber } from '@/components/motion/animated-number';
@@ -34,21 +33,13 @@ function formatPipeline(value: number): string {
 }
 
 function BadgeChip({ badge }: { badge: string }) {
-  const config: Record<string, { icon: typeof Trophy; tone: string }> = {
-    'Top Closer': { icon: Trophy, tone: 'text-amber-700 dark:text-amber-400' },
-    'Fast Responder': { icon: Zap, tone: 'text-blue-700 dark:text-blue-400' },
-    'Hot Streak': { icon: Flame, tone: 'text-rose-700 dark:text-rose-400' },
-  };
-  const c = config[badge] ?? { icon: Medal, tone: 'text-muted-foreground' };
-  const Icon = c.icon;
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium',
-        c.tone,
+        'inline-flex items-center rounded-full border border-border/70 bg-background px-2 py-0.5 text-[10px] font-medium',
+        'text-muted-foreground',
       )}
     >
-      <Icon size={9} aria-hidden />
       {badge}
     </span>
   );

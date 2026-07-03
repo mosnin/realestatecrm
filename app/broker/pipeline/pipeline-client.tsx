@@ -84,13 +84,13 @@ function formatDate(dateStr: string | null): string {
 
 const priorityTone: Record<string, string> = {
   HIGH: 'text-rose-700 dark:text-rose-400',
-  MEDIUM: 'text-amber-700 dark:text-amber-400',
+  MEDIUM: 'text-foreground',
   LOW: 'text-muted-foreground',
 };
 
 const statusTone: Record<string, string> = {
   active: 'text-foreground',
-  won: 'text-emerald-700 dark:text-emerald-400',
+  won: 'text-foreground',
   lost: 'text-rose-700 dark:text-rose-400',
   on_hold: 'text-muted-foreground',
 };
@@ -230,7 +230,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
           transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: reduce ? 0 : 0.05 }}
           className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 flex items-start gap-3"
         >
-          <span className="mt-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" aria-hidden />
+          <span className="mt-1.5 inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground flex-shrink-0" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-medium">Everything&apos;s healthy.</p>
             <p className="text-[13px] text-muted-foreground mt-0.5">
@@ -424,7 +424,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                     <div className="hidden sm:flex items-center gap-4 text-[13px] text-muted-foreground flex-shrink-0 tabular-nums">
                       <span>{agent.deals.length} {agent.deals.length === 1 ? 'deal' : 'deals'}</span>
                       <span>{agentActive} active</span>
-                      <span className="text-emerald-700 dark:text-emerald-400">{agentWon} won</span>
+                      <span className="text-muted-foreground">{agentWon} won</span>
                       {agentValue > 0 && (
                         <span className="font-semibold text-foreground">
                           {formatCompact(agentValue)}
