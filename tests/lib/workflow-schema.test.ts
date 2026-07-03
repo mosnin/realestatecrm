@@ -90,6 +90,39 @@ describe('parseWorkflowDefinition — accepts', () => {
   });
 });
 
+describe('parseWorkflowDefinition — webhook autonomy safety', () => {
+  const webhookDraft: WorkflowDefinition = {
+    trigger: { type: 'webhook', config: {} },
+    conditions: { op: 'and', rules: [] },
+    actions: [{ type: 'notify_agent', config: { title: 'Ping' } }],
+    autonomy: 'draft',
+  };
+
+  it('accepts an unsigned webhook at draft autonomy (Zapier-style catch hook)', () => {
+    expect(() => parseWorkflowDefinition(webhookDraft)).not.toThrow();
+  });
+
+  it('rejects an unsigned webhook that would send automatically', () => {
+    // No webhookSecret + autonomy 'auto' = anyone with the UUID could weaponize
+    // autonomous sends. Must be rejected at save time.
+    expect(() =>
+      parseWorkflowDefinition({ ...webhookDraft, autonomy: 'auto' }),
+    ).toThrow(WorkflowDefinitionError);
+    expect(() =>
+      parseWorkflowDefinition({ ...webhookDraft, autonomy: 'notify' }),
+    ).toThrow(WorkflowDefinitionError);
+  });
+
+  it('accepts a SIGNED webhook at auto autonomy', () => {
+    const signed: WorkflowDefinition = {
+      ...webhookDraft,
+      trigger: { type: 'webhook', config: { webhookSecret: 'a-strong-secret-value' } },
+      autonomy: 'auto',
+    };
+    expect(() => parseWorkflowDefinition(signed)).not.toThrow();
+  });
+});
+
 describe('parseWorkflowDefinition — rejects (named error)', () => {
   it('throws WorkflowDefinitionError, not a raw ZodError', () => {
     let caught: unknown;

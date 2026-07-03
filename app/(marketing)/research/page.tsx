@@ -58,7 +58,7 @@ const REPORTS = [
   {
     title: 'Trust by Design: How Agents Decide to Let Software Send',
     summary:
-      'Interviews with 80 agents and brokers mapping the path from skepticism to delegated trust — and the product principles that earn it: approval-first defaults, one voice, a clean audit trail.',
+      'Interviews with 80 agents and brokers mapping the path from skepticism to delegated trust — and the product principles that earn it: one voice, full transparency, a clean audit trail.',
     category: 'Trust',
     date: 'May 2026',
     pages: '20 pages',

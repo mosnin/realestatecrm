@@ -87,7 +87,7 @@ import type {
   WorkflowGraph,
   WorkflowTrigger,
 } from '@/lib/workflows/schema';
-import { WorkflowBuilder } from './workflow-builder';
+import { WorkflowBuilder, actionsToRows } from './workflow-builder';
 import type { ConditionRowState, WorkflowFormState } from './build-definition';
 import { summarizeWorkflow } from './summary';
 import { WORKFLOW_TEMPLATES, cloneTemplateState } from './templates';
@@ -305,6 +305,20 @@ function recordToFormState(w: WorkflowRecord): WorkflowFormState {
       updateValue: a.type === 'update_lead' ? a.config.value : '',
       notifyTitle: a.type === 'notify_agent' ? a.config.title : '',
       notifyBody: a.type === 'notify_agent' ? (a.config.body ?? '') : '',
+      // Branch paths — previously DROPPED here, so editing/duplicating a branch
+      // workflow loaded zero paths and then failed to re-save (paths.min(1)).
+      // Reuse the builder's canonical converter for the nested sub-actions.
+      branchPaths:
+        a.type === 'branch'
+          ? a.config.paths.map((p) => ({
+              id: editRowId('bp'),
+              label: p.label ?? '',
+              field: p.field,
+              operator: p.operator as Operator,
+              value: p.value !== undefined && p.value !== null ? String(p.value) : '',
+              actions: actionsToRows(p.actions as WorkflowAction[]),
+            }))
+          : [],
     })),
     autonomy: w.autonomy,
     // Carry the stored graph through so the builder opens an advanced workflow

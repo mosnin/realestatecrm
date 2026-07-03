@@ -54,7 +54,7 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Chippi reads each inbound against your live deals and drafts the reply in your voice. Edit it, send it, or skip it, nothing leaves without your tap.',
+      'Chippi reads each inbound against your live deals and sends the reply in your voice, the moment the lead lands.',
     image: '/marketing/product/realtors.jpg',
     imageAlt: 'Chippi drafting a reply in the agent inbox',
   },

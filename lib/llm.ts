@@ -128,11 +128,18 @@ export const OPENAI_FALLBACK_CHAT_MODEL = 'gpt-4o-mini';
  * which key the deployment has.
  */
 export function resolveChatModel(requested?: string | null): string {
-  const candidate = (requested && requested.trim()) || DEFAULT_CHAT_MODEL;
-  // A model that isn't in the registry (e.g. an old per-workspace pick left over
-  // from the since-removed model picker) falls back to the default, so only a
-  // supported model is ever sent to the provider.
-  const wanted = isValidChatModel(candidate) ? candidate : DEFAULT_CHAT_MODEL;
+  // Operator override: CHIPPI_CHAT_MODEL lets the deployer point Chippi at any
+  // OpenRouter slug (e.g. a Claude model — which also unlocks the Anthropic
+  // prompt-caching path in agent/llm.py) WITHOUT a code change. Trusted because
+  // only the deployer sets env, so it becomes the effective default and bypasses
+  // the CHAT_MODELS picker allowlist. Keep in sync with resolve_chat_model() in
+  // agent/llm.py.
+  const envDefault = process.env.CHIPPI_CHAT_MODEL?.trim() || DEFAULT_CHAT_MODEL;
+  const req = requested && requested.trim();
+  // An in-band `requested` value (a persisted per-workspace pick from the
+  // since-removed picker) must still be a known model or it falls back — only
+  // the trusted env override can introduce a new slug.
+  const wanted = req && isValidChatModel(req) ? req : envDefault;
   if (isOpenRouterConfigured()) return wanted;
   // OpenAI-only path: only bare gpt-* models are servable.
   if (wanted.includes('/') || !wanted.toLowerCase().startsWith('gpt')) {

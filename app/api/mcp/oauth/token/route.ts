@@ -5,7 +5,10 @@ import crypto from 'crypto';
 import { SignJWT } from 'jose';
 
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.MCP_JWT_SECRET || process.env.CLERK_SECRET_KEY;
+  // Dedicated secret only — no CLERK_SECRET_KEY fallback (keep MCP token
+  // signing and Clerk session signing in separate trust domains). Must match
+  // the verifier in app/api/mcp/route.ts.
+  const secret = process.env.MCP_JWT_SECRET;
   if (!secret) throw new Error('MCP_JWT_SECRET not configured');
   return new TextEncoder().encode(secret);
 }

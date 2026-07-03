@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
 import type { Contact } from '@/lib/types';
 
@@ -199,6 +200,28 @@ export async function POST(req: NextRequest) {
   try {
     await fireAgentTrigger({ spaceId: space.id, event: 'new_lead', contactId: contact.id });
   } catch (e) { console.error('[contacts] agent trigger failed:', e); }
+
+  // Also dispatch the lead_created WORKFLOW trigger for manually-created leads.
+  // Previously lead_created was emitted ONLY from the public /apply form, so a
+  // lead added by hand in the CRM never fired "when a new lead is created"
+  // workflows. Runs post-response via after(). NOTE: bulk import
+  // (app/api/contacts/import) intentionally does NOT fan out per-row workflow
+  // runs — a several-hundred-row import would otherwise flood the executor; that
+  // path is handled separately if/when per-import automation is wanted.
+  const createdContact = contact as unknown as Record<string, unknown>;
+  const createdSpaceId = space.id;
+  after(async () => {
+    try {
+      await runWorkflowsForEvent({
+        spaceId: createdSpaceId,
+        triggerType: 'lead_created',
+        context: { event: { type: 'lead_created' }, lead: createdContact, contact: createdContact },
+        triggerEvent: { type: 'lead_created', contactId: contact.id },
+      });
+    } catch (e) {
+      console.error('[contacts/POST] lead_created workflow dispatch failed', e);
+    }
+  });
 
   return NextResponse.json(contact, { status: 201 });
 }

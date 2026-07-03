@@ -9,6 +9,7 @@
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { IntegrationsShowcase } from '@/components/marketing/giga/integrations-showcase';
+import { IntegrationsDrift } from '@/components/marketing/giga/integrations-drift';
 import {
   IntegrationsSetupShowcase,
   IntegrationsAutomationShowcase,
@@ -39,12 +40,13 @@ export default function IntegrationsPage() {
           features={[
             { icon: 'Mail', title: 'Email and calendar', desc: 'Gmail, Outlook, Google Calendar, and Calendly.' },
             { icon: 'Users', title: 'Your CRM', desc: 'HubSpot, Salesforce, and Follow Up Boss, two-way.' },
-            { icon: 'MessagesSquare', title: 'Messaging and e-sign', desc: 'WhatsApp, Twilio SMS, Slack, and DocuSign.' },
+            { icon: 'MessagesSquare', title: 'Messaging and e-sign', desc: 'WhatsApp, Slack, and DocuSign.' },
           ]}
           image="/marketing/integrations-hero.jpg"
           variant="integrations"
         />
         <IntegrationsShowcase />
+        <IntegrationsDrift />
         <IntegrationsSetupShowcase />
         <IntegrationsAutomationShowcase />
         <PricingTeaser

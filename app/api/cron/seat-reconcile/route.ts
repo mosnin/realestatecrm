@@ -70,7 +70,7 @@ async function handler(req: NextRequest): Promise<NextResponse> {
 
   if (error) {
     logger.error('[cron/seat-reconcile] brokerage fetch failed', { err: error.message });
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: 'Seat reconciliation failed' }, { status: 500 });
   }
 
   const summary: ReconcileSummary = {

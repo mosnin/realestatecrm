@@ -20,9 +20,11 @@ import { redirect } from 'next/navigation';
 import { Hero } from '@/components/marketing/giga/hero';
 import { Stats } from '@/components/marketing/giga/stats';
 import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import { HowItWorksCircuit } from '@/components/marketing/giga/how-it-works-circuit';
 import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
 import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
 import { Complexity } from '@/components/marketing/giga/complexity';
+import { TestimonialsBand } from '@/components/marketing/giga/testimonials';
 import { ResearchSection } from '@/components/marketing/giga/research';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
@@ -39,9 +41,11 @@ export default async function MarketingHomePage() {
         <Hero />
         <Stats />
         <AgentCanvas />
+        <HowItWorksCircuit />
         <RealtorShowcase />
         <BrokerageShowcase />
         <Complexity />
+        <TestimonialsBand />
       </div>
       {/* Light/dark-adaptive closing sections */}
       <ResearchSection />

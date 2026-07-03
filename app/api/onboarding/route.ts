@@ -55,6 +55,18 @@ export async function GET() {
       console.error('[onboarding GET] backfill failed', err);
     }
 
+    // Never ship secret-shaped columns to the browser. SpaceSetting has an
+    // `anthropicApiKey` column (plus billing/connection blobs); `select('*')`
+    // above would round-trip any value straight into the client. Strip any
+    // key that looks like a credential before it leaves the server.
+    const safeSettings = settings
+      ? (Object.fromEntries(
+          Object.entries(settings as Record<string, unknown>).filter(
+            ([k]) => !/(apikey|api_key|secret|token|ciphertext|password|credential)/i.test(k),
+          ),
+        ) as SpaceSetting)
+      : null;
+
     return NextResponse.json({
       step: user.onboardingCurrentStep,
       completed: getOnboardingStatus(user).isOnboarded,
@@ -71,7 +83,7 @@ export async function GET() {
             id: space.id,
             slug: space.slug,
             name: space.name,
-            settings
+            settings: safeSettings
           }
         : null
     });

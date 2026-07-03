@@ -34,6 +34,7 @@ Keep CHAT_MODELS / DEFAULT_CHAT_MODEL in sync with lib/llm.ts.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -188,7 +189,13 @@ def resolve_chat_model(model: str | None) -> str:
         return "gpt-5"
     if model and model in CHAT_MODELS:
         return model
-    return DEFAULT_CHAT_MODEL
+    # Operator override: CHIPPI_CHAT_MODEL lets the deployer point Chippi at any
+    # OpenRouter slug (e.g. a Claude model, which also unlocks the Anthropic
+    # prompt-caching path above) WITHOUT a code change. Trusted because only the
+    # deployer sets env — it bypasses the CHAT_MODELS picker allowlist. Keep in
+    # sync with resolveChatModel() in lib/llm.ts.
+    env_default = os.environ.get("CHIPPI_CHAT_MODEL", "").strip()
+    return env_default or DEFAULT_CHAT_MODEL
 
 
 # ---------------------------------------------------------------------------

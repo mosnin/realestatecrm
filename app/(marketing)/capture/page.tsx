@@ -3,7 +3,7 @@
  *
  * Arc: PageHero opener → open light split (copy beside a pastel-framed
  * glass card: intake form → scored lead with drafted-reply chips) → white
- * shadow trio (Instant scoring / Your voice / Approval-first) → pastel CTA
+ * shadow trio (Instant scoring / Your voice / On the record) → pastel CTA
  * card. One idea: a lead lands, gets scored, a reply drafts itself, tour
  * times are proposed, you just approve.
  */
@@ -29,7 +29,7 @@ import { LeadOrbit } from '@/components/marketing/site/home/lead-orbit';
 export const metadata = {
   title: 'Capture leads · Chippi',
   description:
-    'Intake forms that feed the loop, every lead lands in Chippi scored, with a reply drafted in your voice and tour times ready to book. Nothing sends without your approval.',
+    'Intake forms that feed the loop, every lead lands in Chippi scored, with a reply sent in your voice and tour times ready to book.',
 };
 
 const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
@@ -45,8 +45,8 @@ const TRIO: { icon: LucideIcon; title: string; body: string }[] = [
   },
   {
     icon: ShieldCheck,
-    title: 'Approval-first.',
-    body: 'Nothing sends without your tap. Edit it, send it, or skip it, every thread stays yours.',
+    title: 'On the record.',
+    body: 'Every send in your voice, logged in plain words, every thread stays yours.',
   },
 ];
 
@@ -89,7 +89,7 @@ const STEPS: { label: string; title: string; body: string }[] = [
   {
     label: 'STEP 3',
     title: 'A reply is ready.',
-    body: 'The first message drafts itself in your voice with tour times from your real calendar. You tap approve, nothing sends without it.',
+    body: 'The first message goes out in your voice with tour times from your real calendar, seconds after the lead lands.',
   },
 ];
 
@@ -210,7 +210,7 @@ export default function CapturePage() {
                     <h3 className="font-semibold tracking-tight text-zinc-950">Drafted, not sent</h3>
                     <p className="mt-1 text-sm text-neutral-600">
                       The first reply waits in your voice, tour times included.
-                      Nothing leaves without your tap.
+                      Sent in your voice, seconds later.
                     </p>
                   </div>
                 </div>
@@ -225,7 +225,7 @@ export default function CapturePage() {
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
-                  <p className="mt-1 text-xs text-neutral-600">Approval-first, nothing sends without you</p>
+                  <p className="mt-1 text-xs text-neutral-600">Every send in your voice, on the record</p>
                 </div>
               </div>
             </div>

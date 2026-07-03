@@ -9,13 +9,14 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  KeyboardSensor,
   useDndContext,
   useSensor,
   useSensors,
   closestCorners,
   type DropAnimation,
 } from '@dnd-kit/core';
-import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
@@ -28,13 +29,12 @@ import {
   X,
   Trophy,
   XCircle,
-  Check,
   Palette,
   ArrowRight,
 } from 'lucide-react';
 import { TITLE_FONT } from '@/lib/typography';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { cn } from '@/lib/utils';
 import { countLabel, pluralize } from '@/lib/formatting';
 import type { Deal, DealStage, Contact, DealContact } from '@/lib/types';
@@ -476,6 +476,9 @@ export function KanbanBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Keyboard drag support so the pipeline is reorderable without a pointer
+    // (accessibility): focus a card, Space to lift, arrows to move, Space to drop.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   // Initial mount fetch doesn't need to fire `onDataChanged` — the sibling
@@ -1150,37 +1153,21 @@ export function KanbanBoard({
                         maxLength={100}
                       />
                       <div className="flex items-center gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <span
-                                className="w-4 h-4 rounded-full border border-border"
-                                style={{ backgroundColor: newStageColor }}
-                              />
-                              <Palette size={11} />
-                              Color
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" className="w-44 p-2">
-                            <div className="grid grid-cols-6 gap-1.5">
-                              {['#6b7280','#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#78716c'].map((c) => (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => setNewStageColor(c)}
-                                  className="w-6 h-6 rounded-md transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring"
-                                  style={{ backgroundColor: c }}
-                                  aria-label={c}
-                                >
-                                  {c === newStageColor && <Check size={10} className="text-white mx-auto" />}
-                                </button>
-                              ))}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                        {/* Full HSL picker (presets + custom) — emits validated
+                            hex, so any brand color works, not just 12 presets. */}
+                        <ColorPicker color={newStageColor} onChange={setNewStageColor}>
+                          <button
+                            type="button"
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <span
+                              className="w-4 h-4 rounded-full border border-border"
+                              style={{ backgroundColor: newStageColor }}
+                            />
+                            <Palette size={11} />
+                            Color
+                          </button>
+                        </ColorPicker>
                         <div className="flex items-center gap-1 ml-auto">
                           <button
                             type="button"
