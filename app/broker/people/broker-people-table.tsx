@@ -60,9 +60,9 @@ function scoreTier(
   score: number | null,
 ): { label: string; dot: string; text: string } | null {
   if (score == null || score <= 0) return null;
-  if (score >= 75) return { label: 'Hot', dot: 'bg-lead-hot', text: 'text-lead-hot' };
-  if (score >= 45) return { label: 'Warm', dot: 'bg-lead-warm', text: 'text-lead-warm' };
-  return { label: 'Cold', dot: 'bg-lead-cold', text: 'text-lead-cold' };
+  if (score >= 75) return { label: 'Hot', dot: 'bg-foreground/40', text: 'text-muted-foreground' };
+  if (score >= 45) return { label: 'Warm', dot: 'bg-foreground/40', text: 'text-muted-foreground' };
+  return { label: 'Cold', dot: 'bg-foreground/40', text: 'text-muted-foreground' };
 }
 
 /**
@@ -631,7 +631,7 @@ function BrokerContactRow({
                 'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
                 followUpOverdue
                   ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
-                  : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+                  : 'text-muted-foreground bg-muted/60',
               )}
             >
               <CalendarDays size={10} />
