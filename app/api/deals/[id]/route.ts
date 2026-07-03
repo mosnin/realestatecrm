@@ -412,7 +412,7 @@ export async function PATCH(
       }
       if (toAdd.length > 0) {
         const dcInserts = toAdd.map((cId) => ({ dealId: id, contactId: cId }));
-        const { error: insertError } = await supabase.from('DealContact').insert(dcInserts);
+        const { error: insertError } = await supabase.from('DealContact').upsert(dcInserts, { onConflict: 'dealId,contactId', ignoreDuplicates: true });
         if (insertError) {
           console.error('[deals/PATCH] dealContact insert error:', insertError);
           return NextResponse.json({ error: 'Failed to link contacts' }, { status: 500 });

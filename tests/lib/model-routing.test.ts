@@ -64,4 +64,29 @@ describe('resolveChatModel falls back for stale/removed picks', () => {
     expect(resolveChatModel('qwen/qwen3.7-plus')).toBe('qwen/qwen3.7-plus');
     expect(resolveChatModel(null)).toBe('qwen/qwen3.7-plus');
   });
+
+  it('CHIPPI_CHAT_MODEL env override becomes the effective default (OpenRouter on)', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-or-test');
+    vi.stubEnv('CHIPPI_CHAT_MODEL', 'anthropic/claude-sonnet-5');
+    vi.resetModules();
+    const { resolveChatModel } = await import('@/lib/llm');
+    // No in-band request → the trusted env slug wins, even though it is not in
+    // the CHAT_MODELS allowlist (only the deployer can set env).
+    expect(resolveChatModel(null)).toBe('anthropic/claude-sonnet-5');
+    expect(resolveChatModel('')).toBe('anthropic/claude-sonnet-5');
+    // A stale, non-registry in-band pick still falls back to the env default,
+    // not to the hardcoded DEFAULT_CHAT_MODEL.
+    expect(resolveChatModel('x-ai/grok-4.3')).toBe('anthropic/claude-sonnet-5');
+  });
+
+  it('OpenAI-only deploy substitutes the gpt fallback for a slash slug env override', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test');
+    vi.stubEnv('CHIPPI_CHAT_MODEL', 'anthropic/claude-sonnet-5');
+    vi.resetModules();
+    const { resolveChatModel, OPENAI_FALLBACK_CHAT_MODEL } = await import('@/lib/llm');
+    // Without OpenRouter, a vendor-prefixed slug can't be served by OpenAI —
+    // the fallback keeps the turn from 404ing on a wrong-provider model.
+    expect(resolveChatModel(null)).toBe(OPENAI_FALLBACK_CHAT_MODEL);
+  });
 });

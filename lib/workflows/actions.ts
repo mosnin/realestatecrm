@@ -96,12 +96,28 @@ export interface ExecuteActionOptions {
  * length — defusing prompt injection while leaving clean names untouched.
  */
 function sanitizeRecipientText(name: string): string {
-  return name
+  return sanitizeInterpolatedValue(name).slice(0, 80);
+}
+
+/**
+ * Sanitize a value substituted into a `{{token}}` slot. Like
+ * `sanitizeRecipientText` it strips control chars (so untrusted lead data can't
+ * smuggle a second "instruction" via newlines) and collapses runs of
+ * whitespace — the prompt-injection defense — but it does NOT cap the length.
+ *
+ * The 80-char cap belongs to a recipient *display name* only. Applying it to
+ * every interpolated value silently truncated real data: a lead's notes in a
+ * draft instruction, an auth token in a webhook URL, a formatter/variable value
+ * over 80 chars in a webhook JSON body — all corrupted mid-string. Length is
+ * not a security control (injection strings are short), so the cap is dropped
+ * here and kept only where a short bounded name is genuinely wanted.
+ */
+function sanitizeInterpolatedValue(value: string): string {
+  return value
     // eslint-disable-next-line no-control-regex -- intentionally stripping control chars (incl. newlines)
     .replace(/[\x00-\x1f\x7f]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
+    .trim();
 }
 
 /**
@@ -110,8 +126,10 @@ function sanitizeRecipientText(name: string): string {
  * by the builder's TokenPicker. Unknown tokens are left as-is so the LLM
  * sees them (rather than a blank) and can handle them gracefully.
  *
- * All resolved values are sanitized through sanitizeRecipientText to prevent
- * prompt injection via untrusted lead data.
+ * All resolved values are sanitized through sanitizeInterpolatedValue to
+ * prevent prompt injection via untrusted lead data (control chars stripped,
+ * whitespace collapsed) — without truncating, so full-length data (webhook
+ * payloads, formatter/variable values, long notes) survives interpolation.
  */
 function resolveTokens(template: string, context: WorkflowContext): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_match, path: string) => {
@@ -159,7 +177,7 @@ function resolveTokens(template: string, context: WorkflowContext): string {
 
     if (value === undefined || value === null) return _match;
     const str = typeof value === 'object' ? JSON.stringify(value) : String(value);
-    return sanitizeRecipientText(str);
+    return sanitizeInterpolatedValue(str);
   });
 }
 
