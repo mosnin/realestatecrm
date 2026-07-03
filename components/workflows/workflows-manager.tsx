@@ -822,9 +822,6 @@ export function WorkflowsManager() {
   if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
-          <AlertTriangle size={20} className="text-rose-600 dark:text-rose-400" strokeWidth={1.5} />
-        </div>
         <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
           Couldn&apos;t load your workflows.
         </p>
@@ -1254,7 +1251,7 @@ export function WorkflowsManager() {
                 type="button"
                 disabled={bulkBusy}
                 onClick={() => bulkSetEnabled(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-[12px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
+                className="inline-flex items-center gap-1.5 rounded-md bg-foreground/[0.06] px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-foreground/[0.1] disabled:opacity-50 transition-colors"
               >
                 Turn on
               </button>
@@ -1347,17 +1344,21 @@ function KeyboardShortcutsModal({ onClose }: { onClose: () => void }) {
 
 // ── Trigger type → icon + accent ─────────────────────────────────────────────
 
+// Monochrome per docs/ui/STYLESHEET.md — trigger/action type is carried by the
+// adjacent label (a word), not by color. Every chip reads the same neutral way.
+const NEUTRAL_CHIP = 'bg-muted text-muted-foreground';
+
 const TRIGGER_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
-  lead_score_threshold: { icon: Target, cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
-  inbound_message: { icon: MessageCircle, cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
-  integration_event: { icon: Plug, cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
-  deal_stage_changed: { icon: TrendingUp, cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
-  schedule: { icon: Clock, cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  lead_created: { icon: UserPlus, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
-  tour_completed: { icon: Home, cls: 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400' },
-  webhook: { icon: Webhook, cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
-  deal_created: { icon: Building2, cls: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' },
-  contact_updated: { icon: RefreshCw, cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
+  lead_score_threshold: { icon: Target, cls: NEUTRAL_CHIP },
+  inbound_message: { icon: MessageCircle, cls: NEUTRAL_CHIP },
+  integration_event: { icon: Plug, cls: NEUTRAL_CHIP },
+  deal_stage_changed: { icon: TrendingUp, cls: NEUTRAL_CHIP },
+  schedule: { icon: Clock, cls: NEUTRAL_CHIP },
+  lead_created: { icon: UserPlus, cls: NEUTRAL_CHIP },
+  tour_completed: { icon: Home, cls: NEUTRAL_CHIP },
+  webhook: { icon: Webhook, cls: NEUTRAL_CHIP },
+  deal_created: { icon: Building2, cls: NEUTRAL_CHIP },
+  contact_updated: { icon: RefreshCw, cls: NEUTRAL_CHIP },
 };
 
 const TRIGGER_LABEL_MAP: Record<string, string> = {
@@ -1396,23 +1397,23 @@ const ACTION_LABEL_MAP: Record<string, string> = {
 // ── Action type → icon ───────────────────────────────────────────────────────
 
 const ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
-  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
-  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
-  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
-  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
-  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  filter:           { icon: Filter,       cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
-  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
-  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
-  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
-  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
-  iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
-  branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
-  run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
-  lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
-  set_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
-  get_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
+  draft_message:    { icon: PencilLine,   cls: NEUTRAL_CHIP },
+  schedule_message: { icon: Clock,        cls: NEUTRAL_CHIP },
+  create_task:      { icon: CheckSquare,  cls: NEUTRAL_CHIP },
+  call_integration: { icon: Plug,         cls: NEUTRAL_CHIP },
+  run_chippi:       { icon: Sparkles,     cls: NEUTRAL_CHIP },
+  delay:            { icon: Clock,        cls: NEUTRAL_CHIP },
+  filter:           { icon: Filter,       cls: NEUTRAL_CHIP },
+  formatter:        { icon: Wand2,        cls: NEUTRAL_CHIP },
+  webhook_post:     { icon: Webhook,      cls: NEUTRAL_CHIP },
+  update_lead:      { icon: UserPlus,     cls: NEUTRAL_CHIP },
+  notify_agent:     { icon: BellRing,     cls: NEUTRAL_CHIP },
+  iterate:          { icon: RotateCcw,    cls: NEUTRAL_CHIP },
+  branch:           { icon: GitBranch,    cls: NEUTRAL_CHIP },
+  run_workflow:     { icon: WorkflowIcon, cls: NEUTRAL_CHIP },
+  lookup_table:     { icon: Table2,       cls: NEUTRAL_CHIP },
+  set_variable:     { icon: Variable,     cls: NEUTRAL_CHIP },
+  get_variable:     { icon: Variable,     cls: NEUTRAL_CHIP },
 };
 
 /**
@@ -1471,12 +1472,12 @@ function WebhookUrlChip({ workflowId }: { workflowId: string }) {
         copyUrl();
       }}
       aria-label={copied ? 'Copied!' : 'Copy webhook URL'}
-      className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-mono text-teal-700 transition-colors hover:bg-teal-100 dark:bg-teal-950/30 dark:text-teal-400 dark:hover:bg-teal-950/50"
+      className="mt-1 inline-flex max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:bg-muted/70"
     >
       <Webhook size={9} aria-hidden className="flex-shrink-0" />
       <span className="truncate">{url}</span>
       {copied ? (
-        <Check size={9} className="flex-shrink-0 text-emerald-500" aria-hidden />
+        <Check size={9} className="flex-shrink-0 text-muted-foreground" aria-hidden />
       ) : (
         <Copy size={9} className="flex-shrink-0 opacity-50" aria-hidden />
       )}
@@ -2386,10 +2387,10 @@ function GlobalRunRow({
           className="group flex items-center gap-1 text-left"
           title="Go to workflow"
         >
-          <span className="truncate text-[13px] font-medium text-foreground group-hover:text-orange-600 transition-colors">
+          <span className="truncate text-[13px] font-medium text-foreground transition-colors">
             {run.workflowName}
           </span>
-          <ArrowRight size={11} className="flex-shrink-0 text-muted-foreground/30 group-hover:text-orange-500 transition-colors" aria-hidden />
+          <ArrowRight size={11} className="flex-shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" aria-hidden />
         </button>
         {(run.error || run.summary) && (
           <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground/70">
@@ -2926,7 +2927,7 @@ function TemplatePreviewModal({
           {template.state.conditions.length > 0 && (
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                   <Filter size={13} aria-hidden />
                 </span>
                 {template.state.actions.length > 0 && (
@@ -3042,11 +3043,13 @@ const CATEGORY_PILLS: Array<{ value: 'all' | TemplateCategory; label: string }> 
   { value: 'Integrations', label: 'Integrations' },
 ];
 
+// Monochrome per docs/ui/STYLESHEET.md — the category name is the label; no
+// per-category color.
 const CATEGORY_BADGE_CLS: Record<TemplateCategory, string> = {
-  'New leads': 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400',
-  'Follow-up': 'bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400',
-  'Scheduling': 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
-  'Integrations': 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400',
+  'New leads': 'bg-muted text-muted-foreground',
+  'Follow-up': 'bg-muted text-muted-foreground',
+  'Scheduling': 'bg-muted text-muted-foreground',
+  'Integrations': 'bg-muted text-muted-foreground',
 };
 
 function TemplateGallery({
