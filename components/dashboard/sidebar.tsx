@@ -668,7 +668,7 @@ function WorkspaceSwitcherRows({
             </div>
             <span className="flex-1 truncate font-medium">{w.name}</span>
             {w.isCurrent ? (
-              <Check size={13} strokeWidth={2} className="text-blue-500 flex-shrink-0" />
+              <Check size={13} strokeWidth={2} className="text-foreground flex-shrink-0" />
             ) : (
               <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
                 {shortcut}
@@ -1549,7 +1549,7 @@ export function Sidebar({
             same identity when they switch workspaces. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
         />
         <div className="relative z-10 flex flex-col h-full">
           {/* Brand mark — in collapsed rail mode it doubles as the expand
@@ -1778,7 +1778,7 @@ function RealtorSidebarShell({
           wash doesn't hint at content beyond the visible edge. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-orange-50/60 via-orange-50/20 to-transparent dark:from-orange-500/[0.04] dark:via-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
       />
 
       <div className="relative z-10 flex flex-col h-full">

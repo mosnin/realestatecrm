@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, GitCompare, X, Star, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Loader2, GitCompare, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -114,9 +114,9 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                       <td key={c.id} className="px-4 py-2">
                         <span className={cn(
                           'text-sm',
-                          isFlag && val === 'hot' && 'text-red-600 dark:text-red-400 font-semibold',
-                          isFlag && val === 'warm' && 'text-amber-600 dark:text-amber-400 font-semibold',
-                          isFlag && val === 'cold' && 'text-slate-500 dark:text-slate-400',
+                          isFlag && val === 'hot' && 'text-foreground font-semibold',
+                          isFlag && val === 'warm' && 'text-foreground font-semibold',
+                          isFlag && val === 'cold' && 'text-muted-foreground',
                         )}>
                           {display}
                         </span>
@@ -164,7 +164,7 @@ export function ApplicationCompare({ slug, selectedIds, onClose }: ApplicationCo
                       <td key={c.id} className="px-4 py-2">
                         <span className={cn(
                           'text-sm font-semibold',
-                          ratio >= 3 ? 'text-emerald-600 dark:text-emerald-400' : ratio >= 2 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+                          ratio >= 3 ? 'text-foreground' : ratio >= 2 ? 'text-foreground' : 'text-destructive'
                         )}>
                           {ratio.toFixed(1)}x
                           {ratio >= 3 && <CheckCircle2 size={11} className="inline ml-1" />}

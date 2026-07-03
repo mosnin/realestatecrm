@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Mail, Phone, Loader2, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Users, Mail, Phone, Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
 import { toast } from 'sonner';
@@ -200,7 +200,6 @@ export function DuplicatesPanel({
           </div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
-            <CheckCircle2 size={28} className="text-emerald-500" />
             <p className="text-sm">No duplicates found{scanned ? ` across ${scanned} contacts` : ''}.</p>
           </div>
         ) : (
