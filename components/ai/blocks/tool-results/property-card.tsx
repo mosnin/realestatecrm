@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, ChevronRight, ChevronDown, MapPin, ImageOff } from 'lucide-react';
+import { ChevronRight, ChevronDown, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { pluralize } from '@/lib/formatting';
@@ -73,20 +73,11 @@ function formatSqft(v: number | null | undefined): string | null {
   return v.toLocaleString();
 }
 
-/** Icon background tone keyed by listingStatus. */
-function iconBg(status: string | undefined): string {
-  const s = (status ?? '').toLowerCase();
-  if (s === 'active') return 'bg-emerald-500/10';
-  if (s === 'pending') return 'bg-amber-500/10';
-  return 'bg-muted';
-}
-
-/** Status chip styling keyed by listingStatus. */
+/** Status chip styling keyed by listingStatus — neutral monochrome chips
+ *  (listing status is a workflow category, not a good/bad signal). */
 const STATUS_CHIP: Record<string, string> = {
-  active:
-    'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
-  pending:
-    'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  active: 'text-muted-foreground bg-muted',
+  pending: 'text-muted-foreground bg-muted',
   sold: 'text-muted-foreground bg-muted',
   closed: 'text-muted-foreground bg-muted',
   withdrawn: 'text-muted-foreground bg-muted',
@@ -116,7 +107,6 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
   }, [open, detail, loading, slug, property.id]);
 
   const compactPrice = formatPrice(property.price);
-  const iconBgClass = iconBg(property.listingStatus);
   const chipClass = statusChipClass(property.listingStatus);
 
   // Sub-line: beds · baths · sqft
@@ -139,16 +129,6 @@ export function PropertyCard({ property, slug, animDelay = 0 }: PropertyCardProp
         onClick={() => setOpen((v) => !v)}
         className="group/row w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/40 transition-colors"
       >
-        {/* Building icon with status-tinted background */}
-        <div
-          className={cn(
-            'w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0',
-            iconBgClass,
-          )}
-        >
-          <Building2 size={14} className="text-muted-foreground" />
-        </div>
-
         {/* Address + specs sub-line */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate leading-tight">
@@ -341,8 +321,8 @@ function PropertyHero({ photos, address }: { photos: string[]; address: string }
   const src = photos[0];
   if (!src || errored) {
     return (
-      <div className="aspect-[16/9] w-full rounded-lg border border-border/40 bg-muted/40 flex items-center justify-center text-muted-foreground/60">
-        <ImageOff size={20} aria-hidden />
+      <div className="aspect-[16/9] w-full rounded-lg border border-border/40 bg-muted/40 flex items-center justify-center text-[11px] text-muted-foreground/70">
+        No photo
       </div>
     );
   }

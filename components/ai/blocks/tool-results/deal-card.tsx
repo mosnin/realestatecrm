@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Briefcase, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo, formatCurrency } from '@/lib/formatting';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
@@ -60,10 +60,12 @@ function formatShortDate(iso: string | null | undefined): string {
 
 /* ─── Stage chip ─────────────────────────────────────────────────────────── */
 
+// Stage is a real deal state machine: won/closed and lost keep a restrained
+// semantic tone; the in-progress stages read as neutral chips (monochrome).
 const STAGE_CHIP: Record<string, string> = {
-  active:       'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-  offer:        'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
-  under_contract: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+  active:       'text-muted-foreground bg-muted',
+  offer:        'text-muted-foreground bg-muted',
+  under_contract: 'text-muted-foreground bg-muted',
   won:          'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
   closed:       'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
   lost:         'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
@@ -105,11 +107,6 @@ function CollapsedRow({ deal, isExpanded }: { deal: DealSummary; isExpanded: boo
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
-      {/* Icon */}
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted/60">
-        <Briefcase size={16} className="text-muted-foreground" />
-      </div>
-
       {/* Content */}
       <div className="min-w-0 flex-1">
         {/* Title row */}

@@ -29,7 +29,7 @@
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Loader2, ArrowRight, Check } from 'lucide-react';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { cn, rootDomain } from '@/lib/utils';
 import { brandOrange } from '@/lib/colors';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
@@ -631,9 +631,9 @@ function BusinessAffordance({
 function SlugHint({ state }: { state: SlugState }) {
   if (state.kind === 'idle') return null;
   if (state.kind === 'checking') return <p className="mt-1 text-xs text-muted-foreground">Checking…</p>;
-  if (state.kind === 'available') return <p className="mt-1 inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><Check size={12} /> Available</p>;
-  if (state.kind === 'taken') return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Taken. Try another.</p>;
-  return <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{state.message}</p>;
+  if (state.kind === 'available') return <p className="mt-1 text-xs text-muted-foreground">Available</p>;
+  if (state.kind === 'taken') return <p className="mt-1 text-xs text-muted-foreground">Taken. Try another.</p>;
+  return <p className="mt-1 text-xs text-muted-foreground">{state.message}</p>;
 }
 
 function WhereAffordance({

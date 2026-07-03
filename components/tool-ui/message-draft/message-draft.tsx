@@ -257,7 +257,7 @@ function FairHousingNotice({ review }: { review: FairHousingResult }) {
   if (review.findings.length === 0) {
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-500" aria-hidden />
+        <ShieldCheck className="size-3.5" aria-hidden />
         Reviewed — no fair-housing concerns.
       </div>
     );

@@ -152,7 +152,7 @@ function RealtorIdentity({
         <BadgeCheck
           size={15}
           aria-label="Verified"
-          className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+          className="shrink-0 fill-foreground text-background"
         />
       )}
     </span>
@@ -172,8 +172,7 @@ function RealtorIdentity({
           aria-hidden
           className={cn(
             'h-14 w-14 rounded-full inline-flex items-center justify-center',
-            'bg-orange-50 text-orange-600 ring-1 ring-orange-200/60',
-            'dark:bg-orange-500/15 dark:text-orange-400 dark:ring-orange-500/20',
+            'bg-muted text-muted-foreground ring-1 ring-border/60',
             'text-xl leading-none select-none',
           )}
           style={TITLE_FONT}

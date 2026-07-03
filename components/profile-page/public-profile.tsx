@@ -391,7 +391,7 @@ export function PublicProfile({
               ) : (
                 <span
                   aria-hidden
-                  className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-4 border-background bg-orange-50 text-3xl leading-none text-orange-600 select-none dark:bg-orange-500/15 dark:text-orange-400"
+                  className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-4 border-background bg-muted text-3xl leading-none text-muted-foreground select-none"
                   style={{ fontFamily: 'var(--font-title)' }}
                 >
                   {deriveInitials(businessName || agentName)}
@@ -421,7 +421,7 @@ export function PublicProfile({
                     <BadgeCheck
                       size={18}
                       aria-label="Verified"
-                      className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+                      className="shrink-0 fill-foreground text-background"
                     />
                   )}
                 </span>
