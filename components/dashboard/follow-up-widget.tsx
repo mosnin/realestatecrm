@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Calendar, CheckCircle2, Phone, Mail, ChevronDown, ChevronUp, Timer } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { LEAD_SCORE_COLORS } from '@/lib/constants/colors';
 
@@ -45,12 +46,20 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
   async function handleClearFollowUp(id: string) {
     setClearing((s) => new Set(s).add(id));
     try {
-      await fetch(`/api/contacts/${id}`, {
+      // Only drop the row once the server confirms — otherwise the follow-up
+      // "vanishes" then silently reappears on the next load (lying UI).
+      const res = await fetch(`/api/contacts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: null }),
       });
+      if (!res.ok) {
+        toast.error('Could not clear the follow-up. Please try again.');
+        return;
+      }
       setContacts((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      toast.error('Could not clear the follow-up. Please try again.');
     } finally {
       setClearing((s) => { const n = new Set(s); n.delete(id); return n; });
     }
@@ -61,14 +70,20 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
     setClearing((s) => new Set(s).add(id));
     try {
       const newFollowUp = new Date(Date.now() + hours * 3600000).toISOString();
-      await fetch(`/api/contacts/${id}`, {
+      const res = await fetch(`/api/contacts/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ followUpAt: newFollowUp }),
       });
+      if (!res.ok) {
+        toast.error('Could not snooze the follow-up. Please try again.');
+        return;
+      }
       setContacts((prev) =>
         prev.map((c) => (c.id === id ? { ...c, followUpAt: newFollowUp } : c))
       );
+    } catch {
+      toast.error('Could not snooze the follow-up. Please try again.');
     } finally {
       setClearing((s) => { const n = new Set(s); n.delete(id); return n; });
     }

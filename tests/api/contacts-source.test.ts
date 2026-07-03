@@ -10,6 +10,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
+// next/server's `after()` requires a real request scope and throws in Vitest.
+// The POST now dispatches the lead_created workflow via after(); stub it to a
+// no-op so the route reaches its 201 (the dispatch is covered by its own test).
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return { ...actual, after: vi.fn() };
+});
 vi.mock('@/lib/api-auth', () => ({
   requireSpaceOwner: vi.fn(),
 }));

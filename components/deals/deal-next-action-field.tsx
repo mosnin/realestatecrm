@@ -54,13 +54,25 @@ export function DealNextActionField({ dealId, initialAction, initialDueAt }: Dea
     setDueAt('');
     setSaving(true);
     try {
-      await fetch(`/api/deals/${dealId}`, {
+      const res = await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nextAction: null, nextActionDueAt: null }),
       });
+      if (!res.ok) {
+        // A failed clear was silently "sticking" in the UI then reappearing on
+        // reload — restore the last saved value and tell the user.
+        toast.error("Couldn't clear the next action.");
+        setAction(savedAction);
+        setDueAt(savedDueAt ? new Date(savedDueAt).toISOString().slice(0, 10) : '');
+        return;
+      }
       setSavedAction('');
       setSavedDueAt('');
+    } catch {
+      toast.error("Couldn't clear the next action.");
+      setAction(savedAction);
+      setDueAt(savedDueAt ? new Date(savedDueAt).toISOString().slice(0, 10) : '');
     } finally {
       setSaving(false);
     }
