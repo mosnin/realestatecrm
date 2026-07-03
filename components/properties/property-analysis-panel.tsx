@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Sparkles, ExternalLink, Loader2, AlertTriangle, Info, RefreshCw, Link2,
+  Sparkles, ExternalLink, Loader2, RefreshCw, Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, timeAgo } from '@/lib/formatting';
@@ -98,7 +98,6 @@ export function PropertyAnalysisPanel({
       {/* ── Header row ─────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Sparkles size={12} className="text-muted-foreground" aria-hidden />
           <h2 className={cn(SECTION_LABEL)}>Analysis</h2>
           {analyzedAt && (
             <span className="text-[11px] text-muted-foreground">
@@ -153,8 +152,7 @@ export function PropertyAnalysisPanel({
 
       {/* ── Not configured ─────────────────────────────────────────── */}
       {notConfigured && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
-          <AlertTriangle size={16} className="mt-0.5 text-amber-600 dark:text-amber-500" aria-hidden />
+        <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
           <div className="text-sm">
             <p className="font-medium text-foreground">Web research isn&apos;t configured</p>
             <p className="text-muted-foreground mt-0.5">
@@ -175,7 +173,6 @@ export function PropertyAnalysisPanel({
       {/* ── No evidence found ──────────────────────────────────────── */}
       {noEvidence && !loading && (
         <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
-          <Info size={16} className="mt-0.5 text-muted-foreground" aria-hidden />
           <div className="text-sm text-muted-foreground">
             We couldn&apos;t find reliable public data for this exact address. Double-check the
             address (including city &amp; state) and try again.
@@ -201,7 +198,7 @@ export function PropertyAnalysisPanel({
 
             {/* Which columns were just filled */}
             {filled.length > 0 && (
-              <p className="text-xs text-emerald-700 dark:text-emerald-500">
+              <p className="text-xs text-muted-foreground">
                 Filled blank fields: {filled.map(prettyField).join(', ')}.
               </p>
             )}

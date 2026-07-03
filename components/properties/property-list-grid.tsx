@@ -20,7 +20,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Building2, BedDouble, Bath, Ruler, Calendar, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { BedDouble, Bath, Ruler, Calendar, ArrowUpRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatCompact } from '@/lib/formatting';
@@ -124,8 +124,7 @@ function PropertyCard({
             )}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground/50">
-            <Building2 size={26} aria-hidden />
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2">
             <span className="text-[11px] text-muted-foreground/70">No photo yet</span>
           </div>
         )}
