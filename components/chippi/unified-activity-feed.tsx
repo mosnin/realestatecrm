@@ -197,60 +197,30 @@ function StatusPill({ status, tone }: { status: ActivityStatus; tone: ActivityTo
 
 function FeedRow({ item, slug }: { item: UnifiedActivityItem; slug: string }) {
   const meta = KIND_META[item.kind];
-  const KindIcon = meta?.icon ?? Info;
-  const StatusIcon = STATUS_ICON[item.status] ?? Info;
   const href = resolveLink(item.link, slug);
 
   const body = (
-    <>
-      <div
-        className={cn(
-          'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
-          TONE_PILL[item.tone],
-        )}
-      >
-        <KindIcon size={14} aria-hidden />
+    <div className="flex-1 min-w-0 space-y-0.5">
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-medium text-foreground leading-snug truncate">
+          {item.title}
+        </p>
+        <span className="text-[11px] tabular-nums text-muted-foreground/70 ml-auto flex-shrink-0">
+          {timeAgo(item.occurredAt)}
+        </span>
       </div>
-      <div className="flex-1 min-w-0 space-y-0.5">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-foreground leading-snug truncate">
-            {item.title}
-          </p>
-          <StatusIcon
-            size={11}
-            aria-hidden
-            className={cn(
-              'flex-shrink-0',
-              item.tone === 'green' && 'text-emerald-600 dark:text-emerald-400',
-              item.tone === 'amber' && 'text-amber-600 dark:text-amber-400',
-              item.tone === 'rose' && 'text-rose-600 dark:text-rose-400',
-              item.tone === 'muted' && 'text-muted-foreground',
-            )}
-          />
-          <span className="text-[11px] tabular-nums text-muted-foreground/70 ml-auto flex-shrink-0">
-            {timeAgo(item.occurredAt)}
-          </span>
-          {href && (
-            <ChevronRight
-              size={13}
-              aria-hidden
-              className="flex-shrink-0 text-muted-foreground/60 group-hover/row:text-foreground transition-colors"
-            />
-          )}
-        </div>
-        {item.summary && (
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-            {item.summary}
-          </p>
-        )}
-        <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
-            {meta?.label ?? item.kind}
-          </span>
-          <StatusPill status={item.status} tone={item.tone} />
-        </div>
+      {item.summary && (
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+          {item.summary}
+        </p>
+      )}
+      <div className="flex items-center gap-2 pt-0.5">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+          {meta?.label ?? item.kind}
+        </span>
+        <StatusPill status={item.status} tone={item.tone} />
       </div>
-    </>
+    </div>
   );
 
   if (href) {
@@ -258,7 +228,7 @@ function FeedRow({ item, slug }: { item: UnifiedActivityItem; slug: string }) {
       <li className="group/row">
         <Link
           href={href}
-          className="flex items-start gap-3 py-4 first:pt-0 hover:bg-foreground/[0.02] -mx-2 px-2 rounded-md transition-colors"
+          className="flex items-start py-3 hover:bg-muted/30 -mx-2 px-2 rounded-md transition-colors"
         >
           {body}
         </Link>
@@ -267,7 +237,7 @@ function FeedRow({ item, slug }: { item: UnifiedActivityItem; slug: string }) {
   }
 
   return (
-    <li className="group/row flex items-start gap-3 py-4 first:pt-0">{body}</li>
+    <li className="group/row flex items-start py-3 px-2 -mx-2">{body}</li>
   );
 }
 
@@ -443,7 +413,7 @@ export function UnifiedActivityFeed() {
   const digest = useMemo(() => summarizeFeed(items, Boolean(nextCursor)), [items, nextCursor]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ── Filter bar ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
         {/* Search + a Filters toggle that hides the heavier facets until asked. */}
@@ -565,7 +535,6 @@ export function UnifiedActivityFeed() {
         <div className="space-y-4" aria-busy="true" aria-label="Loading activity">
           {[1, 2, 3, 4].map((n) => (
             <div key={n} className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-muted/40 animate-pulse" />
               <div className="flex-1 space-y-1">
                 <div className="h-4 w-2/3 rounded bg-muted/40 animate-pulse" />
                 <div className="h-3 w-1/2 rounded bg-muted/30 animate-pulse" />
@@ -599,7 +568,7 @@ export function UnifiedActivityFeed() {
           )}
 
           {/* Day-grouped timeline — Today / Yesterday / weekday headers. */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {groups.map((group) => (
               <motion.section
                 key={group.key}
