@@ -31,7 +31,6 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { cn, rootDomain } from '@/lib/utils';
-import { brandOrange } from '@/lib/colors';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { CHIPPI_PILL } from '@/lib/typography';
 import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
@@ -358,14 +357,10 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Brand-warm wash - same as the onboarding shell, one of the five
-            sanctioned orange contexts. */}
+        {/* Neutral stage - monochrome canvas, matching the onboarding shell. */}
         <div
           aria-hidden
-          className={brandOrange(
-            'LOGO',
-            'pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.04] dark:via-background dark:to-orange-500/[0.03]',
-          )}
+          className="pointer-events-none absolute inset-0 z-0"
         />
 
         {/* Fixed brand mark - the chat's quiet header. */}

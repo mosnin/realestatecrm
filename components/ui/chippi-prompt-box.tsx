@@ -197,7 +197,7 @@ const MODE_META: Record<Exclude<Mode, null>, {
     label: 'Draft',
     Icon: FileText,
     activeClasses:
-      'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400',
+      'bg-foreground/[0.06] border-border/60 text-foreground',
     placeholder: 'Draft a longer message…',
     prefix: 'Draft',
   },
@@ -1400,7 +1400,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                         className={cn(
                           'inline-flex items-center justify-center w-7 h-7 rounded-md',
                           mode === 'draft'
-                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                            ? 'bg-foreground/[0.06] text-foreground'
                             : 'bg-foreground/[0.05] text-muted-foreground',
                         )}
                       >
