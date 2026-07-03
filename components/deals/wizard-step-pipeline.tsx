@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DealStage } from '@/lib/types';
 
@@ -77,15 +76,7 @@ export function WizardStepPipeline({
 
       {/* Detected pipeline suggestion banner */}
       {detectedPipelineType && (
-        <div className={cn(
-          'flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium',
-          detectedPipelineType === 'buyer'
-            ? 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400'
-            : detectedPipelineType === 'seller'
-            ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
-            : 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400'
-        )}>
-          <Info size={13} className="flex-shrink-0" />
+        <div className="flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium bg-muted/40 border border-border/60 text-muted-foreground">
           Based on your contact&apos;s profile, we suggest the{' '}
           <span className="font-semibold capitalize">{detectedPipelineType}</span>{' '}
           pipeline.

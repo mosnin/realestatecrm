@@ -256,7 +256,7 @@ export function DealChecklist({ dealId, initial = [] }: DealChecklistProps) {
                 aria-label={done ? `Mark ${item.label} as not done` : `Mark ${item.label} as done`}
               >
                 {done
-                  ? <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400" />
+                  ? <CheckCircle2 size={18} className="text-foreground" />
                   : <Circle size={18} />}
               </button>
 

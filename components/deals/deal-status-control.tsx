@@ -22,9 +22,9 @@ const STATUS_META: Record<Status, StatusMeta> = {
     label: 'Active',
     Icon: Activity,
     badgeClass:
-      'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+      'bg-muted text-muted-foreground',
     buttonClass:
-      'hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-500/15 dark:hover:text-blue-400',
+      'hover:bg-muted hover:text-foreground',
   },
   won: {
     label: 'Won',
