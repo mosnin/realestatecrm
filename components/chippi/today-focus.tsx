@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Phone, Mail, MessageCircle, SquarePen } from 'lucide-react';
+import { Phone, Mail, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
@@ -110,15 +110,14 @@ export function TodayFocus({ slug }: { slug: string }) {
                     href={`/s/${slug}/contacts/${item.contactId}`}
                     className="flex items-center gap-3 flex-1 min-w-0"
                   >
-                    <div className="w-8 h-8 rounded-full bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center flex-shrink-0 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 text-xs font-semibold text-muted-foreground">
                       {item.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
                         {item.leadScore >= HOT_LEAD_THRESHOLD && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400">
-                            <MessageCircle size={10} />
+                          <span className="inline-flex items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-foreground/70">
                             hot
                           </span>
                         )}

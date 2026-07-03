@@ -1578,7 +1578,6 @@ export function ChippiWorkspace({
                     size="sm"
                     onClick={handleNewConversation}
                     variant="outline"
-                    className="border-amber-400 text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-800"
                   >
                     Start new conversation
                   </Button>

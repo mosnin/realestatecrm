@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
   Send, Pencil, Clock, Loader2, MessageSquare, Mail, StickyNote, AlertTriangle,
-  CheckCircle2, ArrowRight, HelpCircle, MessageCircle,
+  CheckCircle2, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -467,10 +466,7 @@ export function FocusCard({
       className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150')}
     >
       <div className="flex items-center gap-3 text-sm">
-        <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-          <HelpCircle size={13} />
-          Chippi has a question
-        </span>
+        <span className="text-sm font-medium text-foreground">Chippi has a question</span>
         {question.Contact && (
           <span className="text-xs text-muted-foreground truncate">
             about {question.Contact.name}
@@ -561,15 +557,6 @@ function FocusWelcome({
 
   return (
     <div className={cn(FOCUS_CARD_MAX, 'mx-auto text-center py-10')}>
-      {/* Amber circle with a slow breathing pulse — signals life, not decoration. */}
-      <motion.div
-        aria-hidden
-        className="mx-auto mb-6 w-16 h-16 rounded-full bg-amber-100/70 dark:bg-amber-500/10 flex items-center justify-center"
-        animate={{ scale: [1, 1.04, 1] }}
-        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-      >
-        <MessageCircle size={20} className="text-amber-500 dark:text-amber-400" aria-hidden />
-      </motion.div>
       <h2
         className="text-3xl tracking-tight text-foreground"
         style={TITLE_FONT}

@@ -79,13 +79,6 @@ const OUTCOME_META: Record<
   failed: { label: 'failed', tone: 'rose' },
 };
 
-const OUTCOME_TONE_CLASS: Record<string, string> = {
-  green: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  amber: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  rose: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
-  muted: 'bg-muted text-muted-foreground',
-};
-
 const OUTCOME_ICON: Record<string, LucideIcon> = {
   green: CheckCircle2,
   amber: HelpCircle,
@@ -172,7 +165,7 @@ export function ActivityFeed({ slug }: { slug: string }) {
       {!loading && entries.length > 0 && (
         <ul className="divide-y divide-border/60">
           {entries.map((entry) => {
-            const { verb, icon: Icon } = metaFor(entry.actionType);
+            const { verb } = metaFor(entry.actionType);
             const outcomeMeta = OUTCOME_META[entry.outcome] ?? { label: entry.outcome, tone: 'muted' };
             const StateIcon = OUTCOME_ICON[outcomeMeta.tone] ?? Lightbulb;
             const targetName = entry.Contact?.name ?? entry.Deal?.title ?? null;
@@ -191,14 +184,6 @@ export function ActivityFeed({ slug }: { slug: string }) {
             return (
               <li key={entry.id} className="group/row py-4 first:pt-0">
                 <div className="flex items-start gap-3">
-                  <div
-                    className={cn(
-                      'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
-                      OUTCOME_TONE_CLASS[outcomeMeta.tone],
-                    )}
-                  >
-                    <Icon size={13} />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-foreground">

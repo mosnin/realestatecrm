@@ -9,8 +9,8 @@
  * is consequential, so it goes through a confirm; resuming is one tap.
  *
  * State language:
- *   - running → a quiet green dot. Normal state, doesn't shout.
- *   - paused  → an amber pill that reads "Paused". Abnormal state, worth
+ *   - running → a quiet dot. Normal state, doesn't shout.
+ *   - paused  → a filled pill that reads "Paused". Abnormal state, worth
  *               noticing every time the realtor glances at the header.
  */
 
@@ -95,7 +95,7 @@ export function ChippiPowerToggle() {
           'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full border border-border/70 text-xs font-medium transition-colors disabled:opacity-50',
           enabled
             ? 'text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025]'
-            : 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25',
+            : 'bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.1]',
         )}
       >
         {saving ? (
@@ -105,7 +105,7 @@ export function ChippiPowerToggle() {
             aria-hidden
             className={cn(
               'w-1.5 h-1.5 rounded-full flex-shrink-0',
-              enabled ? 'bg-emerald-500' : 'bg-amber-500',
+              enabled ? 'bg-muted-foreground/60' : 'bg-foreground',
             )}
           />
         )}

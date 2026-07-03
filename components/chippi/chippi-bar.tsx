@@ -278,7 +278,7 @@ export function ChippiBar({ slug }: Props) {
         >
           <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
               Chippi
             </div>
             <div className="flex items-center gap-1">

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { SECTION_LABEL } from '@/lib/typography';
@@ -180,18 +179,11 @@ export function MorningStory({ slug, isFresh = false }: Props) {
     setActiveCompose(null);
   }
 
-  // Row treatment: small emerald check icon (matches WhatIDid's
-  // success rows) + the morning sentence as body copy. Interactive
+  // Row treatment: the morning sentence as body copy. Interactive
   // variant wraps the whole row in a button that expands the action
   // sheet below; non-interactive variant is a plain row.
   const rowInner = (
     <div className="flex items-start gap-3 py-3">
-      <span
-        aria-hidden
-        className="w-7 h-7 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0 mt-0.5"
-      >
-        <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-      </span>
       <span className="flex-1 text-sm text-foreground leading-relaxed">
         {displaySentence}
       </span>

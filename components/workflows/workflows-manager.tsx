@@ -2655,199 +2655,123 @@ function RowAction({
 
 // ── Template gallery (zero-state front door) ─────────────────────────────────
 
-/** Icon + accent color per template — gives each card a visual identity. */
-const TEMPLATE_META: Record<string, { icon: LucideIcon; accent: string; dot: string }> = {
+/** Icon per template — gives each card a visual identity. */
+const TEMPLATE_META: Record<string, { icon: LucideIcon }> = {
   'hot-lead-instant-draft': {
     icon: Zap,
-    accent: 'bg-orange-100 dark:bg-orange-950/40',
-    dot: 'text-orange-500 dark:text-orange-400',
   },
   'gmail-client-reply': {
     icon: Mail,
-    accent: 'bg-red-100 dark:bg-red-950/40',
-    dot: 'text-red-500 dark:text-red-400',
   },
   'morning-follow-ups': {
     icon: Sun,
-    accent: 'bg-amber-100 dark:bg-amber-950/40',
-    dot: 'text-amber-500 dark:text-amber-400',
   },
   'tour-completed-thanks': {
     icon: Home,
-    accent: 'bg-blue-100 dark:bg-blue-950/40',
-    dot: 'text-blue-500 dark:text-blue-400',
   },
   'new-lead-welcome': {
     icon: UserPlus,
-    accent: 'bg-sky-100 dark:bg-sky-950/40',
-    dot: 'text-sky-500 dark:text-sky-400',
   },
   'deal-stage-changed-notify': {
     icon: TrendingUp,
-    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
-    dot: 'text-emerald-600 dark:text-emerald-400',
   },
   'inbound-inquiry-multi-step': {
     icon: MessageCircle,
-    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
-    dot: 'text-indigo-500 dark:text-indigo-400',
   },
   'hot-vs-warm-branch': {
     icon: GitBranch,
-    accent: 'bg-violet-100 dark:bg-violet-950/40',
-    dot: 'text-violet-500 dark:text-violet-400',
   },
   'webhook-any-service': {
     icon: Webhook,
-    accent: 'bg-teal-100 dark:bg-teal-950/40',
-    dot: 'text-teal-600 dark:text-teal-400',
   },
   'offer-received': {
     icon: TrendingUp,
-    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
-    dot: 'text-emerald-600 dark:text-emerald-400',
   },
   'contract-signed-checklist': {
     icon: CheckSquare,
-    accent: 'bg-green-100 dark:bg-green-950/40',
-    dot: 'text-green-600 dark:text-green-400',
   },
   'weekly-pipeline-review': {
     icon: Sun,
-    accent: 'bg-yellow-100 dark:bg-yellow-950/40',
-    dot: 'text-yellow-600 dark:text-yellow-400',
   },
   'lead-gone-cold': {
     icon: Target,
-    accent: 'bg-blue-100 dark:bg-blue-950/40',
-    dot: 'text-blue-600 dark:text-blue-400',
   },
   'first-contact-drip': {
     icon: ArrowRight,
-    accent: 'bg-sky-100 dark:bg-sky-950/40',
-    dot: 'text-sky-500 dark:text-sky-400',
   },
   'price-drop-alert': {
     icon: TrendingUp,
-    accent: 'bg-rose-100 dark:bg-rose-950/40',
-    dot: 'text-rose-500 dark:text-rose-400',
   },
   'high-intent-call-reminder': {
     icon: Zap,
-    accent: 'bg-amber-100 dark:bg-amber-950/40',
-    dot: 'text-amber-600 dark:text-amber-400',
   },
   'saturday-open-house-prep': {
     icon: Home,
-    accent: 'bg-violet-100 dark:bg-violet-950/40',
-    dot: 'text-violet-500 dark:text-violet-400',
   },
   'monthly-market-update': {
     icon: Mail,
-    accent: 'bg-indigo-100 dark:bg-indigo-950/40',
-    dot: 'text-indigo-500 dark:text-indigo-400',
   },
   'buyer-pre-approval-nudge': {
     icon: Target,
-    accent: 'bg-orange-100 dark:bg-orange-950/40',
-    dot: 'text-orange-500 dark:text-orange-400',
   },
   'evening-task-wrap': {
     icon: Clock,
-    accent: 'bg-amber-100 dark:bg-amber-950/40',
-    dot: 'text-amber-600 dark:text-amber-400',
   },
   'stale-leads-weekly-sweep': {
     icon: RotateCcw,
-    accent: 'bg-blue-100 dark:bg-blue-950/40',
-    dot: 'text-blue-500 dark:text-blue-400',
   },
   'inspection-stage-update': {
     icon: CheckSquare,
-    accent: 'bg-purple-100 dark:bg-purple-950/40',
-    dot: 'text-purple-600 dark:text-purple-400',
   },
   'new-lead-survey-drip': {
     icon: MessageCircle,
-    accent: 'bg-sky-100 dark:bg-sky-950/40',
-    dot: 'text-sky-500 dark:text-sky-400',
   },
   'post-showing-feedback': {
     icon: Home,
-    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
-    dot: 'text-emerald-600 dark:text-emerald-400',
   },
   'referral-thank-you': {
     icon: UserPlus,
-    accent: 'bg-rose-100 dark:bg-rose-950/40',
-    dot: 'text-rose-500 dark:text-rose-400',
   },
   'slack-new-lead-alert': {
     icon: Plug,
-    accent: 'bg-violet-100 dark:bg-violet-950/40',
-    dot: 'text-violet-600 dark:text-violet-400',
   },
   'inbound-email-auto-ack': {
     icon: Mail,
-    accent: 'bg-red-100 dark:bg-red-950/40',
-    dot: 'text-red-500 dark:text-red-400',
   },
   'hot-lead-push-alert': {
     icon: BellRing,
-    accent: 'bg-rose-100 dark:bg-rose-950/40',
-    dot: 'text-rose-500 dark:text-rose-400',
   },
   'deal-stage-push-alert': {
     icon: BellRing,
-    accent: 'bg-orange-100 dark:bg-orange-950/40',
-    dot: 'text-orange-500 dark:text-orange-400',
   },
   'post-close-30day-checkin': {
     icon: Home,
-    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
-    dot: 'text-emerald-600 dark:text-emerald-400',
   },
   'offer-accepted-celebration': {
     icon: Sparkles,
-    accent: 'bg-amber-100 dark:bg-amber-950/40',
-    dot: 'text-amber-600 dark:text-amber-400',
   },
   'facebook-lead-funnel': {
     icon: Target,
-    accent: 'bg-blue-100 dark:bg-blue-950/40',
-    dot: 'text-blue-600 dark:text-blue-400',
   },
   'end-of-month-pipeline-close': {
     icon: TrendingUp,
-    accent: 'bg-violet-100 dark:bg-violet-950/40',
-    dot: 'text-violet-600 dark:text-violet-400',
   },
   'new-deal-welcome-packet': {
     icon: Building2,
-    accent: 'bg-emerald-100 dark:bg-emerald-950/40',
-    dot: 'text-emerald-600 dark:text-emerald-400',
   },
   'new-deal-push-alert': {
     icon: BellRing,
-    accent: 'bg-orange-100 dark:bg-orange-950/40',
-    dot: 'text-orange-500 dark:text-orange-400',
   },
   'contact-updated-score-check': {
     icon: RefreshCw,
-    accent: 'bg-sky-100 dark:bg-sky-950/40',
-    dot: 'text-sky-500 dark:text-sky-400',
   },
   'contact-updated-zapier-webhook': {
     icon: Webhook,
-    accent: 'bg-teal-100 dark:bg-teal-950/40',
-    dot: 'text-teal-600 dark:text-teal-400',
   },
 };
 
 const TEMPLATE_META_DEFAULT = {
   icon: WorkflowIcon,
-  accent: 'bg-muted',
-  dot: 'text-muted-foreground',
 };
 
 /**
