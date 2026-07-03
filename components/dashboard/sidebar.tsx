@@ -1414,22 +1414,10 @@ export function Sidebar({
   isPlatformAdmin = false,
 }: SidebarProps) {
   const pathname = usePathname();
-  // Read search params and keep in sync with URL changes
-  const [searchParamsString, setSearchParamsString] = useState('');
-  useEffect(() => {
-    const updateParams = () => {
-      setSearchParamsString(window.location.search.replace('?', ''));
-    };
-    updateParams();
-    // Listen for popstate (back/forward) and custom pushState/replaceState
-    window.addEventListener('popstate', updateParams);
-    // Poll briefly to catch Next.js soft navigations that change query params
-    const interval = setInterval(updateParams, 300);
-    return () => {
-      window.removeEventListener('popstate', updateParams);
-      clearInterval(interval);
-    };
-  }, [pathname]);
+  // Query-param string, reactive to soft navigations. Previously this polled
+  // window.location.search every 300ms forever (a state-compare 3×/sec on every
+  // page); useSearchParams() already re-renders on param changes — no interval.
+  const searchParamsString = useSearchParams().toString();
   const base = `/s/${slug}`;
   const { user } = useUser();
   // Shared collapse state (provided by the layout). The broker branch below

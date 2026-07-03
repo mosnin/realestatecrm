@@ -1,8 +1,18 @@
+import { cache } from 'react';
 import { supabase } from '@/lib/supabase';
 import { normalizeSlug } from '@/lib/intake';
 import type { Space } from '@/lib/types';
 
-export async function getSpaceFromSlug(inputSlug: string): Promise<Space | null> {
+/**
+ * Resolve a Space by slug. Wrapped in React `cache()` so the layout, the page,
+ * and any child that resolves the same slug during ONE server request share a
+ * single query instead of each re-running it — a navigation to /s/[slug]/*
+ * previously issued this lookup 2–3× serially. `cache()` is request-scoped, so
+ * there's no cross-request staleness.
+ */
+export const getSpaceFromSlug = cache(async function getSpaceFromSlug(
+  inputSlug: string,
+): Promise<Space | null> {
   const slug = normalizeSlug(inputSlug);
   const { data, error } = await supabase
     .from('Space')
@@ -12,7 +22,7 @@ export async function getSpaceFromSlug(inputSlug: string): Promise<Space | null>
     .maybeSingle();
   if (error) throw error;
   return (data as Space) ?? null;
-}
+});
 
 export async function getSpaceByOwnerId(ownerId: string): Promise<Space | null> {
   // Space.ownerId is UNIQUE, so a user has at most one (producing) Space — the
@@ -53,7 +63,12 @@ export async function userOwnsSpace(spaceId: string, clerkUserId: string): Promi
   return !!space;
 }
 
-export async function getSpaceForUser(clerkUserId: string): Promise<Space | null> {
+export const getSpaceForUser = cache(async function getSpaceForUser(
+  clerkUserId: string,
+): Promise<Space | null> {
+  // Request-scoped dedup (see getSpaceFromSlug) — the layout + page both call
+  // this per navigation.
+  //
   // Two queries but they're simple index lookups — keeping sequential to avoid
   // PostgREST FK constraint name ambiguity with inline references.
   //
@@ -82,4 +97,4 @@ export async function getSpaceForUser(clerkUserId: string): Promise<Space | null
     .maybeSingle();
   if (error) throw error;
   return (data as Space) ?? null;
-}
+});

@@ -558,10 +558,17 @@ function runFormatter(
     }
     case 'regex_extract': {
       if (!regexPattern) { output = ''; break; }
+      // ReDoS mitigation: the pattern AND the input are both user/tenant
+      // controlled, and JS RegExp has no execution timeout. Catastrophic
+      // backtracking cost scales with input length, so cap the pattern length
+      // and run the match against a bounded slice of the input — this turns any
+      // pathological pattern into a small constant-time worst case instead of a
+      // function-hanging DoS.
+      if (regexPattern.length > 200) { output = ''; break; }
       try {
         const flags = (regexFlags ?? '').replace(/[^gimsuy]/g, '');
         const re = new RegExp(regexPattern, flags);
-        const m = strValue.match(re);
+        const m = strValue.slice(0, 1000).match(re);
         output = m ? (m[1] ?? m[0]) : '';
       } catch { output = ''; }
       break;

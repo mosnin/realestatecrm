@@ -3,7 +3,7 @@
  * without NEXT_PUBLIC_SENTRY_DSN ships an inert SDK (no network, no noise).
  *
  * Replay is intentionally omitted for now to keep the client bundle lean;
- * errors + tracing + logs are the priority. Enable replay later if needed.
+ * errors + tracing are the priority. Enable replay later if needed.
  */
 import * as Sentry from '@sentry/nextjs';
 
@@ -19,7 +19,11 @@ if (dsn) {
       process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ??
         (process.env.NODE_ENV === 'production' ? '0.1' : '1.0'),
     ),
-    enableLogs: true,
+    // Logs stay OFF on the client: the logging transport adds weight to every
+    // user's bundle and streams console output from real sessions we don't
+    // triage from the browser. Errors + tracing are the client priority;
+    // structured logs are captured server-side where they're actionable.
+    enableLogs: false,
     sendDefaultPii: false,
     debug: false,
   });
