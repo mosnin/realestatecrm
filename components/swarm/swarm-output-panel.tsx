@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'motion/react';
-import { CheckCircle2, Copy, Check, AlertCircle } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { H3, BODY, BODY_MUTED } from '@/lib/typography';
@@ -23,7 +23,6 @@ export function SwarmOutputPanel({ result, status }: SwarmOutputPanelProps) {
         className="rounded-xl border border-rose-500/20 bg-rose-500/[0.04] p-6 space-y-4"
       >
         <div className="flex items-center gap-2">
-          <AlertCircle className="text-rose-500 flex-shrink-0" size={18} />
           <p className={cn(H3, 'font-semibold')}>Swarm failed.</p>
         </div>
         {result && (
@@ -52,12 +51,11 @@ export function SwarmOutputPanel({ result, status }: SwarmOutputPanelProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-6 space-y-4"
+      className="rounded-xl border border-border/60 bg-muted/40 p-6 space-y-4"
     >
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
           <p className={cn(H3, 'font-semibold')}>Swarm complete.</p>
         </div>
         <button

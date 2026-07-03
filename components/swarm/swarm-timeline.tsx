@@ -2,15 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  MessageCircle,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Brain,
-  Users,
-  FileText,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 
@@ -61,76 +52,20 @@ function eventDescription(type: string, data: Record<string, unknown>): string {
   }
 }
 
-// ─── Per-event icon + dot color ───────────────────────────────────────────────
+// ─── Per-event dot tone ───────────────────────────────────────────────────────
+// Monochrome by default; failed states keep the semantic destructive token.
 
 interface EventStyle {
-  icon: React.ReactNode;
   dotClass: string;
-  iconClass: string;
 }
 
 function getEventStyle(type: string): EventStyle {
   switch (type) {
-    case 'swarm_planning':
-      return {
-        icon: <Brain size={13} />,
-        dotClass: 'bg-muted-foreground/40',
-        iconClass: 'text-muted-foreground',
-      };
-    case 'plan_created':
-      return {
-        icon: <MessageCircle size={13} />,
-        dotClass: 'bg-blue-500',
-        iconClass: 'text-blue-500',
-      };
-    case 'agent_started':
-      return {
-        icon: <Users size={13} />,
-        dotClass: 'bg-blue-500',
-        iconClass: 'text-blue-500',
-      };
-    case 'agent_thinking':
-      return {
-        icon: <Loader2 size={13} className="animate-spin" />,
-        dotClass: 'bg-muted-foreground/40',
-        iconClass: 'text-muted-foreground',
-      };
-    case 'agent_completed':
-      return {
-        icon: <CheckCircle2 size={13} />,
-        dotClass: 'bg-emerald-500',
-        iconClass: 'text-emerald-600 dark:text-emerald-400',
-      };
     case 'agent_failed':
-      return {
-        icon: <XCircle size={13} />,
-        dotClass: 'bg-destructive',
-        iconClass: 'text-destructive',
-      };
-    case 'audit_started':
-      return {
-        icon: <Brain size={13} />,
-        dotClass: 'bg-amber-500',
-        iconClass: 'text-amber-600 dark:text-amber-400',
-      };
-    case 'swarm_completed':
-      return {
-        icon: <CheckCircle2 size={15} />,
-        dotClass: 'bg-emerald-500',
-        iconClass: 'text-emerald-600 dark:text-emerald-400',
-      };
     case 'swarm_failed':
-      return {
-        icon: <XCircle size={15} />,
-        dotClass: 'bg-destructive',
-        iconClass: 'text-destructive',
-      };
+      return { dotClass: 'bg-destructive' };
     default:
-      return {
-        icon: <FileText size={13} />,
-        dotClass: 'bg-muted-foreground/40',
-        iconClass: 'text-muted-foreground',
-      };
+      return { dotClass: 'bg-muted-foreground/40' };
   }
 }
 
@@ -163,10 +98,7 @@ function EventRow({
 
       {/* Right: description + timestamp */}
       <div className="flex-1 min-w-0 pb-4">
-        <div className="flex items-start gap-1.5">
-          <span className={cn('flex-shrink-0 mt-px', style.iconClass)}>{style.icon}</span>
-          <p className="text-sm text-foreground leading-snug">{description}</p>
-        </div>
+        <p className="text-sm text-foreground leading-snug">{description}</p>
         <p className="text-[11px] tabular-nums text-muted-foreground mt-0.5">{time}</p>
       </div>
     </motion.div>

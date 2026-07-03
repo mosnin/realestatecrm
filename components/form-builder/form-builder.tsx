@@ -44,7 +44,6 @@ import {
   ChevronDown,
   ChevronRight,
   X,
-  Eye,
 } from 'lucide-react';
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
 import { H3, SECTION_LABEL } from '@/lib/typography';
@@ -121,8 +120,6 @@ function SortableQuestion({
   onDelete: () => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const typeConfig = getQuestionTypeConfig(question.type);
-  const Icon = typeConfig?.icon;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
@@ -161,7 +158,6 @@ function SortableQuestion({
       >
         <GripVertical size={14} />
       </button>
-      {Icon && <Icon size={14} className="flex-shrink-0 text-muted-foreground" />}
       <span className="text-sm font-medium truncate flex-1 text-foreground">
         {question.label}
         {question.required && (
@@ -294,7 +290,6 @@ function SortableSection({
             <p className="text-sm font-semibold truncate text-foreground">{section.title}</p>
             {section.visibleWhen && (
               <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground border border-border/70 rounded-md px-1.5 py-0.5 flex-shrink-0">
-                <Eye size={10} />
                 Conditional
               </span>
             )}
