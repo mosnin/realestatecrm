@@ -151,7 +151,7 @@ export function FeaturesDark() {
                 </DemoShell>
                 <CardTitle
                   title="Replies in your voice"
-                  body="Ask Chippi for a reply and it is written from how you actually write. Connect your inbox and it drafts them into an approval inbox for you. Read it, tweak it, send it. Nothing leaves without your tap."
+                  body="Ask Chippi for a reply and it is written from how you actually write. Connect your inbox and it sends them in your voice the moment leads land."
                 />
               </CardShell>
 
@@ -256,7 +256,7 @@ export function FeaturesDark() {
                 <ul className="space-y-2 text-sm text-neutral-700">
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 h-[18px] w-[18px] text-[#ff4b29]" />
-                    <span>Approval-first by default</span>
+                    <span>Every send on the record</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="mt-0.5 h-[18px] w-[18px] text-[#ff4b29]" />

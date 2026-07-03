@@ -41,7 +41,7 @@ const STEPS: ShowcaseStep[] = [
       <Frost title="Inbox" badge="Connected">
         <Row icon={Mail} title="Gmail" meta="reading + drafting" tone="text-[#ff9a6e]" right={ON} active />
         <Row icon={Mail} title="Outlook" meta="reading + drafting" right={ON} />
-        <Row icon={Check} title="Replies drafted in your voice" meta="nothing sends without your tap" tone="text-emerald-300/80" />
+        <Row icon={Check} title="Replies sent in your voice" meta="the moment a lead lands" tone="text-emerald-300/80" />
       </Frost>
     ),
   },
@@ -76,7 +76,7 @@ const STEPS: ShowcaseStep[] = [
     mockup: (
       <Frost title="Messaging" badge="Connected">
         <Row icon={MessageSquare} title="WhatsApp" meta="send + follow up" tone="text-[#ff9a6e]" right={ON} active />
-        <Row icon={MessageSquare} title="SMS, via Twilio" meta="send + follow up" right={ON} />
+        <Row icon={MessageSquare} title="WhatsApp" meta="send + follow up" right={ON} />
         <Row icon={Check} title="One worked queue" meta="email, text, and chat together" tone="text-emerald-300/80" />
       </Frost>
     ),

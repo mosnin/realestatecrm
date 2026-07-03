@@ -29,8 +29,8 @@ const CELLS = [
   },
   {
     slot: 'approvals',
-    title: 'Approval-first control.',
-    sub: 'Nothing sends without your tap, \nguardrails and auditing built in.',
+    title: 'Accountable by design.',
+    sub: 'Every send in your voice, \nguardrails and auditing built in.',
   },
 ];
 

@@ -27,6 +27,7 @@
 
 import { SiteHeader } from '@/components/marketing/giga/header';
 import { SiteFooter } from '@/components/marketing/giga/footer';
+import { FooterReveal } from '@/components/ui/footer-reveal';
 import { FprScript } from '@/components/affiliate/fpr-script';
 
 export default function MarketingLayout({
@@ -55,8 +56,17 @@ export default function MarketingLayout({
         </defs>
       </svg>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
-      <SiteFooter />
+      {/* FooterReveal: the footer stays pinned under the page and is uncovered
+          as the content slides up on the last stretch of scroll. The content
+          wrapper carries the shell background so it occludes the pinned footer
+          mid-page. */}
+      <FooterReveal
+        className="flex flex-1 flex-col"
+        contentClassName="flex flex-1 flex-col bg-white dark:bg-[#0a0a0a]"
+        footer={<SiteFooter />}
+      >
+        <main className="flex-1">{children}</main>
+      </FooterReveal>
     </div>
   );
 }

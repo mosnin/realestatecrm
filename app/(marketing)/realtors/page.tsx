@@ -36,7 +36,7 @@ import { FeatureList } from '@/components/marketing/site/home/feature-list';
 export const metadata = {
   title: 'For realtors · Chippi',
   description:
-    'Chippi works your book while you close, reading the inbox, drafting replies in your voice, and proposing tour times against your real calendar. Nothing sends without your tap.',
+    'Chippi works your book while you close, reading the inbox, sending replies in your voice, and booking tour times against your real calendar.',
 };
 
 /* ── Copy ──────────────────────────────────────────────────────────────── */
@@ -86,7 +86,7 @@ const BENTO_CELLS = [
  * this site already stands behind, nothing invented. */
 const BAND_STATS: { value: string; label: string }[] = [
   { value: '24/7', label: 'Working your book around the clock' },
-  { value: '100%', label: 'Approval-first, nothing sends without your tap' },
+  { value: '100%', label: 'Every send in your voice, on the record' },
   { value: '50+', label: 'Tools connect in two minutes' },
 ];
 
@@ -285,7 +285,7 @@ export default function RealtorsPage() {
       <PageHero
         eyebrow="For solo realtors"
         title="Your book, worked while you close"
-        sub="Chippi reads your inbox, drafts every reply in your voice, and proposes tour times against your real calendar. Nothing sends without your tap."
+        sub="Chippi reads your inbox, sends every reply in your voice, and books tour times against your real calendar."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
@@ -331,7 +331,7 @@ export default function RealtorsPage() {
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
                     <p className="mt-1 text-xs text-neutral-600">
-                      Approval-first, nothing sends without your tap
+                      Every send in your voice, on the record
                     </p>
                   </div>
                 </div>
@@ -364,7 +364,7 @@ export default function RealtorsPage() {
                     </h3>
                     <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
                       <ShieldCheck className="h-4 w-4 text-[#ff4b29]" />
-                      Approval-first
+                      On the record
                     </span>
                   </div>
 
@@ -413,7 +413,7 @@ export default function RealtorsPage() {
                 You close the deals. Chippi works the hours in between.
               </h2>
               <p className="mt-4 max-w-md text-base leading-relaxed text-white/80 sm:text-lg">
-                Every reply still waits for your name on it. Chippi just makes
+                Every reply carries your name and your voice. Chippi just makes
                 sure there is always one ready.
               </p>
             </FadeUp>

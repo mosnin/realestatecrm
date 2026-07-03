@@ -36,6 +36,13 @@ import {
   ChevronRight,
   Users,
 } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from '@/components/sharkui/context-menu';
 import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 import Link from 'next/link';
@@ -1692,9 +1699,52 @@ function ContactRow({
           {body}
         </button>
       ) : (
-        <Link href={`/s/${slug}/contacts/${contact.id}`} className={rowClassName}>
-          {body}
-        </Link>
+        /* Right-click gets the power-user menu: everything you'd do to a
+           person without leaving the list. Left-click still navigates. */
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <Link
+              href={`/s/${slug}/contacts/${contact.id}`}
+              className={cn(rowClassName, 'cursor-pointer')}
+            >
+              {body}
+            </Link>
+          </ContextMenuTrigger>
+          <ContextMenuContent className="min-w-48">
+            <ContextMenuItem value="open" asChild>
+              <Link href={`/s/${slug}/contacts/${contact.id}`}>
+                <ChevronRight /> Open
+              </Link>
+            </ContextMenuItem>
+            <ContextMenuItem value="log" asChild>
+              <Link href={`/s/${slug}/chippi/log?personId=${contact.id}`}>
+                <Mic /> Log a note
+              </Link>
+            </ContextMenuItem>
+            {(contact.phone || contact.email) && <ContextMenuSeparator />}
+            {contact.phone && (
+              <ContextMenuItem value="call" asChild>
+                <a href={`tel:${contact.phone}`}>
+                  <Phone /> Call {contact.phone}
+                </a>
+              </ContextMenuItem>
+            )}
+            {contact.email && (
+              <ContextMenuItem value="email" asChild>
+                <a href={`mailto:${contact.email}`}>
+                  <Mail /> Email
+                </a>
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem value="edit" onClick={onEdit}>
+              <Pencil /> Edit
+            </ContextMenuItem>
+            <ContextMenuItem value="delete" variant="destructive" onClick={onDelete}>
+              <Trash2 /> Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       )}
     </motion.li>
   );
