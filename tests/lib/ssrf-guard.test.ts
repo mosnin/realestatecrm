@@ -12,6 +12,7 @@ import {
   isPrivateIpv4Int,
   isBlockedIpv6,
   assertPublicHttpTarget,
+  getSafeDispatcher,
 } from '@/lib/net/ssrf-guard';
 
 describe('parseIpv4ToInt — inet_aton encodings', () => {
@@ -97,5 +98,14 @@ describe('assertPublicHttpTarget — literals (no DNS needed)', () => {
   });
   it('allows a public IP literal', async () => {
     expect((await assertPublicHttpTarget('https://1.1.1.1/hook')).ok).toBe(true);
+  });
+});
+
+describe('getSafeDispatcher — connect-time pinning', () => {
+  it('builds a reusable undici dispatcher (closes the DNS-rebinding TOCTOU)', () => {
+    const d = getSafeDispatcher();
+    expect(d).toBeDefined();
+    // Cached singleton — same instance on repeat calls.
+    expect(getSafeDispatcher()).toBe(d);
   });
 });

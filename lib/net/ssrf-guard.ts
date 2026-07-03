@@ -22,6 +22,8 @@
  */
 
 import { lookup } from 'node:dns/promises';
+import { lookup as nodeLookup, type LookupOptions, type LookupAddress } from 'node:dns';
+import { Agent } from 'undici';
 
 /**
  * Parse an IPv4 literal in any inet_aton-accepted form to a 32-bit unsigned
@@ -116,6 +118,59 @@ export function isBlockedIpv6(host: string): boolean {
   if (h.startsWith('fec') || h.startsWith('fed') || h.startsWith('fee') || h.startsWith('fef')) return true;
   if (h.startsWith('fc') || h.startsWith('fd')) return true;
   return false;
+}
+
+/**
+ * A fetch dispatcher that re-validates the resolved address at CONNECT time.
+ * The pre-flight assertPublicHttpTarget resolves + checks the host, but undici
+ * re-resolves when it actually connects, so a sub-second DNS-rebinding flip
+ * (public IP to the pre-check, private IP to the socket) would slip through.
+ * Hooking the SAME lookup undici uses to connect closes that TOCTOU: a resolved
+ * private/reserved address aborts the connection.
+ *
+ * Lazily built + cached. If undici is somehow unavailable the caller falls back
+ * to pre-flight-only, which still blocks every static-encoding and
+ * DNS-to-private vector — this dispatcher is strictly-additive hardening.
+ */
+let cachedDispatcher: Agent | null | undefined;
+export function getSafeDispatcher(): Agent | undefined {
+  if (cachedDispatcher !== undefined) return cachedDispatcher ?? undefined;
+  try {
+    cachedDispatcher = new Agent({
+      connect: {
+        // Matches undici's LookupFunction / node's dns.lookup shape.
+        lookup: (
+          hostname: string,
+          options: LookupOptions,
+          callback: (
+            err: NodeJS.ErrnoException | null,
+            address: string | LookupAddress[],
+            family: number,
+          ) => void,
+        ) => {
+          nodeLookup(hostname, options, (err, address, family) => {
+            if (err) return callback(err, address as string | LookupAddress[], family);
+            const list: Array<{ address: string }> = Array.isArray(address)
+              ? (address as LookupAddress[])
+              : [{ address: address as string }];
+            for (const a of list) {
+              if (a && typeof a.address === 'string' && isBlockedLiteral(a.address)) {
+                return callback(
+                  new Error('SSRF: host resolved to a private or reserved address'),
+                  address as string | LookupAddress[],
+                  family,
+                );
+              }
+            }
+            callback(null, address as string | LookupAddress[], family);
+          });
+        },
+      },
+    });
+  } catch {
+    cachedDispatcher = null;
+  }
+  return cachedDispatcher ?? undefined;
 }
 
 /** Classify a single host token (literal IP or resolved address). */

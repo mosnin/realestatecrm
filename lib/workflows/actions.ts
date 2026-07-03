@@ -24,7 +24,7 @@ import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { sendPushToSpace } from '@/lib/push';
 import { evaluateConditions, resolveField } from './conditions';
-import { assertPublicHttpTarget } from '@/lib/net/ssrf-guard';
+import { assertPublicHttpTarget, getSafeDispatcher } from '@/lib/net/ssrf-guard';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
 import { UPDATE_LEAD_FIELDS } from './schema';
 
@@ -788,7 +788,9 @@ async function runWebhookPost(
   const outcome = await withRetry<FetchOutcome>(
     async () => {
       try {
-        const res = await fetch(url, {
+        // `dispatcher` is an undici RequestInit extension not present in
+        // lib.dom's RequestInit — carry it through a widened type.
+        const fetchInit: RequestInit & { dispatcher?: unknown } = {
           method: 'POST',
           headers,
           body: body ?? '{}',
@@ -797,7 +799,12 @@ async function runWebhookPost(
           // initial host, so a 3xx into 169.254.169.254 / an internal service
           // would bypass the SSRF guard. A redirect is surfaced as a non-2xx.
           redirect: 'manual',
-        });
+          // Re-validate the resolved IP at connect time to close the DNS-
+          // rebinding TOCTOU the pre-flight check can't. Strictly additive —
+          // undefined when undici is unavailable, leaving pre-flight in force.
+          dispatcher: getSafeDispatcher(),
+        };
+        const res = await fetch(url, fetchInit);
         const text = await res.text().then((t) => t.slice(0, 10_000));
         return { ok: res.ok, status: res.status, text };
       } catch (err) {

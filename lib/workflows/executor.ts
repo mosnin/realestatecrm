@@ -470,6 +470,18 @@ export async function runWorkflowsForEvent(
   const workflows = await loadEnabledWorkflows(input.spaceId);
   const { matching, unmatched } = selectMatchingWorkflows(workflows, input);
 
+  // Most callers dispatch this inside a post-response after(), which has a
+  // bounded execution budget on Vercel. A very large fan-out for a single event
+  // could see its LATE runs truncated. We don't cap (that would silently DROP a
+  // configured workflow); instead surface it so a real fan-out problem is
+  // observable rather than a mystery. A durable queue is the structural fix.
+  if (matching.length > 20) {
+    logger.warn(
+      '[workflows.executor] large workflow fan-out for one event; post-response budget may truncate late runs',
+      { spaceId: input.spaceId, triggerType: input.triggerType, matched: matching.length },
+    );
+  }
+
   // A delivery with candidate workflows but no slug match is the classic
   // "my workflow won't fire" — surface it (wrong/typo'd slug, etc.).
   if (unmatched) {
