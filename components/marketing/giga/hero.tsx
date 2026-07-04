@@ -12,19 +12,15 @@
  * entrance language); respects prefers-reduced-motion via BlurRise.
  */
 
-import Link from 'next/link';
-import { Play } from 'lucide-react';
-import { BlurRise, EyebrowPill, Mono, PillPrimary } from './primitives';
-import { LiveProductIsland } from '@/components/experience/live-product-island';
+import { BlurRise, EyebrowPill, Mono } from './primitives';
 import { ShimmeringText } from '@/components/ui/shimmering-text';
 import { LogosCarousel } from '@/components/ui/logos-carousel';
+import { HeroChat } from './hero-chat';
 
 /* Brokerage wordmarks for the social-proof marquee. Rendered as uniform styled
  * text so every mark reads at the same size/weight (image logos had wildly
  * different intrinsic ratios). Swap for real partner marks when available. */
 const LOGOS = ['Compass', 'RE/MAX', 'Coldwell Banker', 'Keller Williams', 'eXp Realty', 'Sotheby’s'];
-
-const DEMO = '/demo';
 
 export function Hero() {
   return (
@@ -45,7 +41,7 @@ export function Hero() {
       </div>
 
       {/* Centered headline stack */}
-      <div className="mx-auto flex min-h-[100svh] max-w-4xl flex-col items-center justify-center px-5 pb-44 pt-28 text-center sm:px-8">
+      <div className="mx-auto flex min-h-[100svh] max-w-4xl flex-col items-center justify-center px-5 pb-32 pt-28 text-center sm:px-8">
         <BlurRise trigger="load" delay={0.05}>
           <EyebrowPill>
             {/* Slow light-sweep across the eyebrow — the one place the hero
@@ -79,85 +75,13 @@ export function Hero() {
           </p>
         </BlurRise>
 
-        <BlurRise trigger="load" delay={0.4}>
-          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
-            <PillPrimary href={DEMO} withArrow>
-              See a demo
-            </PillPrimary>
-          </div>
-        </BlurRise>
-
-        {/* Social-proof clip card — inline on mobile/tablet (the absolute card
-            below is lg-only to avoid overlapping this centered stack). Keeps
-            the "watch a walkthrough" proof on the storefront for the ~90% of
-            first visits that aren't desktop. */}
-        <BlurRise trigger="load" delay={0.5} className="mt-8 w-full max-w-sm lg:hidden">
-          <Link
-            href={DEMO}
-            className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3 backdrop-blur-xl transition-colors hover:bg-white/[0.1]"
-          >
-            <span className="relative flex h-12 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/marketing/product/realtors.jpg"
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-70"
-              />
-              <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white text-black">
-                <Play className="ml-0.5 h-3 w-3" />
-              </span>
-            </span>
-            <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[13px] font-medium text-white">See Chippi run a floor</span>
-              <span className="mt-0.5 block text-[11px] leading-snug text-white/55">
-                A 90-second walkthrough on real numbers
-              </span>
-            </span>
-          </Link>
+        {/* Ask-Chippi box — the hero's interactive centerpiece (replaces the
+            old video/testimonial card). Frosted glass on the photo; branded
+            with the real Chippi mark. */}
+        <BlurRise trigger="load" delay={0.4} className="mt-10 w-full">
+          <HeroChat />
         </BlurRise>
       </div>
-
-      {/* Bottom-left video / testimonial card */}
-      <BlurRise
-        trigger="load"
-        delay={0.55}
-        className="pointer-events-none absolute bottom-28 left-5 z-10 hidden sm:left-8 lg:block"
-      >
-        <Link
-          href={DEMO}
-          className="pointer-events-auto group flex w-[300px] items-center gap-3 rounded-2xl border border-white/10 bg-black/40 p-3 backdrop-blur-xl transition-colors hover:bg-black/55"
-        >
-          <span className="relative flex h-14 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-            {/* TODO: replace placeholder image, testimonial/clip thumbnail. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/marketing/product/realtors.jpg"
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover opacity-70"
-            />
-            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition-transform duration-200 group-hover:scale-105">
-              <Play className="ml-0.5 h-3.5 w-3.5" />
-            </span>
-          </span>
-          <span className="min-w-0 text-left">
-            <span className="block text-[13px] font-medium text-white">See Chippi run a floor</span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-white/55">
-              A 90-second walkthrough on real numbers
-            </span>
-          </span>
-        </Link>
-      </BlurRise>
-
-      {/* Bottom-right: the live product island — Chippi working in real time.
-          Desktop-only (mirrors the bottom-left clip card) so it never collides
-          with the centered headline stack on narrow viewports. */}
-      <BlurRise
-        trigger="load"
-        delay={0.6}
-        className="pointer-events-none absolute bottom-32 right-8 z-10 hidden lg:block"
-      >
-        <LiveProductIsland />
-      </BlurRise>
 
       {/* Logo cloud, fading in along the bottom */}
       <BlurRise
