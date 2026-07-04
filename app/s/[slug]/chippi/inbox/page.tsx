@@ -135,7 +135,7 @@ export default async function ChippiInboxPage({
                 const waitingTime = relativeTime(task.updatedAt ?? task.createdAt);
 
                 return (
-                  <li key={task.id} className="py-4 space-y-3">
+                  <li key={task.id} className="py-3 space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="pt-0.5 flex-shrink-0">
                         <span

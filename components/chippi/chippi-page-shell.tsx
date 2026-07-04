@@ -29,7 +29,7 @@
  */
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { BODY_MUTED, H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
+import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 interface ChippiPageShellProps {
   /** Small muted line above the title, e.g. "Drafts." or "Memory." */
@@ -65,12 +65,11 @@ export function ChippiPageShell({
   void variant; // consumed by callers for route resolution — no visual branch today
   return (
     <div className="h-full overflow-y-auto">
-      <div
-        className={cn(
-          'w-full max-w-3xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24',
-          SECTION_RHYTHM,
-        )}
-      >
+      {/* Match the Automations page frame: the wider max-w-5xl reading column
+          and the space-y-8 section rhythm, so every Chippi non-chat sub-page
+          (brief, inbox, activity, …) sits in the same premium People/Deals
+          surface rather than a narrow chat-reading column. */}
+      <div className="w-full max-w-5xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-8">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>{greeting}</p>
           {title && (
