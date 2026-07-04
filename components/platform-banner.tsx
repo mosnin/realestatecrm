@@ -18,9 +18,9 @@ type Announcement = {
 
 const STYLES: Record<Announcement['severity'], { strip: string; icon: React.ElementType; iconColor: string }> = {
   info: {
-    strip: 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-500/10 dark:border-blue-500/30 dark:text-blue-200',
+    strip: 'bg-muted border-border text-foreground',
     icon: Info,
-    iconColor: 'text-blue-600 dark:text-blue-400',
+    iconColor: 'text-muted-foreground',
   },
   warning: {
     strip: 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-200',

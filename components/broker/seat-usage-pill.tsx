@@ -75,7 +75,7 @@ function tintClasses(ratio: number): { border: string; text: string; bar: string
   return {
     border: 'border-border bg-muted/40',
     text: 'text-muted-foreground',
-    bar: 'bg-primary/70',
+    bar: 'bg-muted-foreground',
   };
 }
 
@@ -112,7 +112,7 @@ export function SeatUsagePill({
       <span
         title={tooltip}
         className={cn(
-          'inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-50/60 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 tabular-nums',
+          'inline-flex items-center rounded-full border border-border bg-muted/40 font-medium text-muted-foreground tabular-nums',
           sizing,
           className,
         )}
@@ -121,7 +121,7 @@ export function SeatUsagePill({
       >
         <span
           aria-hidden="true"
-          className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+          className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
         />
         <span>
           {countLabel(safeUsed, 'member')}

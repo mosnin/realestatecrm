@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
-import { Flame, Thermometer, Snowflake, HelpCircle, ArrowRight, Inbox, RotateCcw } from 'lucide-react';
+import { ArrowRight, Inbox, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import type { Contact } from '@/lib/types';
 import { LeadsView } from '@/components/leads/leads-view';
@@ -127,26 +127,22 @@ export default async function LeadsPage({
           <div className="h-3 w-px bg-border hidden sm:block" />
           <div className="flex flex-wrap gap-3">
             {tierCounts.hot > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                <Flame size={13} />
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 {tierCounts.hot} hot
               </div>
             )}
             {tierCounts.warm > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                <Thermometer size={13} />
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 {tierCounts.warm} warm
               </div>
             )}
             {tierCounts.cold > 0 && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
-                <Snowflake size={13} />
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 {tierCounts.cold} cold
               </div>
             )}
             {tierCounts.unscored > 0 && (
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <HelpCircle size={13} />
                 {tierCounts.unscored} unscored
               </div>
             )}

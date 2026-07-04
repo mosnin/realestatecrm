@@ -234,7 +234,7 @@ function ConnectionDot({ connected }: { connected: boolean }) {
     <span
       className={cn(
         'flex-shrink-0 w-1.5 h-1.5 rounded-full',
-        connected ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/30',
+        connected ? 'bg-foreground animate-pulse' : 'bg-muted-foreground/30',
       )}
       title={connected ? 'Live stream connected' : 'Disconnected'}
     />

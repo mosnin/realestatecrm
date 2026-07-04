@@ -174,7 +174,7 @@ registry loses them.
 | `ShimmeringText` | Hero eyebrow ("Introducing Chippi") |
 | `LogosCarousel` | Hero logo cloud (replaced the linear marquee) |
 | `TextFlip` | `CtaSection` headline second line |
-| `ChippiCircuit` (`components/experience/chippi-circuit.tsx`) | Homepage after AgentCanvas; `/chippi` page after showcases |
+| `ChippiCircuit` (`components/experience/chippi-circuit.tsx`) | `/help` Help Center, "How Chippi works" section (Chippi mark at core) |
 | `FooterReveal` | Marketing layout (`app/(marketing)/layout.tsx`) |
 | `QuickCaptureDock` via `ContactsQuickCapture` | People page (`app/s/[slug]/contacts/page.tsx`) |
 | `FocusView` | Property gallery stage photo (`components/properties/property-gallery.tsx`) |

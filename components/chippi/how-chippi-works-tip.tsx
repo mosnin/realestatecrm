@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, MessageCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 
 const STORAGE_KEY = 'chippi.tip.howItWorks.dismissedAt';
 
@@ -38,7 +38,6 @@ export function HowChippiWorksTip() {
   return (
     <div className="relative rounded-xl border border-border/70 bg-muted/30 px-4 py-3 pr-9 text-sm text-foreground/90">
       <div className="flex items-start gap-2.5">
-        <MessageCircle size={14} className="text-orange-500 flex-shrink-0 mt-0.5" />
         <div className="space-y-0.5 leading-relaxed">
           <p className="font-medium">How Chippi works</p>
           <p className="text-[13px] text-muted-foreground">

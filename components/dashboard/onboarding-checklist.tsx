@@ -11,7 +11,6 @@ import {
   MessageCircle,
   CalendarDays,
   X,
-  Rocket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -115,9 +114,6 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-              <Rocket size={15} className="text-muted-foreground" />
-            </div>
             <div>
               <p className="text-sm font-semibold text-foreground">
                 {allDone ? 'You\'re all set!' : 'Get started with Chippi'}
@@ -162,7 +158,7 @@ export function OnboardingChecklist({ slug, hasLeads, hasContacts, hasTours, has
               )}
             >
               {step.completed ? (
-                <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                <CheckCircle2 size={16} className="text-foreground flex-shrink-0" />
               ) : (
                 <Circle size={16} className="text-muted-foreground/40 flex-shrink-0 group-hover:text-muted-foreground" />
               )}

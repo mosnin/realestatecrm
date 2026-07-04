@@ -90,9 +90,9 @@ export default async function MyLeadsPage() {
       scoreLabel?.toLowerCase() === 'warm' ||
       (leadScore != null && leadScore >= WARM_LEAD_THRESHOLD);
     const className = isHot
-      ? 'text-rose-700 bg-rose-50 group-hover/row:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/15 dark:group-hover/row:bg-rose-500/25'
+      ? 'text-foreground bg-foreground/[0.06]'
       : isWarm
-        ? 'text-amber-700 bg-amber-50 group-hover/row:bg-amber-100 dark:text-amber-400 dark:bg-amber-500/15 dark:group-hover/row:bg-amber-500/25'
+        ? 'text-muted-foreground bg-muted/60'
         : 'text-muted-foreground bg-muted/60';
     return (
       <span
@@ -173,7 +173,7 @@ export default async function MyLeadsPage() {
                         </span>
                         {scorePill(lead.scoreLabel, lead.leadScore)}
                         {!contacted && (
-                          <span className="inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15">
+                          <span className="inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 text-foreground bg-foreground/[0.06]">
                             New
                           </span>
                         )}

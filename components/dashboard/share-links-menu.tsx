@@ -1,15 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import {
-  Link2,
-  Copy,
-  Check,
-  ArrowUpRight,
-  ClipboardList,
-  CalendarDays,
-  UserCircle,
-} from 'lucide-react';
+import { Link2, Copy, Check, ArrowUpRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL } from '@/lib/typography';
@@ -19,7 +11,6 @@ interface ShareLinksMenuProps {
 }
 
 interface LinkRowProps {
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
   label: string;
   description: string;
   url: string;
@@ -30,7 +21,7 @@ interface LinkRowProps {
 // icon flips to a check for confirmation. A quiet open-in-new-tab sits to the
 // right as a secondary touch. No chips, no outlined buttons — paper-flat rows
 // that match sidebar-user-menu's vocabulary.
-function LinkRow({ icon: Icon, label, description, url, previewHref }: LinkRowProps) {
+function LinkRow({ label, description, url, previewHref }: LinkRowProps) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,11 +53,6 @@ function LinkRow({ icon: Icon, label, description, url, previewHref }: LinkRowPr
         aria-label={copied ? 'Copied' : `Copy ${label.toLowerCase()} link`}
         className="flex flex-1 min-w-0 items-center gap-2.5 text-left active:scale-[0.99] transition-transform duration-150"
       >
-        <Icon
-          size={15}
-          strokeWidth={1.75}
-          className="flex-shrink-0 text-foreground/55"
-        />
         <span className="flex-1 min-w-0">
           <span className="block text-[13px] font-medium leading-tight text-foreground">
             {label}
@@ -74,7 +60,7 @@ function LinkRow({ icon: Icon, label, description, url, previewHref }: LinkRowPr
           <span
             className={cn(
               'block truncate text-[11px] leading-tight mt-0.5 transition-colors duration-150',
-              copied ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground/80',
+              copied ? 'text-foreground' : 'text-muted-foreground/80',
             )}
           >
             {copied ? 'Copied to clipboard' : description}
@@ -85,7 +71,7 @@ function LinkRow({ icon: Icon, label, description, url, previewHref }: LinkRowPr
           className={cn(
             'flex-shrink-0 transition-colors duration-150',
             copied
-              ? 'text-emerald-600 dark:text-emerald-400'
+              ? 'text-foreground'
               : 'text-muted-foreground/40 group-hover:text-muted-foreground',
           )}
         >
@@ -152,7 +138,6 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
         </div>
 
         <LinkRow
-          icon={UserCircle}
           label="Public profile"
           description="Your link-in-bio page"
           url={profileUrl}
@@ -162,7 +147,6 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
         <div className="mx-2 my-0.5 h-px bg-border/60" />
 
         <LinkRow
-          icon={ClipboardList}
           label="Application form"
           description="Where new leads apply"
           url={intakeUrl}
@@ -172,7 +156,6 @@ export function ShareLinksMenu({ slug }: ShareLinksMenuProps) {
         <div className="mx-2 my-0.5 h-px bg-border/60" />
 
         <LinkRow
-          icon={CalendarDays}
           label="Tour booking"
           description="Where prospects book a tour"
           url={bookingUrl}

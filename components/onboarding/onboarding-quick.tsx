@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { rootDomain } from '@/lib/utils';
@@ -217,15 +217,15 @@ export function OnboardingQuick({ defaultName }: Props) {
                 <Loader2 size={11} className="animate-spin flex-shrink-0" />
               )}
               {slugState.kind === 'available' && (
-                <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                <span className="text-muted-foreground flex-shrink-0">available</span>
               )}
               {slugState.kind === 'taken' && (
-                <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">
+                <span className="text-muted-foreground flex-shrink-0">
                   taken - pick a different name
                 </span>
               )}
               {slugState.kind === 'invalid' && (
-                <span className="text-amber-600 dark:text-amber-400 flex-shrink-0 truncate">
+                <span className="text-muted-foreground flex-shrink-0 truncate">
                   {slugState.message}
                 </span>
               )}

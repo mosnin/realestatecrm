@@ -257,21 +257,21 @@ export default function ImportExportClient({ totalLeads }: { totalLeads: number 
         </div>
 
         {importResult && (
-          <div className="rounded-xl border border-border/70 bg-emerald-50/70 dark:bg-emerald-500/10 px-4 py-3 space-y-2">
+          <div className="rounded-xl border border-border/60 bg-muted/40 px-4 py-3 space-y-2">
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
-              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              <CheckCircle2 size={13} className="text-foreground" />
+              <p className="text-sm font-medium text-foreground">
                 Import complete.
               </p>
             </div>
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="text-sm text-muted-foreground">
               <span className="font-semibold tabular-nums">{importResult.imported}</span> imported.{' '}
               <span className="font-semibold tabular-nums">{importResult.skipped}</span> skipped.
             </p>
             {importResult.errors.length > 0 && (
               <ul className="divide-y divide-border/60 max-h-40 overflow-y-auto">
                 {importResult.errors.map((err, i) => (
-                  <li key={i} className="text-xs text-amber-700 dark:text-amber-400 py-1.5">
+                  <li key={i} className="text-xs text-muted-foreground py-1.5">
                     {err}
                   </li>
                 ))}

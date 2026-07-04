@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Plus, X, ListChecks } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { DealMilestone } from '@/lib/types';
@@ -81,7 +81,7 @@ export function DealMilestones({ dealId, initialMilestones }: DealMilestonesProp
           <span className={cn(
             'text-xs font-semibold px-2 py-0.5 rounded-full',
             completedCount === totalCount
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+              ? 'bg-foreground/[0.06] text-foreground'
               : 'bg-muted text-muted-foreground'
           )}>
             {completedCount} / {totalCount} complete
@@ -92,7 +92,6 @@ export function DealMilestones({ dealId, initialMilestones }: DealMilestonesProp
       {/* Empty state */}
       {milestones.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-          <ListChecks size={32} className="text-muted-foreground opacity-40" />
           <p className="text-sm text-muted-foreground">No milestones yet.</p>
           <Button
             size="sm"

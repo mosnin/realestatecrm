@@ -27,7 +27,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
@@ -521,13 +521,13 @@ function StageWhoYouAre(props: {
         <span className="font-mono truncate">{linkPreview}</span>
         {props.slugState.kind === 'checking' && <Loader2 size={11} className="animate-spin flex-shrink-0" />}
         {props.slugState.kind === 'available' && (
-          <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <span className="text-muted-foreground flex-shrink-0">available</span>
         )}
         {props.slugState.kind === 'taken' && (
-          <span className="text-amber-600 dark:text-amber-400 flex-shrink-0">taken — pick another name</span>
+          <span className="text-muted-foreground flex-shrink-0">taken — pick another name</span>
         )}
         {props.slugState.kind === 'invalid' && (
-          <span className="text-amber-600 dark:text-amber-400 flex-shrink-0 truncate">{props.slugState.message}</span>
+          <span className="text-muted-foreground flex-shrink-0 truncate">{props.slugState.message}</span>
         )}
         {!props.slugTouched && props.slugState.kind === 'taken' && (
           <button

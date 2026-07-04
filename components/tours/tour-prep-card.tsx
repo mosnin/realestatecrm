@@ -5,19 +5,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { countLabel } from '@/lib/formatting';
 import {
   MessageCircle,
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  CalendarDays,
-  Clock,
-  AlertTriangle,
-  MessageSquare,
   ChevronDown,
   ChevronUp,
   Loader2,
-  FileText,
-  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_APPLE } from '@/lib/motion';
@@ -71,7 +61,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
       <button
         onClick={loadPrep}
         disabled={loading}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-border bg-muted/40 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
       >
         {loading ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
         Prep
@@ -89,14 +79,13 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
           className="absolute right-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl border border-border/70 bg-card shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.4)] overflow-hidden"
         >
           {/* Header */}
-          <div className="px-4 py-3 bg-primary/5 border-b border-border">
-            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-              <MessageCircle size={13} />
+          <div className="px-4 py-3 bg-muted/40 border-b border-border">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
               Tour Prep — {prep.guestName}
             </div>
             <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><CalendarDays size={10} /> {prep.tourDate}</span>
-              <span className="flex items-center gap-1"><Clock size={10} /> {prep.tourTime} ({prep.duration}min)</span>
+              <span>{prep.tourDate}</span>
+              <span>{prep.tourTime} ({prep.duration}min)</span>
             </div>
           </div>
 
@@ -105,10 +94,10 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
             <div className="space-y-1">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Guest</p>
               <div className="space-y-0.5 text-xs">
-                <p className="flex items-center gap-1.5"><User size={11} className="text-muted-foreground" /> {prep.guestName}</p>
-                <p className="flex items-center gap-1.5"><Mail size={11} className="text-muted-foreground" /> {prep.guestEmail}</p>
-                {prep.guestPhone && <p className="flex items-center gap-1.5"><Phone size={11} className="text-muted-foreground" /> {prep.guestPhone}</p>}
-                {prep.propertyAddress && <p className="flex items-center gap-1.5"><MapPin size={11} className="text-muted-foreground" /> {prep.propertyAddress}</p>}
+                <p>{prep.guestName}</p>
+                <p>{prep.guestEmail}</p>
+                {prep.guestPhone && <p>{prep.guestPhone}</p>}
+                {prep.propertyAddress && <p>{prep.propertyAddress}</p>}
                 {prep.previousTours > 0 && <p className="text-[10px] text-muted-foreground">{countLabel(prep.previousTours, 'previous tour')}</p>}
               </div>
             </div>
@@ -121,9 +110,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
                   <span className="text-lg font-bold tabular-nums">{Math.round(prep.scoreInfo.score)}</span>
                   <span className={cn(
                     'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
-                    prep.scoreInfo.label === 'hot' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                    prep.scoreInfo.label === 'warm' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                    'bg-muted text-muted-foreground'
                   )}>
                     {prep.scoreInfo.label}
                   </span>
@@ -164,8 +151,8 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-red-500/60">Risk Flags</p>
                 <div className="space-y-0.5">
                   {prep.warnings.map((w, i) => (
-                    <p key={i} className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
-                      <AlertTriangle size={10} /> {w}
+                    <p key={i} className="text-xs text-red-600 dark:text-red-400">
+                      {w}
                     </p>
                   ))}
                 </div>
@@ -177,8 +164,7 @@ export function TourPrepCard({ tourId }: TourPrepCardProps) {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Talking Points</p>
               <div className="space-y-1">
                 {prep.talkingPoints.map((t, i) => (
-                  <p key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                    <MessageSquare size={10} className="text-primary flex-shrink-0 mt-0.5" />
+                  <p key={i} className="text-xs text-foreground">
                     {t}
                   </p>
                 ))}

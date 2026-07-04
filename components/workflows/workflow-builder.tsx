@@ -782,7 +782,7 @@ function WorkflowPreview({ state }: { state: WorkflowFormState }) {
       <p
         className={cn(
           'mt-1.5 text-xs',
-          isAuto ? 'font-medium text-amber-600 dark:text-amber-500' : 'text-muted-foreground/80',
+          isAuto ? 'font-medium text-foreground' : 'text-muted-foreground/80',
         )}
       >
         {summary.autonomy}
@@ -834,14 +834,14 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
         className="flex w-full items-center gap-2 text-left"
         aria-expanded={open}
       >
-        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50">
-          <CheckIcon size={11} className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted">
+          <CheckIcon size={11} className="text-muted-foreground" aria-hidden />
         </span>
         <span className="flex-1 text-[12px] font-medium text-foreground">
           {open ? 'Hide' : 'Show'} trigger data
         </span>
         {isReal && (
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
             Live
           </span>
         )}
@@ -868,7 +868,7 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
                     type="button"
                     onClick={loadReal}
                     disabled={loadingReal}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700 disabled:opacity-50 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
                   >
                     {loadingReal ? (
                       <Loader2 size={11} className="animate-spin" aria-hidden />
@@ -903,7 +903,7 @@ function TriggerSampleData({ triggerType }: { triggerType: TriggerType }) {
             <dl className="space-y-1.5">
               {Object.entries(data).map(([key, val]) => (
                 <div key={key} className="flex items-center gap-2 text-[12px]">
-                  <dt className="flex-shrink-0 font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
+                  <dt className="flex-shrink-0 font-mono text-[11px] text-foreground">
                     {`{{${key}}}`}
                   </dt>
                   <dd className="ml-auto flex-shrink-0 truncate text-muted-foreground">
@@ -945,36 +945,23 @@ function ZapCard({
   incomplete?: boolean;
   children: React.ReactNode;
 }) {
-  const cl = {
-    orange: {
-      border: 'border-l-orange-400 dark:border-l-orange-500/70',
-      badge: 'bg-orange-500',
-      icon: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
-    },
-    blue: {
-      border: 'border-l-blue-400 dark:border-l-blue-500/70',
-      badge: 'bg-blue-500',
-      icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
-    },
-    violet: {
-      border: 'border-l-violet-400 dark:border-l-violet-500/70',
-      badge: 'bg-violet-500',
-      icon: 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
-    },
-  }[accent];
+  // Monochrome, per docs/ui/STYLESHEET.md: the `accent` prop is retained for
+  // call-site clarity but no longer maps to a color — every step card reads in
+  // the same calm neutral vocabulary as People/Deals. Category is carried by the
+  // title (a word), not by color.
+  void accent;
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card', cl.border)}>
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
       <div className="flex items-center gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
-        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white', cl.badge)}>
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">
           {step}
         </span>
-        <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Icon size={14} aria-hidden />
         </span>
         <span className="flex-1 text-sm font-semibold text-foreground">{title}</span>
         {incomplete && (
-          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
-            <AlertCircle size={11} aria-hidden />
+          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Incomplete
           </span>
         )}
@@ -1068,89 +1055,18 @@ function actionSummary(row: ActionRowState): string {
   }
 }
 
-/** Per-action-type accent colors: delay = amber, filter = sky, formatter = teal, else violet. */
-function actionAccent(type: WorkflowActionType) {
-  if (type === 'delay') {
-    return {
-      border: 'border-l-amber-400 dark:border-l-amber-500/70',
-      badge: 'bg-amber-500',
-      icon: 'bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
-    };
-  }
-  if (type === 'filter') {
-    return {
-      border: 'border-l-yellow-400 dark:border-l-yellow-500/70',
-      badge: 'bg-yellow-500',
-      icon: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-400',
-    };
-  }
-  if (type === 'formatter') {
-    return {
-      border: 'border-l-teal-400 dark:border-l-teal-500/70',
-      badge: 'bg-teal-500',
-      icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
-    };
-  }
-  if (type === 'webhook_post') {
-    return {
-      border: 'border-l-orange-400 dark:border-l-orange-500/70',
-      badge: 'bg-orange-500',
-      icon: 'bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
-    };
-  }
-  if (type === 'update_lead') {
-    return {
-      border: 'border-l-indigo-400 dark:border-l-indigo-500/70',
-      badge: 'bg-indigo-500',
-      icon: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400',
-    };
-  }
-  if (type === 'notify_agent') {
-    return {
-      border: 'border-l-rose-400 dark:border-l-rose-500/70',
-      badge: 'bg-rose-500',
-      icon: 'bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400',
-    };
-  }
-  if (type === 'iterate') {
-    return {
-      border: 'border-l-teal-400 dark:border-l-teal-500/70',
-      badge: 'bg-teal-500',
-      icon: 'bg-teal-100 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400',
-    };
-  }
-  if (type === 'branch') {
-    return {
-      border: 'border-l-blue-400 dark:border-l-blue-500/70',
-      badge: 'bg-blue-500',
-      icon: 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
-    };
-  }
-  if (type === 'run_workflow') {
-    return {
-      border: 'border-l-purple-400 dark:border-l-purple-500/70',
-      badge: 'bg-purple-500',
-      icon: 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
-    };
-  }
-  if (type === 'lookup_table') {
-    return {
-      border: 'border-l-cyan-400 dark:border-l-cyan-500/70',
-      badge: 'bg-cyan-500',
-      icon: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/50 dark:text-cyan-400',
-    };
-  }
-  if (type === 'set_variable' || type === 'get_variable') {
-    return {
-      border: 'border-l-lime-400 dark:border-l-lime-500/70',
-      badge: 'bg-lime-500',
-      icon: 'bg-lime-100 text-lime-700 dark:bg-lime-950/50 dark:text-lime-400',
-    };
-  }
+/**
+ * Monochrome step treatment (docs/ui/STYLESHEET.md). Action steps used to be
+ * color-coded per type (delay=amber, filter=yellow, formatter=teal, …); the
+ * People/Deals language is monochrome, so every type now reads the same calm
+ * neutral way. The `type` is still carried by the step's label (a word), not by
+ * color. Kept as a function returning a constant so all call sites are untouched.
+ */
+function actionAccent(_type: WorkflowActionType) {
   return {
-    border: 'border-l-violet-400 dark:border-l-violet-500/70',
-    badge: 'bg-violet-500',
-    icon: 'bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400',
+    border: 'border-border/60',
+    badge: 'bg-foreground',
+    icon: 'bg-muted text-muted-foreground',
   };
 }
 
@@ -1761,7 +1677,7 @@ function ActionZapCard({
   const summary = collapsed ? actionSummary(row) : null;
   const isDisabled = row.stepEnabled === false;
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-border/60 border-l-4 bg-card transition-opacity', cl.border, isDisabled && 'opacity-60')}>
+    <div className={cn('overflow-hidden rounded-xl border border-border/60 bg-card transition-opacity', isDisabled && 'opacity-60')}>
       <div className={cn('flex items-center gap-3 bg-muted/20 px-4 py-3', !collapsed && 'border-b border-border/40')}>
         {showDragHandle && (
           <GripVertical
@@ -1770,7 +1686,7 @@ function ActionZapCard({
             className="flex-shrink-0 cursor-grab text-muted-foreground/40 active:cursor-grabbing"
           />
         )}
-        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white', cl.badge)}>
+        <span className={cn('flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-background', cl.badge)}>
           {step}
         </span>
         <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', cl.icon)}>
@@ -1837,12 +1753,12 @@ function ActionZapCard({
             Disabled
           </span>
         ) : incomplete ? (
-          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+          <span className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             <AlertCircle size={11} aria-hidden />
             Incomplete
           </span>
         ) : (
-          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950/50 dark:text-green-400" aria-label="Step configured">
+          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-label="Step configured">
             <CheckIcon size={11} strokeWidth={3} aria-hidden />
           </span>
         )}
@@ -1855,7 +1771,7 @@ function ActionZapCard({
           className={cn(
             'flex-shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors',
             isDisabled
-              ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/30'
+              ? 'text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground'
               : 'text-muted-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground',
           )}
         >
@@ -2024,24 +1940,28 @@ const BUILDER_ACTION_LABELS: Record<string, string> = {
   get_variable: 'Get variable',
 };
 
+// Monochrome per docs/ui/STYLESHEET.md — every action type reads in the same
+// neutral chip (bg-muted / muted-foreground); the type is named in the adjacent
+// label, not encoded in color.
+const NEUTRAL_ICON_CLS = 'bg-muted text-muted-foreground';
 const BUILDER_ACTION_ICON_MAP: Record<string, { icon: LucideIcon; cls: string }> = {
-  draft_message:    { icon: PencilLine,   cls: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400' },
-  schedule_message: { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  create_task:      { icon: CheckSquare,  cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' },
-  call_integration: { icon: Plug,         cls: 'bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400' },
-  run_chippi:       { icon: Sparkles,     cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
-  delay:            { icon: Clock,        cls: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' },
-  filter:           { icon: Filter,       cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400' },
-  formatter:        { icon: Wand2,        cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
-  webhook_post:     { icon: Webhook,      cls: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
-  update_lead:      { icon: UserPlus,     cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400' },
-  notify_agent:     { icon: BellRing,     cls: 'bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' },
-  iterate:          { icon: RotateCcw,    cls: 'bg-teal-100 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400' },
-  branch:           { icon: GitBranch,    cls: 'bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400' },
-  run_workflow:     { icon: WorkflowIcon, cls: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400' },
-  lookup_table:     { icon: Table2,       cls: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950/40 dark:text-cyan-400' },
-  set_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
-  get_variable:     { icon: Variable,     cls: 'bg-lime-100 text-lime-700 dark:bg-lime-950/40 dark:text-lime-400' },
+  draft_message:    { icon: PencilLine,   cls: NEUTRAL_ICON_CLS },
+  schedule_message: { icon: Clock,        cls: NEUTRAL_ICON_CLS },
+  create_task:      { icon: CheckSquare,  cls: NEUTRAL_ICON_CLS },
+  call_integration: { icon: Plug,         cls: NEUTRAL_ICON_CLS },
+  run_chippi:       { icon: Sparkles,     cls: NEUTRAL_ICON_CLS },
+  delay:            { icon: Clock,        cls: NEUTRAL_ICON_CLS },
+  filter:           { icon: Filter,       cls: NEUTRAL_ICON_CLS },
+  formatter:        { icon: Wand2,        cls: NEUTRAL_ICON_CLS },
+  webhook_post:     { icon: Webhook,      cls: NEUTRAL_ICON_CLS },
+  update_lead:      { icon: UserPlus,     cls: NEUTRAL_ICON_CLS },
+  notify_agent:     { icon: BellRing,     cls: NEUTRAL_ICON_CLS },
+  iterate:          { icon: RotateCcw,    cls: NEUTRAL_ICON_CLS },
+  branch:           { icon: GitBranch,    cls: NEUTRAL_ICON_CLS },
+  run_workflow:     { icon: WorkflowIcon, cls: NEUTRAL_ICON_CLS },
+  lookup_table:     { icon: Table2,       cls: NEUTRAL_ICON_CLS },
+  set_variable:     { icon: Variable,     cls: NEUTRAL_ICON_CLS },
+  get_variable:     { icon: Variable,     cls: NEUTRAL_ICON_CLS },
 };
 
 function BuilderStepDetailTable({ detail, actionType }: { detail: unknown; actionType: string | null }) {
@@ -2782,7 +2702,7 @@ export function WorkflowBuilder({
       {mode === 'advanced' && (
         <ZapCard step={2} accent="violet" title="Flow — visual canvas" icon={GitBranch}>
           {isNarrow && (
-            <p className={cn(CAPTION, 'mb-3 text-amber-600 dark:text-amber-500')}>
+            <p className={cn(CAPTION, 'mb-3 text-muted-foreground')}>
               View only — open on a larger screen to edit.
             </p>
           )}
@@ -2997,7 +2917,7 @@ export function WorkflowBuilder({
                     )}
                   >
                     {dragOver === i && dragSrcRef.current !== null && dragSrcRef.current !== i ? (
-                      <div className="h-0.5 w-full rounded-full bg-orange-400" />
+                      <div className="h-0.5 w-full rounded-full bg-foreground/40" />
                     ) : (
                       <>
                         <div className="h-2 w-px bg-border/50" />
@@ -3006,7 +2926,7 @@ export function WorkflowBuilder({
                           title="Insert a step here"
                           aria-label="Insert a step here"
                           onClick={() => setInsertPickerAt(i)}
-                          className="flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground/50 opacity-0 transition-all hover:border-orange-400 hover:bg-orange-50 hover:text-orange-500 hover:opacity-100 group-hover/insert:opacity-100 dark:hover:bg-orange-950/30"
+                          className="flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground/50 opacity-0 transition-all hover:border-foreground/30 hover:bg-muted/40 hover:text-foreground hover:opacity-100 group-hover/insert:opacity-100"
                         >
                           <Plus size={10} aria-hidden />
                         </button>
@@ -3061,7 +2981,7 @@ export function WorkflowBuilder({
                   <button
                     type="button"
                     onClick={() => setAddPickerOpen(true)}
-                    className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-orange-300/70 px-5 py-2.5 text-sm font-semibold text-orange-500 transition-all hover:border-orange-400 hover:bg-orange-50/60 hover:shadow-sm active:scale-[0.98] dark:border-orange-500/40 dark:text-orange-400 dark:hover:bg-orange-950/30"
+                    className="mt-1 flex items-center gap-2 rounded-full border-2 border-dashed border-border/60 px-5 py-2.5 text-sm font-semibold text-muted-foreground transition-all hover:border-foreground/30 hover:bg-muted/40 hover:text-foreground hover:shadow-sm active:scale-[0.98]"
                   >
                     <Plus size={15} aria-hidden />
                     Add step
@@ -3089,7 +3009,6 @@ export function WorkflowBuilder({
           {AUTONOMY_OPTIONS.map((o) => {
             const meta = AUTONOMY_META[o.value];
             const selected = state.autonomy === o.value;
-            const isAuto = o.value === 'auto';
             const Icon = meta.icon;
             return (
               <button
@@ -3100,9 +3019,7 @@ export function WorkflowBuilder({
                 className={cn(
                   'flex flex-col items-start gap-1.5 rounded-xl border p-3 text-left transition-colors',
                   selected
-                    ? isAuto
-                      ? 'border-amber-400/70 bg-amber-50/60 dark:border-amber-500/50 dark:bg-amber-950/30'
-                      : 'border-foreground/40 bg-foreground/[0.04]'
+                    ? 'border-foreground/40 bg-foreground/[0.04]'
                     : 'border-border/60 hover:border-foreground/25 hover:bg-foreground/[0.02]',
                 )}
               >
@@ -3110,9 +3027,7 @@ export function WorkflowBuilder({
                   className={cn(
                     'inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors',
                     selected
-                      ? isAuto
-                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                        : 'bg-foreground text-background'
+                      ? 'bg-foreground text-background'
                       : 'bg-foreground/[0.05] text-muted-foreground',
                   )}
                 >
@@ -3129,7 +3044,7 @@ export function WorkflowBuilder({
         <p
           className={cn(
             CAPTION,
-            state.autonomy === 'auto' && 'font-medium text-amber-600 dark:text-amber-500',
+            state.autonomy === 'auto' && 'font-medium text-foreground',
           )}
         >
           {AUTONOMY_CAPTION[state.autonomy]}
@@ -3242,7 +3157,7 @@ export function WorkflowBuilder({
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors',
               showHistory
-                ? 'border-orange-300/60 bg-orange-50 text-orange-700 dark:border-orange-700/40 dark:bg-orange-950/30 dark:text-orange-400'
+                ? 'border-foreground/40 bg-foreground/[0.06] text-foreground'
                 : 'border-border/60 bg-muted/30 text-muted-foreground hover:text-foreground',
             )}
           >
@@ -3256,13 +3171,13 @@ export function WorkflowBuilder({
           className={cn(
             'flex cursor-pointer select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
             enabled
-              ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-700/50 dark:bg-green-950/30 dark:text-green-400'
+              ? 'border-foreground/40 bg-foreground/[0.06] text-foreground'
               : 'border-border/60 bg-muted/30 text-muted-foreground',
           )}
         >
           <Power
             size={13}
-            className={enabled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/60'}
+            className={enabled ? 'text-foreground' : 'text-muted-foreground/60'}
             aria-hidden
           />
           <span>{workflowId ? (enabled ? 'On' : 'Paused') : (enabled ? 'Turn on when saved' : 'Save as draft')}</span>
@@ -3398,7 +3313,7 @@ function WebhookTriggerDisplay({
             aria-label={copied ? 'Copied' : 'Copy webhook URL'}
             className="flex-shrink-0 inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
           >
-            {copied ? <CheckIcon size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            {copied ? <CheckIcon size={12} className="text-foreground" /> : <Copy size={12} />}
           </button>
         </div>
       ) : (
@@ -3414,7 +3329,7 @@ function WebhookTriggerDisplay({
               Signing secret <span className="text-muted-foreground/50">(optional)</span>
             </Label>
             {secretSet && (
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">✓ Signature verification enabled</span>
+              <span className="text-[10px] font-medium text-muted-foreground">✓ Signature verification enabled</span>
             )}
           </div>
           <div className="relative flex items-center">
@@ -3615,11 +3530,11 @@ function TriggerConfig({
             className="h-8"
           />
         </FieldRow>
-        <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
-          <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-          <span className="text-[12px] text-amber-700 dark:text-amber-300">
+        <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+          <Clock size={11} className="flex-shrink-0 text-muted-foreground" aria-hidden />
+          <span className="text-[12px] text-muted-foreground">
             Next run: <span className="font-medium">{computeNextRun(t.cadence, t.hour || '9')}</span>
-            {t.timezone && <span className="ml-1 text-amber-600/70"> ({t.timezone})</span>}
+            {t.timezone && <span className="ml-1 text-muted-foreground/70"> ({t.timezone})</span>}
           </span>
         </div>
       </div>
@@ -3913,10 +3828,10 @@ function ConditionGroupEditor({
   }
 
   return (
-    <li className="rounded-lg border border-amber-300/60 bg-amber-50/30 dark:border-amber-700/40 dark:bg-amber-950/10 p-2">
+    <li className="rounded-lg border border-border/60 bg-muted/30 p-2">
       {/* Group header row */}
       <div className="mb-2 flex items-center gap-2">
-        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Group
         </span>
         {/* Op toggle — opposite of outer to make nesting useful */}
@@ -3960,7 +3875,7 @@ function ConditionGroupEditor({
       <button
         type="button"
         onClick={addRow}
-        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 transition-colors hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200"
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <Plus size={11} aria-hidden />
         Add row to group
@@ -4308,11 +4223,11 @@ function FormatterActionConfig({
         const preview = computeFormatterPreview(row, triggerType);
         if (!preview) return null;
         return (
-          <div className="rounded-md border border-teal-200/60 bg-teal-50 px-3 py-2 dark:border-teal-800/40 dark:bg-teal-950/30">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-teal-600/70 dark:text-teal-400/70">
+          <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Sample output
             </p>
-            <p className="font-mono text-[12px] text-teal-800 dark:text-teal-300 break-all">
+            <p className="font-mono text-[12px] text-foreground break-all">
               {preview}
             </p>
           </div>
@@ -4963,13 +4878,6 @@ function BranchActionConfig({
     });
   }
 
-  const PATH_COLORS = [
-    'border-l-blue-400',
-    'border-l-violet-400',
-    'border-l-emerald-400',
-    'border-l-amber-400',
-  ];
-
   /** Which path's sub-step picker is open (null = none). */
   const [subPickerForPath, setSubPickerForPath] = useState<string | null>(null);
 
@@ -4981,7 +4889,6 @@ function BranchActionConfig({
 
       {paths.length === 0 && (
         <div className="rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
-          <GitBranch size={18} className="mx-auto mb-2 text-muted-foreground/40" aria-hidden />
           <p className="text-[12px] text-muted-foreground">No paths yet — add your first path below.</p>
         </div>
       )}
@@ -4991,11 +4898,11 @@ function BranchActionConfig({
         return (
           <div
             key={path.id}
-            className={`overflow-hidden rounded-lg border border-border/60 border-l-4 bg-muted/10 ${PATH_COLORS[pi] ?? 'border-l-blue-400'}`}
+            className="overflow-hidden rounded-lg border border-border/60 bg-muted/10"
           >
             {/* Path header */}
             <div className="flex items-center gap-2 border-b border-border/30 bg-background/50 px-3 py-2">
-              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-[10px] font-bold text-background">
                 {pi + 1}
               </span>
               <input
@@ -5133,7 +5040,7 @@ function BranchActionConfig({
         <button
           type="button"
           onClick={addPath}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-blue-300/70 py-2 text-[12px] font-medium text-blue-500 transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-950/20"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/60 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/40 hover:text-foreground"
         >
           <Plus size={13} aria-hidden />
           Add path
@@ -5550,17 +5457,17 @@ function ActionConfig({
         )}
 
         {delayHint && (
-          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
-            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+            <Clock size={11} className="flex-shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-[12px] text-muted-foreground">
               This step will pause for <span className="font-medium">{delayHint}</span>
             </span>
           </div>
         )}
         {mode === 'until_weekday' && (
-          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
-            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+            <Clock size={11} className="flex-shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-[12px] text-muted-foreground">
               Waits until the next <span className="font-medium">{WEEKDAYS[parseInt(row.untilWeekday, 10)] ?? 'day'}</span>{' '}
               at <span className="font-medium">{(() => {
                 const h = parseInt(row.untilHour, 10);
@@ -5571,9 +5478,9 @@ function ActionConfig({
           </div>
         )}
         {mode === 'until_date' && row.untilDate && (
-          <div className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 dark:bg-amber-950/30">
-            <Clock size={11} className="flex-shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-            <span className="text-[12px] text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5">
+            <Clock size={11} className="flex-shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-[12px] text-muted-foreground">
               Pauses until <span className="font-medium">{new Date(row.untilDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
             </span>
           </div>
@@ -5855,8 +5762,8 @@ function InstructionField({
         rows={3}
       />
       {hasTokens && (
-        <div className="rounded-md border border-indigo-200/60 bg-indigo-50/40 px-2.5 py-2 dark:border-indigo-700/30 dark:bg-indigo-950/20">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-500/70 dark:text-indigo-400/60">
+        <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             with variables filled in
           </p>
           <p className="text-[12.5px] leading-relaxed text-foreground/80">
@@ -5864,7 +5771,7 @@ function InstructionField({
               /^{{[^}]+}}$/.test(part) ? (
                 <span
                   key={i}
-                  className="mx-[1px] inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300"
+                  className="mx-[1px] inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground"
                 >
                   {part}
                 </span>

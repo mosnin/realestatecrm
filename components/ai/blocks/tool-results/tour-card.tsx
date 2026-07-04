@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CalendarDays, MapPin, ChevronRight, Phone, Mail, ExternalLink } from 'lucide-react';
+import { MapPin, ChevronRight, Phone, Mail, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EntityCard } from '../entity-card';
 import { CardSkeleton } from '../card-skeleton';
@@ -32,25 +32,10 @@ export interface TourDetail {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_ICON_BG: Record<string, string> = {
-  scheduled: 'bg-amber-500/10',
-  confirmed: 'bg-emerald-500/10',
-  completed: 'bg-muted',
-  cancelled: 'bg-rose-500/10',
-  no_show: 'bg-rose-500/10',
-};
-
-const STATUS_ICON_COLOR: Record<string, string> = {
-  scheduled: 'text-amber-600 dark:text-amber-400',
-  confirmed: 'text-emerald-600 dark:text-emerald-400',
-  completed: 'text-muted-foreground',
-  cancelled: 'text-rose-600 dark:text-rose-400',
-  no_show: 'text-rose-600 dark:text-rose-400',
-};
-
+// Tour status is a real state machine: booked (confirmed) and cancelled /
+// no-show keep a restrained semantic tone; scheduled/completed read neutral.
 const STATUS_CHIP_CLASSES: Record<string, string> = {
-  scheduled:
-    'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  scheduled: 'text-muted-foreground bg-muted',
   confirmed:
     'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
   completed: 'text-muted-foreground bg-muted',
@@ -95,22 +80,10 @@ function TourRow({
   isExpanded: boolean;
 }) {
   const status = normalizeStatus(tour.status);
-  const iconBg = STATUS_ICON_BG[status] ?? 'bg-muted';
-  const iconColor = STATUS_ICON_COLOR[status] ?? 'text-muted-foreground';
   const chipClass = STATUS_CHIP_CLASSES[status] ?? 'text-muted-foreground bg-muted';
 
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors">
-      {/* Icon */}
-      <div
-        className={cn(
-          'w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0',
-          iconBg,
-        )}
-      >
-        <CalendarDays size={14} className={iconColor} />
-      </div>
-
       {/* Main content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

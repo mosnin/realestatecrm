@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Target, Zap } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ContactAgentContextProps {
@@ -39,7 +39,7 @@ export function ContactAgentContext({ contactId }: ContactAgentContextProps) {
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {ctx.goalType && (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 rounded-full px-1.5 py-0.5">
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground bg-muted border border-border/60 rounded-full px-1.5 py-0.5">
           <Target size={8} />
           {GOAL_LABELS[ctx.goalType] ?? ctx.goalType}
         </span>

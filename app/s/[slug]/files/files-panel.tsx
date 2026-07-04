@@ -219,9 +219,7 @@ export function FilesPanel() {
                 'font-medium tabular-nums',
                 usedPercent >= 90
                   ? 'text-rose-600 dark:text-rose-400'
-                  : usedPercent >= 70
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-foreground',
+                  : 'text-foreground',
               )}
             >
               {usedPercent}%
@@ -231,11 +229,7 @@ export function FilesPanel() {
             <div
               className={cn(
                 'h-full transition-all',
-                usedPercent >= 90
-                  ? 'bg-rose-500/80'
-                  : usedPercent >= 70
-                    ? 'bg-amber-500/80'
-                    : 'bg-emerald-500/80',
+                usedPercent >= 90 ? 'bg-rose-500/80' : 'bg-foreground/80',
               )}
               style={{ width: `${usedPercent}%` }}
             />

@@ -16,7 +16,6 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { CheckCircle2 } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -114,9 +113,6 @@ export default async function ChippiInboxPage({
     >
       {!hasDrafts && !hasApprovals ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
-            <CheckCircle2 size={22} strokeWidth={1.5} className="text-muted-foreground/60" />
-          </div>
           <p className="text-base text-foreground">You&apos;re all caught up.</p>
           <p className={cn(BODY_MUTED, 'mt-1.5 max-w-xs')}>
             When Chippi has a draft to send or a decision for you, it&apos;ll land here.
@@ -145,7 +141,7 @@ export default async function ChippiInboxPage({
                         <span
                           className={cn(
                             'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                            'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+                            'bg-foreground/[0.06] text-foreground/70',
                           )}
                         >
                           Waiting · {waitingTime}

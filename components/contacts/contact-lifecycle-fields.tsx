@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Clock, UserPlus, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -73,8 +73,8 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
 
       {/* Referral source */}
       <div>
-        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1" htmlFor={`ref-${contactId}`}>
-          <UserPlus size={11} /> Referral source
+        <label className="text-[11px] text-muted-foreground mb-1 block" htmlFor={`ref-${contactId}`}>
+          Referral source
         </label>
         <input
           id={`ref-${contactId}`}
@@ -92,8 +92,8 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
 
       {/* Snooze */}
       <div>
-        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1" htmlFor={`snooze-${contactId}`}>
-          <Clock size={11} /> {isSnoozed ? `Snoozed until ${new Date(snooze).toLocaleDateString()}` : 'Snooze until'}
+        <label className="text-[11px] text-muted-foreground mb-1 block" htmlFor={`snooze-${contactId}`}>
+          {isSnoozed ? `Snoozed until ${new Date(snooze).toLocaleDateString()}` : 'Snooze until'}
         </label>
         <div className="flex items-center gap-1.5">
           <input
@@ -104,7 +104,7 @@ export function ContactLifecycleFields({ contactId, initialReferralSource, initi
             disabled={savingSnooze}
             className={cn(
               'flex-1 text-sm bg-transparent border border-border rounded px-2 py-1',
-              isSnoozed && 'bg-amber-50 dark:bg-amber-500/10 text-amber-900 dark:text-amber-200',
+              isSnoozed && 'bg-foreground/[0.06] text-foreground',
             )}
           />
           {isSnoozed && (

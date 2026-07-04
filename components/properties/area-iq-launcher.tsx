@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { MapPinned, Loader2, AlertTriangle, Info, Search } from 'lucide-react';
+import { MapPinned, Loader2, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -130,8 +130,7 @@ export function AreaIqLauncher({ className }: { className?: string }) {
         )}
 
         {notConfigured && (
-          <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
-            <AlertTriangle size={16} className="mt-0.5 text-amber-600 dark:text-amber-500" aria-hidden />
+          <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
             <div className="text-sm">
               <p className="font-medium text-foreground">Web research isn&apos;t configured</p>
               <p className="text-muted-foreground mt-0.5">
@@ -144,7 +143,6 @@ export function AreaIqLauncher({ className }: { className?: string }) {
 
         {noEvidence && (
           <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
-            <Info size={16} className="mt-0.5 text-muted-foreground" aria-hidden />
             <div className="text-sm text-muted-foreground">
               We couldn&apos;t find enough public data for that area. Try a ZIP, or a city and state.
             </div>

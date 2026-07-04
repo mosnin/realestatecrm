@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, CalendarDays, Check, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FollowUpSuggestionsProps {
@@ -108,8 +108,7 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
 
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2.5">
-      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-        <MessageCircle size={13} />
+      <div className="text-xs font-semibold text-foreground">
         Suggested follow-ups
       </div>
       <div className="space-y-2">
@@ -119,19 +118,18 @@ export function FollowUpSuggestions(props: FollowUpSuggestionsProps) {
             className={cn(
               'flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-all',
               applied.has(i)
-                ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-900/10'
+                ? 'border-border bg-foreground/[0.06]'
                 : 'border-border bg-card hover:bg-accent/30'
             )}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <CalendarDays size={14} className="text-muted-foreground flex-shrink-0" />
               <div>
                 <p className="text-xs font-medium">{s.label}</p>
                 <p className="text-xs text-muted-foreground">{s.description}</p>
               </div>
             </div>
             {applied.has(i) ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex-shrink-0">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium flex-shrink-0">
                 <Check size={12} /> Set
               </span>
             ) : (

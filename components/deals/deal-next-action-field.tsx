@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowRight, Calendar, Loader2, X } from 'lucide-react';
+import { Calendar, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DealNextActionFieldProps {
@@ -90,7 +90,6 @@ export function DealNextActionField({ dealId, initialAction, initialDueAt }: Dea
       overdue ? 'border-red-200 dark:border-red-800' : 'border-border/70',
     )}>
       <div className="flex items-center gap-2 mb-2">
-        <ArrowRight size={14} className="text-muted-foreground" />
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Next action
         </p>

@@ -540,7 +540,7 @@ function Stat({
           STAT_NUMBER_COMPACT,
           'leading-none tabular-nums',
           dim && 'text-muted-foreground/60',
-          warn && 'text-amber-600 dark:text-amber-400',
+          warn && 'text-foreground',
         )}
         style={TITLE_FONT}
       >
@@ -572,7 +572,6 @@ function HotLeadsCell({ slug, hotLeads }: { slug: string; hotLeads: DashboardDat
                 href={`/s/${slug}/contacts/${lead.id}`}
                 className="group/row flex items-center gap-3 py-2.5 -mx-1.5 px-1.5 rounded-lg hover:bg-foreground/[0.035] active:bg-foreground/[0.06] transition-colors"
               >
-                <Flame size={13} className="text-amber-500 shrink-0" />
                 <span className="flex-1 min-w-0">
                   <span className="text-sm text-foreground truncate block group-hover/row:underline underline-offset-2 decoration-foreground/30">
                     {lead.name}

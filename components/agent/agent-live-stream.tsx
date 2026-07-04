@@ -29,9 +29,9 @@ interface Props {
 
 const EVENT_CONFIG: Record<string, { icon: React.ElementType; className: string }> = {
   connected: { icon: Bot, className: 'text-muted-foreground' },
-  info: { icon: Info, className: 'text-blue-500' },
-  action: { icon: Zap, className: 'text-emerald-500' },
-  draft: { icon: CheckCircle2, className: 'text-amber-500' },
+  info: { icon: Info, className: 'text-muted-foreground' },
+  action: { icon: Zap, className: 'text-muted-foreground' },
+  draft: { icon: CheckCircle2, className: 'text-muted-foreground' },
   complete: { icon: CheckCircle2, className: 'text-emerald-600' },
   error: { icon: AlertCircle, className: 'text-destructive' },
 };
@@ -124,7 +124,6 @@ export function AgentLiveStream({ runId, onClose }: Props) {
                 'leading-relaxed break-words min-w-0',
                 event.type === 'complete' ? 'text-emerald-600 font-semibold' : '',
                 event.type === 'error' ? 'text-destructive' : 'text-foreground/90',
-                event.type === 'draft' ? 'text-amber-600' : '',
               )}>
                 {event.message}
               </span>

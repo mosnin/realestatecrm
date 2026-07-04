@@ -109,12 +109,10 @@ export function StatusBadge({ value, options }: StatusBadgeProps) {
       variant={variant}
       className={cn(
         "border",
-        config.tone === "warning" &&
-          "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-100",
+        // Color is reserved for genuine good/bad states; info/warning tones
+        // render as neutral secondary badges.
         config.tone === "success" &&
           "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-100",
-        config.tone === "info" &&
-          "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-100",
         config.tone === "danger" &&
           "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-100",
       )}
@@ -342,12 +340,10 @@ export function BadgeValue({ value, options }: BadgeValueProps) {
       variant={variant}
       className={cn(
         "border",
-        tone === "warning" &&
-          "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-100",
+        // Color is reserved for genuine good/bad states; info/warning tones
+        // render as neutral secondary badges.
         tone === "success" &&
           "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-100",
-        tone === "info" &&
-          "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-100",
         tone === "danger" &&
           "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-100",
       )}

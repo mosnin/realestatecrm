@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { GitBranch } from 'lucide-react';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
 
 // ── Preview question renderer ──
@@ -121,7 +120,6 @@ function PreviewSection({ section, allSections }: { section: FormSection; allSec
     <div className={cn('space-y-4', isConditional && 'opacity-70')}>
       {isConditional && (
         <div className="inline-flex items-center gap-1.5 rounded bg-foreground/[0.06] text-muted-foreground px-1.5 py-0.5 text-[10px] font-mono">
-          <GitBranch size={10} className="text-muted-foreground/60 flex-shrink-0" />
           <span>Conditional · shown when {formatCondition(section.visibleWhen, allSections)}</span>
         </div>
       )}

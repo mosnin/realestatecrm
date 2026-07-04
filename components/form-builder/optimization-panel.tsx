@@ -6,15 +6,8 @@ import {
   RefreshCw,
   Loader2,
   X,
-  ArrowUp,
-  Trash2,
-  Pencil,
-  Plus,
-  BarChart3,
   ChevronDown,
   ChevronRight,
-  MessageCircle,
-  Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { H2, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT, BODY_MUTED } from '@/lib/typography';
@@ -75,14 +68,6 @@ const TYPE_LABELS: Record<string, string> = {
   modify: 'Edit',
   add: 'Add',
   scoring: 'Scoring',
-};
-
-const TYPE_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  reorder: ArrowUp,
-  remove: Trash2,
-  modify: Pencil,
-  add: Plus,
-  scoring: BarChart3,
 };
 
 const LOADING_STEPS = [
@@ -175,7 +160,6 @@ function SuggestionRow({
   onDismiss: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const Icon = TYPE_ICONS[suggestion.type] ?? Lightbulb;
   const isAI = suggestion.source === 'ai';
   const dotTone = IMPACT_DOT[suggestion.impact] ?? IMPACT_DOT.low;
   const impactLabel = IMPACT_LABEL[suggestion.impact] ?? IMPACT_LABEL.low;
@@ -190,17 +174,11 @@ function SuggestionRow({
           className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', dotTone)}
         />
 
-        {/* Type icon, muted */}
-        <Icon size={14} className="text-muted-foreground/70 flex-shrink-0 mt-0.5" />
-
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
             <p className="text-sm font-medium text-foreground leading-snug">{suggestion.title}</p>
             <MutedPill>{TYPE_LABELS[suggestion.type] ?? suggestion.type}</MutedPill>
-            <MutedPill>
-              {isAI ? <MessageCircle size={9} /> : <Database size={9} />}
-              {isAI ? 'AI' : 'data'}
-            </MutedPill>
+            <MutedPill>{isAI ? 'AI' : 'data'}</MutedPill>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">{suggestion.description}</p>
 
@@ -460,11 +438,11 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
           {/* Performance summary */}
           <PerformanceSummary performance={result.performance} />
 
-          {/* Message (e.g., not enough data) — sanctioned subtle amber */}
+          {/* Message (e.g., not enough data) — neutral notice */}
           {result.message && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{result.message}</p>
-              <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1 leading-relaxed">
+            <div className="rounded-lg border border-border/60 bg-muted/40 px-4 py-3">
+              <p className="text-sm font-medium text-foreground">{result.message}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 Share your form link with more applicants to collect enough data. Once you reach the threshold, come back here for personalized recommendations.
               </p>
             </div>
@@ -488,11 +466,11 @@ export function OptimizationPanel({ slug }: OptimizationPanelProps) {
               </p>
             </div>
           ) : !result.message ? (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
-              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+            <div className="rounded-lg border border-border/60 bg-muted/40 p-6 text-center">
+              <p className="text-sm font-medium text-foreground">
                 Your form looks great. No changes needed right now.
               </p>
-              <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Check back after you get more submissions for new insights.
               </p>
             </div>

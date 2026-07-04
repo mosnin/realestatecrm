@@ -142,7 +142,7 @@ export function SidebarUserMenu({
       )}
       <span
         aria-hidden
-        className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-background"
+        className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-foreground/40 ring-2 ring-background"
       />
     </div>
   );

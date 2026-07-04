@@ -61,8 +61,8 @@ const CATEGORY_LABELS: Record<Category, string> = {
 
 // Status pill tones — the canonical status palette from STYLESHEET.md.
 const STATUS_STYLES: Record<TicketStatus, string> = {
-  open: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  in_progress: 'text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/15',
+  open: 'text-foreground bg-foreground/[0.06]',
+  in_progress: 'text-muted-foreground bg-muted',
   resolved: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
   closed: 'text-muted-foreground bg-muted',
 };

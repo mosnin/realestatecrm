@@ -30,9 +30,9 @@ function formatCurrency(value: number): string {
 function insightColor(text: string): string {
   const lower = text.toLowerCase();
   if (lower.includes('closing') || lower.includes('priority')) {
-    return 'bg-amber-400';
+    return 'bg-foreground';
   }
-  return 'bg-blue-500';
+  return 'bg-muted-foreground/40';
 }
 
 function SkeletonCard() {
@@ -121,7 +121,7 @@ export function AgentPortfolioInsights() {
                 <p
                   className={cn(
                     'text-xl font-semibold',
-                    data.high_score_count > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground',
+                    data.high_score_count > 0 ? 'text-foreground' : 'text-muted-foreground',
                   )}
                 >
                   {data.high_score_count}
@@ -139,7 +139,7 @@ export function AgentPortfolioInsights() {
                   className={cn(
                     'text-xl font-semibold',
                     data.engagement_rate_pct < 30
-                      ? 'text-red-500 dark:text-red-400'
+                      ? 'text-muted-foreground'
                       : 'text-foreground',
                   )}
                 >
@@ -157,7 +157,7 @@ export function AgentPortfolioInsights() {
                 <p
                   className={cn(
                     'text-xl font-semibold',
-                    data.deals_closing_14d > 0 ? 'text-amber-500 dark:text-amber-400' : 'text-muted-foreground',
+                    data.deals_closing_14d > 0 ? 'text-foreground' : 'text-muted-foreground',
                   )}
                 >
                   {data.deals_closing_14d}

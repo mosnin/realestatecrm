@@ -12,9 +12,9 @@ interface StageProgressionProps {
 }
 
 const STAGES = [
-  { type: 'QUALIFICATION', label: 'Qualifying', color: 'bg-blue-500' },
-  { type: 'TOUR', label: 'Tour', color: 'bg-amber-500' },
-  { type: 'APPLICATION', label: 'Applied', color: 'bg-emerald-500' },
+  { type: 'QUALIFICATION', label: 'Qualifying', color: 'bg-foreground' },
+  { type: 'TOUR', label: 'Tour', color: 'bg-foreground' },
+  { type: 'APPLICATION', label: 'Applied', color: 'bg-foreground' },
 ] as const;
 
 export function StageProgression({ contactId, currentType }: StageProgressionProps) {

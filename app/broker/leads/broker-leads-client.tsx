@@ -99,11 +99,11 @@ function scorePill(label: string | null) {
   // hovered so the chip warms with the row. Text and label are unchanged.
   const className =
     l === 'hot'
-      ? 'text-rose-700 bg-rose-50 group-hover/row:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/15 dark:group-hover/row:bg-rose-500/25'
+      ? 'text-foreground bg-foreground/[0.06]'
       : l === 'warm'
-        ? 'text-amber-700 bg-amber-50 group-hover/row:bg-amber-100 dark:text-amber-400 dark:bg-amber-500/15 dark:group-hover/row:bg-amber-500/25'
+        ? 'text-muted-foreground bg-muted/60'
         : l === 'cold'
-          ? 'text-sky-700 bg-sky-50 group-hover/row:bg-sky-100 dark:text-sky-400 dark:bg-sky-500/15 dark:group-hover/row:bg-sky-500/25'
+          ? 'text-muted-foreground bg-muted/60'
           : 'text-muted-foreground bg-muted/60';
   return (
     <span
@@ -145,10 +145,9 @@ function relativeTime(iso: string | null) {
 
 function stagePill(stage: AssignedLeadProgress['currentStage']) {
   const styles: Record<string, string> = {
-    QUALIFICATION: 'text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-500/15',
-    TOUR: 'text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-500/15',
-    APPLICATION:
-      'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+    QUALIFICATION: 'text-muted-foreground bg-muted/60',
+    TOUR: 'text-muted-foreground bg-muted/60',
+    APPLICATION: 'text-muted-foreground bg-muted/60',
   };
   const labels: Record<string, string> = {
     QUALIFICATION: 'Qualifying',
@@ -597,7 +596,7 @@ function AssignedRow({
             </span>
             {progress ? stagePill(progress.currentStage) : scorePill(lead.scoreLabel)}
             {progress?.hasDeal && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15 flex-shrink-0">
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 text-foreground bg-foreground/[0.06] flex-shrink-0">
                 <Handshake size={9} />
                 Deal
               </span>
@@ -609,7 +608,7 @@ function AssignedRow({
             )}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground truncate flex items-center gap-1.5">
-            <Check size={10} className="text-emerald-600 flex-shrink-0" />
+            <Check size={10} className="text-muted-foreground flex-shrink-0" />
             <span className="truncate">{realtorName}</span>
             {progress?.lastActivityAt && (
               <>
@@ -621,8 +620,8 @@ function AssignedRow({
             {progress?.hasFollowUp && (
               <>
                 <span className="text-muted-foreground/40">·</span>
-                <CalendarClock size={10} className="text-amber-600 flex-shrink-0" />
-                <span className="text-amber-700 dark:text-amber-400">Follow-up set</span>
+                <CalendarClock size={10} className="text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground">Follow-up set</span>
               </>
             )}
             {!progress && lead.assignedAt && (

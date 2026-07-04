@@ -357,17 +357,16 @@ function TriggerNodeView({ data, selected }: NodeProps<CanvasNode>) {
     <div
       className={cn(
         NODE_SHELL,
-        'border-orange-300/70 dark:border-orange-700/60',
-        selected && 'ring-2 ring-orange-400/50',
+        selected ? 'border-foreground/40 ring-2 ring-foreground/10' : 'border-border/60',
         runClasses(data),
       )}
     >
       <div className="flex items-center gap-3 px-3 py-3">
-        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+        <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Zap size={15} aria-hidden />
         </span>
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-600/80 dark:text-orange-400/80">Trigger</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Trigger</p>
           <p className="truncate text-[13px] font-semibold text-foreground leading-snug">{label}</p>
         </div>
       </div>
@@ -403,8 +402,8 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
       {/* Two SOURCE handles on Bottom — True left, False right. */}
       <div className="relative">
         <div className="flex justify-between px-6 pb-1.5">
-          <span className="text-[10px] font-semibold text-emerald-600/90 dark:text-emerald-400/90">Yes</span>
-          <span className="text-[10px] font-semibold text-rose-600/90 dark:text-rose-400/90">No</span>
+          <span className="text-[10px] font-semibold text-muted-foreground">Yes</span>
+          <span className="text-[10px] font-semibold text-muted-foreground">No</span>
         </div>
       </div>
       <Handle
@@ -412,14 +411,14 @@ function ConditionNodeView({ data, selected }: NodeProps<CanvasNode>) {
         type="source"
         position={Position.Bottom}
         style={{ left: '30%' }}
-        className={cn(HANDLE_CLASS, '!bg-emerald-500/70 !border-emerald-300')}
+        className={HANDLE_CLASS}
       />
       <Handle
         id="false"
         type="source"
         position={Position.Bottom}
         style={{ left: '70%' }}
-        className={cn(HANDLE_CLASS, '!bg-rose-500/65 !border-rose-300')}
+        className={HANDLE_CLASS}
       />
     </div>
   );

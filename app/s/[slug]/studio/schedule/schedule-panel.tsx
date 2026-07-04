@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Upload, AlertCircle, CalendarClock } from 'lucide-react';
+import { Upload, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,9 +54,9 @@ function nowLocalForInput(): string {
 }
 
 const STATUS_TONE: Record<string, string> = {
-  scheduled: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  publishing: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  posted: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+  scheduled: 'text-muted-foreground bg-muted',
+  publishing: 'text-muted-foreground bg-muted',
+  posted: 'text-foreground bg-foreground/[0.06]',
   failed: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
   canceled: 'text-muted-foreground bg-muted',
 };
@@ -313,7 +313,6 @@ export function SchedulePanel({
         <p className={SECTION_LABEL}>Scheduled</p>
         {posts.length === 0 ? (
           <EmptyState
-            icon={CalendarClock}
             title="Nothing scheduled yet."
             description="Posts you queue will line up here."
           />

@@ -34,7 +34,6 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { BrandLogo } from '@/components/brand-logo';
-import { brandOrange } from '@/lib/colors';
 import { safeHref, cn } from '@/lib/utils';
 import { TITLE_FONT } from '@/lib/typography';
 import { blurRise, INTAKE_EASE } from './intake-motion';
@@ -152,7 +151,7 @@ function RealtorIdentity({
         <BadgeCheck
           size={15}
           aria-label="Verified"
-          className="shrink-0 fill-sky-500 text-white dark:fill-sky-400"
+          className="shrink-0 fill-foreground text-background"
         />
       )}
     </span>
@@ -172,8 +171,7 @@ function RealtorIdentity({
           aria-hidden
           className={cn(
             'h-14 w-14 rounded-full inline-flex items-center justify-center',
-            'bg-orange-50 text-orange-600 ring-1 ring-orange-200/60',
-            'dark:bg-orange-500/15 dark:text-orange-400 dark:ring-orange-500/20',
+            'bg-muted text-muted-foreground ring-1 ring-border/60',
             'text-xl leading-none select-none',
           )}
           style={TITLE_FONT}
@@ -234,13 +232,11 @@ export function IntakeChatShell({
     // border, no sticky chrome. The brand-warm wash is the same one the
     // onboarding rides on so this reads as the same product family.
     <div className="relative min-h-dvh w-full overflow-hidden bg-background text-foreground">
-      {/* Brand-warm wash — full bleed, fixed so it never scrolls. */}
+      {/* Neutral stage — full bleed, fixed so it never scrolls. Monochrome
+          canvas, matching the onboarding shell. */}
       <div
         aria-hidden
-        className={brandOrange(
-          'LOGO',
-          'pointer-events-none fixed inset-0 z-0 bg-gradient-to-br from-orange-50/70 via-background to-orange-50/50 dark:from-orange-500/[0.05] dark:via-background dark:to-orange-500/[0.03]',
-        )}
+        className="pointer-events-none fixed inset-0 z-0"
       />
 
       {/* Optional cover-photo glow — a softened, blurred band at the very top
@@ -266,10 +262,7 @@ export function IntakeChatShell({
           />
           <div
             aria-hidden
-            className={brandOrange(
-              'LOGO',
-              'absolute inset-0 bg-gradient-to-b from-orange-500/[0.05] to-transparent',
-            )}
+            className="absolute inset-0 bg-gradient-to-b from-foreground/[0.04] to-transparent"
           />
         </div>
       )}

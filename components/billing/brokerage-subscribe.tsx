@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react';
-import { Check, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
@@ -206,8 +206,8 @@ function CadenceToggle({
         )}
       >
         Annual
-        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-          <Check size={9} /> Save 20%
+        <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          Save 20%
         </span>
       </button>
     </div>

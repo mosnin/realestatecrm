@@ -133,7 +133,7 @@ export function WhatIDid({ slug }: { slug: string }) {
           animate="enter"
         >
           {entries.slice(0, 6).map((entry) => {
-            const { verb, icon: Icon } = metaFor(entry.actionType);
+            const { verb } = metaFor(entry.actionType);
             const targetName = entry.Contact?.name ?? entry.Deal?.title ?? null;
             const targetHref = entry.Contact
               ? `/s/${slug}/contacts/${entry.Contact.id}`
@@ -143,9 +143,6 @@ export function WhatIDid({ slug }: { slug: string }) {
 
             const RowInner = (
               <>
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                  <Icon size={13} className="text-emerald-600 dark:text-emerald-400" />
-                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm leading-snug">
                     <span className="text-foreground">I {verb}</span>{' '}

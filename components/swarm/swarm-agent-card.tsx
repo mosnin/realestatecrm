@@ -57,9 +57,9 @@ export function SwarmAgentCard({
   const borderClass = cn(
     'rounded-xl border bg-card p-4 flex flex-col gap-3 transition-colors duration-300',
     flashGreen
-      ? 'border-emerald-500/50'
+      ? 'border-foreground/40'
       : status === 'running'
-        ? 'border-blue-500/30'
+        ? 'border-foreground/30'
         : 'border-border/60',
   );
 
@@ -104,8 +104,8 @@ export function SwarmAgentCard({
             <div className="flex items-center gap-2">
               {/* Pulsing dot */}
               <span className="relative flex size-1.5 flex-shrink-0">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-blue-500" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-muted-foreground/60 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-muted-foreground" />
               </span>
               <p className={cn(CAPTION, 'italic leading-snug')}>{thinkingMessage}</p>
             </div>

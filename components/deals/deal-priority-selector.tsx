@@ -15,8 +15,8 @@ type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 const PRIORITY_META: Record<Priority, { label: string; className: string }> = {
   LOW: { label: 'Low', className: 'text-muted-foreground bg-muted' },
-  MEDIUM: { label: 'Medium', className: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10' },
-  HIGH: { label: 'High', className: 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/10' },
+  MEDIUM: { label: 'Medium', className: 'text-foreground bg-muted' },
+  HIGH: { label: 'High', className: 'text-foreground bg-foreground/[0.06]' },
 };
 
 interface DealPrioritySelectorProps {

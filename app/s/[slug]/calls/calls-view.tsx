@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Phone, PhoneOff, ChevronDown } from 'lucide-react';
+import { Phone, ChevronDown } from 'lucide-react';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -55,12 +55,13 @@ interface Call {
   createdAt: string;
 }
 
-// Status pill tones — the canonical status palette from STYLESHEET.md.
+// Status pill tones — monochrome; the label carries the state. A failed call
+// keeps the rose error token (a genuine failure), everything else is neutral.
 const STATUS_STYLES: Record<CallStatus, string> = {
-  initiated: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  ringing: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  answered: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-  completed: 'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+  initiated: 'text-muted-foreground bg-muted',
+  ringing: 'text-muted-foreground bg-muted',
+  answered: 'text-muted-foreground bg-muted',
+  completed: 'text-foreground bg-foreground/[0.06]',
   no_answer: 'text-muted-foreground bg-muted',
   failed: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
 };
@@ -239,13 +240,6 @@ export function CallsView({ slug }: { slug: string }) {
                       )}
                       aria-expanded={isOpen}
                     >
-                      <div className="mt-0.5 w-7 h-7 shrink-0 rounded-lg bg-foreground/[0.04] flex items-center justify-center">
-                        {c.status === 'failed' || c.status === 'no_answer' ? (
-                          <PhoneOff size={13} strokeWidth={1.75} className="text-muted-foreground" />
-                        ) : (
-                          <Phone size={13} strokeWidth={1.75} className="text-muted-foreground" />
-                        )}
-                      </div>
                       <div className="flex-1 min-w-0">
                         <p className={cn(BODY, 'font-medium truncate')}>
                           {c.contactName ?? c.toNumber}
@@ -276,7 +270,7 @@ export function CallsView({ slug }: { slug: string }) {
                     </button>
 
                     {isOpen && hasDetail && (
-                      <div className="mt-3 ml-10 space-y-4">
+                      <div className="mt-3 space-y-4">
                         {c.summary && (
                           <div className="space-y-1.5">
                             <p className={cn(SECTION_LABEL)}>Chippi summary</p>

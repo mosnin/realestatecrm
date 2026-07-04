@@ -277,7 +277,7 @@ function RealtorRow({ row, maxAll }: { row: RealtorRollup; maxAll: number }) {
         {/* Activity bar — proportional to the busiest realtor */}
         <div className="h-1 bg-muted/60 rounded-full overflow-hidden" aria-hidden>
           <motion.div
-            className="h-full bg-orange-500/80 dark:bg-orange-400/70 rounded-full"
+            className="h-full bg-foreground rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${proportion * 100}%` }}
             transition={{ duration: 0.5, ease: EASE_OUT }}

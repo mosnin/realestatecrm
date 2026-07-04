@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, CheckCircle2, Phone, Mail, ChevronDown, ChevronUp, Timer } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { LEAD_SCORE_COLORS } from '@/lib/constants/colors';
 
 export interface FollowUpContact {
   id: string;
@@ -93,18 +92,11 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
     if (initialContacts.length === 0) return null;
     // User cleared all follow-ups this session — show success state
     return (
-      <div className="rounded-lg border border-emerald-200 dark:border-emerald-500/25 bg-emerald-50/60 dark:bg-emerald-500/5 px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">All caught up!</p>
-            <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
-              No follow-ups due right now. Nice work.
-            </p>
-          </div>
-        </div>
+      <div className="rounded-lg border border-border/60 bg-muted/40 px-5 py-4">
+        <p className="text-sm font-semibold text-foreground">All caught up</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          No follow-ups due right now. Nice work.
+        </p>
       </div>
     );
   }
@@ -120,9 +112,6 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
         className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-accent transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-            <Calendar size={14} className="text-muted-foreground" />
-          </div>
           <div>
             <p className="text-sm font-semibold text-foreground">
               Follow-ups due
@@ -170,12 +159,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                       {contact.name}
                     </Link>
                     {contact.scoreLabel && (
-                      <span
-                        className={cn(
-                          'inline-flex items-center text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none',
-                          (LEAD_SCORE_COLORS[contact.scoreLabel as keyof typeof LEAD_SCORE_COLORS]?.badge) ?? LEAD_SCORE_COLORS.unscored.badge
-                        )}
-                      >
+                      <span className="inline-flex items-center text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none bg-muted text-muted-foreground">
                         {contact.scoreLabel}
                       </span>
                     )}
@@ -185,13 +169,13 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {contact.phone && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Phone size={10} /> {contact.phone}
+                      <span className="text-[11px] text-muted-foreground">
+                        {contact.phone}
                       </span>
                     )}
                     {contact.email && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-[150px]">
-                        <Mail size={10} /> {contact.email}
+                      <span className="text-[11px] text-muted-foreground truncate max-w-[150px]">
+                        {contact.email}
                       </span>
                     )}
                   </div>
@@ -204,7 +188,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                       'text-[11px] font-semibold rounded-md px-2 py-0.5',
                       isOverdue
                         ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                        : 'bg-muted text-muted-foreground'
                     )}
                   >
                     {isOverdue ? 'Overdue' : 'Due'}{' '}
@@ -245,7 +229,7 @@ export function FollowUpWidget({ slug, contacts: initialContacts }: Props) {
                     title="Mark done"
                     disabled={isBusy}
                     onClick={() => handleClearFollowUp(contact.id)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/15 transition-colors"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <CheckCircle2 size={14} />
                   </button>

@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { MapPinned, Loader2, RefreshCw, AlertTriangle, Info } from 'lucide-react';
+import { MapPinned, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
@@ -93,7 +93,6 @@ export function PropertyAreaPanel({
       {/* ── Header row ─────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <MapPinned size={12} className="text-muted-foreground" aria-hidden />
           <h2 className={cn(SECTION_LABEL)}>Area IQ</h2>
           {generatedAt && (
             <span className="text-[11px] text-muted-foreground">researched {timeAgo(generatedAt)}</span>
@@ -151,8 +150,7 @@ export function PropertyAreaPanel({
 
       {/* ── Not configured ─────────────────────────────────────────── */}
       {notConfigured && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
-          <AlertTriangle size={16} className="mt-0.5 text-amber-600 dark:text-amber-500" aria-hidden />
+        <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
           <div className="text-sm">
             <p className="font-medium text-foreground">Web research isn&apos;t configured</p>
             <p className="text-muted-foreground mt-0.5">
@@ -173,7 +171,6 @@ export function PropertyAreaPanel({
       {/* ── No evidence found ──────────────────────────────────────── */}
       {noEvidence && !loading && (
         <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
-          <Info size={16} className="mt-0.5 text-muted-foreground" aria-hidden />
           <div className="text-sm text-muted-foreground">
             We couldn&apos;t find enough public data to brief this area. Make sure the property has a
             city &amp; state (or ZIP) set, then try again.

@@ -585,7 +585,7 @@ export default async function BrokerForecastPage() {
                               className={cn(
                                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0',
                                 deal.health === 'on-track' &&
-                                  'text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15',
+                                  'text-muted-foreground bg-muted',
                                 deal.health === 'at-risk' &&
                                   'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
                                 deal.health === 'stuck' &&

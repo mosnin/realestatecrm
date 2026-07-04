@@ -309,7 +309,7 @@ export function EmailReadView({
                   className={cn(
                     'transition-colors duration-200',
                     message.starred
-                      ? 'fill-amber-500 text-amber-500'
+                      ? 'fill-foreground text-foreground'
                       : 'text-muted-foreground',
                   )}
                 />

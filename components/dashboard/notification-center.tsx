@@ -2,17 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Bell,
-  PhoneIncoming,
-  CalendarDays,
-  Clock,
-  Users,
-  AlertCircle,
-  Briefcase,
-  X,
-  CheckCheck,
-} from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowser } from '@/lib/supabase-browser';
@@ -27,20 +17,6 @@ interface Notification {
   createdAt: string;
   priority: 'high' | 'medium' | 'low';
 }
-
-const TYPE_ICONS: Record<string, typeof Bell> = {
-  new_lead: PhoneIncoming,
-  upcoming_tour: CalendarDays,
-  follow_up_due: Clock,
-  waitlist: Users,
-  tour_needs_action: Briefcase,
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  high: 'text-red-600 dark:text-red-400',
-  medium: 'text-amber-600 dark:text-amber-400',
-  low: 'text-muted-foreground',
-};
 
 export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -153,7 +129,7 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
               className={cn(
                 'absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full text-[10px] font-semibold leading-none inline-flex items-center justify-center tabular-nums ring-2 ring-background',
                 highCount > 0
-                  ? 'bg-orange-500 text-white'
+                  ? 'bg-foreground text-background'
                   : 'bg-foreground/15 text-foreground/70',
               )}
             >
@@ -174,9 +150,8 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
             <button
               type="button"
               onClick={handleMarkAllRead}
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
             >
-              <CheckCheck size={12} strokeWidth={1.75} />
               Mark all read
             </button>
           )}
@@ -185,56 +160,40 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
         <div className="max-h-[22rem] overflow-y-auto">
           {totalCount === 0 ? (
             <div className="py-10 text-center text-muted-foreground">
-              <Bell size={24} className="mx-auto mb-2 opacity-30" strokeWidth={1.75} />
               <p className="text-sm">Nothing pressing.</p>
               <p className="text-xs mt-0.5">I&apos;m watching the pipeline.</p>
             </div>
           ) : (
             <div className="space-y-0.5">
-              {notifications.map((n) => {
-                const Icon = TYPE_ICONS[n.type] || AlertCircle;
-                return (
-                  <div
-                    key={n.id}
-                    className="group flex items-start gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-foreground/[0.05]"
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className="group flex items-start gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-foreground/[0.05]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleOpenNotification(n)}
+                    className="flex flex-1 min-w-0 items-start gap-2.5 text-left active:scale-[0.99] transition-transform duration-150"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleOpenNotification(n)}
-                      className="flex flex-1 min-w-0 items-start gap-2.5 text-left active:scale-[0.99] transition-transform duration-150"
-                    >
-                      <span
-                        className={cn(
-                          'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
-                          n.priority === 'high'
-                            ? 'bg-red-100 dark:bg-red-500/15'
-                            : n.priority === 'medium'
-                              ? 'bg-amber-100 dark:bg-amber-500/15'
-                              : 'bg-foreground/[0.06]',
-                        )}
-                      >
-                        <Icon size={14} strokeWidth={1.75} className={PRIORITY_COLORS[n.priority]} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-medium leading-tight text-foreground truncate">
+                        {n.title}
                       </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] font-medium leading-tight text-foreground truncate">
-                          {n.title}
-                        </span>
-                        <span className="block text-[11px] leading-snug mt-0.5 text-muted-foreground/80 truncate">
-                          {n.description}
-                        </span>
+                      <span className="block text-[11px] leading-snug mt-0.5 text-muted-foreground/80 truncate">
+                        {n.description}
                       </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDismiss(n, e)}
-                      aria-label="Dismiss notification"
-                      className="flex-shrink-0 -mr-0.5 mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-all duration-150 hover:bg-foreground/[0.06] hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
-                    >
-                      <X size={13} strokeWidth={1.75} />
-                    </button>
-                  </div>
-                );
-              })}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDismiss(n, e)}
+                    aria-label="Dismiss notification"
+                    className="flex-shrink-0 -mr-0.5 mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/40 opacity-0 transition-all duration-150 hover:bg-foreground/[0.06] hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                  >
+                    <X size={13} strokeWidth={1.75} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

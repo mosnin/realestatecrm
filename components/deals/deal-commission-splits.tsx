@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Check, Loader2, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatting';
 import { AnimatedNumber } from '@/components/motion/animated-number';
@@ -110,7 +110,6 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-        <DollarSign size={14} className="text-muted-foreground" />
         <h2 className="text-sm font-semibold">Commission</h2>
       </div>
 
@@ -143,7 +142,7 @@ export function DealCommissionSplits({ dealId, dealValue, dealCommissionRate, in
                   className={cn(
                     'w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 transition-colors',
                     paid
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                      ? 'bg-foreground/[0.06] text-foreground'
                       : 'border border-border text-muted-foreground hover:border-foreground',
                   )}
                   title={paid ? 'Paid. Tap to unmark' : 'Unpaid. Tap to mark paid'}
@@ -264,7 +263,7 @@ function Summary({ label, value, subValue, bold }: { label: string; value: numbe
             visibly re-settles when a row is added or marked paid. */}
         <AnimatedNumber value={value} format={formatCurrency} duration={500} />
       </p>
-      {subValue && <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5">{subValue}</p>}
+      {subValue && <p className="text-[10px] text-muted-foreground mt-0.5">{subValue}</p>}
     </div>
   );
 }

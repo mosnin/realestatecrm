@@ -47,15 +47,16 @@ export interface ContactRowInput {
   lastContactedAt?: string | null;
 }
 
-/** Lead-score tiers → badge tone. Hot reads as a positive signal (green),
- *  cold as a caution (amber), unscored as neutral. */
+/** Lead-score tiers → badge tone. Temperature tiers are decorative, not a
+ *  good/bad state machine, so every tier renders as a neutral badge and the
+ *  tier label carries the meaning. */
 const CONTACT_STATUS_MAP: Record<
   string,
   { tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label?: string }
 > = {
-  hot: { tone: 'success', label: 'Hot' },
-  warm: { tone: 'info', label: 'Warm' },
-  cold: { tone: 'warning', label: 'Cold' },
+  hot: { tone: 'neutral', label: 'Hot' },
+  warm: { tone: 'neutral', label: 'Warm' },
+  cold: { tone: 'neutral', label: 'Cold' },
   unscored: { tone: 'neutral', label: 'Unscored' },
 };
 
@@ -121,14 +122,16 @@ export interface DealRowInput {
   closeDate?: string | null;
 }
 
+// Deal status is a real state machine: won/lost keep a restrained semantic
+// tone (good/bad terminal states); active/on-hold read as neutral chips.
 const DEAL_STATUS_MAP: Record<
   string,
   { tone: 'success' | 'warning' | 'danger' | 'info' | 'neutral'; label?: string }
 > = {
-  active: { tone: 'info', label: 'Active' },
+  active: { tone: 'neutral', label: 'Active' },
   won: { tone: 'success', label: 'Won' },
   lost: { tone: 'danger', label: 'Lost' },
-  on_hold: { tone: 'warning', label: 'On hold' },
+  on_hold: { tone: 'neutral', label: 'On hold' },
 };
 
 export function buildDealsTable(deals: DealRowInput[], id = 'deals'): SerializableDataTable {

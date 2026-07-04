@@ -39,17 +39,18 @@ interface ContactCardProps {
   animDelay?: number;
 }
 
-// Score label → pill colours. Hot uses rose (not orange — orange is Chippi-only per STYLESHEET).
+// Lead-score/temperature tiers are decorative, not a good/bad state machine —
+// they read as neutral pills so the score number carries the signal.
 const SCORE_PILL: Record<string, string> = {
-  hot: 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15',
-  warm: 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
+  hot: 'text-muted-foreground bg-muted',
+  warm: 'text-muted-foreground bg-muted',
   cold: 'text-muted-foreground bg-muted',
 };
 
-// Small inline text tone used in the collapsed row (no bg pill, just coloured text).
+// Small inline text tone used in the collapsed row (no bg pill, just text).
 const SCORE_TEXT: Record<string, string> = {
-  hot: 'text-rose-600 dark:text-rose-400',
-  warm: 'text-amber-600 dark:text-amber-400',
+  hot: 'text-muted-foreground',
+  warm: 'text-muted-foreground',
   cold: 'text-muted-foreground',
 };
 

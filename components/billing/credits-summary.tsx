@@ -83,7 +83,7 @@ export async function CreditsSummary({ spaceId, slug }: { spaceId: string; slug:
                   <span
                     className={cn(
                       'text-sm tabular-nums',
-                      t.delta < 0 ? 'text-muted-foreground' : 'text-emerald-600 dark:text-emerald-400',
+                      t.delta < 0 ? 'text-muted-foreground' : 'text-foreground',
                     )}
                   >
                     {t.delta > 0 ? '+' : ''}
