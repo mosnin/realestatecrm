@@ -25,6 +25,7 @@ import { RescoreButton } from '@/components/contacts/rescore-button';
 import { ApplicationStatusManager } from '@/components/contacts/application-status-manager';
 import { PdfExportButton } from '@/components/contacts/pdf-export-button';
 import { CollapsibleSection } from '@/components/contacts/collapsible-section';
+import { TellChippiEnrich } from '@/components/chippi/tell-chippi-enrich';
 import { DynamicApplicationDisplay } from '@/components/contacts/dynamic-application-display';
 import { WhyThisScore } from '@/components/contacts/why-this-score';
 import { ContactActionPills } from '@/components/contacts/contact-action-pills';
@@ -254,6 +255,12 @@ export default async function ClientDetailPage({
           )}
         </section>
       )}
+
+      {/* Tell Chippi more — enrich this person in plain language; Chippi files
+          the new context into the right fields (notes, intent, budget, tags). */}
+      <div className="border-t border-border/60 pt-4">
+        <TellChippiEnrich slug={slug} contactId={contact.id} />
+      </div>
 
       {/* Below the fold — every section is a <details>. The default-open
           rule is "open when there's something to act on." A finished

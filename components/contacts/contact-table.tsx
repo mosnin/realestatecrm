@@ -43,7 +43,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/sharkui/context-menu';
-import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
+import { BODY_MUTED, H1, TITLE_FONT, CHIPPI_PILL } from '@/lib/typography';
+import { TellChippiModal } from '@/components/chippi/tell-chippi-modal';
+import { ChippiLogoMark } from '@/components/chippi/chippi-logo-mark';
 
 import Link from 'next/link';
 import { ApplicationCompare } from './application-compare';
@@ -167,6 +169,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [importOpen, setImportOpen] = useState(false);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [tellChippiOpen, setTellChippiOpen] = useState(false);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   // Set on fetchContacts failure. Used to render an inline banner above the
@@ -703,12 +706,23 @@ export function ContactTable({ slug }: ContactTableProps) {
           h1, one-sentence status. The "Tell Chippi → / or fill out the form"
           pair that used to sit awkwardly inside the h1 row moved to the
           empty state — when there's data, that affordance is noise. */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>People.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Your relationships
-        </h1>
-        {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <p className={BODY_MUTED}>People.</p>
+          <h1 className={H1} style={TITLE_FONT}>
+            Your relationships
+          </h1>
+          {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+        </div>
+        {/* Tell Chippi — say what you know, Chippi files it and opens the record. */}
+        <button
+          type="button"
+          className={cn(CHIPPI_PILL, 'flex-shrink-0')}
+          onClick={() => setTellChippiOpen(true)}
+        >
+          <ChippiLogoMark size={16} />
+          Tell Chippi
+        </button>
       </header>
 
       {/* Lead-type chip strip — small line directly under the title, only
@@ -1124,14 +1138,13 @@ export function ContactTable({ slug }: ContactTableProps) {
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
               <p className="text-base text-foreground">No relationships yet.</p>
               <p className={cn(BODY_MUTED, 'mt-1.5')}>
-                <Link
-                  href={`/s/${slug}/chippi?prefill=${encodeURIComponent(
-                    "I'm adding a new person — ",
-                  )}`}
+                <button
+                  type="button"
+                  onClick={() => setTellChippiOpen(true)}
                   className="text-foreground underline underline-offset-2 hover:no-underline"
                 >
                   Tell Chippi about someone
-                </Link>
+                </button>
                 {', or '}
                 <button
                   type="button"
@@ -1498,6 +1511,8 @@ export function ContactTable({ slug }: ContactTableProps) {
             : undefined
         }
       />
+
+      <TellChippiModal slug={slug} open={tellChippiOpen} onOpenChange={setTellChippiOpen} />
 
       {importOpen && (
         <CsvImportModal
