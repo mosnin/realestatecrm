@@ -184,6 +184,7 @@ function DraftRow({
   const [editedContent, setEditedContent] = useState(draft.content);
   const [actioning, setActioning] = useState<'approved' | 'dismissed' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
   const [dismissError, setDismissError] = useState<string | null>(null);
   const [autoSendCancelled, setAutoSendCancelled] = useState(false);
   const [autoSendRemainingMs, setAutoSendRemainingMs] = useState<number | null>(null);
@@ -307,7 +308,7 @@ function DraftRow({
   // they just resolved as the others stagger up to fill the space.
   if (celebrationKind) {
     return (
-      <article className="group/row py-3 first:pt-0 last:pb-0">
+      <article className="group/row rounded-xl border border-border/60 bg-card p-4 sm:p-5">
         <div className="flex items-baseline gap-2 text-sm">
           {draft.Contact && (
             <span className="font-medium text-muted-foreground truncate">
@@ -324,7 +325,7 @@ function DraftRow({
   }
 
   return (
-    <article className="group/row py-3 first:pt-0 last:pb-0">
+    <article className="group/row rounded-xl border border-border/60 bg-card p-4 sm:p-5">
       {/* Meta line: checkbox · contact · channel · confidence · time */}
       <div className="flex items-center gap-3 text-sm">
         {/* Quiet checkbox — invisible until row hover or selected. Matches the
@@ -430,32 +431,58 @@ function DraftRow({
           </span>
         </div>
       ) : (
-        <div className="group/content relative mt-2">
-          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pr-14">
-            {editedContent}
-            {isEdited && (
-              <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
-            )}
-          </p>
-          <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
-            <button
-              onClick={copyContent}
-              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="Copy"
-              aria-label="Copy message"
-            >
-              {copied ? <Check size={11} /> : <Copy size={11} />}
-            </button>
-            <button
-              onClick={startEdit}
-              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="Edit"
-              aria-label="Edit message"
-            >
-              <Pencil size={11} />
-            </button>
-          </div>
-        </div>
+        (() => {
+          // Long drafts clamp to a readable preview inside a contained message
+          // block (so the inbox scans like an inbox, not a stack of full
+          // emails); a quiet toggle reveals the rest.
+          const isLong = editedContent.length > 320 || editedContent.split('\n').length > 7;
+          const clamped = isLong && !bodyExpanded;
+          return (
+            <div className="group/content relative mt-3">
+              <div
+                className={cn(
+                  'rounded-lg border border-border/50 bg-muted/25 px-3.5 py-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap',
+                  clamped && 'max-h-40 overflow-hidden',
+                )}
+              >
+                {editedContent}
+                {isEdited && (
+                  <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
+                )}
+              </div>
+
+              {/* Copy / edit — quiet, top-right of the message block. */}
+              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
+                <button
+                  onClick={copyContent}
+                  className="w-6 h-6 rounded flex items-center justify-center bg-card/80 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Copy"
+                  aria-label="Copy message"
+                >
+                  {copied ? <Check size={11} /> : <Copy size={11} />}
+                </button>
+                <button
+                  onClick={startEdit}
+                  className="w-6 h-6 rounded flex items-center justify-center bg-card/80 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Edit"
+                  aria-label="Edit message"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+
+              {isLong && (
+                <button
+                  type="button"
+                  onClick={() => setBodyExpanded((v) => !v)}
+                  className="mt-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {bodyExpanded ? 'Show less' : 'Show full draft'}
+                </button>
+              )}
+            </div>
+          );
+        })()
       )}
 
       {!editing && meta.charLimit && editedContent.length > meta.charLimit && (
@@ -1051,7 +1078,7 @@ export function AgentDraftInbox({ slug }: Props) {
 
       {/* Draft rows */}
       {!loading && drafts.length > 0 && (
-        <StaggerList className="divide-y divide-border/60">
+        <StaggerList className="space-y-3">
           {drafts.map((draft) => (
             <StaggerItem key={draft.id}>
               <DraftRow
