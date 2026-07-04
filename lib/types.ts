@@ -19,6 +19,8 @@ export type User = {
   onboard: boolean;
   platformRole: PlatformRole;
   accountType: AccountType;
+  /** Last time the user was active anywhere in the app (messaging presence). */
+  lastSeenAt?: Date | null;
 };
 
 export type Brokerage = {
@@ -88,6 +90,76 @@ export type Invitation = {
   expiresAt: Date;
   invitedById: string | null;
   createdAt: Date;
+};
+
+// ── Brokerage messaging (Channels / DMs / presence) ──────────────────────────
+
+export type ChannelKind = 'channel' | 'dm';
+export type ChannelVisibility = 'public' | 'private';
+export type ChannelMemberRole = 'owner' | 'member';
+export type ChannelMessageKind =
+  | 'text'
+  | 'file'
+  | 'file_request'
+  | 'deal_status_request'
+  | 'system';
+
+export type Channel = {
+  id: string;
+  brokerageId: string;
+  kind: ChannelKind;
+  visibility: ChannelVisibility;
+  name: string | null;
+  topic: string | null;
+  dmKey: string | null;
+  createdById: string | null;
+  archivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ChannelMember = {
+  id: string;
+  channelId: string;
+  userId: string;
+  role: ChannelMemberRole;
+  lastReadAt: Date | null;
+  lastReadMessageId: string | null;
+  muted: boolean;
+  joinedAt: Date;
+};
+
+/** A file shared inside a message. */
+export type MessageAttachment = {
+  fileId: string | null;
+  name: string;
+  url: string;
+  size: number | null;
+  contentType: string | null;
+};
+
+export type ChannelMessage = {
+  id: string;
+  channelId: string;
+  brokerageId: string;
+  senderId: string | null;
+  kind: ChannelMessageKind;
+  body: string | null;
+  attachments: MessageAttachment[];
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  editedAt: Date | null;
+  deletedAt: Date | null;
+};
+
+/** A brokerage member as seen in the messaging roster (joins User profile). */
+export type MessagingMember = {
+  userId: string;
+  name: string | null;
+  email: string;
+  avatar: string | null;
+  role: MembershipRole;
+  lastSeenAt: string | null;
 };
 
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';

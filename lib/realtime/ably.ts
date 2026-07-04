@@ -103,3 +103,103 @@ export async function createSpaceTokenRequest(
     capability: { [`space:${spaceId}:*`]: ['subscribe'] },
   });
 }
+
+// ── Brokerage messaging (Channels / DMs / presence) ──────────────────────────
+//
+// A separate real-time surface from the activity feed above. Three channel
+// shapes, all namespaced under the brokerage so a token can never reach
+// another brokerage's traffic:
+//
+//   brokerage:${bid}:channel:${cid}  — one per Channel/DM. Message fan-out +
+//                                        read receipts + typing. Members only.
+//   brokerage:${bid}:presence        — one per brokerage. Ably presence set:
+//                                        who's online right now.
+//   brokerage:${bid}:user:${uid}     — one per member. Personal notify lane so
+//                                        a member learns they were added to a
+//                                        new DM/channel and can re-authorize.
+//
+// Clients are ALWAYS subscribe-only on message channels — messages are written
+// by the server (DB is source of truth) then published here. Clients get
+// `presence` on the presence channel only (to enter/leave the online set).
+
+export function brokerageMessageChannel(brokerageId: string, channelId: string): string {
+  return `brokerage:${brokerageId}:channel:${channelId}`;
+}
+export function brokeragePresenceChannel(brokerageId: string): string {
+  return `brokerage:${brokerageId}:presence`;
+}
+export function brokerageUserChannel(brokerageId: string, userId: string): string {
+  return `brokerage:${brokerageId}:user:${userId}`;
+}
+
+/**
+ * Publish a real-time event to a messaging channel. BEST-EFFORT: never throws,
+ * never blocks the caller. The message is already persisted in ChannelMessage;
+ * a dropped publish only means open clients wait for their next poll/refetch.
+ * `name` is the Ably event name ('message' | 'read' | 'typing' | 'update').
+ */
+export async function publishMessageEvent(
+  brokerageId: string,
+  channelId: string,
+  name: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const client = getClient();
+  if (!client) return;
+  try {
+    await client.channels.get(brokerageMessageChannel(brokerageId, channelId)).publish(name, data);
+  } catch (err) {
+    logger.warn('[realtime.ably] message publish failed', { brokerageId, channelId, name }, err);
+  }
+}
+
+/**
+ * Publish to a member's personal notify lane — used when they're added to a new
+ * DM/channel so their client re-authorizes (to pick up the new channel in its
+ * token capability) and refetches its channel list. Best-effort.
+ */
+export async function publishUserEvent(
+  brokerageId: string,
+  userId: string,
+  name: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const client = getClient();
+  if (!client) return;
+  try {
+    await client.channels.get(brokerageUserChannel(brokerageId, userId)).publish(name, data);
+  } catch (err) {
+    logger.warn('[realtime.ably] user publish failed', { brokerageId, userId, name }, err);
+  }
+}
+
+/**
+ * Mint a capability-scoped TokenRequest for the messaging client. Capabilities
+ * are computed from the caller's CURRENT memberships, so the grant is precise:
+ *   - subscribe on each channel the user belongs to (by id — private channels
+ *     are unreachable to non-members even if the UUID leaks)
+ *   - subscribe + presence on the brokerage presence channel
+ *   - subscribe on the user's own personal notify lane
+ * When the user opens a new DM / joins a channel, the client calls
+ * ably.auth.authorize() to re-mint with the widened capability.
+ *
+ * Returns null when ABLY_API_KEY is unset (caller maps to 503).
+ */
+export async function createMessagingTokenRequest(
+  clientId: string,
+  brokerageId: string,
+  channelIds: string[],
+): Promise<TokenRequest | null> {
+  const client = getClient();
+  if (!client) return null;
+  // Literal-union element type so it satisfies Ably's capabilityOp[] (a plain
+  // string[] does not).
+  const capability: Record<string, ('subscribe' | 'presence')[]> = {
+    [brokeragePresenceChannel(brokerageId)]: ['subscribe', 'presence'],
+    [brokerageUserChannel(brokerageId, clientId)]: ['subscribe'],
+  };
+  for (const cid of channelIds) {
+    capability[brokerageMessageChannel(brokerageId, cid)] = ['subscribe'];
+  }
+  return client.auth.createTokenRequest({ clientId, capability });
+}
