@@ -1,42 +1,22 @@
-import { Suspense } from 'react';
-import { notFound, redirect } from 'next/navigation';
-import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSlug } from '@/lib/space';
-import { supabase } from '@/lib/supabase';
-import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
-import { WorkflowsManager } from '@/components/workflows/workflows-manager';
-import { AutomationsIntro } from '@/components/workflows/automations-intro';
+import { redirect } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Workflows — Chippi' };
-
-export default async function WorkflowsPage({
+/**
+ * /automations/workflows → the unified Automations hub.
+ *
+ * Workflows is a SECTION of the single Automations hub, not its own page — the
+ * hub already renders the same WorkflowsManager. This route used to render it a
+ * second time, so the hub and this page looked identical. It now redirects to
+ * the hub (preserving `?new=1` so "New workflow" still opens the builder), and
+ * the sidebar links to the `#workflows` section anchor instead.
+ */
+export default async function WorkflowsRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
   const { slug } = await params;
-  const { userId } = await auth();
-  if (!userId) redirect('/login/realtor');
-
-  const space = await getSpaceFromSlug(slug);
-  if (!space) notFound();
-
-  const { data: spaceOwner } = await supabase
-    .from('User')
-    .select('id')
-    .eq('clerkId', userId)
-    .eq('id', space.ownerId)
-    .maybeSingle();
-  if (!spaceOwner) notFound();
-
-  return (
-    <ChippiPageShell greeting="Workflows." title="Workflows" subtitle="When something happens — react to an event.">
-      <Suspense fallback={null}>
-        <WorkflowsManager />
-      </Suspense>
-      {/* First-visit feature tour — self-dismissing, persisted per browser. */}
-      <AutomationsIntro />
-    </ChippiPageShell>
-  );
+  const { new: isNew } = await searchParams;
+  redirect(`/s/${slug}/automations${isNew === '1' ? '?new=1' : '#workflows'}`);
 }

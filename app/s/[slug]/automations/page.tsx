@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { WorkflowsManager } from '@/components/workflows/workflows-manager';
 import { RoutinesManager } from '@/components/routines/routines-manager';
 import { TrustLadderBanner } from '@/components/workflows/trust-ladder-banner';
+import { AutomationsIntro } from '@/components/workflows/automations-intro';
 import { BODY_MUTED, H1, TITLE_FONT, SECTION_LABEL, CAPTION } from '@/lib/typography';
 
 export const dynamic = 'force-dynamic';
@@ -71,7 +72,7 @@ export default async function AutomationsPage({
         <TrustLadderBanner />
       </div>
 
-      <section className="space-y-3">
+      <section id="workflows" className="scroll-mt-24 space-y-3">
         <div className="mx-auto w-full max-w-5xl space-y-1">
           <h2 className={SECTION_LABEL}>When something happens</h2>
           <p className={CAPTION}>
@@ -83,7 +84,7 @@ export default async function AutomationsPage({
         </Suspense>
       </section>
 
-      <section className="space-y-3">
+      <section id="routines" className="scroll-mt-24 space-y-3">
         <div className="mx-auto w-full max-w-5xl space-y-1">
           <h2 className={SECTION_LABEL}>On a schedule</h2>
           <p className={CAPTION}>
@@ -92,6 +93,9 @@ export default async function AutomationsPage({
         </div>
         <RoutinesManager apiBase="/api/routines" />
       </section>
+
+      {/* First-visit feature tour — self-dismissing, persisted per browser. */}
+      <AutomationsIntro />
     </div>
   );
 }

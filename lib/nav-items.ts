@@ -72,10 +72,14 @@ export const realtorNavItems: NavItem[] = [
     label: 'Automations',
     icon: Zap,
     badgeKey: 'activeWorkflows',
+    // Workflows + Routines are two SECTIONS of the single Automations hub, not
+    // separate pages — the hub renders both. These children scroll to the
+    // matching section anchor so we never show two near-identical pages (the
+    // hub and a workflows-only page rendering the same manager).
     children: [
-      { href: '/automations/workflows', label: 'Workflows', exact: true },
-      { href: '/automations/workflows?new=1', label: 'New workflow' },
-      { href: '/automations/routines', label: 'Routines' },
+      { href: '/automations#workflows', label: 'Workflows' },
+      { href: '/automations?new=1', label: 'New workflow' },
+      { href: '/automations#routines', label: 'Routines' },
       { href: '/automations/settings', label: 'Configuration' },
     ],
   },
