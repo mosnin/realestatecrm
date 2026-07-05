@@ -91,14 +91,16 @@ function compFacts(c: CmaComp): string {
 
 // ── Main view ────────────────────────────────────────────────────────────────
 
-export function CmaView({ slug }: { slug: string }) {
+export function CmaView({ slug, initialAddress }: { slug: string; initialAddress?: string }) {
   const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [reports, setReports] = useState<CmaReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(true);
 
-  // Subject input: either a saved property id, or typed fields.
-  const [subjectId, setSubjectId] = useState<string>('');
-  const [address, setAddress] = useState('');
+  // Subject input: either a saved property id, or typed fields. A property
+  // page's "Run a CMA" handoff arrives with ?address= — start in typing mode
+  // with the subject already filled so the realtor lands one click from Build.
+  const [subjectId, setSubjectId] = useState<string>(initialAddress ? TYPE_IT : '');
+  const [address, setAddress] = useState(initialAddress ?? '');
   const [beds, setBeds] = useState('');
   const [baths, setBaths] = useState('');
   const [sqft, setSqft] = useState('');

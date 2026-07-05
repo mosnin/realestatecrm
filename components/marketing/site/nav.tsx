@@ -48,27 +48,12 @@ interface NavGroup {
   items: MegaItem[];
 }
 
+// Two spines, one decision (the Focus Update): a visitor is an AGENT or runs
+// a BROKERAGE — the nav asks exactly that and nothing else. The old "Product"
+// museum (a tile per feature) dissolved into the two stories: features now
+// appear as moments in a day, not exhibits. Every feature page still exists
+// and is reachable — from inside the story it belongs to.
 const GROUPS: NavGroup[] = [
-  {
-    label: 'Product',
-    href: '/chippi',
-    featured: {
-      eyebrow: 'Meet Chippi',
-      title: 'All your leads, worked while you close.',
-      body: 'The agent inside your CRM, it reads, scores, drafts, books, and follows up.',
-      cta: 'Meet Chippi',
-      href: '/chippi',
-    },
-    items: [
-      { icon: Users, label: 'People', desc: 'Leads scored and followed up', href: '/people' },
-      { icon: KanbanSquare, label: 'Deals', desc: 'A pipeline that runs itself', href: '/deals' },
-      { icon: Home, label: 'Properties', desc: 'Every listing, synced', href: '/properties' },
-      { icon: Megaphone, label: 'Content studio', desc: 'Posts and emails, on the go', href: '/studio' },
-      { icon: FolderOpen, label: 'Files', desc: 'Every document, one search', href: '/files' },
-      { icon: Target, label: 'Capture leads', desc: 'Forms, pages, tour links', href: '/capture' },
-      { icon: Link2, label: 'Public bio', desc: 'One link, every lead', href: '/bio' },
-    ],
-  },
   {
     label: 'For realtors',
     href: '/realtors',
@@ -84,6 +69,8 @@ const GROUPS: NavGroup[] = [
       { icon: Target, label: 'Know who to call first', desc: 'Scored against your live deals', href: '/people' },
       { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time, it’s handled', href: '/realtors' },
       { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six tabs', href: '/deals' },
+      { icon: Megaphone, label: 'Post the listing', desc: 'Flyers and posts, made in place', href: '/studio' },
+      { icon: Link2, label: 'Capture every lead', desc: 'Forms, pages, one public bio', href: '/capture' },
     ],
   },
   {
@@ -98,8 +85,8 @@ const GROUPS: NavGroup[] = [
     },
     items: [
       { icon: GitBranch, label: 'Lead routing', desc: 'Right lead, right agent, logged', href: '/brokerages' },
-      { icon: BarChart3, label: 'The whole floor', desc: 'Performance at a glance', href: '/brokerages' },
-      { icon: MessagesSquare, label: 'Team chat', desc: 'Per-deal channels, @chippi in line', href: '/brokerages' },
+      { icon: BarChart3, label: 'The whole floor', desc: 'Who’s on, what’s stuck, live', href: '/brokerages' },
+      { icon: MessagesSquare, label: 'Team messaging', desc: 'Real-time DMs and channels', href: '/brokerages' },
       { icon: Users, label: 'Members & roles', desc: 'Three roles, no permissions maze', href: '/brokerages' },
     ],
   },
@@ -114,6 +101,7 @@ const GROUPS: NavGroup[] = [
       href: '/demo',
     },
     items: [
+      { icon: Home, label: 'Meet Chippi', desc: 'The agent inside the CRM', href: '/chippi' },
       { icon: Plug, label: 'Integrations', desc: 'The tools you already use', href: '/integrations' },
       { icon: Building2, label: 'Company', desc: 'Why we built Chippi', href: '/company' },
       { icon: PlayCircle, label: 'Book a demo', desc: 'See it on your own floor', href: '/demo' },
