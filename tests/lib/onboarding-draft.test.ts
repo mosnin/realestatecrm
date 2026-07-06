@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { composeOnboardingDraft } from '@/lib/onboarding-draft';
+import { composeOnboardingDraft, composeFirstLeadTrick, SAMPLE_LEAD_NAME } from '@/lib/onboarding-draft';
 
 const base = {
   name: 'Sarah Chen',
@@ -82,5 +82,38 @@ describe('composeOnboardingDraft', () => {
         }
       }
     }
+  });
+});
+
+describe('composeFirstLeadTrick', () => {
+  it('performs the whole job in order: read → score → draft → follow-up → filed', () => {
+    const trick = composeFirstLeadTrick(base);
+    expect(trick.steps.map((s) => s.key)).toEqual([
+      'read', 'score', 'draft', 'followup', 'filed',
+    ]);
+  });
+
+  it('is deterministic — same inputs, same trick', () => {
+    expect(composeFirstLeadTrick(base)).toEqual(composeFirstLeadTrick(base));
+  });
+
+  it('names the lead source when one is chosen, and reads fine without', () => {
+    const withSource = composeFirstLeadTrick(base);
+    expect(withSource.steps[0].detail).toContain('Zillow');
+    const noSource = composeFirstLeadTrick({ ...base, leadSources: [] });
+    expect(noSource.steps[0].detail).toContain('a new lead');
+  });
+
+  it('reflects the chosen voice in the draft step', () => {
+    expect(composeFirstLeadTrick({ ...base, tone: 'direct' }).steps[2].detail).toContain('direct');
+    expect(composeFirstLeadTrick({ ...base, tone: 'warm' }).steps[2].detail).toContain('warm');
+  });
+
+  it('keeps the sample honest: named "(sample)" and score fields consistent', () => {
+    const trick = composeFirstLeadTrick(base);
+    expect(SAMPLE_LEAD_NAME).toContain('(sample)');
+    expect(trick.leadName).toBe(SAMPLE_LEAD_NAME);
+    expect(trick.steps[1].label).toContain(String(trick.score));
+    expect(trick.scoreLabel).toBe('hot');
   });
 });

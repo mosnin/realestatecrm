@@ -29,13 +29,13 @@
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, Check } from 'lucide-react';
 import { cn, rootDomain } from '@/lib/utils';
 import { normalizeSlug, isValidSlug } from '@/lib/intake';
 import { CHIPPI_PILL } from '@/lib/typography';
 import { trackSignUp, trackOnboardingComplete } from '@/lib/analytics/events';
 import { BrandLogo } from '@/components/brand-logo';
-import { composeOnboardingDraft } from '@/lib/onboarding-draft';
+import { composeOnboardingDraft, composeFirstLeadTrick } from '@/lib/onboarding-draft';
 import { readSignupPlan } from '@/lib/signup-plan';
 import { OnboardingIntro, OnboardingReady } from './onboarding-cinematics';
 import { ChippiSays, UserSays, AnswerAffordance, Thread } from './onboarding-chat';
@@ -254,10 +254,18 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
     try {
       await saveProfilePartial();
 
+      // The exact draft the realtor just watched Chippi type — the API seeds
+      // it (with the sample lead) into their book so the trick is real.
+      const firstLead = {
+        draftBody: composeOnboardingDraft({
+          name, businessName, tone: tone ?? 'warm', clientTypes, leadSources,
+        }).body,
+      };
+
       if (role === 'brokerage_owner') {
         const completeRes = await fetch('/api/onboarding', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'complete', accountType: 'both' }),
+          body: JSON.stringify({ action: 'complete', accountType: 'both', firstLead }),
         });
         if (!completeRes.ok) throw new Error('complete');
 
@@ -283,19 +291,21 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
 
       const completeRes = await fetch('/api/onboarding', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'complete', accountType: 'realtor' }),
+        body: JSON.stringify({ action: 'complete', accountType: 'realtor', firstLead }),
       });
       if (!completeRes.ok) throw new Error('complete');
 
       trackSignUp();
       trackOnboardingComplete({ accountType: 'realtor' });
-      redirectRef.current = `/s/${slug}/chippi`;
+      // Land on Today — the sample lead Chippi just worked is the first
+      // thing in the prepared day, so the trick connects to the product.
+      redirectRef.current = `/s/${slug}/chippi/brief`;
       setPhase('ready');
     } catch {
       setError("Couldn't finish setup. Usually temporary.");
       setSubmitting(false);
     }
-  }, [saveProfilePartial, slug, role, businessName]);
+  }, [saveProfilePartial, slug, role, businessName, name, tone, clientTypes, leadSources]);
 
   // ── Copy ──────────────────────────────────────────────────────────────────────
 
@@ -826,7 +836,21 @@ function RevealAffordance({
   onFinish: () => void;
 }) {
   const draft = composeOnboardingDraft({ name, businessName, tone, clientTypes, leadSources });
+  const trick = composeFirstLeadTrick({ name, businessName, tone, clientTypes, leadSources });
   const [typed, setTyped] = useState(false);
+  // How many trick steps have appeared. The draft typing IS the 'draft' step
+  // performed live, so the staged list starts after typing completes and
+  // reveals one line at a time — the whole job, not one piece of it.
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    if (!typed || shown >= trick.steps.length) return;
+    const t = setTimeout(() => setShown((n) => n + 1), shown === 0 ? 500 : 900);
+    return () => clearTimeout(t);
+  }, [typed, shown, trick.steps.length]);
+
+  const done = shown >= trick.steps.length;
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border/70 bg-card p-5">
@@ -837,10 +861,31 @@ function RevealAffordance({
           <TypingText text={draft.body} onDone={() => setTyped(true)} />
         </p>
       </div>
+
+      {/* The rest of the job, performed in sequence. Each line lands with the
+          same quiet fade the thread uses; no spinners, no theatre — these are
+          the real states the seeded lead will be in when Today loads. */}
+      {typed && (
+        <ol className="space-y-2.5">
+          {trick.steps.slice(0, shown).map((step) => (
+            <li
+              key={step.key}
+              className="flex items-start gap-2.5 duration-500 animate-in fade-in slide-in-from-bottom-1"
+            >
+              <Check size={14} className="mt-0.5 shrink-0 text-foreground" strokeWidth={2.5} />
+              <span className="text-sm leading-snug">
+                <span className="font-medium text-foreground">{step.label}</span>
+                <span className="block text-[13px] text-muted-foreground">{step.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+
       {error && <ErrorLine message={error} />}
-      <div className={cn('flex justify-end transition-opacity duration-500', typed ? 'opacity-100' : 'pointer-events-none opacity-0')}>
+      <div className={cn('flex justify-end transition-opacity duration-500', done ? 'opacity-100' : 'pointer-events-none opacity-0')}>
         <button type="button" onClick={onFinish} disabled={submitting} className={CHIPPI_PILL}>
-          {submitting ? <Loader2 size={14} className="animate-spin" /> : <>Looks good, take me in <ArrowRight size={14} /></>}
+          {submitting ? <Loader2 size={14} className="animate-spin" /> : <>It&rsquo;s in my book — take me in <ArrowRight size={14} /></>}
         </button>
       </div>
     </div>
