@@ -39,6 +39,7 @@ import {
   FileText,
   Megaphone,
   MessageCircle,
+  MessagesSquare,
   Activity,
   Upload,
   ArrowLeft,
@@ -152,6 +153,7 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
       { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
       { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
+      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
       { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
       { href: '/broker/activity', label: 'Audit log', icon: Shield, exact: false, adminOnly: true },
       { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
@@ -198,6 +200,7 @@ export const brokerMemberNavSections: BrokerNavSection[] = [
     items: [
       { href: '/broker', label: 'My day', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/my-leads', label: 'My leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
     ],
   },
   {
@@ -1137,6 +1140,14 @@ function RealtorNav({
   // exact same row chrome via renderItem. Uses the same Flag icon as the
   // broker-side "Reviews" entry for a shared icon vocabulary.
   if (isBrokerageMember) {
+    // Team messaging — real-time DMs + channels with the brokerage (owners,
+    // admins, fellow agents). Same membership gate as Reviews: a solo realtor
+    // has no team to message, so the row only appears for brokerage members.
+    workspaceItems.push({
+      href: '/messages',
+      label: 'Messages',
+      icon: MessagesSquare,
+    });
     workspaceItems.push({
       href: '/reviews',
       label: 'Reviews',

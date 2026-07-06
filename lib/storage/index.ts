@@ -292,6 +292,7 @@ export const STORAGE_PREFIXES = {
   studio: 'studio',
   profileCover: 'profile-cover',
   profilePhoto: 'profile-photo',
+  messageAttachments: 'message-attachments',
 } as const;
 
 /** Convenient key builder. Pass the prefix + the suffix segments and get a
