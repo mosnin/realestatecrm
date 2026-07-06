@@ -24,6 +24,7 @@ import { PulseNumber } from '@/components/ui/pulse-number';
 import {
   Building2,
   ChevronRight,
+  ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
   Users,
@@ -40,6 +41,7 @@ import {
   Megaphone,
   MessageCircle,
   MessagesSquare,
+  Radar,
   Activity,
   Upload,
   ArrowLeft,
@@ -145,19 +147,15 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
           { href: '/broker', label: 'History', exact: true },
         ],
       },
+      // The Floor — the single command view (who's reachable, what's waiting,
+      // what's stalled, who's asking for judgement). First stop of the day;
+      // every deeper surface is one link away from it or one disclosure down.
+      { href: '/broker/floor', label: 'The Floor', icon: Radar, exact: false, adminOnly: false },
       { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-      { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
-      { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
-      { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
       { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
-      { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
-      { href: '/broker/activity', label: 'Audit log', icon: Shield, exact: false, adminOnly: true },
-      { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
-      { href: '/broker/routines', label: 'Routines', icon: CalendarClock, exact: false, adminOnly: true },
       {
         href: '/broker/settings',
         label: 'Settings',
@@ -179,6 +177,17 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
   {
     label: 'More',
     items: [
+      // Command surfaces demoted from the main rail by the Focus Update —
+      // still one disclosure away; the Floor's KPI tiles deep-link into the
+      // daily ones (Reviews, Leads, Deals) so the rail stays five-ish rows.
+      { href: '/broker/people', label: 'People', icon: Users, exact: false, adminOnly: false },
+      { href: '/broker/forecast', label: 'Forecast', icon: TrendingUp, exact: false, adminOnly: false },
+      { href: '/broker/properties', label: 'Properties', icon: Building2, exact: false, adminOnly: false },
+      { href: '/broker/reviews', label: 'Reviews', icon: Flag, exact: false, adminOnly: false },
+      { href: '/broker/agent-activity', label: 'Agent activity', icon: Activity, exact: false, adminOnly: false },
+      { href: '/broker/activity', label: 'Audit log', icon: Shield, exact: false, adminOnly: true },
+      { href: '/broker/integrations', label: 'Integrations', icon: Plug, exact: false, adminOnly: false },
+      { href: '/broker/routines', label: 'Routines', icon: CalendarClock, exact: false, adminOnly: true },
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
       { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
@@ -283,9 +292,14 @@ function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean
   // An `exact` parent only owns its own exact route — used by the broker
   // Chippi entry (/broker), whose href is a prefix of every other broker
   // route. Without this, a prefix match would light up Chippi on every
-  // broker page. Realtor parents don't set `exact`, so this is a no-op there.
+  // broker page.
   if (item.exact) {
     return pathname === `${base}${item.href}`;
+  }
+  // A sub-route promoted to its own nav row (Today at /chippi/brief) is
+  // disclaimed by the parent so the two rows never light up together.
+  if (item.excludePaths?.some((p) => pathname.startsWith(`${base}${p}`))) {
+    return false;
   }
   return pathname.startsWith(`${base}${item.href}`);
 }
@@ -970,20 +984,15 @@ function BrokerSidebarConversations() {
 //   • Settings → no header (bottom-pinned)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const AUTOMATION_HREFS = new Set<string>(['/automations']);
-const WORKSPACE_HREFS = new Set<string>([
-  '/contacts',
-  '/deals',
-  '/calendar',
-  '/communication',
-  '/properties',
-  '/studio',
-  '/files',
-]);
-const SETUP_HREFS = new Set<string>([
-  '/profile-page',
-  '/intake',
-]);
+// The Focus Update: the sidebar is CORE + MORE, nothing else.
+//   • CORE — the five doors an agent actually opens daily: Chippi (pinned AI
+//     row), Today, People, Deals, and Messages (brokerage members). Every
+//     capability outside these is reachable by asking Chippi or in context.
+//   • MORE — everything else, one collapsed disclosure below the core.
+//     Collapsed by default; auto-opens when the active route lives inside it;
+//     the user's manual choice is remembered (localStorage).
+const CORE_HREFS = new Set<string>(['/chippi/brief', '/contacts', '/deals']);
+const MORE_STORAGE_KEY = 'sidebar:more-open';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Notification slot — reserved space that sits between the scroll area
@@ -1120,55 +1129,63 @@ function RealtorNav({
 
   // AI-related items always sit at the top
   const aiItems = realtorNavItems.filter((item) => item.isAI);
-  // Automations — top-level, sits between Chippi and the workspace bucket.
-  // No section header: it's prominent enough to stand alone.
-  const automationItems = realtorNavItems.filter(
-    (item) => !item.isAI && AUTOMATION_HREFS.has(item.href),
+  // CORE — the daily doors, in canonical lib/nav-items.ts order: Today,
+  // People, Deals (+ Messages for brokerage members, appended below).
+  const coreItems = realtorNavItems.filter(
+    (item) => !item.isAI && CORE_HREFS.has(item.href),
   );
-  // Workspace bucket — daily work surfaces (gets the WORKSPACE small-caps
-  // header above it). Filtered through the canonical realtorNavItems order
-  // so route additions inherit the order without touching this file.
-  const workspaceItems = realtorNavItems.filter(
-    (item) => !item.isAI && WORKSPACE_HREFS.has(item.href),
-  );
-  // Reviews — broker feedback on deals the agent flagged for review
-  // (/s/[slug]/reviews). Lives in lib/nav-items.ts's blind spot: that file
-  // can't gate by brokerage membership, so the row is defined here and only
-  // shown to realtors who belong to a brokerage (a solo realtor has no broker
-  // to review them; their reviews page would just be empty). Appended to the
-  // workspace bucket so it sits alongside Deals/Properties and inherits the
-  // exact same row chrome via renderItem. Uses the same Flag icon as the
-  // broker-side "Reviews" entry for a shared icon vocabulary.
+  // Team messaging — real-time DMs + channels with the brokerage. Defined
+  // here (not lib/nav-items.ts) because that file can't gate by brokerage
+  // membership; a solo realtor has no team to message.
   if (isBrokerageMember) {
-    // Team messaging — real-time DMs + channels with the brokerage (owners,
-    // admins, fellow agents). Same membership gate as Reviews: a solo realtor
-    // has no team to message, so the row only appears for brokerage members.
-    workspaceItems.push({
+    coreItems.push({
       href: '/messages',
       label: 'Messages',
       icon: MessagesSquare,
     });
-    workspaceItems.push({
+  }
+  // MORE — every capability that isn't a daily door. Nothing is removed:
+  // Automations, Calendar, Mailbox, Properties, Studio, Files, Profile,
+  // Intake all live here, one disclosure down. Canonical order preserved.
+  const moreItems = realtorNavItems.filter(
+    (item) =>
+      !item.isAI &&
+      item.href !== '/settings' &&
+      !CORE_HREFS.has(item.href),
+  );
+  // Reviews — broker feedback on deals the agent flagged. Brokerage members
+  // only (same gate as Messages); occasional, so it lives in More.
+  if (isBrokerageMember) {
+    moreItems.push({
       href: '/reviews',
       label: 'Reviews',
       icon: Flag,
     });
   }
-  // Setup bucket — once-and-done surfaces (gets the SETUP small-caps header).
-  const setupItems = realtorNavItems.filter(
-    (item) => !item.isAI && SETUP_HREFS.has(item.href),
-  );
-  // Any leaf the buckets above didn't claim — kept appended (no header) so
-  // a new route added to `lib/nav-items.ts` still renders. The set-based
-  // filter makes the bucketing additive, not exhaustive.
-  const otherItems = realtorNavItems.filter(
-    (item) =>
-      !item.isAI &&
-      item.href !== '/settings' &&
-      !AUTOMATION_HREFS.has(item.href) &&
-      !WORKSPACE_HREFS.has(item.href) &&
-      !SETUP_HREFS.has(item.href),
-  );
+
+  // More disclosure state: closed by default (the whole point), auto-open
+  // when the active route lives inside it, manual choice remembered.
+  const moreOwnsPath = moreItems.some((item) => doesItemOwnPath(item, pathname, base));
+  const [moreOpen, setMoreOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(MORE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const moreVisible = moreOpen || moreOwnsPath;
+  const toggleMore = () => {
+    setMoreOpen((prev) => {
+      const next = !(prev || moreOwnsPath);
+      try {
+        window.localStorage.setItem(MORE_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        /* private mode — session-only state is fine */
+      }
+      return next;
+    });
+  };
 
   // Route IS the signal for which nav mode this sidebar is in. On
   // /chippi/* the main links cross-fade out and the conversation history
@@ -1292,45 +1309,44 @@ function RealtorNav({
             doesn't need a category to belong to. */}
         {aiItems.map(renderItem)}
 
-        {/* Automations — sits immediately below Chippi, no section header.
-            Prominent enough to stand alone between the AI and workspace
-            buckets. */}
-        {automationItems.map(renderItem)}
+        {/* CORE — the daily doors: Today, People, Deals (+ Messages for
+            brokerage members). No section header; five rows don't need a
+            category. This IS the sidebar; everything below is disclosure. */}
+        {coreItems.map(renderItem)}
 
-        {/* RECORDS — daily work surfaces (the realtor's book of business:
-            People, Deals, Properties, etc.). Labeled to match the
-            inspiration's "Records" group above the existing workspace nav
-            items — no restructuring of `lib/nav-items.ts`, just a calmer
-            small-caps header above the same routes. Hidden in collapsed
-            rail mode (no horizontal room). */}
-        {workspaceItems.length > 0 && (
+        {/* MORE — every other capability, one disclosure down. Nothing was
+            removed from the product; it just stopped being a decision the
+            agent makes on every glance. Closed by default, auto-opens when
+            the active route lives inside, choice remembered. In collapsed
+            rail mode the header has no room — render the rows flat (the
+            rail is already an opt-in power view). */}
+        {collapsed ? (
+          moreItems.map(renderItem)
+        ) : (
           <>
-            {!collapsed && (
-              <p className={cn(SECTION_LABEL, 'px-3 pt-4 pb-1.5 select-none')}>
-                Records
-              </p>
-            )}
-            {workspaceItems.map(renderItem)}
+            <button
+              type="button"
+              onClick={toggleMore}
+              aria-expanded={moreVisible}
+              className={cn(
+                SECTION_LABEL,
+                'flex w-full items-center gap-1 px-3 pt-4 pb-1.5 select-none',
+                'cursor-pointer transition-colors hover:text-foreground',
+              )}
+            >
+              More
+              <ChevronDown
+                size={12}
+                strokeWidth={2}
+                className={cn(
+                  'transition-transform duration-200',
+                  moreVisible ? 'rotate-0' : '-rotate-90',
+                )}
+              />
+            </button>
+            {moreVisible && moreItems.map(renderItem)}
           </>
         )}
-
-        {/* SETUP — once-and-done surfaces (Profile, Intake form). Same
-            collapse rule as WORKSPACE. */}
-        {setupItems.length > 0 && (
-          <>
-            {!collapsed && (
-              <p className={cn(SECTION_LABEL, 'px-3 pt-4 pb-1.5 select-none')}>
-                Setup
-              </p>
-            )}
-            {setupItems.map(renderItem)}
-          </>
-        )}
-
-        {/* Anything the buckets above didn't claim — appended without a
-            header so a new `lib/nav-items.ts` route stays renderable
-            without forcing an edit to this file. */}
-        {otherItems.map(renderItem)}
       </div>
 
       {/* Context-aware second section. Route IS the signal:

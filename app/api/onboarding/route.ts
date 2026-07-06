@@ -8,7 +8,65 @@ import { resolveSelfServePlan } from '@/lib/plans';
 import { sendWelcomeEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { emit as emitTelemetry } from '@/lib/telemetry';
+import { SAMPLE_LEAD_NAME } from '@/lib/onboarding-draft';
 import type { User, Space, SpaceSetting } from '@/lib/types';
+
+/**
+ * Seed the sample lead the realtor just watched Chippi work in the reveal
+ * ("the three-minute magic"). The trick must be real, not theatre: the exact
+ * lead — scored, drafted, follow-up set — lands in their CRM so Today's first
+ * render shows it. Guards: only when the space has NO contacts yet (importers
+ * and re-completers are skipped), and clearly marked "(sample)" + tagged so
+ * it's honest in every list and trivially deletable. Best-effort by contract:
+ * a seeding failure must never fail onboarding completion.
+ */
+async function seedSampleLead(spaceId: string, draftBody: string | null): Promise<void> {
+  try {
+    const { count } = await supabase
+      .from('Contact')
+      .select('*', { count: 'exact', head: true })
+      .eq('spaceId', spaceId);
+    if ((count ?? 0) > 0) return;
+
+    const contactId = crypto.randomUUID();
+    const followUpAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: contactErr } = await supabase.from('Contact').insert({
+      id: contactId,
+      spaceId,
+      name: SAMPLE_LEAD_NAME,
+      email: 'jordan.rivera@example.com',
+      leadType: 'buyer',
+      type: 'QUALIFICATION',
+      tags: ['sample-lead'],
+      notes:
+        'Sample lead from your welcome — Chippi read it, scored it, drafted the first touch, and set a follow-up. Delete any time.',
+      leadScore: 84,
+      scoreLabel: 'hot',
+      scoreSummary: 'Pre-approved with a real timeline — call-first material.',
+      scoringStatus: 'scored',
+      followUpAt,
+      source: 'manual',
+    });
+    if (contactErr) {
+      console.error('[onboarding] sample lead seed failed', contactErr);
+      return;
+    }
+
+    if (draftBody) {
+      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+        id: crypto.randomUUID(),
+        contactId,
+        spaceId,
+        type: 'note',
+        content: `Chippi drafted this first touch during your welcome:\n\n${draftBody}`,
+        metadata: { via: 'onboarding_reveal', sample: true },
+      });
+      if (activityErr) console.error('[onboarding] sample activity seed failed', activityErr);
+    }
+  } catch (e) {
+    console.error('[onboarding] sample lead seed threw', e);
+  }
+}
 
 export async function GET() {
   const { userId } = await auth();
@@ -592,6 +650,16 @@ export async function POST(req: NextRequest) {
         .update(updatePayload)
         .eq('id', user.id);
       if (error) throw error;
+
+      // Three-minute magic: land the lead the realtor just watched Chippi
+      // work into their actual book (see seedSampleLead). Broker-only
+      // accounts have no realtor workspace to seed.
+      if (space && !isBrokerOnly) {
+        const firstLead = (body as { firstLead?: { draftBody?: unknown } }).firstLead;
+        const draftBody =
+          typeof firstLead?.draftBody === 'string' ? firstLead.draftBody.trim().slice(0, 2000) : null;
+        await seedSampleLead(space.id, draftBody);
+      }
 
       // Phase 2 telemetry: fire signup_completed exactly when the user
       // transitions from non-onboarded to onboarded. The early-return path

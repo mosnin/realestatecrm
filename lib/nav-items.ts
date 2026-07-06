@@ -10,6 +10,7 @@ import {
   Building2,
   FolderOpen,
   Aperture,
+  Sun,
   Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -33,6 +34,13 @@ export interface NavItem {
   isAI?: boolean;
   /** Badge key for dynamic counts (e.g. 'leads', 'followUps') */
   badgeKey?: string;
+  /**
+   * Path prefixes this item must NOT claim even though they sit under its
+   * href. Lets a sub-route be promoted to its own top-level nav item (Today
+   * lives at /chippi/brief but belongs to the Today row, not Chippi) without
+   * both rows lighting up.
+   */
+  excludePaths?: string[];
 }
 
 // ── Realtor sidebar nav ──────────────────────────────────────────────────────
@@ -53,8 +61,10 @@ export const realtorNavItems: NavItem[] = [
     icon: MessageCircle,
     isAI: true,
     badgeKey: 'pendingDrafts',
+    // /chippi/brief is the Today row's home (promoted to its own top-level
+    // item below) — excluded here so the two rows never light up together.
+    excludePaths: ['/chippi/brief'],
     children: [
-      { href: '/chippi/brief', label: 'Brief' },
       { href: '/chippi/inbox', label: 'Inbox' },
       // Activity = the ONE unified, filterable timeline (/chippi/activity) that
       // merges Chippi's own actions with the cross-app events it noticed —
@@ -66,6 +76,16 @@ export const realtorNavItems: NavItem[] = [
       { href: '/chippi/activity', label: 'Activity' },
       { href: '/chippi/integrations', label: 'Integrations' },
     ],
+  },
+  // Today — the prepared day, and the workspace's default landing (the root
+  // /s/[slug] redirect points here). One glance: today's book, what Chippi
+  // did, what needs a human. Owns /chippi/brief exclusively (see the
+  // excludePaths on the Chippi item above).
+  {
+    href: '/chippi/brief',
+    label: 'Today',
+    icon: Sun,
+    exact: true,
   },
   {
     href: '/automations',
@@ -176,11 +196,13 @@ export const realtorMoreNavItems: NavItem[] = [];
 // Billing, Profile, or other account-level routes here when they earn it.
 export const secondaryNavItems: { href: string; label: string; icon: LucideIcon }[] = [];
 
-/** Primary items with shorter labels for the mobile bottom bar. */
+/** Primary items with shorter labels for the mobile bottom bar. Mirrors the
+ *  sidebar's core five: Today replaces Calendar (Calendar lives in More /
+ *  behind Chippi — the prepared day already surfaces what's coming). */
 export const mobileNavItems = [
   { href: '/chippi', label: 'Chippi', icon: MessageCircle },
+  { href: '/chippi/brief', label: 'Today', icon: Sun },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

@@ -33,6 +33,7 @@ Tool surface:
   - get_intake_form / add_intake_question / remove_intake_question
     / update_intake_question / save_intake_form
   - generate_studio_image / edit_studio_image
+  - message_teammate / create_automation
 """
 
 from __future__ import annotations
@@ -79,6 +80,7 @@ from tools.routing import route_lead
 from tools.tours import book_tour, delete_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 from tools.studio import generate_studio_image, edit_studio_image
+from tools.team import message_teammate, create_automation
 
 logger = structlog.get_logger(__name__)
 
@@ -116,6 +118,20 @@ Hard rules:
 - send_email_now (present only when no inbox is connected) sends from Chippi's
   SYSTEM address, not the realtor's inbox — last resort; otherwise draft_message
   and suggest connecting an inbox. send_sms_now is the native SMS path.
+- The realtor's BROKERAGE TEAM (their broker, admins, fellow agents) is a
+  third target: "tell Sarah…", "ask my broker…", "let the team know…" →
+  message_teammate (Chippi's built-in team messaging, NOT slack/email). If
+  the recipient is ambiguous the tool returns candidates — ask which one.
+
+# Standing behavior → build it, don't describe it
+When the realtor describes something that should happen EVERY time ("whenever
+a new lead comes in…", "every time a tour finishes…", "always follow up
+after…") → create_automation with their description. Then tell them plainly:
+it's built, it's running, and it only DRAFTS for their approval — they can see
+or change it under Automations. Never send them to the builder to do it
+themselves; the builder is for inspecting what you built. One-off scheduled
+tasks and daily habits stay manage_routines; event-driven "when X happens do
+Y" is create_automation.
 
 # Modes
 The opening message tells you which:
@@ -380,6 +396,9 @@ def make_chippi_agent(
         # Studio — content generation
         generate_studio_image,
         edit_studio_image,
+        # Team — brokerage messaging + silent automation building
+        message_teammate,
+        create_automation,
     ]
     # send_email_now sends from Chippi's SYSTEM address (Resend), not the
     # realtor's inbox — wrong for client correspondence. Only expose it when no

@@ -120,3 +120,85 @@ export function composeOnboardingDraft(input: OnboardingDraftInput): OnboardingD
     `No rush, and no pressure. ${firstName}, ${business}`;
   return { frame, body };
 }
+
+// ── The full trick ────────────────────────────────────────────────────────────
+//
+// The reveal used to stop at the typed draft — one step of the job, then the
+// dashboard. The trick is the WHOLE job, performed once, end to end: read →
+// score → draft → follow-up → filed. Same design rule as the draft above:
+// deterministic, pure, instant — the magic is the performance, not the
+// generation. And it's real, not theatre: the 'complete' API seeds this exact
+// lead (clearly marked as a sample) into the realtor's CRM, so the first thing
+// Today shows is the lead they just watched Chippi work.
+
+export interface TrickStep {
+  key: 'read' | 'score' | 'draft' | 'followup' | 'filed';
+  /** Short bold lead-in, e.g. "Scored 84 · Hot". */
+  label: string;
+  /** One quiet explanatory line under it. */
+  detail: string;
+}
+
+export interface FirstLeadTrick {
+  /** Full display name for the seeded sample contact. */
+  leadName: string;
+  /** Deterministic demo score + label + one-line why. */
+  score: number;
+  scoreLabel: 'hot';
+  scoreSummary: string;
+  /** Days from completion until the scheduled follow-up. */
+  followUpDays: number;
+  /** The staged lines the reveal animates in, in order. */
+  steps: TrickStep[];
+}
+
+/** The seeded sample contact's full name — "(sample)" keeps it honest in every
+ *  list it ever appears in. */
+export const SAMPLE_LEAD_NAME = 'Jordan Rivera (sample)';
+
+/**
+ * Compose the end-to-end reveal sequence. Pure — same inputs, same trick.
+ */
+export function composeFirstLeadTrick(input: OnboardingDraftInput): FirstLeadTrick {
+  const primarySource = input.leadSources[0];
+  const sourcePhrase = primarySource ? SOURCE_PHRASE[primarySource] : undefined;
+  const from = sourcePhrase ? `a ${sourcePhrase} lead` : 'a new lead';
+
+  const score = 84;
+  const scoreSummary = 'Pre-approved with a real timeline — call-first material.';
+
+  return {
+    leadName: SAMPLE_LEAD_NAME,
+    score,
+    scoreLabel: 'hot',
+    scoreSummary,
+    followUpDays: 2,
+    steps: [
+      {
+        key: 'read',
+        label: 'Read the lead',
+        detail: `Jordan Rivera — ${from}. Pre-approved, wants to move within 60 days.`,
+      },
+      {
+        key: 'score',
+        label: `Scored ${score} · Hot`,
+        detail: scoreSummary,
+      },
+      {
+        key: 'draft',
+        label: 'Drafted the first touch',
+        detail: `In your ${input.tone} voice — you just watched it happen.`,
+      },
+      {
+        key: 'followup',
+        label: 'Follow-up scheduled',
+        detail: 'Two days out, in case Jordan goes quiet. You can move it any time.',
+      },
+      {
+        key: 'filed',
+        label: 'Filed in People',
+        detail: 'Jordan is in your book right now — marked as a sample, delete whenever.',
+      },
+    ],
+  };
+}

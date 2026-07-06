@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Mic, MoreHorizontal, TrendingUp, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Mic, MoreHorizontal, TrendingUp, RotateCcw, BarChart3 } from 'lucide-react';
+import { formatPropertyAddress } from '@/lib/properties';
 import type { DealStage, DealActivity, DealMilestone } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, getInitials } from '@/lib/formatting';
@@ -537,6 +538,19 @@ export default async function DealDetailPage({
               </FieldCell>
 
               <DealPropertyPicker dealId={id} slug={slug} initial={linkedProperty} />
+
+              {/* Contextual CMA handoff — only when a property is attached;
+                  the subject arrives pre-filled (Focus Update: capabilities
+                  appear where the work is, not as destinations). */}
+              {linkedProperty && (
+                <Link
+                  href={`/s/${slug}/cma?address=${encodeURIComponent(formatPropertyAddress(linkedProperty))}`}
+                  className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-accent/50"
+                >
+                  <BarChart3 size={14} className="text-muted-foreground" />
+                  Run a CMA on this property
+                </Link>
+              )}
             </div>
           </aside>
 
