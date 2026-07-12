@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
+import { WorkSessionsStrip } from '@/components/chippi/work-sessions-strip';
+import { WorkSessionDialog } from '@/components/chippi/work-session-dialog';
 import {
   ChippiPromptBox,
   type MentionItem,
@@ -74,6 +76,10 @@ interface ChippiWorkspaceProps {
   showConnectBanner?: boolean;
   /** Skills offered in the chat's `/` menu. From loadUserInvocableSkills(). */
   skills?: SkillItem[];
+  /** Space id — enables the live work-sessions strip (Supabase Realtime filter). */
+  spaceId?: string;
+  /** Connected apps + custom plugins offered in the @ mention menu. */
+  mentionApps?: { slug: string; label: string }[];
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -183,6 +189,8 @@ export function ChippiWorkspace({
   skills = [],
   accountName = null,
   variant = 'realtor',
+  spaceId,
+  mentionApps = [],
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
@@ -193,6 +201,8 @@ export function ChippiWorkspace({
     initialConversationId,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // /work command → the work-session launcher.
+  const [workDialogOpen, setWorkDialogOpen] = useState(false);
   // Server-driven loading: pending during the soft-nav so we can show the
   // "One moment" placeholder instead of the previous conversation's
   // transcript flashing for a beat. `useTransition` is the natural fit —
@@ -686,9 +696,17 @@ export function ChippiWorkspace({
           id: 'mention-search-error',
         });
       }
+      // Connected apps + custom plugins — the ChatGPT-Work "@-mention an app
+      // to bring its context in". Local filter; the list came from the server.
+      const q = query.toLowerCase();
+      for (const app of mentionApps) {
+        if (!q || app.label.toLowerCase().includes(q) || app.slug.toLowerCase().includes(q)) {
+          results.push({ id: `app-${app.slug}`, type: 'app', label: app.label, subtitle: 'App / plugin' });
+        }
+      }
       return results;
     },
-    [isBroker, slug],
+    [isBroker, slug, mentionApps],
   );
 
   const handleSend = useCallback(
@@ -703,8 +721,10 @@ export function ChippiWorkspace({
       if (!text && !hasAttachments) return;
       let contextPrefix = '';
       if (mentions.length > 0) {
-        const labels = mentions.map(
-          (m) => `[${m.type === 'contact' ? 'Contact' : 'Deal'}: ${m.label}]`,
+        const labels = mentions.map((m) =>
+          m.type === 'app'
+            ? `[Use the ${m.label} app/plugin for this request]`
+            : `[${m.type === 'contact' ? 'Contact' : 'Deal'}: ${m.label}]`,
         );
         contextPrefix = `(Referencing: ${labels.join(', ')})\n\n`;
       }
@@ -1085,6 +1105,9 @@ export function ChippiWorkspace({
   // inside ChippiPromptBox itself.
   const renderInput = () => (
     <div>
+      {/* Live background work sessions — plan progress, approvals, questions,
+          and the finished report, updating over Supabase Realtime. */}
+      {spaceId && !isBroker && <WorkSessionsStrip slug={slug} spaceId={spaceId} />}
       {/* Queued messages — typed while Chippi was working; each dispatches in
           order as a turn finishes. × drops one before it sends. */}
       {queuedMessages.length > 0 && (
@@ -1122,6 +1145,15 @@ export function ChippiWorkspace({
         skills={skills}
         showModeSwitch={!isBroker}
         conversationId={activeConversationId}
+        onCommandAction={(action) => {
+          if (action === 'work-session') setWorkDialogOpen(true);
+        }}
+      />
+      <WorkSessionDialog
+        slug={slug}
+        conversationId={activeConversationId}
+        open={workDialogOpen}
+        onOpenChange={setWorkDialogOpen}
       />
       {/* Rate-limit countdown — shown below the composer when the API is
           throttling. Counts down from 60 s and disappears automatically. */}

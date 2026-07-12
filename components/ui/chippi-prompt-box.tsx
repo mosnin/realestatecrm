@@ -24,6 +24,8 @@ import {
   UserPlus,
   ClipboardCheck,
   Target,
+  Sparkles,
+  Plug,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -31,7 +33,7 @@ import { cn } from '@/lib/utils';
 
 export interface MentionItem {
   id: string;
-  type: 'contact' | 'deal';
+  type: 'contact' | 'deal' | 'app';
   label: string;
   subtitle?: string;
 }
@@ -43,6 +45,12 @@ export interface SkillItem {
   description: string;
   /** Composer text; may carry one {placeholder} for the realtor to fill. */
   prompt: string;
+  /**
+   * When set, picking this entry does NOT inject the prompt — it fires the
+   * parent's onCommandAction(action) instead (e.g. 'work-session' opens the
+   * work-session dialog). Built-in commands only.
+   */
+  action?: string;
 }
 
 /**
@@ -74,6 +82,7 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
   'meeting-prep': ClipboardCheck,
   'my-deals': Briefcase,
   goal: Target,
+  work: Sparkles,
 };
 
 /**
@@ -86,6 +95,13 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
  * manage_goal and keeps working toward it across turns.
  */
 export const BUILTIN_COMMANDS: SkillItem[] = [
+  {
+    slug: 'work',
+    title: 'Start a work session',
+    description: 'Chippi works a goal in the background and returns a report',
+    prompt: '',
+    action: 'work-session',
+  },
   {
     slug: 'goal',
     title: 'Set a goal',
@@ -137,6 +153,9 @@ interface ChippiPromptBoxProps {
    *  stream. When omitted, the Send button stays disabled while loading
    *  instead of swapping to Stop. */
   onAbort?: () => void;
+  /** Fired when the realtor picks an action command from the "/" menu
+   *  (e.g. 'work-session'). The parent owns the surface it opens. */
+  onCommandAction?: (action: string) => void;
   disabled?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -284,6 +303,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       onAttach,
       onVoiceStart,
       onAbort,
+      onCommandAction,
       disabled = false,
       isLoading = false,
       className,
@@ -801,6 +821,15 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     }
 
     function selectSkill(skill: SkillItem) {
+      // Action commands (e.g. /work) open a surface instead of injecting a
+      // prompt — clear the "/" query and hand off to the parent.
+      if (skill.action) {
+        setMessage('');
+        setSlashOpen(false);
+        slashDismissedRef.current = false;
+        onCommandAction?.(skill.action);
+        return;
+      }
       const { text, selStart, selEnd } = expandSkillPrompt(skill.prompt);
       setMessage(text);
       setSlashOpen(false);
@@ -1230,6 +1259,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                   >
                     {m.type === 'contact' ? (
                       <User size={11} className="text-muted-foreground" />
+                    ) : m.type === 'app' ? (
+                      <Plug size={11} className="text-muted-foreground" />
                     ) : (
                       <Briefcase size={11} className="text-muted-foreground" />
                     )}
@@ -1650,6 +1681,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-foreground/[0.05] text-muted-foreground flex-shrink-0">
                         {item.type === 'contact' ? (
                           <User size={11} />
+                        ) : item.type === 'app' ? (
+                          <Plug size={11} />
                         ) : (
                           <Briefcase size={11} />
                         )}
