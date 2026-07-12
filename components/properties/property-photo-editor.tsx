@@ -23,6 +23,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, Star, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
+import { normalizeImageForUpload } from '@/lib/image-normalize';
 
 /** Apple ease-out cubic — entrances, reorders. */
 const EASE_APPLE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -48,17 +49,28 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
   const remaining = Math.max(0, max - value.length);
   const atCap = remaining === 0;
 
-  async function uploadOne(file: File): Promise<string | null> {
+  async function uploadOne(file: File): Promise<{ url: string } | { error: string }> {
+    // Shrink in the browser first — a full-size phone photo can exceed the
+    // hosting platform's request-body limit and fail before our route even
+    // runs. Best-effort: returns the original untouched if it can't decode
+    // (e.g. HEIC), which the server then transcodes.
+    const prepared = await normalizeImageForUpload(file);
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', prepared);
     fd.append('type', 'property-photo');
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    let res: Response;
+    try {
+      res = await fetch('/api/upload', { method: 'POST', body: fd });
+    } catch {
+      return { error: 'Network error — check your connection and try again.' };
+    }
     const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
     if (!res.ok || !data.url) {
-      setError(data.error || 'Upload failed.');
-      return null;
+      // 413 comes from the platform, not our route, so it has no JSON body.
+      const msg = data.error || (res.status === 413 ? 'That photo is too large to upload.' : 'Upload failed.');
+      return { error: msg };
     }
-    return data.url;
+    return { url: data.url };
   }
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -71,21 +83,36 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
 
     // Truncate to `remaining` so we don't silently lose extras to the cap.
     const toUpload = picked.slice(0, remaining);
+    const notices: string[] = [];
     if (picked.length > toUpload.length) {
-      setError(`Only ${countLabel(toUpload.length, 'more photo')} fit.`);
+      notices.push(`Only ${countLabel(toUpload.length, 'more photo')} fit.`);
     }
 
     try {
-      // Sequential, not parallel — keeps order predictable (first picked
-      // lands first in the array) and avoids hammering the upload route
-      // (which is rate-limited at 10/min per user).
+      // Sequential, not parallel — keeps order predictable (first picked lands
+      // first) and respects the route's 10/min rate limit. A single failure no
+      // longer halts the batch: we skip the bad file, keep the good ones, and
+      // report what didn't make it (one bad photo shouldn't lose the other 11).
       const collected: string[] = [];
+      let failed = 0;
+      let lastError = '';
       for (const file of toUpload) {
-        const url = await uploadOne(file);
-        if (url) collected.push(url);
-        else break; // first failure halts the batch
+        const result = await uploadOne(file);
+        if ('url' in result) collected.push(result.url);
+        else {
+          failed += 1;
+          lastError = result.error;
+        }
       }
       if (collected.length > 0) onChange([...value, ...collected]);
+      if (failed > 0) {
+        notices.push(
+          failed === toUpload.length
+            ? lastError
+            : `${countLabel(failed, 'photo')} couldn't be added (${lastError})`,
+        );
+      }
+      setError(notices.join(' '));
     } finally {
       setUploading(false);
     }
@@ -113,7 +140,10 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
       <input
         ref={fileRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        // Include HEIC/HEIF so iPhone photos are pickable — the server
+        // transcodes them to JPEG. `image/*` as a catch-all because iOS
+        // Safari often reports an empty or odd MIME for camera-roll files.
+        accept="image/*,.heic,.heif"
         multiple
         onChange={handleFiles}
         className="hidden"
@@ -140,7 +170,7 @@ export function PropertyPhotoEditor({ value, onChange, max = DEFAULT_MAX }: Prop
               <Plus size={20} aria-hidden />
               <span className="text-xs">Add photos</span>
               <span className="text-[10px] text-muted-foreground/70">
-                PNG / JPEG / WebP, up to 5MB
+                JPEG, PNG, WebP, or iPhone HEIC
               </span>
             </>
           )}

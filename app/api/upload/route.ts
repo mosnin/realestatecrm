@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { uploadObject, getPublicUrl, buildKey, deleteObject, publicUrlToKey } from '@/lib/storage';
+import { sniffImageFormat, extensionFor, contentTypeFor } from '@/lib/storage/image-format';
+import heicConvert from 'heic-convert';
 
 export const runtime = 'nodejs';
 
@@ -29,43 +31,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid upload type' }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Only PNG, JPEG, and WebP images are allowed' }, { status: 400 });
+    // Size cap on the RECEIVED bytes. Note: the hosting platform rejects
+    // request bodies over ~4.5 MB before this handler ever runs, so the real
+    // ceiling is enforced upstream — the client downscales images before
+    // upload to stay well under it (see lib/image-normalize). This cap is a
+    // secondary guard, generous enough not to reject a legitimate HEIC (which
+    // the client can't shrink and sends at original size).
+    const sizeCap = type === 'property-photo' ? 10 * 1024 * 1024 : 4 * 1024 * 1024;
+    if (file.size > sizeCap) {
+      const mb = Math.floor(sizeCap / (1024 * 1024));
+      return NextResponse.json({ error: `That file is too large — keep it under ${mb}MB.` }, { status: 400 });
     }
 
-    // Property photos can be a hair larger than profile assets (5 MB) so the
-    // realtor doesn't have to compress every MLS-quality JPEG before upload.
-    // Other types stay capped at 2 MB.
-    const sizeCap = type === 'property-photo' ? 5 * 1024 * 1024 : 2 * 1024 * 1024;
-    if (file.size > sizeCap) {
+    // Identify the image by its bytes, not its (spoofable / iOS-mislabeled)
+    // declared type. Supports JPEG / PNG / WebP / GIF / HEIC.
+    let buffer = Buffer.from(await file.arrayBuffer());
+    const format = sniffImageFormat(new Uint8Array(buffer.subarray(0, 16)));
+    if (!format) {
       return NextResponse.json(
-        { error: type === 'property-photo' ? 'File must be under 5MB' : 'File must be under 2MB' },
+        { error: "That doesn't look like a supported image. Use a JPEG, PNG, WebP, or an iPhone HEIC photo." },
         { status: 400 },
       );
     }
 
-    // Validate magic bytes to prevent disguised file uploads
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const PNG_MAGIC = [0x89, 0x50, 0x4E, 0x47];
-    const JPEG_MAGIC = [0xFF, 0xD8, 0xFF];
-    const WEBP_MAGIC = [0x57, 0x45, 0x42, 0x50]; // bytes 8-11
+    let ext = extensionFor(format);
+    let contentType = contentTypeFor(format);
 
-    let detectedExt: string | null = null;
-    if (buffer.length >= 4 && PNG_MAGIC.every((b, i) => buffer[i] === b)) {
-      detectedExt = 'png';
-    } else if (buffer.length >= 3 && JPEG_MAGIC.every((b, i) => buffer[i] === b)) {
-      detectedExt = 'jpg';
-    } else if (buffer.length >= 12 && WEBP_MAGIC.every((b, i) => buffer[i + 8] === b)) {
-      detectedExt = 'webp';
+    // HEIC (the iPhone default) can't be shown in a browser <img>, so transcode
+    // it to JPEG here — the realtor never has to convert anything by hand.
+    if (format === 'heic') {
+      try {
+        const jpeg = await heicConvert({ buffer, format: 'JPEG', quality: 0.85 });
+        buffer = Buffer.from(jpeg);
+        ext = 'jpg';
+        contentType = 'image/jpeg';
+      } catch (convertErr) {
+        console.error('[upload] HEIC transcode failed:', convertErr);
+        return NextResponse.json(
+          { error: "Couldn't process that iPhone photo. Try again, or share it as a JPEG." },
+          { status: 422 },
+        );
+      }
     }
 
-    if (!detectedExt) {
-      return NextResponse.json({ error: 'File content does not match a valid image format (PNG, JPEG, WebP)' }, { status: 400 });
-    }
-
-    const ext = detectedExt;
     // Property photos go under the `property-photos/` prefix the storage-gc
     // sweeper already knows how to scan (it intersects Property.photos URLs
     // against listed keys). Branding assets (logo / photo / favicon /
@@ -88,7 +96,7 @@ export async function POST(req: NextRequest) {
       await uploadObject({
         key,
         body: buffer,
-        contentType: file.type,
+        contentType,
         isPublic: true,
       });
     } catch (uploadError) {
