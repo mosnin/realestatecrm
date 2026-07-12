@@ -23,6 +23,7 @@ import {
   Sunrise,
   UserPlus,
   ClipboardCheck,
+  Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -72,7 +73,27 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
   'follow-ups': Send,
   'meeting-prep': ClipboardCheck,
   'my-deals': Briefcase,
+  goal: Target,
 };
+
+/**
+ * Built-in slash commands — always in the "/" menu, ahead of the skills.
+ * Same SkillItem contract (prompt injection; one {placeholder} becomes the
+ * initial selection), so filtering, keyboard nav, and selection are shared
+ * with skills instead of a second command system. Exported for tests.
+ *
+ * /goal is the standing objective: the agent creates an AgentGoal via
+ * manage_goal and keeps working toward it across turns.
+ */
+export const BUILTIN_COMMANDS: SkillItem[] = [
+  {
+    slug: 'goal',
+    title: 'Set a goal',
+    description: 'Give Chippi an outcome to keep working toward',
+    prompt:
+      'Set a goal for me to work toward: {describe the outcome, e.g. book 3 tours from my Zillow leads this week}. Create it, keep it active, and factor it into what you prioritize and suggest until it is done.',
+  },
+];
 
 type Mode = 'draft' | null;
 
@@ -354,14 +375,19 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const hasReadyAttachments = attachments.some((a) => a.uploadStatus === 'ready');
     const hasUploadingAttachments = attachments.some((a) => a.uploadStatus === 'uploading');
     const hasContent = message.trim().length > 0 || hasReadyAttachments;
-    const sendDisabled =
-      disabled || isLoading || !hasContent || hasUploadingAttachments;
+    // NOT gated on isLoading: submitting while Chippi is streaming QUEUES the
+    // message (the parent's send() holds it and dispatches when the turn
+    // ends) — the ChatGPT-Work interaction. Attachments stay blocked while
+    // uploading either way.
+    const sendDisabled = disabled || !hasContent || hasUploadingAttachments;
 
-    // Slash menu — the message after "/" is the live filter query.
+    // Slash menu — built-in commands (/goal, …) lead, then the skills. The
+    // message after "/" is the live filter query.
+    const menuSkills = [...BUILTIN_COMMANDS, ...skills];
     const slashQuery = slashOpen ? message.slice(1).toLowerCase() : '';
     const filteredSkills =
-      slashOpen && skills.length > 0
-        ? skills.filter(
+      slashOpen
+        ? menuSkills.filter(
             (s) =>
               !slashQuery ||
               s.title.toLowerCase().includes(slashQuery) ||
@@ -762,7 +788,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       // skill query. Once it's a real sentence (space) or empty, the menu
       // closes; clearing the "/" also lifts a prior Esc dismissal.
       const isSlash = v.startsWith('/') && !v.includes(' ') && !v.includes('\n');
-      if (isSlash && skills.length > 0) {
+      // Built-in commands mean the menu always has at least one entry.
+      if (isSlash) {
         if (!slashDismissedRef.current) {
           setSlashOpen(true);
           setSlashIndex(0);
@@ -906,27 +933,55 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     //   else                 → inert Send slot for layout consistency
     function renderRightButton() {
       if (isLoading) {
-        if (onAbort) {
-          return (
+        // While streaming, a drafted message can be QUEUED — it sends the
+        // moment the current reply finishes (Enter does the same). The Stop
+        // control stays put so interrupting is never more than one tap.
+        const queueButton =
+          hasContent && !sendDisabled ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={onAbort}
-                  aria-label="Stop generating"
+                  onClick={handleSubmit}
+                  aria-label="Queue message"
                   className={cn(
                     'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                    'bg-foreground text-background hover:bg-foreground/90',
+                    'border border-border bg-background text-foreground hover:bg-accent',
                     'transition-all duration-150 active:scale-[0.96]',
                   )}
                 >
-                  <Square size={12} strokeWidth={2.25} className="fill-current" />
+                  <ArrowUp size={14} strokeWidth={2.25} />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={6}>
-                Stop
+                Queue — sends when Chippi finishes
               </TooltipContent>
             </Tooltip>
+          ) : null;
+        if (onAbort) {
+          return (
+            <div className="flex items-center gap-1.5">
+              {queueButton}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onAbort}
+                    aria-label="Stop generating"
+                    className={cn(
+                      'inline-flex items-center justify-center w-8 h-8 rounded-full',
+                      'bg-foreground text-background hover:bg-foreground/90',
+                      'transition-all duration-150 active:scale-[0.96]',
+                    )}
+                  >
+                    <Square size={12} strokeWidth={2.25} className="fill-current" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={6}>
+                  Stop
+                </TooltipContent>
+              </Tooltip>
+            </div>
           );
         }
         return (
