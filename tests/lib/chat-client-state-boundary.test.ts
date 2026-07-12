@@ -56,6 +56,6 @@ describe('chat client-side boundary state', () => {
     expect(workspaceSource).toContain('if (isBroker) {');
     expect(workspaceSource).toContain('broker-specific mentions should use dedicated');
     expect(workspaceSource).toContain('return results;');
-    expect(workspaceSource).toContain('[isBroker, slug]');
+    expect(workspaceSource).toContain('[isBroker, slug, mentionApps]');
   });
 });

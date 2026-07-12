@@ -16,13 +16,20 @@ describe('BUILTIN_COMMANDS', () => {
     expect(goal!.prompt.length).toBeGreaterThan(20);
   });
 
-  it('every command prompt expands with a selectable placeholder', () => {
-    for (const cmd of BUILTIN_COMMANDS) {
+  it('every PROMPT command expands with a selectable placeholder (action commands are exempt)', () => {
+    for (const cmd of BUILTIN_COMMANDS.filter((c) => !c.action)) {
       const { text, selStart, selEnd } = expandSkillPrompt(cmd.prompt);
       expect(text).not.toContain('{');
       expect(text).not.toContain('}');
       // The selection must be a real, non-empty range the realtor overtypes.
       expect(selEnd).toBeGreaterThan(selStart);
+    }
+  });
+
+  it('action commands declare an action and skip prompt injection', () => {
+    for (const cmd of BUILTIN_COMMANDS.filter((c) => c.action)) {
+      expect(cmd.action!.length).toBeGreaterThan(0);
+      expect(cmd.prompt).toBe('');
     }
   });
 

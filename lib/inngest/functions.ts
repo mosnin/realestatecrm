@@ -23,6 +23,10 @@ import {
 } from '@/lib/integrations/triggers';
 import { captureEvent, setEventStatus } from '@/lib/integrations/events';
 import { publishSpaceEvent } from '@/lib/realtime/ably';
+import {
+  planSession as planWorkSession,
+  executeSession as executeWorkSession,
+} from '@/lib/work-sessions/engine';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
@@ -457,5 +461,36 @@ export const handleComposioTrigger = inngest.createFunction(
       connectionId: connection.id,
       ...result,
     };
+  },
+);
+
+// ── Work sessions ─────────────────────────────────────────────────────────────
+//
+// Two durable phases for Chippi's long-running background runs (see
+// lib/work-sessions/engine.ts). Each function is a thin shell — the engine
+// owns all state transitions on the WorkSession row, and re-entry after a
+// retry is safe because completed steps are skipped.
+
+export const workSessionPlan = inngest.createFunction(
+  { id: 'work-session-plan', triggers: [{ event: 'work-session/plan' }] },
+  async ({ event, step }) => {
+    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    if (!sessionId) return { skipped: true };
+    const status = await step.run('plan', () => planWorkSession(sessionId));
+    // just_go sessions fall straight through to execution.
+    if (status === 'running') {
+      await step.run('execute', () => executeWorkSession(sessionId));
+    }
+    return { sessionId, status };
+  },
+);
+
+export const workSessionExecute = inngest.createFunction(
+  { id: 'work-session-execute', triggers: [{ event: 'work-session/execute' }] },
+  async ({ event, step }) => {
+    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    if (!sessionId) return { skipped: true };
+    await step.run('execute', () => executeWorkSession(sessionId));
+    return { sessionId };
   },
 );

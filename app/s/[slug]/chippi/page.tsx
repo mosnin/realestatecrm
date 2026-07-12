@@ -150,6 +150,28 @@ export default async function ChippiPage({
     })),
   ];
 
+  // @-mentionable apps: connected integration toolkits + enabled custom
+  // plugins — the composer's mention menu offers them alongside contacts
+  // and deals ("@gmail", "@mls-lookup").
+  const [{ data: toolkitRows }, { data: pluginRows }] = await Promise.all([
+    supabase
+      .from('IntegrationConnection')
+      .select('toolkit')
+      .eq('spaceId', space.id)
+      .eq('status', 'active'),
+    supabase
+      .from('CustomPlugin')
+      .select('name')
+      .eq('spaceId', space.id)
+      .eq('enabled', true),
+  ]);
+  const mentionApps = [
+    ...Array.from(new Set((toolkitRows ?? []).map((r) => r.toolkit as string).filter(Boolean))).map(
+      (t) => ({ slug: t, label: t.charAt(0).toUpperCase() + t.slice(1) }),
+    ),
+    ...((pluginRows ?? []).map((r) => ({ slug: r.name as string, label: r.name as string }))),
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <ChippiWorkspace
@@ -163,6 +185,8 @@ export default async function ChippiPage({
         showConnectBanner={showConnectBanner}
         skills={skills}
         accountName={(spaceOwner.name as string | null) ?? null}
+        spaceId={space.id}
+        mentionApps={mentionApps}
       />
     </div>
   );
