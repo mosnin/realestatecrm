@@ -1107,7 +1107,9 @@ export function ChippiWorkspace({
     <div>
       {/* Live background work sessions — plan progress, approvals, questions,
           and the finished report, updating over Supabase Realtime. */}
-      {spaceId && !isBroker && <WorkSessionsStrip slug={slug} spaceId={spaceId} />}
+      {spaceId && !isBroker && (
+        <WorkSessionsStrip slug={slug} spaceId={spaceId} onAskAbout={handleTellMeAboutLead} />
+      )}
       {/* Queued messages — typed while Chippi was working; each dispatches in
           order as a turn finishes. × drops one before it sends. */}
       {queuedMessages.length > 0 && (

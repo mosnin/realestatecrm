@@ -10,10 +10,13 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * GET   /api/work-sessions/[id]?slug= — one session.
- * PATCH /api/work-sessions/[id]?slug= — the realtor's three controls:
+ * PATCH /api/work-sessions/[id]?slug= — the realtor's controls:
  *   { action: 'approve' }            awaiting_approval → running (+ execute)
  *   { action: 'answer', answer }     awaiting_input → planning (+ re-plan)
  *   { action: 'cancel' }             any active state → cancelled
+ *   { action: 'stop_recurrence' }    recurrence → 'none' (ends the repeat
+ *                                    chain — the sleeping recur function
+ *                                    re-checks this before cloning)
  * Every transition is guarded on the CURRENT status so a stale button can't
  * restart a finished run.
  */
@@ -79,6 +82,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq('id', id)
       .eq('status', 'awaiting_input');
     await kickPlan(id);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'stop_recurrence') {
+    await supabase
+      .from('WorkSession')
+      .update({ recurrence: 'none', updatedAt: new Date().toISOString() })
+      .eq('id', id)
+      .eq('spaceId', auth.space.id);
     return NextResponse.json({ ok: true });
   }
 

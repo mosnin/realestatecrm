@@ -11,6 +11,7 @@ import {
   handleComposioTrigger,
   workSessionPlan,
   workSessionExecute,
+  workSessionRecur,
 } from '@/lib/inngest/functions';
 
 export const runtime = 'nodejs';
@@ -18,5 +19,11 @@ export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [publishScheduledPost, handleComposioTrigger, workSessionPlan, workSessionExecute],
+  functions: [
+    publishScheduledPost,
+    handleComposioTrigger,
+    workSessionPlan,
+    workSessionExecute,
+    workSessionRecur,
+  ],
 });

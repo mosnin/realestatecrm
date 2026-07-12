@@ -97,6 +97,9 @@ import { getWeatherTool } from './get-weather';
 // Connected-app activity (captured Composio trigger deliveries)
 import { getRecentEventsTool } from './get-recent-events';
 
+// Work sessions — read a finished background run's report
+import { readSessionReportTool } from './read-session-report';
+
 // Communication — drafting + sending + post-hoc logging
 import { draftEmailTool } from './draft-email';
 import { draftSmsTool } from './draft-sms';
@@ -234,4 +237,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Custom plugins (user-registered HTTP tools) ────────────────────────
   listPluginsTool as ToolDefinition,
   usePluginTool as ToolDefinition,
+
+  // ── Work sessions ──────────────────────────────────────────────────────
+  readSessionReportTool as ToolDefinition,
 ];

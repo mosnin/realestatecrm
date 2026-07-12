@@ -11,11 +11,13 @@ export const runtime = 'nodejs';
 const MAX_GOAL = 1000;
 
 /**
- * GET  /api/work-sessions?slug= — recent sessions (active first), for the
- *      workspace strip. Live updates ride Supabase Realtime; this is the
- *      initial load + reconnect catch-up.
+ * GET  /api/work-sessions?slug=&limit= — recent sessions (newest first), for
+ *      the workspace strip (default 20) and the history page (?limit=50).
+ *      Live updates ride Supabase Realtime; this is the initial load +
+ *      reconnect catch-up.
  * POST /api/work-sessions — start one: { slug, goal, autonomy?, allowQuestions?,
- *      conversationId? }. Creates the row and kicks planning in the background.
+ *      recurrence?, conversationId? }. Creates the row and kicks planning in
+ *      the background.
  */
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -23,12 +25,15 @@ export async function GET(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
+  const limitRaw = Number.parseInt(req.nextUrl.searchParams.get('limit') ?? '', 10);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 20;
+
   const { data } = await supabase
     .from('WorkSession')
     .select('*')
     .eq('spaceId', auth.space.id)
     .order('createdAt', { ascending: false })
-    .limit(20);
+    .limit(limit);
   return NextResponse.json({ sessions: data ?? [] });
 }
 
@@ -36,7 +41,8 @@ export async function POST(req: NextRequest) {
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
   const body = (read.data ?? {}) as {
-    slug?: string; goal?: string; autonomy?: string; allowQuestions?: boolean; conversationId?: string;
+    slug?: string; goal?: string; autonomy?: string; allowQuestions?: boolean;
+    recurrence?: string; conversationId?: string;
   };
   if (!body.slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   const auth = await requireSpaceOwner(body.slug);
@@ -75,6 +81,8 @@ export async function POST(req: NextRequest) {
       goal,
       autonomy: body.autonomy === 'just_go' ? 'just_go' : 'plan_first',
       allowQuestions: body.allowQuestions !== false,
+      recurrence:
+        body.recurrence === 'daily' || body.recurrence === 'weekly' ? body.recurrence : 'none',
     })
     .select('*')
     .single();

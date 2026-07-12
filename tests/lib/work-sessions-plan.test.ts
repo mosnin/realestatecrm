@@ -38,6 +38,7 @@ vi.mock('@/lib/ai-tools/agent-model', () => ({ getAgentModel: () => undefined })
 vi.mock('@/lib/ai-tools/sdk-bridge', () => ({ toSdkTool: vi.fn() }));
 vi.mock('@/lib/ai-tools/tools', () => ({ ALL_TOOLS: [] }));
 vi.mock('@openai/agents', () => ({ run: vi.fn(), Agent: class {} }));
+vi.mock('@/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 
 import { planSession } from '@/lib/work-sessions/engine';
 

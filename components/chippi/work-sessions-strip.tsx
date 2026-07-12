@@ -13,11 +13,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   Loader2, Check, X, Circle, CircleDashed, FileText, Sparkles, ChevronDown,
+  MessageCircleQuestion, Inbox,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WorkSessionReportDialog } from '@/components/chippi/work-session-report-dialog';
 import { cn } from '@/lib/utils';
 import { useRealtime } from '@/hooks/use-realtime';
 import type { PlanStep, WorkSessionRow } from '@/lib/work-sessions/types';
@@ -34,7 +37,14 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: string }) {
+export function WorkSessionsStrip({
+  slug, spaceId, onAskAbout,
+}: {
+  slug: string;
+  spaceId: string;
+  /** Prefill the composer with a question about a finished session. */
+  onAskAbout?: (text: string) => void;
+}) {
   const [sessions, setSessions] = useState<WorkSessionRow[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -87,6 +97,7 @@ export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: st
           key={s.id}
           session={s}
           slug={slug}
+          onAskAbout={onAskAbout}
           onDismiss={
             ACTIVE.has(s.status) ? undefined : () => setDismissed((d) => new Set(d).add(s.id))
           }
@@ -104,15 +115,17 @@ function StepIcon({ status }: { status: PlanStep['status'] }) {
 }
 
 function SessionCard({
-  session, slug, onDismiss,
+  session, slug, onDismiss, onAskAbout,
 }: {
   session: WorkSessionRow;
   slug: string;
   onDismiss?: () => void;
+  onAskAbout?: (text: string) => void;
 }) {
   const [expanded, setExpanded] = useState(ACTIVE.has(session.status));
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   async function act(action: 'approve' | 'cancel' | 'answer') {
     setBusy(true);
@@ -183,6 +196,27 @@ function SessionCard({
             </ul>
           )}
 
+          {/* Live narration — the one line of "what it's doing right now". */}
+          {session.status === 'running' && session.currentAction && (
+            <p className="animate-pulse pl-6 text-[11px] italic text-muted-foreground">
+              {session.currentAction}
+            </p>
+          )}
+
+          {/* Drafts staged so far — visible mid-run and after, because the
+              inbox is where the realtor acts on them. */}
+          {session.draftCount > 0 && (
+            <Link
+              href={`/s/${slug}/chippi/inbox`}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            >
+              <Inbox size={11} />
+              {session.draftCount === 1
+                ? '1 draft waiting in your inbox'
+                : `${session.draftCount} drafts waiting in your inbox`}
+            </Link>
+          )}
+
           {/* Approval gate. */}
           {session.status === 'awaiting_approval' && (
             <div className="flex items-center gap-2">
@@ -214,20 +248,44 @@ function SessionCard({
             </div>
           )}
 
-          {/* Finished: summary + deliverable. */}
+          {/* Finished: summary + deliverable, readable in place. */}
           {session.status === 'completed' && (
             <div className="space-y-1.5">
               {session.summary && <p className="text-[12px] text-muted-foreground">{session.summary}</p>}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {session.artifactFileId && (
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] text-foreground transition-colors hover:bg-accent"
+                  >
+                    <FileText size={12} />
+                    View report
+                  </button>
+                )}
+                {onAskAbout && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAskAbout(
+                        `[Work session ${session.id}] Walk me through this report — what should I act on first?`,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] text-foreground transition-colors hover:bg-accent"
+                  >
+                    <MessageCircleQuestion size={12} />
+                    Ask Chippi about this
+                  </button>
+                )}
+              </div>
               {session.artifactFileId && (
-                <a
-                  href={`/api/work-sessions/${session.id}/artifact?slug=${encodeURIComponent(slug)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] text-foreground transition-colors hover:bg-accent"
-                >
-                  <FileText size={12} />
-                  {session.artifactName ?? 'Open the report'}
-                </a>
+                <WorkSessionReportDialog
+                  open={reportOpen}
+                  onOpenChange={setReportOpen}
+                  sessionId={session.id}
+                  slug={slug}
+                  name={session.artifactName}
+                />
               )}
             </div>
           )}

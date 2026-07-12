@@ -26,6 +26,8 @@ import { publishSpaceEvent } from '@/lib/realtime/ably';
 import {
   planSession as planWorkSession,
   executeSession as executeWorkSession,
+  cloneRecurringSession,
+  getSession as getWorkSession,
 } from '@/lib/work-sessions/engine';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
@@ -492,5 +494,43 @@ export const workSessionExecute = inngest.createFunction(
     if (!sessionId) return { skipped: true };
     await step.run('execute', () => executeWorkSession(sessionId));
     return { sessionId };
+  },
+);
+
+/**
+ * workSessionRecur — the recurrence chain. The engine sends
+ * 'work-session/recur' when a session with recurrence !== 'none' completes;
+ * this function sleeps until the next occurrence, re-checks that the realtor
+ * hasn't turned recurrence off in the meantime, clones the session, and runs
+ * the clone. The clone recurs again on ITS completion, continuing the chain.
+ * Inngest-only by design — a sleeping chain can't live in an inline after().
+ */
+export const workSessionRecur = inngest.createFunction(
+  { id: 'work-session-recur', triggers: [{ event: 'work-session/recur' }] },
+  async ({ event, step }) => {
+    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    if (!sessionId) return { skipped: true };
+
+    // Memoize the wake time so retries don't drift the schedule.
+    const wakeAt = await step.run('next-occurrence', async () => {
+      const session = await getWorkSession(sessionId);
+      if (!session || session.recurrence === 'none') return null;
+      const ms = session.recurrence === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+      return new Date(Date.now() + ms).toISOString();
+    });
+    if (!wakeAt) return { skipped: 'not recurring' };
+
+    await step.sleepUntil('until-next-occurrence', wakeAt);
+
+    // cloneRecurringSession re-checks recurrence — stop_recurrence while we
+    // slept ends the chain here.
+    const cloneId = await step.run('clone', () => cloneRecurringSession(sessionId));
+    if (!cloneId) return { sessionId, skipped: 'recurrence off or space busy' };
+
+    const status = await step.run('plan', () => planWorkSession(cloneId));
+    if (status === 'running') {
+      await step.run('execute', () => executeWorkSession(cloneId));
+    }
+    return { sessionId, cloneId };
   },
 );

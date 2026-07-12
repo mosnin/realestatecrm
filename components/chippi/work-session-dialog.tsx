@@ -28,6 +28,7 @@ export function WorkSessionDialog({
   const [goal, setGoal] = useState('');
   const [autonomy, setAutonomy] = useState<'plan_first' | 'just_go'>('plan_first');
   const [allowQuestions, setAllowQuestions] = useState(true);
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +39,7 @@ export function WorkSessionDialog({
       const res = await fetch('/api/work-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, goal, autonomy, allowQuestions, conversationId }),
+        body: JSON.stringify({ slug, goal, autonomy, allowQuestions, recurrence, conversationId }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -46,6 +47,7 @@ export function WorkSessionDialog({
         return;
       }
       setGoal('');
+      setRecurrence('none');
       onOpenChange(false);
       onStarted?.();
     } finally {
@@ -106,9 +108,35 @@ export function WorkSessionDialog({
             Chippi may pause once to ask a clarifying question
           </label>
 
+          {/* Recurrence — “every morning, prep my day” is the killer use. */}
+          <div className="flex items-center gap-1.5">
+            <span className="mr-1 text-[12px] text-muted-foreground">Repeat</span>
+            {(
+              [
+                { v: 'none', label: 'Once' },
+                { v: 'daily', label: 'Daily' },
+                { v: 'weekly', label: 'Weekly' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.v}
+                type="button"
+                onClick={() => setRecurrence(opt.v)}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px] transition-colors',
+                  recurrence === opt.v
+                    ? 'border-foreground bg-accent/40 text-foreground'
+                    : 'border-border text-muted-foreground hover:bg-accent/20',
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <p className="text-[11px] leading-snug text-muted-foreground/80">
-            Sessions research and analyze — they never send messages or change records. Actions come
-            back as recommendations in the report.
+            Sessions research, analyze, and stage message drafts for your approval — they never send
+            anything or change records on their own.
           </p>
 
           {error && <p className="text-xs text-destructive">{error}</p>}

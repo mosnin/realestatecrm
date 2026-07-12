@@ -34,4 +34,10 @@ export interface WorkSessionRow {
   artifactName: string | null;
   summary: string | null;
   error: string | null;
+  /** Live narration line while running ("Searching contacts…"). */
+  currentAction: string | null;
+  /** 'none' | 'daily' | 'weekly' — recurring sessions re-queue on completion. */
+  recurrence: 'none' | 'daily' | 'weekly';
+  /** Message drafts the session staged into the drafts inbox. */
+  draftCount: number;
 }
