@@ -149,6 +149,13 @@ export interface UseAgentTaskResult {
    * itself automatically when this reaches zero.
    */
   rateLimitSeconds: number;
+  /**
+   * Messages typed while a turn was streaming, waiting to dispatch — one per
+   * completed turn, in order (the ChatGPT-Work "queued messages" mechanic).
+   */
+  queuedMessages: { text: string; mode: ChatMode }[];
+  /** Drop a queued message (by index) before it dispatches. */
+  removeQueuedMessage: (index: number) => void;
 }
 
 /** Short random id for UI-local message keys. */
@@ -170,6 +177,19 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  // Synchronous mirror of isStreaming — send() consults this (not the state)
+  // so the queue drain scheduled in consumeStream's finally can't race a
+  // stale closure into re-queueing forever.
+  const isStreamingRef = useRef(false);
+  // Messages typed while a turn is streaming. Dispatched in order, one per
+  // completed turn (the ChatGPT-Work "queued messages" mechanic).
+  const [queuedMessages, setQueuedMessages] = useState<{ text: string; mode: ChatMode }[]>([]);
+  const queuedRef = useRef<{ text: string; mode: ChatMode }[]>([]);
+  // Late-bound self-reference so the drain in consumeStream's finally can
+  // call the CURRENT send without a circular useCallback dependency.
+  const sendRef = useRef<
+    ((text: string, attachmentIds?: string[], mode?: ChatMode) => Promise<void>) | null
+  >(null);
   const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -571,6 +591,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       abortRef.current = controller;
       turnTerminalRef.current = false;
       setIsStreaming(true);
+      isStreamingRef.current = true;
       setError(null);
 
       try {
@@ -671,6 +692,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         abortRef.current = null;
         streamingMsgIdRef.current = null;
         setIsStreaming(false);
+        isStreamingRef.current = false;
         setLiveCallIds(new Set());
         setStreamingReasoning('');
         // Reset the reasoning buffer + turn start here too, not only in
@@ -679,6 +701,17 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // "Thought for Xs" duration into the next answer.
         reasoningBufferRef.current = '';
         turnStartedAtRef.current = null;
+        // Drain the queue: one message per completed turn, in order. Deferred
+        // a tick so this turn's teardown state settles before the next send's
+        // optimistic UI lands.
+        const next = queuedRef.current[0];
+        if (next) {
+          queuedRef.current = queuedRef.current.slice(1);
+          setQueuedMessages(queuedRef.current);
+          setTimeout(() => {
+            void sendRef.current?.(next.text, undefined, next.mode);
+          }, 0);
+        }
       }
     },
     [abort, applyEvent, landChippiError],
@@ -721,7 +754,19 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
       // Allow attachment-only sends — the user might just want to drop in a
       // photo with no caption. Block when both text AND attachments are empty.
-      if ((!trimmed && !hasAttachments) || isStreaming) return;
+      if (!trimmed && !hasAttachments) return;
+      // Mid-turn sends QUEUE instead of dropping: the message dispatches in
+      // order when the current turn ends (ChatGPT-Work mechanic). Text only —
+      // attachment uploads are owned by the composer's lifecycle. Guarded on
+      // the ref (not state) so the drain in consumeStream's finally can never
+      // race a stale closure back into the queue.
+      if (isStreamingRef.current) {
+        if (trimmed && !hasAttachments) {
+          queuedRef.current = [...queuedRef.current, { text: trimmed, mode }];
+          setQueuedMessages(queuedRef.current);
+        }
+        return;
+      }
 
       // Fix 2: record immediately so retryLastMessage always has current data.
       lastUserInputRef.current = { text: trimmed, ...(hasAttachments ? { attachmentIds } : {}) };
@@ -799,6 +844,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     },
     [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
   );
+  // Late-bind for the queue drain (see consumeStream's finally).
+  sendRef.current = send;
+
+  /** Drop a queued message before it dispatches (index into queuedMessages). */
+  const removeQueuedMessage = useCallback((index: number) => {
+    queuedRef.current = queuedRef.current.filter((_, i) => i !== index);
+    setQueuedMessages(queuedRef.current);
+  }, []);
 
   const approve = useCallback(
     async (requestId: string, editedArgs?: Record<string, unknown>) => {
@@ -943,5 +996,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     clearError,
     retryLastMessage,
     rateLimitSeconds,
+    queuedMessages,
+    removeQueuedMessage,
   };
 }

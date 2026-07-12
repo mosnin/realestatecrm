@@ -71,6 +71,8 @@ import { findToursTool } from './find-tours';
 // Properties
 import { findPropertyTool } from './find-property';
 import { researchAreaTool } from './research-area';
+import { usePluginTool } from './use-plugin';
+import { listPluginsTool } from './list-plugins';
 import { findComparablePropertiesTool } from './find-comparable-properties';
 import { addPropertyTool } from './add-property';
 import { updatePropertyStatusTool } from './update-property-status';
@@ -228,4 +230,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Clarification ──────────────────────────────────────────────────────
   askRealtorTool as ToolDefinition,
+
+  // ── Custom plugins (user-registered HTTP tools) ────────────────────────
+  listPluginsTool as ToolDefinition,
+  usePluginTool as ToolDefinition,
 ];

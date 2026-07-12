@@ -18,7 +18,7 @@ import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
 export const metadata = {
-  title: 'Integrations · Chippi',
+  title: 'Plugins · Chippi',
   description:
     'Connect the tools you already pay for. Chippi plugs into your inbox, calendar, CRM, messaging, and e-sign through Composio, then works inside them, no rip and replace.',
 };

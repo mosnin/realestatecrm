@@ -253,6 +253,8 @@ export function ChippiWorkspace({
     abort,
     retryLastMessage,
     rateLimitSeconds,
+    queuedMessages,
+    removeQueuedMessage,
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
@@ -1083,12 +1085,38 @@ export function ChippiWorkspace({
   // inside ChippiPromptBox itself.
   const renderInput = () => (
     <div>
+      {/* Queued messages — typed while Chippi was working; each dispatches in
+          order as a turn finishes. × drops one before it sends. */}
+      {queuedMessages.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+          {queuedMessages.map((q, i) => (
+            <span
+              key={`${i}-${q.text.slice(0, 16)}`}
+              className="inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground"
+            >
+              <span className="truncate">{q.text}</span>
+              <span className="shrink-0 text-muted-foreground/60">· queued</span>
+              <button
+                type="button"
+                onClick={() => removeQueuedMessage(i)}
+                aria-label="Remove queued message"
+                className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <ChippiPromptBox
         placeholder="Tell me what you need, or press / for skills…"
         onSend={handleSend}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
-        disabled={isStreaming || pendingApproval !== null || rateLimitSeconds > 0}
+        // NOT locked while streaming — typing stays live and Enter (or the
+        // queue button) holds the message for the next turn (useAgentTask
+        // owns the queue). Approval waits + rate limits still lock it.
+        disabled={pendingApproval !== null || rateLimitSeconds > 0}
         isLoading={isStreaming}
         prefill={prefill ?? undefined}
         skills={skills}

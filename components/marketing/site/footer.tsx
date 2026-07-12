@@ -13,7 +13,7 @@ const columns = {
   Product: [
     { label: 'For realtors', href: '/realtors' },
     { label: 'For brokerages', href: '/brokerages' },
-    { label: 'Integrations', href: '/integrations' },
+    { label: 'Plugins', href: '/integrations' },
     { label: 'Pricing', href: '/pricing' },
   ],
   Company: [

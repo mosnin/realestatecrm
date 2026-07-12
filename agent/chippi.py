@@ -34,6 +34,7 @@ Tool surface:
     / update_intake_question / save_intake_form
   - generate_studio_image / edit_studio_image
   - message_teammate / create_automation
+  - list_plugins / use_plugin
 """
 
 from __future__ import annotations
@@ -81,6 +82,7 @@ from tools.tours import book_tour, delete_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
 from tools.studio import generate_studio_image, edit_studio_image
 from tools.team import message_teammate, create_automation
+from tools.plugins import list_plugins, use_plugin
 
 logger = structlog.get_logger(__name__)
 
@@ -122,6 +124,12 @@ Hard rules:
   third target: "tell Sarah…", "ask my broker…", "let the team know…" →
   message_teammate (Chippi's built-in team messaging, NOT slack/email). If
   the recipient is ambiguous the tool returns candidates — ask which one.
+
+# Custom plugins
+The realtor can register their OWN HTTP tools on the Plugins page. list_plugins
+shows what exists and when each applies; when a request matches a plugin's
+description, call use_plugin with the plugin's exact name. Never invent plugin
+names — if unsure, list first. Plugin calls are approval-gated like sends.
 
 # Standing behavior → build it, don't describe it
 When the realtor describes something that should happen EVERY time ("whenever
@@ -399,6 +407,9 @@ def make_chippi_agent(
         # Team — brokerage messaging + silent automation building
         message_teammate,
         create_automation,
+        # Custom plugins — the realtor's own HTTP tools
+        list_plugins,
+        use_plugin,
     ]
     # send_email_now sends from Chippi's SYSTEM address (Resend), not the
     # realtor's inbox — wrong for client correspondence. Only expose it when no

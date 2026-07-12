@@ -75,6 +75,7 @@ _NATIVE_TOOL_NAMES = frozenset({
     "update_intake_question", "save_intake_form",
     "generate_studio_image", "edit_studio_image",
     "message_teammate", "create_automation",
+    "list_plugins", "use_plugin",
     # Dispatcher tools — curated must never collide with these either.
     "find_integration_tool", "call_integration_tool",
 })

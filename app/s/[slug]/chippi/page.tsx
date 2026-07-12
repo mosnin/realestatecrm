@@ -128,9 +128,27 @@ export default async function ChippiPage({
   // banner stays hidden — there's nothing to connect to.
   const showConnectBanner = composioConfigured() && !hasIntegrations;
 
-  // The skills offered in the composer's `/` menu — read from the SKILL.md
-  // files at request time (cached for the process lifetime).
-  const skills = loadUserInvocableSkills();
+  // The skills offered in the composer's `/` menu: built-in SKILL.md skills
+  // (cached for the process lifetime) followed by the realtor's OWN saved
+  // skills (UserSkill rows — reusable playbooks they wrote themselves,
+  // managed from the Plugins & Skills page). Same shape, one menu.
+  const builtinSkills = loadUserInvocableSkills();
+  const { data: userSkillRows } = await supabase
+    .from('UserSkill')
+    .select('id, title, description, prompt')
+    .eq('spaceId', space.id)
+    .eq('enabled', true)
+    .order('createdAt', { ascending: false })
+    .limit(50);
+  const skills = [
+    ...builtinSkills,
+    ...(userSkillRows ?? []).map((s) => ({
+      slug: `user-${s.id as string}`,
+      title: s.title as string,
+      description: ((s.description as string) || 'Your saved skill'),
+      prompt: s.prompt as string,
+    })),
+  ];
 
   return (
     <div className="flex h-full flex-col">

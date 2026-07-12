@@ -4,9 +4,10 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+import { PluginsSkillsManager } from '@/components/chippi/plugins-skills-manager';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Integrations — Chippi' };
+export const metadata = { title: 'Plugins — Chippi' };
 
 /**
  * /chippi/integrations — connect/disconnect the third-party apps Chippi acts
@@ -58,11 +59,14 @@ export default async function ChippiIntegrationsPage({
 
   return (
     <ChippiPageShell
-      greeting="Integrations."
-      title="The apps I act through."
-      subtitle="Connect your tools so I can work across them. I never send without your tap."
+      greeting="Plugins."
+      title="The tools I act through."
+      subtitle="Connect apps, add your own plugins, and save skills. I never send without your tap."
     >
-      <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
+      <div className="space-y-10">
+        <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
+        <PluginsSkillsManager slug={slug} />
+      </div>
     </ChippiPageShell>
   );
 }

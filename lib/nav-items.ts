@@ -74,7 +74,7 @@ export const realtorNavItems: NavItem[] = [
       // feed is subsumed without losing the listen on/off toggles.
       // Integrations = the connect/disconnect management surface.
       { href: '/chippi/activity', label: 'Activity' },
-      { href: '/chippi/integrations', label: 'Integrations' },
+      { href: '/chippi/integrations', label: 'Plugins' },
     ],
   },
   // Today — the prepared day, and the workspace's default landing (the root
