@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -507,6 +508,9 @@ export function IntroDisclosure({
         >
           <DialogHeader className="p-6 space-y-2 bg-muted border-b border-border">
             <DialogTitle>Feature Tour</DialogTitle>
+            <DialogDescription className="sr-only">
+              Review the product’s key features step by step.
+            </DialogDescription>
             {showProgressBar && (
               <div className="flex mt-2 w-full justify-center  ">
                 <Progress

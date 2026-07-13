@@ -39,4 +39,18 @@ describe('realtor quick-create shortcuts', () => {
     expect(calendar).toContain('onClose={closeAddModal}');
     expect(calendar).toContain("router.replace(`/s/${slug}/calendar`, { scroll: false })");
   });
+
+  it('gives the contact and calendar dialogs accessible descriptions', () => {
+    const contactForm = readFileSync(
+      resolve(root, 'components/contacts/contact-form.tsx'),
+      'utf8',
+    );
+    const calendar = readFileSync(
+      resolve(root, 'app/s/[slug]/calendar/calendar-view.tsx'),
+      'utf8',
+    );
+
+    expect(contactForm).toContain('DialogDescription className="sr-only"');
+    expect(calendar).toContain('DialogDescription className="sr-only"');
+  });
 });

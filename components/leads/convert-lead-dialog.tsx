@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -87,12 +88,12 @@ export function ConvertLeadDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-1">
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
             Move{' '}
             <span className="font-semibold text-foreground">{leadName}</span> to
             your Clients pipeline? They&apos;ll be removed from the Leads inbox and
             you can track them through Qualifying → Tour → Applied.
-          </p>
+          </DialogDescription>
           <div className="flex gap-2 justify-end">
             <Button
               variant="outline"

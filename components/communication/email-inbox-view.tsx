@@ -37,6 +37,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -820,6 +821,9 @@ function ComposeDialog({
           <DialogTitle className="text-base font-medium text-foreground">
             New message
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Compose and send a new email message.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

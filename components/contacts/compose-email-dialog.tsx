@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -72,6 +73,9 @@ export function ComposeEmailDialog({ contactId, contactName, contactEmail }: Com
               <Mail size={16} className="text-muted-foreground" />
               Email {contactName}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Compose and send an email to {contactName}.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">

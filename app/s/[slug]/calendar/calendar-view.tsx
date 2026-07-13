@@ -35,6 +35,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -1602,6 +1603,9 @@ function AddEventModal({
       <DialogContent className={cn('sm:max-w-md', dialogMotionClass)}>
         <DialogHeader>
           <DialogTitle>New event</DialogTitle>
+          <DialogDescription className="sr-only">
+            Add an event to your connected calendar with its date, time, and attendees.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
