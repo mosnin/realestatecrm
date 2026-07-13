@@ -34,8 +34,12 @@ async function hasVerifiedCurrentSubscription(
   status: string | null | undefined,
   periodEnd: string | null | undefined,
 ): Promise<boolean | null> {
-  if (status !== 'active' && status !== 'trialing') return false;
-  if (hasCurrentSubscription(status, periodEnd)) return true;
+  if (
+    (status === 'active' || status === 'trialing') &&
+    hasCurrentSubscription(status, periodEnd)
+  ) {
+    return true;
+  }
   if (!subscriptionId) return false;
 
   try {

@@ -197,6 +197,25 @@ describe('POST /api/billing/checkout (brokerage) — billing cadence', () => {
     expect(sessionsCreateMock).not.toHaveBeenCalled();
   });
 
+  it('blocks checkout when an inactive database row still points at a live Stripe subscription', async () => {
+    dbState.subscriptionId = 'sub_missed_webhook';
+    dbState.subscriptionStatus = 'inactive';
+    dbState.periodEnd = null;
+    subscriptionsRetrieveMock.mockResolvedValue({
+      status: 'active',
+      items: { data: [{ current_period_end: 4_102_444_800 }] },
+      trial_end: null,
+      start_date: 1_776_000_000,
+    });
+
+    const res = await POST(req({ scope: 'brokerage', plan: 'team' }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'Your brokerage already has an active subscription.',
+    });
+    expect(sessionsCreateMock).not.toHaveBeenCalled();
+  });
+
   it('fails closed without claiming active when Stripe verification is unavailable', async () => {
     dbState.subscriptionId = 'sub_unknown';
     dbState.subscriptionStatus = 'active';
