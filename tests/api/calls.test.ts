@@ -214,6 +214,7 @@ describe('GET /api/calls', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
+      configured: false,
       calls: [
         expect.objectContaining({ id: 'call_1', contactName: 'Ada Lovelace' }),
         expect.objectContaining({ id: 'call_2', contactName: null }),
