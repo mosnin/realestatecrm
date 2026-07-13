@@ -103,6 +103,7 @@ beforeEach(() => {
   inngestSendMock.mockReset();
   inngestSendMock.mockResolvedValue({ ids: ['evt_1'] });
   redisSetMock.mockReset();
+  redisSetMock.mockResolvedValue('OK');
   redisIncrMock.mockReset();
   redisExpireMock.mockReset();
   redisExpireMock.mockResolvedValue(1);
@@ -160,7 +161,9 @@ describe('composio webhook receiver', () => {
 
   it('skips Inngest when redis.set NX returns null (duplicate delivery)', async () => {
     verifyMock.mockResolvedValueOnce(verifiedPayload());
-    redisSetMock.mockResolvedValueOnce(null); // dedupe says "seen"
+    redisSetMock
+      .mockResolvedValueOnce('OK') // verified-delivery health marker
+      .mockResolvedValueOnce(null); // dedupe says "seen"
 
     const res = await POST(makeRequest());
 
