@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, pickSpacePriceId } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { hasCurrentSubscription, requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { PLANS, addonSeatsForPlan, isAnnualAvailable } from '@/lib/plans';
+import type Stripe from 'stripe';
 
 type BrokeragePlan = 'team' | 'team_plus';
 
@@ -18,6 +19,39 @@ type Cadence = 'monthly' | 'annual';
  *  the literal 'annual' resolves to 'monthly' (the safe default). */
 function resolveCadence(raw: unknown): Cadence {
   return raw === 'annual' ? 'annual' : 'monthly';
+}
+
+/**
+ * Avoid both sides of a stale-webhook failure: a stale active/trialing row must
+ * not dead-end a canceled customer, but it also must not permit a duplicate
+ * subscription when Stripe is actually current. Persisted current periods can
+ * short-circuit; stale periods are verified read-only against Stripe. If that
+ * verification is unavailable, fail closed against duplicate billing.
+ */
+async function hasVerifiedCurrentSubscription(
+  stripe: Stripe,
+  subscriptionId: string | null | undefined,
+  status: string | null | undefined,
+  periodEnd: string | null | undefined,
+): Promise<boolean> {
+  if (status !== 'active' && status !== 'trialing') return false;
+  if (hasCurrentSubscription(status, periodEnd)) return true;
+  if (!subscriptionId) return false;
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const livePeriodEnd =
+      subscription.items.data[0]?.current_period_end ??
+      subscription.trial_end ??
+      subscription.start_date;
+    return hasCurrentSubscription(
+      subscription.status,
+      new Date(livePeriodEnd * 1000),
+    );
+  } catch (err) {
+    console.error('[checkout] Could not verify stale subscription against Stripe:', err);
+    return true;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -69,9 +103,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Couldn't check subscription status — usually temporary." }, { status: 500 });
     }
 
-    // Block if user already has an active or trialing subscription
+    let stripe;
+    try {
+      stripe = getStripe();
+    } catch (err: any) {
+      console.error('[checkout] Stripe init failed:', err.message);
+      return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
+    }
+
+    // Block a verified current subscription. A stale row is checked against
+    // Stripe so a canceled customer can renew without risking a duplicate sub.
     const currentStatus = stripeData?.stripeSubscriptionStatus;
-    if (currentStatus === 'active' || currentStatus === 'trialing') {
+    if (
+      await hasVerifiedCurrentSubscription(
+        stripe,
+        stripeData?.stripeSubscriptionId,
+        currentStatus,
+        stripeData?.stripePeriodEnd,
+      )
+    ) {
       return NextResponse.json({ error: 'You already have an active subscription.' }, { status: 400 });
     }
 
@@ -81,14 +131,6 @@ export async function POST(req: NextRequest) {
         error: 'You have an existing subscription with a payment issue. Please update your payment method in billing settings.',
         redirect: `/s/${slug}/billing`,
       }, { status: 400 });
-    }
-
-    let stripe;
-    try {
-      stripe = getStripe();
-    } catch (err: any) {
-      console.error('[checkout] Stripe init failed:', err.message);
-      return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
     }
 
     // Resolve the Stripe price from the selected tier via lib/plans.ts (single
@@ -247,7 +289,7 @@ async function handleBrokerageCheckout(
   // Load live Stripe columns for the Brokerage row (may not be on ctx.brokerage type yet)
   const { data: brokerageStripe, error: brokerageQueryErr } = await supabase
     .from('Brokerage')
-    .select('id, name, ownerId, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus')
+    .select('id, name, ownerId, stripeCustomerId, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
     .eq('id', ctx.brokerage.id)
     .single();
 
@@ -263,9 +305,25 @@ async function handleBrokerageCheckout(
     );
   }
 
-  // Block if the brokerage already has an active or trialing subscription
+  let stripe;
+  try {
+    stripe = getStripe();
+  } catch (err: any) {
+    console.error('[checkout:brokerage] Stripe init failed:', err.message);
+    return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
+  }
+
+  // Block a verified current subscription. Live Stripe verification lets an
+  // actually canceled brokerage renew even when its webhook-backed row is stale.
   const currentStatus = brokerageStripe.stripeSubscriptionStatus;
-  if (currentStatus === 'active' || currentStatus === 'trialing') {
+  if (
+    await hasVerifiedCurrentSubscription(
+      stripe,
+      brokerageStripe.stripeSubscriptionId,
+      currentStatus,
+      brokerageStripe.stripePeriodEnd,
+    )
+  ) {
     return NextResponse.json(
       { error: 'Your brokerage already has an active subscription.' },
       { status: 400 },
@@ -283,14 +341,6 @@ async function handleBrokerageCheckout(
       },
       { status: 400 },
     );
-  }
-
-  let stripe;
-  try {
-    stripe = getStripe();
-  } catch (err: any) {
-    console.error('[checkout:brokerage] Stripe init failed:', err.message);
-    return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.usechippi.com';

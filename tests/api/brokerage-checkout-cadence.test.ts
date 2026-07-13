@@ -34,18 +34,29 @@ const { checkRateLimitMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
 
-const { sessionsCreateMock } = vi.hoisted(() => ({
+const { sessionsCreateMock, subscriptionsRetrieveMock } = vi.hoisted(() => ({
   sessionsCreateMock: vi.fn(async (_params: Record<string, unknown>) => ({
     id: 'cs_b',
     url: 'https://stripe/checkout/cs_b',
   })),
+  subscriptionsRetrieveMock: vi.fn(),
 }));
 vi.mock('@/lib/stripe', () => ({
-  getStripe: () => ({ checkout: { sessions: { create: sessionsCreateMock } } }),
+  getStripe: () => ({
+    checkout: { sessions: { create: sessionsCreateMock } },
+    subscriptions: { retrieve: subscriptionsRetrieveMock },
+  }),
   pickSpacePriceId: () => null,
 }));
 
-const { dbState } = vi.hoisted(() => ({ dbState: { memberCount: 1 } }));
+const { dbState } = vi.hoisted(() => ({
+  dbState: {
+    memberCount: 1,
+    subscriptionId: null as string | null,
+    subscriptionStatus: 'inactive',
+    periodEnd: null as string | null,
+  },
+}));
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from(table: string) {
@@ -59,8 +70,9 @@ vi.mock('@/lib/supabase', () => ({
               name: 'Acme',
               ownerId: 'u1',
               stripeCustomerId: 'cus_b',
-              stripeSubscriptionId: null,
-              stripeSubscriptionStatus: 'inactive',
+              stripeSubscriptionId: dbState.subscriptionId,
+              stripeSubscriptionStatus: dbState.subscriptionStatus,
+              stripePeriodEnd: dbState.periodEnd,
             },
             error: null,
           }),
@@ -90,12 +102,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   checkRateLimitMock.mockResolvedValue({ allowed: true });
   sessionsCreateMock.mockResolvedValue({ id: 'cs_b', url: 'https://stripe/checkout/cs_b' });
+  subscriptionsRetrieveMock.mockReset();
   getBrokerContextMock.mockResolvedValue({
     brokerage: { id: 'br1', name: 'Acme' },
     membership: { role: 'broker_owner' },
     dbUserId: 'u1',
   });
   dbState.memberCount = 1;
+  dbState.subscriptionId = null;
+  dbState.subscriptionStatus = 'inactive';
+  dbState.periodEnd = null;
 });
 
 describe('POST /api/billing/checkout (brokerage) — billing cadence', () => {
@@ -145,5 +161,39 @@ describe('POST /api/billing/checkout (brokerage) — billing cadence', () => {
     expect(res.status).toBe(200);
     const params = sessionsCreateMock.mock.calls[0]![0] as any;
     expect(params.line_items[0]).toEqual({ price: 'price_team_plus_m', quantity: 1 });
+  });
+
+  it('allows renewal when the persisted trial is expired and Stripe confirms cancellation', async () => {
+    dbState.subscriptionId = 'sub_old';
+    dbState.subscriptionStatus = 'trialing';
+    dbState.periodEnd = '2026-04-24T00:00:00.000Z';
+    subscriptionsRetrieveMock.mockResolvedValue({
+      status: 'canceled',
+      items: { data: [{ current_period_end: 1_777_000_000 }] },
+      trial_end: null,
+      start_date: 1_776_000_000,
+    });
+
+    const res = await POST(req({ scope: 'brokerage', plan: 'team' }));
+    expect(res.status).toBe(200);
+    expect(subscriptionsRetrieveMock).toHaveBeenCalledWith('sub_old');
+    expect(sessionsCreateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a stale database row when Stripe confirms the subscription is current', async () => {
+    dbState.subscriptionId = 'sub_live';
+    dbState.subscriptionStatus = 'active';
+    dbState.periodEnd = '2026-04-24T00:00:00.000Z';
+    subscriptionsRetrieveMock.mockResolvedValue({
+      status: 'active',
+      items: { data: [{ current_period_end: 4_102_444_800 }] },
+      trial_end: null,
+      start_date: 1_776_000_000,
+    });
+
+    const res = await POST(req({ scope: 'brokerage', plan: 'team' }));
+    expect(res.status).toBe(400);
+    expect(subscriptionsRetrieveMock).toHaveBeenCalledWith('sub_live');
+    expect(sessionsCreateMock).not.toHaveBeenCalled();
   });
 });
