@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getBrokerContext, canEditSettings } from '@/lib/permissions';
-import { BrokerConnectedAppsSection } from '@/components/broker/broker-connected-apps-section';
+import { BrokerageConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import {
   H1,
   TITLE_FONT,
@@ -74,7 +74,7 @@ export default async function BrokerIntegrationsPage({
           </p>
         </div>
       ) : (
-        <BrokerConnectedAppsSection callbackResult={callbackResult} />
+        <BrokerageConnectedAppsSection callbackResult={callbackResult} />
       )}
     </div>
   );
