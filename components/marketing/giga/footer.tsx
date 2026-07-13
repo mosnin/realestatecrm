@@ -2,7 +2,7 @@
 
 /**
  * SiteFooter, light/dark-adaptive footer (reference-matched): the twirling
- * shader-gradient band on top, then the Chippi wordmark + COMPLIANT badges on
+ * shader-gradient band on top, then the Chippi wordmark + security-practice badges on
  * the left and three link columns on the right, with a © / social meta row.
  */
 
@@ -30,7 +30,7 @@ const columns: Record<string, { label: string; href: string }[]> = {
   ],
 };
 
-const BADGES = ['SOC 2', 'ISO 27001', 'GDPR'];
+const SECURITY_PRACTICES = ['Access', 'Audit', 'Privacy'];
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
 
 export function SiteFooter() {
@@ -58,7 +58,8 @@ export function SiteFooter() {
       <div className="relative">
         <div className="mx-auto w-full max-w-6xl px-5 py-14 sm:px-8">
           <div className="grid gap-10 md:grid-cols-[1.2fr_2fr]">
-            {/* Left: logo + compliance */}
+            {/* Left: logo + security practices. Avoid certification claims unless
+                the corresponding audit or attestation can be linked publicly. */}
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo-black.png" alt="Chippi" width={512} height={171} className="h-5 w-auto dark:hidden" />
@@ -66,18 +67,17 @@ export function SiteFooter() {
               <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="hidden h-5 w-auto dark:block" />
               <span style={MONO} className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/40">
                 <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-500" />
-                Compliant
+                Security controls
               </span>
               <div className="mt-3 flex items-center gap-2">
-                {BADGES.map((b) => (
+                {SECURITY_PRACTICES.map((practice) => (
                   <span
-                    key={b}
+                    key={practice}
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-neutral-50 text-center text-[8px] font-semibold uppercase leading-tight tracking-wide text-neutral-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
                   >
-                    {b}
+                    {practice}
                   </span>
                 ))}
-                <span className="text-[11px] text-neutral-400 dark:text-white/35">+ more</span>
               </div>
             </div>
 
