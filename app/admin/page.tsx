@@ -37,6 +37,7 @@ import {
   META,
   CAPTION,
 } from '@/lib/typography';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export default async function AdminOverviewPage() {
   const isAdmin = await isPlatformAdmin();
@@ -276,13 +277,19 @@ export default async function AdminOverviewPage() {
 
     // ── Revenue metrics ───────────────────────────────────────────────
     try {
-      const subRes = await supabase.from('Space').select('stripeSubscriptionStatus');
-      const statuses = (subRes.data ?? []) as { stripeSubscriptionStatus: string | null }[];
+      const subRes = await supabase
+        .from('Space')
+        .select('stripeSubscriptionStatus, stripePeriodEnd');
+      const statuses = (subRes.data ?? []) as {
+        stripeSubscriptionStatus: string | null;
+        stripePeriodEnd: string | null;
+      }[];
       totalSpaces = statuses.length;
       for (const row of statuses) {
         const s = row.stripeSubscriptionStatus;
-        if (s === 'active') activeSubscriptions++;
-        else if (s === 'trialing') trialUsers++;
+        const current = hasCurrentSubscription(s, row.stripePeriodEnd, now);
+        if (s === 'active' && current) activeSubscriptions++;
+        else if (s === 'trialing' && current) trialUsers++;
         else if (s === 'past_due') pastDueUsers++;
         else if (s === 'canceled') canceledUsers++;
       }
