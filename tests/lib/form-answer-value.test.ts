@@ -6,12 +6,24 @@
  * type, the label mapping, and the empty/invalid fallbacks.
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { formatAnswerValue } from '@/lib/form-versioning';
 import type { FormQuestion } from '@/lib/types';
 
 const q = (over: Partial<FormQuestion>): FormQuestion =>
   ({ id: 'q1', label: 'Q', type: 'text', ...over } as FormQuestion);
+
+const originalTimezone = process.env.TZ;
+
+beforeAll(() => {
+  // Date-only answers are calendar values, not instants. Run in a negative
+  // offset zone so an accidental UTC-midnight parse would display June 30.
+  process.env.TZ = 'America/Los_Angeles';
+});
+
+afterAll(() => {
+  process.env.TZ = originalTimezone;
+});
 
 describe('formatAnswerValue', () => {
   it('renders empty for null / undefined / empty string', () => {
@@ -58,7 +70,7 @@ describe('formatAnswerValue', () => {
   });
 
   it('date formats nicely and falls back to the raw string when unparseable', () => {
-    expect(formatAnswerValue('2026-07-01', q({ type: 'date' }))).toMatch(/Jul .*2026/);
+    expect(formatAnswerValue('2026-07-01', q({ type: 'date' }))).toBe('Jul 1, 2026');
     expect(formatAnswerValue('not-a-date', q({ type: 'date' }))).toBe('not-a-date');
   });
 });

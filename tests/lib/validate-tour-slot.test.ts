@@ -18,7 +18,7 @@
  * payload for that table so a test can dial in any availability config.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi, beforeEach } from 'vitest';
 
 type Settings = {
   tourDuration: number;
@@ -82,6 +82,18 @@ const WED_0900_ET = new Date('2026-07-15T13:00:00.000Z'); // valid: in-window, a
 const WED_1900_ET = new Date('2026-07-15T23:00:00.000Z'); // off-hours (after 17:00)
 const WED_0913_ET = new Date('2026-07-15T13:13:00.000Z'); // misaligned (not a slot start)
 const SUN_0900_ET = new Date('2026-07-19T13:00:00.000Z'); // wrong weekday (Sunday)
+
+const originalTimezone = process.env.TZ;
+
+beforeAll(() => {
+  // The validator must depend only on the brokerage timezone, not the Node
+  // process timezone (UTC on Vercel and often local time in development).
+  process.env.TZ = 'America/Los_Angeles';
+});
+
+afterAll(() => {
+  process.env.TZ = originalTimezone;
+});
 
 beforeEach(() => {
   settingsRow = { ...DEFAULT_SETTINGS };
