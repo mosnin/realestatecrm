@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
  * The SupabaseRealtimeBridge component (mounted in the dashboard layout)
  * fetches the Clerk JWT and feeds it in here. Without that bridge in the
  * tree, Realtime is a no-op — which is the graceful-degradation path
- * if Clerk's "supabase" template isn't configured yet.
+ * if Clerk's native Supabase integration is unavailable.
  */
 let _browserClient: ReturnType<typeof createClient> | undefined;
 
