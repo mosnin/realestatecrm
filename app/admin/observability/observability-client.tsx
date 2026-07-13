@@ -31,6 +31,7 @@ import type { SentryIssue, SentryEventStats } from '@/lib/sentry-api';
 
 interface ObservabilityData {
   issues: SentryIssue[];
+  issuesAvailable: boolean;
   stats: SentryEventStats | null;
   fetchedAt: string;
 }
@@ -128,10 +129,12 @@ function sumCounts(points: SentryEventStats['points'], lastNDays: number): numbe
 export function ObservabilityClient({
   configured,
   issues: initialIssues,
+  issuesAvailable: initialIssuesAvailable,
   stats: initialStats,
   fetchedAt: initialFetchedAt,
 }: ObservabilityClientProps) {
   const [issues, setIssues] = useState<SentryIssue[]>(initialIssues);
+  const [issuesAvailable, setIssuesAvailable] = useState(initialIssuesAvailable);
   const [stats, setStats] = useState<SentryEventStats | null>(initialStats);
   const [fetchedAt, setFetchedAt] = useState(initialFetchedAt);
   const [refreshing, setRefreshing] = useState(false);
@@ -146,6 +149,7 @@ export function ObservabilityClient({
       if (res.ok) {
         const data = (await res.json()) as ObservabilityData;
         setIssues(data.issues);
+        setIssuesAvailable(data.issuesAvailable);
         setStats(data.stats);
         setFetchedAt(data.fetchedAt);
       }
@@ -189,6 +193,17 @@ export function ObservabilityClient({
 
   return (
     <div className="space-y-8">
+      {!issuesAvailable && (
+        <div className="flex gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Sentry issue data is unavailable.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Check the Sentry token and project permissions. Do not treat the zero values below as healthy.
+            </p>
+          </div>
+        </div>
+      )}
       {/* ── Stat cells ─────────────────────────────────────────────────── */}
       <section
         className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
@@ -197,15 +212,15 @@ export function ObservabilityClient({
         {[
           {
             label: 'Unresolved issues',
-            value: unresolvedCount,
-            sub: `last 14d`,
-            alert: unresolvedCount > 0,
+            value: issuesAvailable ? unresolvedCount : '—',
+            sub: issuesAvailable ? `last 14d` : 'unavailable',
+            alert: !issuesAvailable || unresolvedCount > 0,
           },
           {
             label: 'Errors & fatals',
-            value: fatalOrError,
-            sub: `of ${issues.length} issues`,
-            alert: fatalOrError > 0,
+            value: issuesAvailable ? fatalOrError : '—',
+            sub: issuesAvailable ? `of ${issues.length} issues` : 'unavailable',
+            alert: !issuesAvailable || fatalOrError > 0,
           },
           {
             label: 'Events (24h)',
@@ -287,7 +302,12 @@ export function ObservabilityClient({
           </button>
         </div>
 
-        {issues.length === 0 ? (
+        {!issuesAvailable ? (
+          <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 px-5 py-10 text-center">
+            <p className="text-sm text-foreground">Open issues could not be loaded.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Restore Sentry API access, then refresh this page.</p>
+          </div>
+        ) : issues.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
             <p className="text-sm text-foreground">No open issues.</p>
             <p className="text-xs text-muted-foreground mt-1">
