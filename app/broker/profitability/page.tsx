@@ -47,7 +47,6 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import { ProfitabilityClient } from './profitability-client';
 
 export const metadata: Metadata = { title: 'Profitability -- Brokerage' };
@@ -185,32 +184,26 @@ export default async function BrokerProfitabilityPage() {
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Total GCI</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={totals.gci} format={formatCompact} />
+                {formatCompact(totals.gci)}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Net to brokerage</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={totals.brokerageNet} format={formatCompact} />
+                {formatCompact(totals.brokerageNet)}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Deals closed</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber
-                  value={totals.dealsClosed}
-                  format={(n) => Math.round(n).toLocaleString()}
-                />
+                {totals.dealsClosed.toLocaleString()}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Lead to deal</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
                 {totals.teamLeadToDealRate != null ? (
-                  <AnimatedNumber
-                    value={totals.teamLeadToDealRate}
-                    format={(n) => `${Math.round(n * 10) / 10}%`}
-                  />
+                  {`${Math.round(totals.teamLeadToDealRate * 10) / 10}%`}
                 ) : (
                   '—'
                 )}
