@@ -26,4 +26,12 @@ describe('marketing claims', () => {
     expect(hero).not.toContain("'RE/MAX'");
     expect(hero).toContain('Built for modern brokerages');
   });
+
+  it('does not publish illustrative job openings', () => {
+    const careers = readFileSync('app/(marketing)/careers/page.tsx', 'utf8');
+
+    expect(careers).not.toContain('Head of PR, Europe');
+    expect(careers).not.toContain('Head of Growth Marketing');
+    expect(careers).toContain('No open roles right now.');
+  });
 });
