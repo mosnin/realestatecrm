@@ -246,7 +246,7 @@ export function GeneralSettingsForm({ space }: GeneralSettingsFormProps) {
               </div>
             )}
           </div>
-          <p className={CAPTION}>Your intake link: chippi.com/apply/{newSlug}</p>
+          <p className={CAPTION}>Your intake link: usechippi.com/apply/{newSlug}</p>
         </div>
       </div>
 
