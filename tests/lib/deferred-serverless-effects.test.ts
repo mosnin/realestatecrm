@@ -13,13 +13,14 @@ vi.mock('@/lib/logger', () => ({
 import { audit } from '@/lib/audit';
 import { notifyBroker } from '@/lib/broker-notify';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { sendClientNotification } from '@/lib/client-email';
 
 beforeEach(() => {
   afterMock.mockReset();
 });
 
 describe('deferred serverless side effects', () => {
-  it('registers audit, broker notification, and seat billing work with after()', async () => {
+  it('registers critical writes and client notification email with after()', async () => {
     await Promise.all([
       audit({ actorClerkId: 'user_1', action: 'UPDATE', resource: 'Contact' }),
       notifyBroker({
@@ -28,9 +29,15 @@ describe('deferred serverless side effects', () => {
         title: 'Review requested',
       }),
       syncBrokerageSeatBilling('brokerage_1'),
+      sendClientNotification({
+        to: 'client@example.com',
+        subject: 'New message',
+        heading: 'You have a new message',
+        body: 'Open your portal to read it.',
+      }),
     ]);
 
-    expect(afterMock).toHaveBeenCalledTimes(3);
+    expect(afterMock).toHaveBeenCalledTimes(4);
     for (const [callback] of afterMock.mock.calls) {
       expect(callback).toBeTypeOf('function');
     }

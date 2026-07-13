@@ -4,6 +4,7 @@
  * cleanly when RESEND_API_KEY is unset so local/dev never throws.
  */
 import 'server-only';
+import { after } from 'next/server';
 import { Resend } from 'resend';
 import { logger } from '@/lib/logger';
 
@@ -72,15 +73,16 @@ export async function sendClientCode(params: {
   }
 }
 
-/** Generic portal notification (new message from realtor, info request, status change). */
-export async function sendClientNotification(params: {
+type ClientNotificationParams = {
   to: string;
   subject: string;
   heading: string;
   body: string;
   ctaLabel?: string;
   ctaHref?: string;
-}): Promise<void> {
+};
+
+async function performClientNotification(params: ClientNotificationParams): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     logger.warn('[client-email] RESEND_API_KEY unset — notification skipped');
@@ -104,4 +106,17 @@ export async function sendClientNotification(params: {
   } catch (err) {
     logger.error('[client-email] notification send failed', {}, err);
   }
+}
+
+/** Generic portal notification (new message from realtor, info request, status change). */
+export async function sendClientNotification(params: ClientNotificationParams): Promise<void> {
+  const task = performClientNotification(params);
+
+  try {
+    after(() => task);
+  } catch {
+    // Unit tests and non-request callers do not have a Next.js request scope.
+  }
+
+  await task;
 }
