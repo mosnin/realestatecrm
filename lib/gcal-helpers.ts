@@ -16,6 +16,7 @@
 import { supabase } from '@/lib/supabase';
 import { decrypt, encrypt, decryptOrPassthrough } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -91,7 +92,7 @@ export async function getValidAccessToken(
  * id is empty — the caller's contract is "make sure this event doesn't
  * exist anymore", and if no token, we never could have created it.
  */
-export async function deleteGoogleEvent(args: {
+async function performDeleteGoogleEvent(args: {
   spaceId: string;
   googleEventId: string | null | undefined;
 }): Promise<boolean> {
@@ -156,4 +157,23 @@ export async function deleteGoogleEvent(args: {
     errText,
   });
   return false;
+}
+
+/**
+ * Delete a mirrored Google Calendar event while retaining the exact in-flight
+ * request through the end of a Next.js serverless invocation. Callers may keep
+ * this best-effort cleanup off their response path without Vercel suspending it;
+ * callers that await it preserve the same boolean result.
+ */
+export async function deleteGoogleEvent(args: {
+  spaceId: string;
+  googleEventId: string | null | undefined;
+}): Promise<boolean> {
+  const task = performDeleteGoogleEvent(args);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  return task;
 }
