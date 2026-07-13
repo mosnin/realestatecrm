@@ -45,14 +45,16 @@ async function loadPerformanceData(spaceId: string): Promise<{
 
 export default async function ContactsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
   // Middleware only requires login; ownership of /s/[slug] is enforced here.
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
 
-  const { slug } = await params;
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -72,7 +74,7 @@ export default async function ContactsPage({
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       <PerformanceStrip deals={deals} stages={stages} />
-      <ContactTable slug={slug} />
+      <ContactTable slug={slug} openCreateForm={sp.new === 'contact'} />
       {/* Floating quick-capture dock — jot a thought without leaving the list. */}
       <ContactsQuickCapture slug={slug} />
     </div>
