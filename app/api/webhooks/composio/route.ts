@@ -41,6 +41,8 @@ const DEDUPE_TTL_SECONDS = 24 * 60 * 60;
 // Modal bill from a single connected account.
 const HOURLY_CAP_PER_TRIGGER = 60;
 const RATE_WINDOW_SECONDS = 60 * 60;
+const WEBHOOK_HEALTH_KEY = 'composio:webhook:last-verified-at';
+const WEBHOOK_HEALTH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const WEBHOOK_ID_HEADER = 'webhook-id';
 const WEBHOOK_TIMESTAMP_HEADER = 'webhook-timestamp';
@@ -114,6 +116,19 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  // Make inbound-trigger health observable. Environment-variable presence
+  // only proves credentials exist; this timestamp proves a signed delivery
+  // actually reached the canonical endpoint. Monitoring must never break the
+  // webhook path, so a Redis failure is logged and ignored.
+  await redis
+    .set(WEBHOOK_HEALTH_KEY, new Date().toISOString(), { ex: WEBHOOK_HEALTH_TTL_SECONDS })
+    .catch((err) => {
+      logger.warn('[composio-webhook] could not record verified-delivery health', {
+        webhookId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    });
 
   // ── Dedupe ────────────────────────────────────────────────────────────
   // Composio retries on non-2xx. We also have Inngest's at-least-once
