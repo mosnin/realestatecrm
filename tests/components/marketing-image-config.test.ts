@@ -16,6 +16,6 @@ describe('marketing social-image route config', () => {
       expect(openGraph).toContain(literal);
     }
 
-    expect(twitter).not.toMatch(/export\s*\{[\s\S]*runtime[\s\S]*\}\s*from/);
+    expect(twitter).not.toMatch(/export\s*\{[\s\S]*?runtime[\s\S]*?\}\s*from/);
   });
 });

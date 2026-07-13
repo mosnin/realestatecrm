@@ -73,7 +73,8 @@ vi.mock('@/lib/supabase', () => {
 });
 
 // Import AFTER mocks.
-import { POST, MAX_BULK } from '@/app/api/contacts/bulk/route';
+import { POST } from '@/app/api/contacts/bulk/route';
+import { MAX_CONTACT_BULK as MAX_BULK } from '@/lib/api-limits';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { assignLeadToRealtor } from '@/lib/broker-assign-lead';

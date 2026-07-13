@@ -66,7 +66,12 @@ const nextConfig: NextConfig = {
   // collection with ENOENT default-stylesheet.css. Excluding the package
   // makes Next.js require() it from node_modules instead, with intact
   // relative paths.
-  serverExternalPackages: ['isomorphic-dompurify', 'jsdom'],
+  // heic-convert ships a WASM loader whose dynamic require cannot be safely
+  // statically analyzed, and Ably's Node entrypoint pulls in keyv's dynamic
+  // adapter loader. Both are server-only in this app. Leaving them as traced
+  // runtime dependencies avoids noisy critical-dependency warnings and keeps
+  // Webpack from re-processing large vendor bundles on every production build.
+  serverExternalPackages: ['isomorphic-dompurify', 'jsdom', 'heic-convert', 'ably'],
   // Marketing redesign ships local placeholder imagery today. Unsplash is
   // allowlisted so the founder can drop in royalty-free architecture/interior
   // photos by URL later (the marketing tags are plain <img>, but this also

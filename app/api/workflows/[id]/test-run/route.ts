@@ -27,6 +27,7 @@ import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { getWorkflow } from '@/lib/workflows/store';
 import type { WorkflowContext } from '@/lib/workflows/actions';
 import type { WorkflowTrigger } from '@/lib/workflows/schema';
+import { scrubSampleContext } from '@/lib/workflows/sample-context';
 
 export const runtime = 'nodejs';
 // The test executes the headless agent for draft_message / run_chippi actions,
@@ -116,32 +117,6 @@ function sampleContextFor(trigger: WorkflowTrigger): WorkflowContext {
       return { event: { type: String((_never as { type: string }).type) } };
     }
   }
-}
-
-/**
- * Scrub an untrusted sampleContext override against the synthetic context. Only
- * a plain object override is accepted (anything else falls back to the synthetic
- * context). The caller's values are layered ON TOP of the synthetic context, but
- * the entity ids (contact/lead/deal `.id`) are ALWAYS forced back to the
- * synthetic 'sample' ids — a caller can shape the run's data but can never point
- * it at an id it doesn't own.
- */
-export function scrubSampleContext(override: unknown, synthetic: WorkflowContext): WorkflowContext {
-  if (!override || typeof override !== 'object' || Array.isArray(override)) {
-    return synthetic;
-  }
-  const merged: WorkflowContext = { ...synthetic, ...(override as Record<string, unknown>) };
-
-  // Re-pin entity ids to the synthetic sample id (or drop the id if the synthetic
-  // context had no such entity), so a caller-supplied id never reaches a write.
-  for (const key of ['contact', 'lead', 'deal'] as const) {
-    const overrideEntity = (override as Record<string, unknown>)[key];
-    if (overrideEntity && typeof overrideEntity === 'object' && !Array.isArray(overrideEntity)) {
-      const syntheticEntity = synthetic[key] as Record<string, unknown> | undefined;
-      merged[key] = { ...(overrideEntity as Record<string, unknown>), id: syntheticEntity?.id };
-    }
-  }
-  return merged;
 }
 
 export async function POST(

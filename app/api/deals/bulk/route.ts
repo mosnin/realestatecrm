@@ -27,9 +27,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { syncDeal } from '@/lib/vectorize';
 import type { Deal } from '@/lib/types';
-
-/** Upper bound on a single bulk request. Keeps the per-id loop bounded. */
-export const MAX_BULK = 200;
+import { MAX_DEAL_BULK as MAX_BULK } from '@/lib/api-limits';
 
 // 'won' deliberately excluded — see file header.
 const VALID_BULK_STATUSES = ['active', 'lost', 'on_hold'] as const;

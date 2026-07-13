@@ -27,9 +27,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
-
-/** Max duplicates folded into a survivor in one merge (matches the RPC cap). */
-export const MAX_MERGE_GROUP = 50;
+import { MAX_CONTACT_MERGE_GROUP as MAX_MERGE_GROUP } from '@/lib/api-limits';
 
 /** Reference tables re-pointed by merge_contacts(), for the preview count. */
 const REFERENCE_TABLES: ReadonlyArray<{ table: string; column: string }> = [

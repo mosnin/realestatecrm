@@ -11,6 +11,7 @@ import { MarketingPixels } from '@/components/analytics/marketing-pixels';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://www.usechippi.com'),
   title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
   description: 'An AI agent that runs your realtor workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current so you can focus on the deals that matter. Start your 7-day free trial.',
   keywords: ['agentic OS', 'AI agent', 'real estate', 'realtors', 'brokerages', 'AI lead scoring', 'lead qualification', 'tour scheduling', 'deal pipeline', 'CRM'],
