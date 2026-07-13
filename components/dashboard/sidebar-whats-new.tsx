@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { SECTION_LABEL } from '@/lib/typography';
@@ -63,13 +62,6 @@ export function SidebarWhatsNew({ collapsed = false }: SidebarWhatsNewProps) {
         <p className="text-[12px] text-foreground/85 leading-snug pr-4">
           Email + Calendar mirror is live.
         </p>
-        <Link
-          href="/changelog"
-          className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-        >
-          See changes
-          <span aria-hidden>→</span>
-        </Link>
       </div>
     </div>
   );
