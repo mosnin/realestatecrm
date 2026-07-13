@@ -47,6 +47,7 @@ import { composioConfigured } from '@/lib/integrations/composio';
 import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
 import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
+import { isComposioAuthError } from '@/lib/integrations/composio-errors';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -319,18 +320,7 @@ export async function loadIntegrationToolsDetailed(
  * as transient and the row is left alone.
  */
 export function isAuthLikeError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as {
-    name?: string;
-    statusCode?: number;
-    code?: string;
-    cause?: { statusCode?: number };
-  };
-  if (e.name === 'ComposioConnectedAccountNotFoundError') return true;
-  if (e.statusCode === 401 || e.statusCode === 403) return true;
-  if (e.cause && (e.cause.statusCode === 401 || e.cause.statusCode === 403)) return true;
-  if (typeof e.code === 'string' && e.code.startsWith('CONNECTED_ACCOUNT_')) return true;
-  return false;
+  return isComposioAuthError(err);
 }
 
 /**
