@@ -39,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -308,6 +309,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                       <span className={cn(SECTION_LABEL, 'pt-px')}>admin</span>
                     </SheetTitle>
                   </div>
+                  <SheetDescription className="sr-only">
+                    Navigate Chippi administration.
+                  </SheetDescription>
                 </SheetHeader>
                 <SidebarNav pathname={pathname} onItemClick={() => setOpen(false)} />
                 <div className="border-t border-border/50">

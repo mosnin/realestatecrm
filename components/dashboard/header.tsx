@@ -11,6 +11,7 @@ import {
   Sheet,
   SheetClose,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger
@@ -198,6 +199,9 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
               <SheetTitle className="flex items-center gap-2.5 text-sidebar-foreground">
                 <BrandLogo className="h-5" alt="Chippi" />
               </SheetTitle>
+              <SheetDescription className="sr-only">
+                Navigate your Chippi workspace and account.
+              </SheetDescription>
               {/* Workspace switcher — uses the shared desktop component so the
                   rich popover (email header, ⌘-shortcuts, "+ New" footer) is
                   identical across viewports. Inside a Sheet the Radix Popover
