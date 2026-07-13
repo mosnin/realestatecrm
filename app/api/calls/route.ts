@@ -2,7 +2,7 @@
  * Calls — realtor-facing click-to-call + call log.
  *
  *   POST { slug, contactId?, toNumber }  → { call }   place a call, log it
- *   GET  ?slug=<slug>                    → { calls }  the space's calls, newest first
+ *   GET  ?slug=<slug>                    → { calls, configured }  calls + voice availability
  *
  * Auth: requireSpaceOwner(slug) — the workspace owner (or a managing
  * broker_owner/broker_admin).
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     contactName: c.contactId ? contactNames.get(c.contactId) ?? null : null,
   }));
 
-  return NextResponse.json({ calls });
+  return NextResponse.json({ calls, configured: Boolean(getVoiceConfig()) });
 }
 
 // ── POST — place a call ─────────────────────────────────────────────────────
