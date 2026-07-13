@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOTS = ['app', 'components', 'lib'];
+const CONFIG_FILES = ['.env.example'];
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -14,7 +15,7 @@ function sourceFiles(directory: string): string[] {
 
 describe('production origin contract', () => {
   it('does not generate links to the discontinued app hostname', () => {
-    const offenders = ROOTS.flatMap(sourceFiles).filter((file) =>
+    const offenders = [...ROOTS.flatMap(sourceFiles), ...CONFIG_FILES].filter((file) =>
       readFileSync(file, 'utf8').includes('my.usechippi.com'),
     );
 
