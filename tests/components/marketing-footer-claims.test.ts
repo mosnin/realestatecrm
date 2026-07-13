@@ -17,4 +17,13 @@ describe('marketing claims', () => {
 
     expect(homepage).not.toContain('TestimonialsBand');
   });
+
+  it('does not imply unapproved customer relationships', () => {
+    const hero = readFileSync('components/marketing/giga/hero.tsx', 'utf8');
+
+    expect(hero).not.toContain('Trusted across modern brokerages');
+    expect(hero).not.toContain("'Compass'");
+    expect(hero).not.toContain("'RE/MAX'");
+    expect(hero).toContain('Built for modern brokerages');
+  });
 });
