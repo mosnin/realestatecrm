@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
@@ -14,7 +14,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
  *   2. Creates an AgentQuestion scoped to the realtor's space + this
  *      contact, which surfaces in /chippi's focus card / questions panel
  *      so the realtor sees it as the next thing that needs them.
- *   3. (TODO follow-up) emails the realtor via the existing notify path.
+ *   3. Emails the realtor via the existing notify path.
  *
  * Why a structured request and not "just a chat message" — the realtor's
  * focus card needs a typed entry to render the right action affordance
@@ -164,15 +164,17 @@ export async function POST(req: NextRequest) {
     console.error('[portal/tour-request] Question insert error:', questionRes.error);
   }
 
-  // Notify realtor (fire and forget — same pattern as message endpoint).
-  void notifyRealtorOfTourRequest(
-    contact.spaceId,
-    contact.name,
-    safeTimes,
-    safeAddress,
-    safeNotes,
-  ).catch((err) =>
-    console.error('[portal/tour-request] Realtor notification failed:', err),
+  // Run after the response while keeping the serverless invocation alive.
+  after(() =>
+    notifyRealtorOfTourRequest(
+      contact.spaceId,
+      contact.name,
+      safeTimes,
+      safeAddress,
+      safeNotes,
+    ).catch((err) =>
+      console.error('[portal/tour-request] Realtor notification failed:', err),
+    ),
   );
 
   return NextResponse.json({ message: messageRes.data }, { status: 201 });

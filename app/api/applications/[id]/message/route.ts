@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 
@@ -66,10 +66,13 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
   }
 
-  // Send email to applicant (fire and forget)
+  // Keep the serverless invocation alive long enough to deliver the email
+  // without adding notification latency to the API response.
   if (contact.email) {
-    sendMessageNotification(contact, sanitized).catch((err) =>
-      console.error('[message] Email notification failed:', err),
+    after(() =>
+      sendMessageNotification(contact, sanitized).catch((err) =>
+        console.error('[message] Email notification failed:', err),
+      ),
     );
   }
 
