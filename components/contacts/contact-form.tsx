@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -393,6 +394,11 @@ export function ContactForm({
             screen readers and doesn't emit its missing-title console error. */}
         <div className="px-6 py-4 border-b border-border/60">
           <DialogTitle className={H2}>{displayTitle}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {mode === 'edit'
+              ? 'Update this person’s contact details and stage.'
+              : 'Add a person by typing a description or filling in their contact details.'}
+          </DialogDescription>
         </div>
 
         {/* Mode toggle — only when "Type it" is available (add + slug present) */}
