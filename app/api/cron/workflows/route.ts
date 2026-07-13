@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { monitorCron } from '@/lib/cron-monitor';
+import { isScheduleDue, type ScheduleConfig } from '@/lib/workflows/schedule';
 
 export const runtime = 'nodejs';
 // A schedule workflow's actions drive the same headless agent runtime the
@@ -33,65 +34,6 @@ export const maxDuration = 300;
 const MAX_PER_TICK = 500;
 // Parallel workflow runs in flight at once.
 const MAX_CONCURRENCY = 5;
-
-/** A `schedule` workflow's trigger.config, as stored. */
-interface ScheduleConfig {
-  cadence: 'hourly' | 'daily' | 'weekdays';
-  hour?: number;
-  timezone?: string;
-}
-
-/**
- * Derive the local hour and weekday of `now` in the given IANA timezone.
- * Falls back to UTC on any error (unsupported or mis-spelled TZ name).
- */
-function localHourAndDay(now: Date, timezone?: string): { hour: number; dow: number } {
-  if (!timezone) {
-    return { hour: now.getUTCHours(), dow: now.getUTCDay() };
-  }
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      weekday: 'short',
-      hour12: false,
-    }).formatToParts(now);
-    const hourStr = parts.find((p) => p.type === 'hour')?.value ?? String(now.getUTCHours());
-    const weekdayStr = parts.find((p) => p.type === 'weekday')?.value ?? 'Mon';
-    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    // hour12:false returns '24' for midnight in some locales — normalise to 0.
-    const hour = parseInt(hourStr, 10) % 24;
-    const dow = dayMap[weekdayStr] ?? now.getUTCDay();
-    return { hour, dow };
-  } catch {
-    return { hour: now.getUTCHours(), dow: now.getUTCDay() };
-  }
-}
-
-/**
- * Decide whether a schedule workflow is DUE in the current tick.
- *
- * Pure + exported so the cadence logic is unit-testable without HTTP:
- *   - hourly   → always due (it fires every tick).
- *   - daily    → due only when the LOCAL hour (per timezone, default UTC) equals config.hour.
- *   - weekdays → that AND the LOCAL day is Mon–Fri.
- *
- * A `daily`/`weekdays` config with no `hour` defaults to hour 0.
- */
-export function isScheduleDue(config: ScheduleConfig, now: Date): boolean {
-  if (config.cadence === 'hourly') return true;
-
-  const { hour: currentHour, dow } = localHourAndDay(now, config.timezone);
-  const targetHour = config.hour ?? 0;
-  if (currentHour !== targetHour) return false;
-
-  if (config.cadence === 'weekdays') {
-    return dow >= 1 && dow <= 5;
-  }
-
-  // daily, on its hour.
-  return true;
-}
 
 interface ScheduleWorkflowRow {
   id: string;

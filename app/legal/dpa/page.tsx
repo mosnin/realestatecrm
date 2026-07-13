@@ -16,7 +16,7 @@ export default function DataProcessingAgreementPage() {
         This Data Processing Agreement (&quot;DPA&quot;) forms part of the <a href="/legal/terms" className="underline hover:text-foreground">Terms of Service</a> between
         Chippi Inc. (&quot;Processor,&quot; &quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) and the Subscriber (&quot;Controller,&quot; &quot;you,&quot;
         or &quot;your&quot;) who has agreed to the Terms of Service for the Chippi platform available at usechippi.com
-        and my.usechippi.com (the &quot;Service&quot;). This DPA sets out the terms under which Chippi processes
+        and www.usechippi.com (the &quot;Service&quot;). This DPA sets out the terms under which Chippi processes
         personal data on behalf of the Controller.
       </p>
 

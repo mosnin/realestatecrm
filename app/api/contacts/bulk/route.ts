@@ -31,9 +31,7 @@ import { assignLeadToRealtor } from '@/lib/broker-assign-lead';
 import { audit } from '@/lib/audit';
 import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
-
-/** Upper bound on a single bulk request. Keeps the per-id loop bounded. */
-export const MAX_BULK = 200;
+import { MAX_CONTACT_BULK as MAX_BULK } from '@/lib/api-limits';
 
 const TAG_MAX_LEN = 100;
 const VALID_STAGES = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;

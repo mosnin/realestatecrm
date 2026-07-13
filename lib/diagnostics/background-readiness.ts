@@ -158,7 +158,35 @@ function checkInngest(): ReadinessCheck {
 }
 
 /**
- * e. Integrations (Composio). Without the API key the app can't connect apps or
+ * e. Browser push (VAPID). All three values are required: the public key is
+ * shipped to the client, while the private key and contact subject sign each
+ * delivery. Without the complete set, push actions silently reach nobody.
+ */
+function checkWebPush(): ReadinessCheck {
+  if (
+    isSet('NEXT_PUBLIC_VAPID_PUBLIC_KEY') &&
+    isSet('VAPID_PRIVATE_KEY') &&
+    isSet('VAPID_SUBJECT')
+  ) {
+    return {
+      key: 'web-push',
+      label: 'Browser push notifications',
+      status: 'ok',
+      detail: 'VAPID credentials are configured for browser push signing.',
+    };
+  }
+  return {
+    key: 'web-push',
+    label: 'Browser push notifications',
+    status: 'missing',
+    detail: 'Push actions cannot deliver without a complete VAPID credential set.',
+    fix:
+      'Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT, then redeploy.',
+  };
+}
+
+/**
+ * f. Integrations (Composio). Without the API key the app can't connect apps or
  * receive any triggers at all.
  */
 async function checkComposio(): Promise<ReadinessCheck> {
@@ -215,7 +243,7 @@ export async function getComposioReadinessStatus(): Promise<ReadinessStatus> {
 }
 
 /**
- * f. Recent activity (per-space). Only included when a spaceId is given. Reads
+ * g. Recent activity (per-space). Only included when a spaceId is given. Reads
  * the most recent routine run for the space and reports:
  *   - ok       — a routine ran inside the recency window
  *   - degraded — routines exist but none have run (or the last run is stale)
@@ -327,6 +355,7 @@ export async function getBackgroundReadiness(spaceId?: string): Promise<Backgrou
     checkChatOffload(),
     checkCron(),
     checkInngest(),
+    checkWebPush(),
     await checkComposio(),
   ];
 

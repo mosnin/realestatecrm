@@ -122,7 +122,7 @@ export default async function Image() {
               letterSpacing: '0.18em',
             }}
           >
-            chippi.app
+            usechippi.com
           </span>
           <span
             style={{

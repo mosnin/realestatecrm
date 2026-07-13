@@ -249,7 +249,7 @@ export default async function ClientDetailPage({
           )}
           {contact.applicationRef && contact.statusPortalToken && (
             <CopyApplicantPortalLink
-              url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com'}/apply/${slug}/status?ref=${encodeURIComponent(contact.applicationRef)}&token=${encodeURIComponent(contact.statusPortalToken)}`}
+              url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com'}/apply/${slug}/status?ref=${encodeURIComponent(contact.applicationRef)}&token=${encodeURIComponent(contact.statusPortalToken)}`}
             />
           )}
         </section>

@@ -59,7 +59,8 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: vi.fn((table: string) => makeChain(table)) } };
 });
 
-import { POST, MAX_BULK } from '@/app/api/deals/bulk/route';
+import { POST } from '@/app/api/deals/bulk/route';
+import { MAX_DEAL_BULK as MAX_BULK } from '@/lib/api-limits';
 import { requireSpaceOwner } from '@/lib/api-auth';
 
 const mockRequireSpaceOwner = vi.mocked(requireSpaceOwner);

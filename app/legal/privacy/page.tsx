@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
 
       <p className="text-sm leading-6 text-muted-foreground">
         This Privacy Policy describes how Chippi Inc. (&quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and
-        protects information in connection with the Chippi platform available at usechippi.com and my.usechippi.com
+        protects information in connection with the Chippi platform available at usechippi.com and www.usechippi.com
         (the &quot;Service&quot;). By using the Service, you agree to the practices described in this policy.
       </p>
 
@@ -214,7 +214,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">14B. Our Analytics and Advertising</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>14B.1. This section is distinct from Section 14A. It describes the analytics and advertising technologies <strong className="text-foreground">Chippi itself</strong> uses on our public marketing website (usechippi.com) and within the Service (my.usechippi.com). With respect to these technologies, <strong className="text-foreground">Chippi acts as the Data Controller</strong>.</p>
+          <p>14B.1. This section is distinct from Section 14A. It describes the analytics and advertising technologies <strong className="text-foreground">Chippi itself</strong> uses on our public marketing website (usechippi.com) and within the Service (www.usechippi.com). With respect to these technologies, <strong className="text-foreground">Chippi acts as the Data Controller</strong>.</p>
           <p>14B.2. <strong className="text-foreground">Technologies we use.</strong> Depending on the page and over time, we may load: Google Analytics 4 and Google Ads, the Meta (Facebook) Pixel, Microsoft Clarity and Microsoft Advertising (UET), the LinkedIn Insight Tag, and the TikTok, Pinterest, and Reddit pixels. Each is enabled independently and may be added or removed as our marketing changes.</p>
           <p>14B.3. <strong className="text-foreground">What they collect.</strong> These technologies may collect your device and browser information, IP address, the pages you view and links you click, referring URLs, and conversion events such as page views, account signups, onboarding completion, and purchases, together with cookies and similar identifiers set by each provider. Microsoft Clarity and Amplitude may also record session replays (such as mouse movement, clicks, and scrolling); we configure these tools to mask sensitive input fields.</p>
           <p>14B.4. <strong className="text-foreground">Why we use them.</strong> To measure website traffic and the performance of our marketing, understand our signup and purchase funnel, improve our site and product, and deliver and measure Chippi&apos;s own advertising (including retargeting our visitors) on these platforms. We do not use these technologies to make decisions about Applicants.</p>

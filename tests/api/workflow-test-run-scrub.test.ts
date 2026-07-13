@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { scrubSampleContext } from '@/app/api/workflows/[id]/test-run/route';
+import { scrubSampleContext } from '@/lib/workflows/sample-context';
 import type { WorkflowContext } from '@/lib/workflows/actions';
 
 const synthetic: WorkflowContext = {

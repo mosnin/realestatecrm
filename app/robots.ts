@@ -3,7 +3,7 @@ import type { MetadataRoute } from 'next';
 /**
  * Marketing-site base URL. Prefer NEXT_PUBLIC_SITE_URL; fall back to the
  * production marketing host. Note this is the public root (usechippi.com),
- * NOT the app subdomain (my.usechippi.com) used by NEXT_PUBLIC_APP_URL.
+ * NOT the app subdomain (www.usechippi.com) used by NEXT_PUBLIC_APP_URL.
  */
 const BASE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ?? 'https://usechippi.com'

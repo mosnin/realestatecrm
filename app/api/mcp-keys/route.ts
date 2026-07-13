@@ -91,8 +91,8 @@ export async function POST(req: NextRequest) {
     key: rawKey,
     clientId,
     clientSecret,
-    tokenUrl: 'https://my.usechippi.com/api/mcp/oauth/token',
-    mcpUrl: 'https://my.usechippi.com/api/mcp',
+    tokenUrl: 'https://www.usechippi.com/api/mcp/oauth/token',
+    mcpUrl: 'https://www.usechippi.com/api/mcp',
   }, { status: 201 });
 }
 

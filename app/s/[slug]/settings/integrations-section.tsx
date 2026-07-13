@@ -73,7 +73,7 @@ function CredentialRow({
  * surfaces and have their own components below / elsewhere.
  */
 export function McpSection({ slug }: McpSectionProps) {
-  const MCP_ENDPOINT = 'https://my.usechippi.com/api/mcp';
+  const MCP_ENDPOINT = 'https://www.usechippi.com/api/mcp';
 
   // ── MCP state ──────────────────────────────────────────────────────────
   const [mcpKeys, setMcpKeys] = useState<McpKey[]>([]);

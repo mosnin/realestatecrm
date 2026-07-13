@@ -72,7 +72,7 @@ function CredentialRow({
  * brokerage owner's space.
  */
 export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
-  const MCP_ENDPOINT = 'https://my.usechippi.com/api/mcp';
+  const MCP_ENDPOINT = 'https://www.usechippi.com/api/mcp';
 
   const [keys, setKeys] = useState<McpKey[]>([]);
   const [loading, setLoading] = useState(true);

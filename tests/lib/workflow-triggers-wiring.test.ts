@@ -26,7 +26,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // 1. Schedule due-logic — pure helper, no mocks needed.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { isScheduleDue } from '@/app/api/cron/workflows/route';
+import { isScheduleDue } from '@/lib/workflows/schedule';
 
 describe('isScheduleDue', () => {
   // A Monday 09:00 UTC and a Saturday 09:00 UTC, for the weekday gate.

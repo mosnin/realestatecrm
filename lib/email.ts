@@ -88,7 +88,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
 
   const { toEmail, spaceName, spaceSlug, contactId, name, phone, email, budget, leadScore, scoreLabel, scoreSummary, applicationData: app, formConfigSnapshot } = params;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const contactUrl = `${appUrl}/s/${spaceSlug}/contacts/${contactId}`;
 
   const tierColor = scoreLabel === 'hot' ? '#059669' : scoreLabel === 'warm' ? '#d97706' : '#6b7280';
@@ -204,7 +204,7 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   const FROM = getFromAddress();
 
   const { toEmail, spaceName, spaceSlug, contacts } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const leadsUrl = `${appUrl}/s/${spaceSlug}/leads`;
 
   const contactRows = contacts
@@ -312,7 +312,7 @@ export async function sendNotificationDigest(params: NotificationDigestParams): 
   const FROM = getFromAddress();
 
   const { toEmail, spaceName, spaceSlug, cadence, sections } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
 
   const periodLabel = cadence === 'weekly' ? 'this week' : 'today';
   const totalEvents = sections.reduce((n, s) => n + s.items.length, 0);
@@ -502,7 +502,7 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
   const FROM = getFromAddress();
 
   const { toEmail, spaceName, spaceSlug, dealTitle, dealValue, dealAddress, dealPriority, contactNames } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const dealsUrl = `${appUrl}/s/${spaceSlug}/deals`;
 
   const detailRows = [
@@ -574,7 +574,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
   const acceptUrl = `${appUrl}/invite/${token}`;
@@ -659,7 +659,7 @@ export async function sendApplicationConfirmation(params: ApplicationConfirmatio
   const FROM = getFromAddress();
 
   const { toEmail, applicantName, businessName, slug, applicationRef, leadType, customMessage, statusPortalToken } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   let statusUrl = `${appUrl}/apply/${encodeURIComponent(slug)}/status?ref=${encodeURIComponent(applicationRef)}`;
   if (statusPortalToken) {
     statusUrl += `&token=${encodeURIComponent(statusPortalToken)}`;
@@ -739,7 +739,7 @@ export async function sendWelcomeEmail(params: {
 
   const { toEmail, userName, spaceName, spaceSlug } = params;
   const name = esc(userName) || 'there';
-  const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'my.usechippi.com';
+  const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'www.usechippi.com';
   const dashboardUrl = spaceSlug ? `https://${domain}/s/${spaceSlug}` : `https://${domain}/setup`;
 
   const html = `
@@ -925,7 +925,7 @@ export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams)
   const FROM = getFromAddress();
 
   const { toEmail, userName } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const accountSettingsUrl = `${appUrl}/settings/account`;
   const name = esc(userName) || 'there';
 
@@ -1016,7 +1016,7 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
   const FROM = getFromAddress();
 
   const { toEmail, applicantName, businessName, slug, applicationRef, statusPortalToken, newStatus, note } = params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   let portalUrl = `${appUrl}/apply/${encodeURIComponent(slug)}/status?ref=${encodeURIComponent(applicationRef)}`;
   if (statusPortalToken) {
     portalUrl += `&token=${encodeURIComponent(statusPortalToken)}`;

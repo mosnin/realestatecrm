@@ -52,7 +52,7 @@ export async function POST() {
   }
 
   const stripe = getStripe();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.usechippi.com';
 
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,

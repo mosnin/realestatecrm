@@ -216,7 +216,7 @@ async function notifyRealtorOfTourRequest(
     ? process.env.RESEND_FROM_EMAIL
     : `notifications@${process.env.RESEND_FROM_EMAIL ?? 'alerts.usechippi.com'}`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const escape = (s: string) =>
     s.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\r\n\t]/g, ' ').slice(0, 500);
   const safeName = escape(applicantName).slice(0, 100);

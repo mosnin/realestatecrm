@@ -84,7 +84,7 @@ function detailBox(items: { label: string; value: string }[]): string {
 /** Absolute URL to the guest self-service tour page, or null when no token. */
 function manageUrl(manageToken: string | null | undefined): string | null {
   if (!manageToken) return null;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   return `${appUrl}/tour/${encodeURIComponent(manageToken)}`;
 }
 
@@ -225,7 +225,7 @@ export async function sendTourFollowUp(data: TourEmailData) {
 export async function sendAgentNotification(agentEmail: string, data: TourEmailData) {
   const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress, businessName, slug } = data;
   const subject = `New Tour Booked — ${guestName} on ${formatDate(startsAt)}`;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const toursUrl = `${appUrl}/s/${slug}/calendar`;
 
   const body = `

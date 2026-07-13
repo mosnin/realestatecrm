@@ -15,7 +15,7 @@ export default function TermsPage() {
       <p className="text-sm leading-6 text-muted-foreground">
         Welcome to Chippi. These Terms of Service (&quot;Terms&quot;) constitute a legally binding agreement between you and
         Chippi Inc. (&quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) governing your access to and use of the Chippi platform
-        available at usechippi.com and my.usechippi.com (the &quot;Service&quot;). By accessing or using the Service, you agree
+        available at usechippi.com and www.usechippi.com (the &quot;Service&quot;). By accessing or using the Service, you agree
         to be bound by these Terms. If you do not agree, do not use the Service.
       </p>
 
@@ -23,7 +23,7 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">1. Definitions</h2>
         <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-2 leading-6">
-          <li><strong className="text-foreground">&quot;Service&quot;</strong> means the Chippi platform, including the web application at my.usechippi.com, all related APIs, integrations, AI features (including lead scoring, voice AI assistant, and MCP server integration), deal pipelines, tour scheduling, and documentation.</li>
+          <li><strong className="text-foreground">&quot;Service&quot;</strong> means the Chippi platform, including the web application at www.usechippi.com, all related APIs, integrations, AI features (including lead scoring, voice AI assistant, and MCP server integration), deal pipelines, tour scheduling, and documentation.</li>
           <li><strong className="text-foreground">&quot;User&quot;</strong> means any individual or entity that accesses or uses the Service, including Subscribers and Applicants.</li>
           <li><strong className="text-foreground">&quot;Subscriber&quot;</strong> means a realtor, brokerage, or other entity that creates an account and subscribes to the Service to manage real estate operations, including intake forms, lead management, deal pipelines, and brokerage team management.</li>
           <li><strong className="text-foreground">&quot;Applicant&quot;</strong> means any individual who submits information through a Subscriber&apos;s intake forms or interacts with the Service on behalf of or at the direction of a Subscriber.</li>

@@ -288,9 +288,14 @@ export async function loadDeliveryContext(spaceId: string): Promise<DeliverySpac
 }
 
 export function getAppOrigin(): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_ORIGIN ??
-    process.env.NEXT_PUBLIC_VERCEL_URL ??
-    'https://my.usechippi.com'
-  ).replace(/\/$/, '');
+  const configuredOrigin =
+    process.env.NEXT_PUBLIC_APP_ORIGIN ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (configuredOrigin) return configuredOrigin.replace(/\/$/, '');
+
+  const vercelHost = process.env.NEXT_PUBLIC_VERCEL_URL;
+  if (vercelHost) {
+    return `https://${vercelHost.replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+  }
+
+  return 'https://www.usechippi.com';
 }

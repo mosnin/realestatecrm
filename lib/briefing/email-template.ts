@@ -30,7 +30,7 @@ export interface BriefEmailHtmlParams {
   brief: Brief;
   spaceSlug: string;
   briefDate: string; // YYYY-MM-DD
-  appOrigin: string; // e.g. https://my.usechippi.com — no trailing slash
+  appOrigin: string; // e.g. https://www.usechippi.com — no trailing slash
   unsubscribeUrl: string;
   businessName: string | null;
 }
