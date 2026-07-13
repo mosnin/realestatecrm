@@ -18,8 +18,8 @@ import { setRealtimeAuth } from '@/lib/supabase-browser';
  *
  * Refresh strategy:
  *   - Fetch a token on mount.
- *   - Re-fetch every 50 minutes. Clerk default JWT lifetime is 60 minutes;
- *     we leave a 10-minute buffer so a slow tick can't leave us holding
+ *   - Re-fetch every 50 seconds. Clerk session JWTs expire after 60 seconds;
+ *     we leave a 10-second buffer so a slow tick can't leave us holding
  *     an expired token.
  *   - On unmount, clear the token (sign-out path), which falls Realtime
  *     back to anon — i.e. no events.
@@ -38,7 +38,7 @@ export function useSupabaseRealtimeAuth(): void {
 
     async function refresh() {
       try {
-        const token = await getToken();
+        const token = await getToken({ skipCache: true });
         if (cancelled) return;
         setRealtimeAuth(token);
       } catch (err) {
@@ -54,12 +54,13 @@ export function useSupabaseRealtimeAuth(): void {
     }
 
     void refresh();
-    // Clerk JWT default lifetime is 60min. Refresh at 50min for a buffer.
-    const interval = setInterval(() => void refresh(), 50 * 60 * 1000);
+    // Clerk session JWTs expire after 60s. Force a fresh token at 50s.
+    const interval = setInterval(() => void refresh(), 50 * 1000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      setRealtimeAuth(null);
     };
   }, [isLoaded, isSignedIn, getToken]);
 }
