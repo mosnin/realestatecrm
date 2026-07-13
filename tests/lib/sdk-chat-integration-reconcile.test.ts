@@ -97,6 +97,22 @@ describe('isAuthLikeError', () => {
     expect(isAuthLikeError(err)).toBe(true);
   });
 
+  it('matches Composio API v3 connected-account-not-found errors nested under cause', () => {
+    const err = Object.assign(new Error('tool execution failed'), {
+      statusCode: 400,
+      cause: {
+        error: {
+          error: {
+            code: 1810,
+            slug: 'ActionExecute_ConnectedAccountNotFound',
+          },
+        },
+      },
+    });
+
+    expect(isAuthLikeError(err)).toBe(true);
+  });
+
   it('does NOT match transient/network/5xx errors', () => {
     expect(isAuthLikeError(new Error('socket hang up'))).toBe(false);
     expect(isAuthLikeError(Object.assign(new Error('boom'), { statusCode: 500 }))).toBe(false);
