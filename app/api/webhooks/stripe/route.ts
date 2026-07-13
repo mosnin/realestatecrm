@@ -54,7 +54,7 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
     const msg = statusMessages[newStatus];
     if (!msg) return;
 
-    const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'my.usechippi.com';
+    const domain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'www.usechippi.com';
 
     const result = await resend.emails.send({
       from: `Chippi <${FROM}>`,

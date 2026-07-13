@@ -291,6 +291,6 @@ export function getAppOrigin(): string {
   return (
     process.env.NEXT_PUBLIC_APP_ORIGIN ??
     process.env.NEXT_PUBLIC_VERCEL_URL ??
-    'https://my.usechippi.com'
+    'https://www.usechippi.com'
   ).replace(/\/$/, '');
 }

@@ -359,7 +359,7 @@ export function SlugStep({
   onNext,
   onCheck,
   busy,
-  urlPrefix = 'chippi.app/',
+  urlPrefix = 'usechippi.com/',
 }: SlugStepProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);

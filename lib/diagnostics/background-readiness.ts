@@ -238,3 +238,130 @@ async function checkComposio(): Promise<ReadinessCheck> {
  * surfaces. This deliberately reuses the same verified-webhook probe as the
  * admin diagnostics page so public and internal health cannot disagree.
  */
+export async function getComposioReadinessStatus(): Promise<ReadinessStatus> {
+  return (await checkComposio()).status;
+}
+
+/**
+ * g. Recent activity (per-space). Only included when a spaceId is given. Reads
+ * the most recent routine run for the space and reports:
+ *   - ok       — a routine ran inside the recency window
+ *   - degraded — routines exist but none have run (or the last run is stale)
+ *   - ok/info  — no routines at all (nothing scheduled is the expected state,
+ *                not a problem — reported as 'ok' with an informative detail)
+ *
+ * DEFENSIVE: any query error becomes a 'degraded' check carrying the detail —
+ * this function never throws.
+ */
+async function checkRecentActivity(spaceId: string): Promise<ReadinessCheck> {
+  const key = 'recent-activity';
+  const label = 'Recent activity';
+  try {
+    const { data, error } = await supabase
+      .from('Routine')
+      .select('lastRunAt, lastRunStatus')
+      .eq('spaceId', spaceId)
+      .order('lastRunAt', { ascending: false, nullsFirst: false })
+      .limit(1);
+
+    if (error) {
+      return {
+        key,
+        label,
+        status: 'degraded',
+        detail: `Couldn't read recent run history: ${error.message}`,
+      };
+    }
+
+    const rows = data ?? [];
+    if (rows.length === 0) {
+      return {
+        key,
+        label,
+        status: 'ok',
+        detail: 'No routines scheduled yet — nothing is expected to run in the background.',
+      };
+    }
+
+    const lastRunAt = rows[0]?.lastRunAt as string | null | undefined;
+    if (!lastRunAt) {
+      return {
+        key,
+        label,
+        status: 'degraded',
+        detail: 'Routines exist but none have run yet.',
+        fix: 'Confirm the executor and scheduled-run checks above are green.',
+      };
+    }
+
+    const ageMs = Date.now() - new Date(lastRunAt).getTime();
+    if (Number.isFinite(ageMs) && ageMs <= RECENT_RUN_WINDOW_MS) {
+      const status = rows[0]?.lastRunStatus as string | null | undefined;
+      return {
+        key,
+        label,
+        status: 'ok',
+        detail: `Last background run ${relativeTime(ageMs)}${status ? ` (${status})` : ''}.`,
+      };
+    }
+
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: `Routines exist but the last run was ${relativeTime(ageMs)} — nothing recent.`,
+      fix: 'Confirm the executor and scheduled-run checks above are green.',
+    };
+  } catch (err) {
+    // Never throw — a query failure is itself a (soft) readiness signal.
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: `Couldn't read recent run history: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
+/** Coarse human relative time for a positive age in ms. */
+function relativeTime(ageMs: number): string {
+  const mins = Math.round(ageMs / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Derive the overall status. A single 'missing' (a gap with no fallback) drags
+ * the whole surface to 'down'; any 'degraded' without a 'missing' is 'degraded';
+ * otherwise 'ok'.
+ */
+function deriveOverall(checks: ReadinessCheck[]): OverallStatus {
+  if (checks.some((c) => c.status === 'missing')) return 'down';
+  if (checks.some((c) => c.status === 'degraded')) return 'degraded';
+  return 'ok';
+}
+
+/**
+ * Build the full background-readiness report. Pass a spaceId to include the
+ * per-space "recent activity" check; omit it for the env-only view.
+ */
+export async function getBackgroundReadiness(spaceId?: string): Promise<BackgroundReadiness> {
+  const checks: ReadinessCheck[] = [
+    checkExecutor(),
+    checkChatOffload(),
+    checkCron(),
+    checkInngest(),
+    checkWebPush(),
+    await checkComposio(),
+  ];
+
+  if (spaceId) {
+    checks.push(await checkRecentActivity(spaceId));
+  }
+
+  return { overall: deriveOverall(checks), checks };
+}

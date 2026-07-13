@@ -110,10 +110,10 @@ export default function LegalHubPage() {
             >
               <span className="text-sm text-foreground">{label}</span>
               <a
-                href="mailto:legal@chippi.app"
+                href="mailto:help@usechippi.com"
                 className="shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                legal@chippi.app
+                help@usechippi.com
               </a>
             </li>
           ))}
@@ -121,10 +121,10 @@ export default function LegalHubPage() {
         <p className="text-sm text-muted-foreground">
           Questions about any of these — write to{' '}
           <a
-            href="mailto:legal@chippi.app"
+            href="mailto:help@usechippi.com"
             className="underline underline-offset-2 transition-colors hover:text-foreground"
           >
-            legal@chippi.app
+            help@usechippi.com
           </a>
           .
         </p>

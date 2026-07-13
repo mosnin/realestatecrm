@@ -139,7 +139,7 @@ async function sendMessageNotification(
   ]);
 
   const businessName = settings?.businessName ?? space?.name ?? 'Your Agent';
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
 
   let portalUrl = '';
   if (space?.slug && contact.applicationRef) {

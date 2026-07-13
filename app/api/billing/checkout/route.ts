@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Billing not configured. Contact support.' }, { status: 503 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.usechippi.com';
 
     // Reuse existing Stripe customer or create one
     let customerId = stripeData?.stripeCustomerId;
@@ -293,7 +293,7 @@ async function handleBrokerageCheckout(
     return NextResponse.json({ error: 'Stripe not configured. Contact support.' }, { status: 500 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.usechippi.com';
 
   // Reuse existing Stripe customer or create one (concurrency-safe)
   let customerId = brokerageStripe.stripeCustomerId ?? null;

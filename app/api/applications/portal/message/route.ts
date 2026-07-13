@@ -153,7 +153,7 @@ async function notifyRealtorOfMessage(
       ? process.env.RESEND_FROM_EMAIL
       : `notifications@${process.env.RESEND_FROM_EMAIL ?? 'alerts.usechippi.com'}`;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const safeName = applicantName.replace(/[\r\n\t]/g, ' ').slice(0, 100);
   const safeContent = messageContent.replace(/</g, '&lt;').replace(/>/g, '&gt;').slice(0, 500);
 

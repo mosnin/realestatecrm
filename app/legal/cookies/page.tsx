@@ -14,7 +14,7 @@ export default function CookiePolicyPage() {
 
       <p className="text-sm leading-6 text-muted-foreground">
         This Cookie Policy explains how Chippi Inc. (&quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) uses cookies and similar
-        technologies on the Chippi platform available at usechippi.com and my.usechippi.com (the &quot;Service&quot;).
+        technologies on the Chippi platform available at usechippi.com and www.usechippi.com (the &quot;Service&quot;).
       </p>
 
       {/* 1. What Are Cookies */}

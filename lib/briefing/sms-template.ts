@@ -19,7 +19,7 @@ export interface BriefSmsParams {
   headline: string;
   spaceSlug: string;
   briefDate: string; // YYYY-MM-DD
-  appOrigin: string; // e.g. https://my.usechippi.com — no trailing slash
+  appOrigin: string; // e.g. https://www.usechippi.com — no trailing slash
 }
 
 /**

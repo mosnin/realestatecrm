@@ -162,10 +162,10 @@ export default async function StatusPage() {
           <p className="mt-8 text-sm text-neutral-500">
             Subscribe to status updates at{' '}
             <a
-              href="mailto:status@chippi.app"
+              href="mailto:help@usechippi.com"
               className="underline underline-offset-2 transition-colors hover:text-zinc-950"
             >
-              status@chippi.app
+              help@usechippi.com
             </a>
             .
           </p>

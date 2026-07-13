@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       .single();
     const customerId = custRow?.stripeCustomerId ?? undefined;
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://my.usechippi.com';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.usechippi.com';
     // Recorded on both the session and the payment intent so the webhook can
     // read it regardless of which object it inspects.
     const metadata = {

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { MessageCircle, Loader2, ArrowRight } from 'lucide-react';
 import {
   renderTemplate,
@@ -25,6 +27,10 @@ interface Props {
  * Parent receives a { subject, body } pair to slot into its own compose UI.
  */
 export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disabled }: Props) {
+  const params = useParams<{ slug?: string }>();
+  const manageHref = params.slug
+    ? `/s/${encodeURIComponent(params.slug)}/settings/templates`
+    : '/broker/templates';
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -87,19 +93,19 @@ export function TemplatePicker({ channel, ctx, onPick, label = 'Templates', disa
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               {channel} templates
             </p>
-            <a
-              href="/settings?tab=apps"
+            <Link
+              href={manageHref}
               className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
             >
               Manage <ArrowRight size={9} />
-            </a>
+            </Link>
           </div>
 
           {applicable.length === 0 ? (
             <div className="px-3 py-6 text-center text-xs text-muted-foreground">
               No {channel} templates yet.
               <br />
-              <a href="/settings?tab=apps" className="underline">Create one →</a>
+              <Link href={manageHref} className="underline">Create one →</Link>
             </div>
           ) : (
             <ul className="max-h-72 overflow-y-auto divide-y divide-border">

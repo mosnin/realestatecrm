@@ -30,7 +30,7 @@ export function generatePrivacyPolicy(
 
 <h3>1. Introduction</h3>
 <p>${entity} ("we," "us," or "our") is committed to protecting the privacy and security of your personal information. This Privacy Policy describes how we collect, use, disclose, and safeguard your information when you interact with us, including through our online intake forms, websites, and communication channels.</p>
-<p>We are the <strong>data controller</strong> responsible for the personal data we collect from you. We use Chippi (my.usechippi.com), a third-party customer relationship management platform, to process data on our behalf. Chippi acts solely as a <strong>data processor</strong> and does not independently control or make decisions about your personal information.</p>
+<p>We are the <strong>data controller</strong> responsible for the personal data we collect from you. We use Chippi (www.usechippi.com), a third-party customer relationship management platform, to process data on our behalf. Chippi acts solely as a <strong>data processor</strong> and does not independently control or make decisions about your personal information.</p>
 
 <h3>2. Information We Collect</h3>
 <p>We may collect the following categories of personal information:</p>
@@ -58,7 +58,7 @@ export function generatePrivacyPolicy(
 <h3>4. Third-Party Services</h3>
 <p>We use the following third-party service providers who may process your data:</p>
 <ul>
-  <li><strong>Chippi (my.usechippi.com):</strong> Our CRM platform that stores and processes your data on our behalf as a data processor. Chippi does not sell, share, or independently use your personal data</li>
+  <li><strong>Chippi (www.usechippi.com):</strong> Our CRM platform that stores and processes your data on our behalf as a data processor. Chippi does not sell, share, or independently use your personal data</li>
   <li><strong>Stripe:</strong> For processing payments and billing (if applicable). Stripe's privacy policy governs payment data</li>
   <li><strong>AI Services:</strong> Artificial intelligence providers used for lead scoring and analysis. Data sent to AI services is used solely for generating scores and insights, and is not used to train AI models</li>
   <li><strong>Email and SMS Providers:</strong> Third-party services used to deliver communications you have consented to receive</li>
@@ -113,7 +113,7 @@ export function generatePrivacyPolicy(
 <p>We may update this Privacy Policy from time to time. We will notify you of material changes by posting the updated policy with a revised "Last updated" date. Your continued interaction with us after such changes constitutes acceptance of the updated policy.</p>
 
 <h3>12. Platform Disclaimer</h3>
-<p>Chippi (my.usechippi.com) is a software platform that provides tools for real estate professionals to manage their client relationships. <strong>Chippi is not responsible for the privacy practices of individual ${entityLabel}s or brokerages that use its platform.</strong> This privacy policy is maintained by ${entity}, and all inquiries about data handling should be directed to ${entity}, not to Chippi. Chippi processes data solely as instructed by ${entity} and bears no independent liability for the data collection or use practices described herein.</p>
+<p>Chippi (www.usechippi.com) is a software platform that provides tools for real estate professionals to manage their client relationships. <strong>Chippi is not responsible for the privacy practices of individual ${entityLabel}s or brokerages that use its platform.</strong> This privacy policy is maintained by ${entity}, and all inquiries about data handling should be directed to ${entity}, not to Chippi. Chippi processes data solely as instructed by ${entity} and bears no independent liability for the data collection or use practices described herein.</p>
 
 <h3>13. Contact Information</h3>
 <p>If you have questions about this Privacy Policy or wish to exercise your rights, please contact us:</p>

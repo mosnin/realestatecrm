@@ -14,7 +14,7 @@ export default function AcceptableUsePolicyPage() {
 
       <p className="text-sm leading-6 text-muted-foreground">
         This Acceptable Use Policy (&quot;AUP&quot;) governs the use of the Chippi platform available at usechippi.com and
-        my.usechippi.com (the &quot;Service&quot;) operated by Chippi Inc. (&quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;). This AUP is
+        www.usechippi.com (the &quot;Service&quot;) operated by Chippi Inc. (&quot;Chippi,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;). This AUP is
         incorporated into and forms part of our <a href="/legal/terms" className="underline hover:text-foreground">Terms of Service</a>.
         All Users of the Service must comply with this policy.
       </p>

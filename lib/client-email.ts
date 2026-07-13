@@ -15,7 +15,7 @@ function fromAddress(): string {
 function portalUrl(): string {
   return (
     process.env.NEXT_PUBLIC_CLIENTS_URL ||
-    `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com'}/clients`
+    `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com'}/clients`
   );
 }
 

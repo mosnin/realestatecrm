@@ -202,7 +202,7 @@ async function handler(req: NextRequest) {
           const resend = new Resend(process.env.RESEND_API_KEY);
           const rawFrom = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
           const FROM = rawFrom.includes('@') ? rawFrom : `notifications@${rawFrom}`;
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://my.usechippi.com';
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
 
           const html = buildWeeklyReportHtml({
             brokerageName: brokerage.name,

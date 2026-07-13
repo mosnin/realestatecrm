@@ -383,7 +383,7 @@ export async function POST(req: NextRequest) {
 
   const BASE_URL = process.env.NEXT_PUBLIC_ROOT_DOMAIN
     ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`
-    : 'https://my.usechippi.com';
+    : 'https://www.usechippi.com';
 
   const authResult = await authenticateKey(req);
   if (!authResult) {
@@ -438,7 +438,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const BASE_URL = process.env.NEXT_PUBLIC_ROOT_DOMAIN
     ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`
-    : 'https://my.usechippi.com';
+    : 'https://www.usechippi.com';
 
   // If no auth, return 401 with resource metadata link (MCP OAuth discovery)
   const auth = req.headers.get('authorization');
