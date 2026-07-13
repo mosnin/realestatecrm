@@ -25,6 +25,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { redis } from '@/lib/redis';
 
 export type ReadinessStatus = 'ok' | 'degraded' | 'missing';
 
@@ -51,6 +52,8 @@ export interface BackgroundReadiness {
  *  plus slack means a run inside ~36h is healthy; older than that and we nudge
  *  ("routines exist but nothing has run lately"). */
 const RECENT_RUN_WINDOW_MS = 36 * 60 * 60 * 1000;
+const COMPOSIO_HEALTH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const COMPOSIO_WEBHOOK_HEALTH_KEY = 'composio:webhook:last-verified-at';
 
 /** Presence-only — never the value. */
 function isSet(name: string): boolean {
@@ -158,22 +161,48 @@ function checkInngest(): ReadinessCheck {
  * e. Integrations (Composio). Without the API key the app can't connect apps or
  * receive any triggers at all.
  */
-function checkComposio(): ReadinessCheck {
-  if (isSet('COMPOSIO_API_KEY')) {
+async function checkComposio(): Promise<ReadinessCheck> {
+  const key = 'composio';
+  const label = 'Integrations (Composio)';
+  if (!isSet('COMPOSIO_API_KEY') || !isSet('COMPOSIO_WEBHOOK_SECRET')) {
     return {
-      key: 'composio',
-      label: 'Integrations (Composio)',
-      status: 'ok',
-      detail: 'COMPOSIO_API_KEY set — apps can connect and triggers can be received.',
+      key,
+      label,
+      status: 'missing',
+      detail: "Can't connect apps and verify inbound triggers without both Composio credentials.",
+      fix: 'Set COMPOSIO_API_KEY and COMPOSIO_WEBHOOK_SECRET, then redeploy.',
     };
   }
-  return {
-    key: 'composio',
-    label: 'Integrations (Composio)',
-    status: 'missing',
-    detail: "Can't connect apps or receive triggers without COMPOSIO_API_KEY.",
-    fix: 'Set COMPOSIO_API_KEY from the Composio dashboard and redeploy.',
-  };
+
+  try {
+    const lastVerifiedAt = await redis.get<string>(COMPOSIO_WEBHOOK_HEALTH_KEY);
+    const verifiedMs = lastVerifiedAt ? new Date(lastVerifiedAt).getTime() : Number.NaN;
+    const ageMs = Date.now() - verifiedMs;
+    if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= COMPOSIO_HEALTH_WINDOW_MS) {
+      return {
+        key,
+        label,
+        status: 'ok',
+        detail: `Signed webhook delivery verified ${relativeTime(ageMs)}.`,
+      };
+    }
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: 'Credentials are set, but no signed webhook delivery has been verified in the last 7 days.',
+      fix: 'Set the Composio webhook URL directly to https://www.usechippi.com/api/webhooks/composio and send a test delivery.',
+    };
+  } catch (err) {
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: `Credentials are set, but webhook delivery health could not be read: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    };
+  }
 }
 
 /**
@@ -289,7 +318,7 @@ export async function getBackgroundReadiness(spaceId?: string): Promise<Backgrou
     checkChatOffload(),
     checkCron(),
     checkInngest(),
-    checkComposio(),
+    await checkComposio(),
   ];
 
   if (spaceId) {
