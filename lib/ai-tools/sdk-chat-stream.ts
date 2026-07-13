@@ -278,9 +278,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // approval prompt. Reset on every tool_call_start.
       let reasoningBuffer = '';
 
-      // Maps callId → ExecutionStep id so we can correlate tool_call_result
-      // back to the row we inserted on tool_call_start.
-      const callIdToStepId = new Map<string, string>();
+      // Maps callId → the pending ExecutionStep insert. Tool results can arrive
+      // before that insert resolves (especially for fast local tools), so retaining
+      // the promise prevents a terminal result from racing past the ledger row.
+      const callIdToStepPromise = new Map<string, Promise<string>>();
 
       // Maps callId → tool name, so on tool_call_result (which carries no
       // name) we can recognize a delegate_task result and lift the SwarmRun
@@ -375,25 +376,29 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
           // Fire-and-forget ExecutionStep logging. Never awaited — must not
           // block or affect the stream in any way.
-          void logToolCallStart(
+          const stepPromise = logToolCallStart(
             input.ctx.space.id,
             event.name,
             event.args,
             undefined,
-          ).then((stepId) => {
-            callIdToStepId.set(event.callId, stepId);
-          }).catch(() => {});
+          );
+          callIdToStepPromise.set(event.callId, stepPromise);
+          void stepPromise.catch(() => {
+            if (callIdToStepPromise.get(event.callId) === stepPromise) {
+              callIdToStepPromise.delete(event.callId);
+            }
+          });
         }
 
         if (event.type === 'tool_call_result') {
-          const stepId = callIdToStepId.get(event.callId);
-          if (stepId) {
-            callIdToStepId.delete(event.callId);
-            if (event.ok) {
-              void logToolCallComplete(stepId, event.summary).catch(() => {});
-            } else {
-              void logToolCallError(stepId, event.error ?? event.summary).catch(() => {});
-            }
+          const stepPromise = callIdToStepPromise.get(event.callId);
+          if (stepPromise) {
+            callIdToStepPromise.delete(event.callId);
+            void stepPromise.then((stepId) => (
+              event.ok
+                ? logToolCallComplete(stepId, event.summary)
+                : logToolCallError(stepId, event.error ?? event.summary)
+            )).catch(() => {});
           }
 
           // Attach the structured payload the tool stashed in the sink so the

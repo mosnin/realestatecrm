@@ -6,8 +6,8 @@
  * nothing, never writes to Brief.{email,sms}SentAt so it doesn't
  * clobber the morning send.
  *
- * Rate limit: 3 per day per space. In-memory counter — process restart
- * resets it, which is fine for a "Send me a test" affordance.
+ * Rate limit: 3 per UTC day per space, backed by the shared production
+ * rate limiter so cold starts and parallel serverless instances cannot reset it.
  */
 
 import { NextResponse } from 'next/server';
@@ -18,27 +18,13 @@ import { composeBrief } from '@/lib/briefing/compose';
 import { localDateIn } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import type { Brief } from '@/lib/briefing/types';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const DAILY_LIMIT = 3;
 const DEFAULT_TIMEZONE = 'America/New_York';
 
-// spaceId → { count, dayKey }. Resets when dayKey changes or process restarts.
-const testSendCounts = new Map<string, { count: number; dayKey: string }>();
-
 function dayKey(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function checkAndIncrement(spaceId: string): boolean {
-  const today = dayKey();
-  const entry = testSendCounts.get(spaceId);
-  if (!entry || entry.dayKey !== today) {
-    testSendCounts.set(spaceId, { count: 1, dayKey: today });
-    return true;
-  }
-  if (entry.count >= DAILY_LIMIT) return false;
-  entry.count += 1;
-  return true;
 }
 
 export async function POST() {
@@ -49,7 +35,12 @@ export async function POST() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  if (!checkAndIncrement(space.id)) {
+  const { allowed } = await checkRateLimit(
+    `brief:test:${space.id}:${dayKey()}`,
+    DAILY_LIMIT,
+    2 * 24 * 60 * 60,
+  );
+  if (!allowed) {
     return NextResponse.json(
       { error: 'Test send limit reached for today. Try again tomorrow.' },
       { status: 429 },

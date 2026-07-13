@@ -39,6 +39,23 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     expect(executionSteps.match(/after\(\(\) => task\)/g)).toHaveLength(3);
   });
 
+  it('does not lose a fast tool result before its execution-step insert resolves', () => {
+    const stream = readFileSync('lib/ai-tools/sdk-chat-stream.ts', 'utf8');
+
+    expect(stream).toContain('const callIdToStepPromise = new Map<string, Promise<string>>()');
+    expect(stream).toContain('callIdToStepPromise.set(event.callId, stepPromise)');
+    expect(stream).toContain('void stepPromise.then((stepId) => (');
+    expect(stream).not.toContain('const callIdToStepId = new Map<string, string>()');
+  });
+
+  it('keeps the test-brief send cap across production cold starts', () => {
+    const route = readFileSync('app/api/agent/briefing/test/route.ts', 'utf8');
+
+    expect(route).toContain("import { checkRateLimit } from '@/lib/rate-limit'");
+    expect(route).toContain('`brief:test:${space.id}:${dayKey()}`');
+    expect(route).not.toContain('const testSendCounts = new Map');
+  });
+
   it('retains detached agent dispatch and task activity logging', () => {
     const delegation = readFileSync('lib/ai-tools/tools/delegate-task.ts', 'utf8');
     const taskStatus = readFileSync('app/api/agent/tasks/[taskId]/status/route.ts', 'utf8');
