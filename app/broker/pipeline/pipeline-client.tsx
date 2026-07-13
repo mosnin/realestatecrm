@@ -7,7 +7,7 @@ import {
   ChevronRight,
   ArrowUpDown,
 } from 'lucide-react';
-import { formatCompact } from '@/lib/formatting';
+import { formatCalendarDateUtc, formatCompact } from '@/lib/formatting';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
@@ -74,12 +74,6 @@ function formatCurrency(n: number): string {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(n);
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 const priorityTone: Record<string, string> = {
@@ -475,7 +469,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                                   {statusLabels[deal.status] ?? deal.status}
                                 </td>
                                 <td className="px-2 py-2.5 text-right text-[13px] text-muted-foreground">
-                                  {formatDate(deal.closeDate)}
+                                  {formatCalendarDateUtc(deal.closeDate)}
                                 </td>
                               </tr>
                             ))}
@@ -558,7 +552,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
                       {statusLabels[deal.status] ?? deal.status}
                     </td>
                     <td className="px-3 py-3 text-right text-[13px] text-muted-foreground">
-                      {formatDate(deal.closeDate)}
+                      {formatCalendarDateUtc(deal.closeDate)}
                     </td>
                   </tr>
                 ))}
