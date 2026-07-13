@@ -24,7 +24,6 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 import { AnalyticsBreakdowns } from './breakdowns';
 import {
@@ -226,34 +225,25 @@ export default async function BrokerAnalyticsPage() {
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Total leads</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber
-                  value={totalLeads}
-                  format={(n) => Math.round(n).toLocaleString()}
-                />
+                {totalLeads.toLocaleString()}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Deals won</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber
-                  value={totalWon}
-                  format={(n) => Math.round(n).toLocaleString()}
-                />
+                {totalWon.toLocaleString()}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Pipeline value</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={totalPipelineValue} format={formatCompact} />
+                {formatCompact(totalPipelineValue)}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Lead to win</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber
-                  value={teamConversion}
-                  format={(n) => `${Math.round(n)}%`}
-                />
+                {`${teamConversion}%`}
               </p>
             </div>
           </section>
