@@ -5,6 +5,7 @@ import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { TourManageClient } from './tour-manage-client';
 import { PublicPageMinimalShell } from '@/components/public-page-shell';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 async function resolveStoredPhoto(value: string | null | undefined): Promise<string | null> {
   if (!value) return null;
@@ -51,7 +52,7 @@ export default async function TourManagePage({
       .maybeSingle(),
     supabase
       .from('Space')
-      .select('name, slug, ownerId, stripeSubscriptionStatus')
+      .select('name, slug, ownerId, stripeSubscriptionStatus, stripePeriodEnd')
       .eq('id', tour.spaceId)
       .maybeSingle(),
     supabase
@@ -63,8 +64,14 @@ export default async function TourManagePage({
 
   const businessName = settings?.businessName || space?.name || 'the property';
   // Hide the Chippi mark on paid tiers (white-label), matching /book/[slug].
-  const subStatus = (space as { stripeSubscriptionStatus?: string | null } | null)?.stripeSubscriptionStatus;
-  const hidePoweredBy = subStatus === 'active' || subStatus === 'trialing';
+  const typedSpace = space as {
+    stripeSubscriptionStatus?: string | null;
+    stripePeriodEnd?: string | null;
+  } | null;
+  const hidePoweredBy = hasCurrentSubscription(
+    typedSpace?.stripeSubscriptionStatus,
+    typedSpace?.stripePeriodEnd,
+  );
   const [coverPhotoUrl, agentPhoto] = await Promise.all([
     resolveStoredPhoto(
       (profileRow as { coverPhotoUrl?: string | null } | null)?.coverPhotoUrl ?? null,

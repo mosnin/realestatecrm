@@ -5,6 +5,7 @@ import { IntakeChat } from '@/components/intake-chat/intake-chat';
 import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import type { IntakeFormConfig } from '@/lib/types';
 import type { Metadata } from 'next';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 // Cache this page for 60 seconds — it's public and rarely changes.
 export const revalidate = 60;
@@ -67,7 +68,7 @@ export default async function BrokerageApplyPage({
   // owner has exactly one space.
   const { data: linkedSpace } = await supabase
     .from('Space')
-    .select('id, slug, name, ownerId, stripeSubscriptionStatus')
+    .select('id, slug, name, ownerId, stripeSubscriptionStatus, stripePeriodEnd')
     .eq('ownerId', ownerMembership.userId)
     .eq('brokerageId', brokerage.id)
     .maybeSingle();
@@ -76,7 +77,7 @@ export default async function BrokerageApplyPage({
   if (!space) {
     const { data: ownerSpaces } = await supabase
       .from('Space')
-      .select('id, slug, name, ownerId, stripeSubscriptionStatus')
+      .select('id, slug, name, ownerId, stripeSubscriptionStatus, stripePeriodEnd')
       .eq('ownerId', ownerMembership.userId)
       .order('createdAt', { ascending: true })
       .limit(2);
@@ -189,7 +190,7 @@ export default async function BrokerageApplyPage({
   // Hide the Chippi mark on paid tiers — visible only on the free tier as
   // a value-exchange brand exposure. The brokerage owner pays for white-label
   // when their linked space is on an active paid plan (or trialing into one).
-  const hidePoweredBy = status === 'active' || status === 'trialing';
+  const hidePoweredBy = hasCurrentSubscription(status, space.stripePeriodEnd);
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',

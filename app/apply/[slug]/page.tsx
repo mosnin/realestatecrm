@@ -11,6 +11,7 @@ import { PreviewBridge } from './preview-bridge';
 import { clerkClient } from '@clerk/nextjs/server';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
 import type { Metadata, Viewport } from 'next';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 /** viewport-fit=cover lets the page draw under the iOS notch / status-bar
  *  area instead of leaving a body-coloured strip above the cover photo.
@@ -191,7 +192,7 @@ export default async function PublicApplyPage({
   // Hide the Chippi mark on paid tiers — visible only on the free tier as
   // a value-exchange brand exposure. The realtor pays for white-label when
   // they're on an active paid plan (or trialing into one).
-  const hidePoweredBy = status === 'active' || status === 'trialing';
+  const hidePoweredBy = hasCurrentSubscription(status, space.stripePeriodEnd);
 
   // ── Resolve dynamic form configs (dual: rental + buyer) ──────────────────
   type IFC = import('@/lib/types').IntakeFormConfig;

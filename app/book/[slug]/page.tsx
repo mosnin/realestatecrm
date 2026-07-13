@@ -9,6 +9,7 @@ import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { FormUnavailable } from '@/components/form-unavailable';
 import { TrackingPixels } from '@/components/tracking-pixels';
 import type { TrackingPixels as TrackingPixelsType } from '@/lib/types';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 /** viewport-fit=cover so the booking page draws under the iOS notch the
  *  way the public profile and intake do — one applicant-facing family. */
@@ -121,7 +122,7 @@ export default async function PublicBookingPage({
   // Hide the Chippi mark on paid tiers — visible only on the free tier as
   // a value-exchange brand exposure. The realtor pays for white-label when
   // they're on an active paid plan (or trialing into one).
-  const hidePoweredBy = subStatus === 'active' || subStatus === 'trialing';
+  const hidePoweredBy = hasCurrentSubscription(subStatus, space.stripePeriodEnd);
 
   const customization = {
     accentColor: settings?.intakeAccentColor || '#ff964f',

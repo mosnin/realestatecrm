@@ -21,6 +21,7 @@ import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 
 export default async function DashboardLayout({
@@ -154,7 +155,7 @@ export default async function DashboardLayout({
     try {
       const { data: subData, error: subError } = await supabase
         .from('Space')
-        .select('stripeSubscriptionStatus, stripeSubscriptionId, trialUsedAt')
+        .select('stripeSubscriptionStatus, stripePeriodEnd, stripeSubscriptionId, trialUsedAt')
         .eq('id', space.id)
         .maybeSingle();
 
@@ -167,7 +168,7 @@ export default async function DashboardLayout({
       const status = subData?.stripeSubscriptionStatus ?? 'inactive';
       const hasSubscriptionHistory = !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
 
-      if (status !== 'active' && status !== 'trialing') {
+      if (!hasCurrentSubscription(status, subData?.stripePeriodEnd)) {
         // If on an exempt path (billing/settings) AND user has subscription history,
         // allow access so they can manage their billing/resubscribe.
         // Users with NO subscription history must NOT access exempt paths.

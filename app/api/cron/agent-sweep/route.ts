@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { monitorCron } from '@/lib/cron-monitor';
 import { assertCanSpend, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import { recordDispatch, markInFlight, markFailed } from '@/lib/agent/run-ledger';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 // Env vars read at request time, not module load. Otherwise tests (and
 // serverless cold-start ordering) lock these to whatever was set when the
@@ -107,7 +108,7 @@ async function handler(req: NextRequest) {
   for (let from = 0; ; from += SPACE_PAGE_SIZE) {
     const { data, error: spaceErr } = await supabase
       .from('Space')
-      .select('id, slug')
+      .select('id, slug, stripeSubscriptionStatus, stripePeriodEnd')
       .in('stripeSubscriptionStatus', ['active', 'trialing'])
       .order('id', { ascending: true })
       .range(from, from + SPACE_PAGE_SIZE - 1);
@@ -115,8 +116,19 @@ async function handler(req: NextRequest) {
       console.error('[cron/agent-sweep] Failed to load spaces', spaceErr);
       return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
     }
-    const page = (data ?? []) as { id: string; slug: string }[];
-    allSpaces.push(...page);
+    const page = (data ?? []) as {
+      id: string;
+      slug: string;
+      stripeSubscriptionStatus: string | null;
+      stripePeriodEnd: string | null;
+    }[];
+    allSpaces.push(
+      ...page
+        .filter((space) =>
+          hasCurrentSubscription(space.stripeSubscriptionStatus, space.stripePeriodEnd),
+        )
+        .map(({ id, slug }) => ({ id, slug })),
+    );
     if (page.length < SPACE_PAGE_SIZE) break; // last page reached
   }
 

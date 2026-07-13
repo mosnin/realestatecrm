@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { PublicProfile, type PublicProperty } from '@/components/profile-page/public-profile';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 /** viewport-fit=cover lets the page draw under the iOS notch / status-bar area
  *  instead of leaving a body-coloured strip above it. On the /p/[slug] page
@@ -182,7 +183,7 @@ export default async function PublicRealtorPage({
   }
 
   const subStatus = space.stripeSubscriptionStatus;
-  const hidePoweredBy = subStatus === 'active' || subStatus === 'trialing';
+  const hidePoweredBy = hasCurrentSubscription(subStatus, space.stripePeriodEnd);
 
   const businessName = settings?.businessName || space.name;
 

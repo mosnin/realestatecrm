@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireRoutineRun } from '@/lib/routines';
 import { monitorCron } from '@/lib/cron-monitor';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 // The Modal-free in-process fallback (lib/routines fireInProcessRun) blocks the
@@ -84,14 +85,17 @@ async function handler(req: NextRequest) {
   const spaceIds = [...new Set(due.map((r) => r.spaceId))];
   const { data: spaceRows, error: spaceErr } = await supabase
     .from('Space')
-    .select('id, ownerId, stripeSubscriptionStatus')
+    .select('id, ownerId, stripeSubscriptionStatus, stripePeriodEnd')
     .in('id', spaceIds);
   if (spaceErr) {
     console.error('[cron/routines] Failed to load spaces', spaceErr);
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
   }
   const activeSpaceRows = (spaceRows ?? []).filter((s) =>
-    ['active', 'trialing'].includes(s.stripeSubscriptionStatus as string),
+    hasCurrentSubscription(
+      s.stripeSubscriptionStatus as string,
+      s.stripePeriodEnd as string | null,
+    ),
   );
   const activeSpaces = new Set(activeSpaceRows.map((s) => s.id as string));
   const ownerIdsBySpace = new Map<string, string>();

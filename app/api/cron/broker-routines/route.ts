@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireBrokerRoutineRun } from '@/lib/broker-routines';
 import { monitorCron } from '@/lib/cron-monitor';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 // Match the space-routine cron's budget: broker dispatch shares fireRoutineRun's
@@ -77,7 +78,7 @@ async function handler(req: NextRequest) {
   const brokerageIds = [...new Set(due.map((r) => r.brokerageId))];
   const { data: brokerageRows, error: brokerageErr } = await supabase
     .from('Brokerage')
-    .select('id, stripeSubscriptionStatus')
+    .select('id, stripeSubscriptionStatus, stripePeriodEnd')
     .in('id', brokerageIds);
   if (brokerageErr) {
     console.error('[cron/broker-routines] Failed to load brokerages', brokerageErr);
@@ -85,7 +86,12 @@ async function handler(req: NextRequest) {
   }
   const activeBrokerages = new Set(
     (brokerageRows ?? [])
-      .filter((b) => ['active', 'trialing'].includes(b.stripeSubscriptionStatus as string))
+      .filter((b) =>
+        hasCurrentSubscription(
+          b.stripeSubscriptionStatus as string,
+          b.stripePeriodEnd as string | null,
+        ),
+      )
       .map((b) => b.id as string),
   );
 
