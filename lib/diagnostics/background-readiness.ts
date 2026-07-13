@@ -172,7 +172,7 @@ function checkWebPush(): ReadinessCheck {
       key: 'web-push',
       label: 'Browser push notifications',
       status: 'ok',
-      detail: 'VAPID credentials set — browser push delivery is enabled.',
+      detail: 'VAPID credentials are configured for browser push signing.',
     };
   }
   return {
