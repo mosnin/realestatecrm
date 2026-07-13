@@ -1,3 +1,5 @@
+import 'server-only';
+import { after } from 'next/server';
 import { embedText } from '@/lib/embeddings';
 import { upsertVector, deleteVector } from '@/lib/zilliz';
 import type { Deal, IntakeFormConfig, FormQuestion } from '@/lib/types';
@@ -22,7 +24,16 @@ type VectorContact = {
   formConfigSnapshot?: IntakeFormConfig | null;
 };
 
-export async function syncContact(contact: VectorContact) {
+function keepAlive(task: Promise<void>): Promise<void> {
+  try {
+    after(() => task);
+  } catch {
+    // CLI workers and unit tests may run outside a Next.js request context.
+  }
+  return task;
+}
+
+async function persistContactVector(contact: VectorContact): Promise<void> {
   const text = buildContactEmbeddingText(contact);
 
   const vector = await embedText(text);
@@ -34,6 +45,10 @@ export async function syncContact(contact: VectorContact) {
     text,
     vector
   );
+}
+
+export async function syncContact(contact: VectorContact): Promise<void> {
+  await keepAlive(persistContactVector(contact));
 }
 
 /**
@@ -95,7 +110,7 @@ function buildContactEmbeddingText(contact: VectorContact): string {
   return baseParts.filter(Boolean).join(' ');
 }
 
-export async function syncDeal(deal: Deal & { stage?: { name: string } }) {
+async function persistDealVector(deal: Deal & { stage?: { name: string } }): Promise<void> {
   const text = [
     deal.title,
     deal.description,
@@ -118,10 +133,14 @@ export async function syncDeal(deal: Deal & { stage?: { name: string } }) {
   );
 }
 
-export async function deleteContactVector(spaceId: string, contactId: string) {
-  await deleteVector(spaceId, `contact_${contactId}`);
+export async function syncDeal(deal: Deal & { stage?: { name: string } }): Promise<void> {
+  await keepAlive(persistDealVector(deal));
 }
 
-export async function deleteDealVector(spaceId: string, dealId: string) {
-  await deleteVector(spaceId, `deal_${dealId}`);
+export async function deleteContactVector(spaceId: string, contactId: string): Promise<void> {
+  await keepAlive(deleteVector(spaceId, `contact_${contactId}`));
+}
+
+export async function deleteDealVector(spaceId: string, dealId: string): Promise<void> {
+  await keepAlive(deleteVector(spaceId, `deal_${dealId}`));
 }
