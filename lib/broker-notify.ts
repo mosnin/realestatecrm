@@ -5,6 +5,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 
 export type BrokerNotificationType =
   | 'member_joined'
@@ -22,7 +23,7 @@ export interface NotifyBrokerParams {
   metadata?: Record<string, unknown>;
 }
 
-export async function notifyBroker(params: NotifyBrokerParams): Promise<void> {
+async function persistBrokerNotification(params: NotifyBrokerParams): Promise<void> {
   const { brokerageId, type, title, body, metadata } = params;
 
   try {
@@ -38,4 +39,19 @@ export async function notifyBroker(params: NotifyBrokerParams): Promise<void> {
   } catch (err) {
     logger.error('[broker-notify] failed to create notification', { type, brokerageId }, err);
   }
+}
+
+/**
+ * Preserve awaited semantics while keeping voided route calls alive after the
+ * response. The same in-flight promise is shared with after(), so the write is
+ * never duplicated.
+ */
+export async function notifyBroker(params: NotifyBrokerParams): Promise<void> {
+  const task = persistBrokerNotification(params);
+  try {
+    after(() => task);
+  } catch {
+    // Non-request workers and unit tests continue with best-effort execution.
+  }
+  await task;
 }

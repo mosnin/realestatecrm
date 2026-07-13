@@ -20,7 +20,7 @@
 import { supabase } from '@/lib/supabase';
 import { getClientIp } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import type { NextRequest } from 'next/server';
+import { after, type NextRequest } from 'next/server';
 
 export type AuditAction =
   | 'CREATE'
@@ -51,7 +51,7 @@ export interface AuditParams {
   metadata?: Record<string, unknown>;
 }
 
-export async function audit(params: AuditParams): Promise<void> {
+async function persistAudit(params: AuditParams): Promise<void> {
   const {
     actorClerkId,
     action,
@@ -81,4 +81,21 @@ export async function audit(params: AuditParams): Promise<void> {
   } catch (err) {
     logger.error('[audit] unexpected error', { action, resource, resourceId }, err);
   }
+}
+
+/**
+ * Persist the event immediately for callers that await it, while also
+ * registering the same in-flight promise with after(). Callers that deliberately
+ * use `void audit(...)` stay non-blocking without risking termination when the
+ * route returns. Outside a Next.js request scope, after() throws and the normal
+ * awaited/best-effort behavior remains unchanged.
+ */
+export async function audit(params: AuditParams): Promise<void> {
+  const task = persistAudit(params);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may not have a Next.js request context.
+  }
+  await task;
 }

@@ -4,7 +4,7 @@
  * Nightly per-seat billing reconciliation (Fix #1, drift healer).
  *
  * The membership-change paths (join / invite-accept / offboard / member-remove /
- * admin-remove) each fire-and-forget syncBrokerageSeatBilling after the write so
+ * admin-remove) each schedules syncBrokerageSeatBilling after the write so
  * the Stripe per-unit add-on quantity tracks the active member count in real
  * time. But that sync is best-effort: a Stripe blip, a crashed request, or a
  * membership row added/removed by a path that forgot to sync would leave the

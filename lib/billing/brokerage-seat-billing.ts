@@ -23,6 +23,7 @@
  */
 
 import Stripe from 'stripe';
+import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getStripe } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
@@ -85,8 +86,8 @@ export interface SeatSyncResult {
  * Sync a brokerage subscription's per-seat add-on quantity to its current
  * active member count. Best-effort + idempotent: re-running with the same member
  * count is a no-op, and a missing subscription / add-on price / infra blip is a
- * safe skip (logged, not thrown). Callers fire-and-forget after the membership
- * write has committed.
+ * safe skip (logged, not thrown). Request handlers schedule it after the
+ * membership write has committed and keep the serverless invocation alive.
  *
  * @param brokerageId  the brokerage whose seats changed
  * @param prorationBehavior  Stripe proration on the quantity change. Defaults to
@@ -95,7 +96,7 @@ export interface SeatSyncResult {
  *   for a per-seat product. (The base bundle is untouched, so this only ever
  *   prorates the incremental per-seat line.)
  */
-export async function syncBrokerageSeatBilling(
+async function performBrokerageSeatBillingSync(
   brokerageId: string,
   prorationBehavior: Stripe.SubscriptionUpdateParams.ProrationBehavior = 'create_prorations',
 ): Promise<SeatSyncResult> {
@@ -152,6 +153,24 @@ export async function syncBrokerageSeatBilling(
     logger.error('[seat-billing] sync failed (member change still applied)', { brokerageId }, e);
     return { status: 'skipped', reason: 'exception' };
   }
+}
+
+/**
+ * Preserve the normal awaited result while also keeping voided membership-route
+ * reconciliations alive after the response. The same in-flight promise is
+ * registered with after(), so Stripe is never called twice.
+ */
+export async function syncBrokerageSeatBilling(
+  brokerageId: string,
+  prorationBehavior: Stripe.SubscriptionUpdateParams.ProrationBehavior = 'create_prorations',
+): Promise<SeatSyncResult> {
+  const task = performBrokerageSeatBillingSync(brokerageId, prorationBehavior);
+  try {
+    after(() => task);
+  } catch {
+    // Cron jobs and unit tests may not have a Next.js request context.
+  }
+  return task;
 }
 
 /**
