@@ -21,7 +21,6 @@ import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import {
   aggregateDraftStats,
   draftStatsWindowStart,
@@ -614,7 +613,7 @@ export default async function BrokerBriefPage() {
                 className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')}
                 style={TITLE_FONT}
               >
-                <AnimatedNumber value={revTotalForecast} format={formatCurrency} />
+                {formatCurrency(revTotalForecast)}
               </p>
               {revPaceSentence && (
                 <p className={cn(CAPTION, 'mt-1')}>
@@ -631,7 +630,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  <AnimatedNumber value={revWonGci} format={formatCompact} />
+                  {formatCompact(revWonGci)}
                 </p>
               </div>
               <div className="bg-background px-4 py-3">
@@ -640,7 +639,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  <AnimatedNumber value={revInFlightGci} format={formatCompact} />
+                  {formatCompact(revInFlightGci)}
                 </p>
               </div>
             </div>
