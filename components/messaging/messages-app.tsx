@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { useMessagingRealtime } from '@/hooks/use-messaging';
+import { toast } from 'sonner';
 
 // ── Wire types (match the /api/messages responses) ───────────────────────────
 
@@ -403,7 +404,12 @@ function ChannelRail({
         setNewName('');
         setCreating(false);
         onChannelCreated(channel.id);
+      } else {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast.error(payload?.error ?? "Couldn't create that channel. Try again.");
       }
+    } catch {
+      toast.error("Couldn't create that channel. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
