@@ -17,6 +17,8 @@ Phase 2 caching telemetry:
 
 from __future__ import annotations
 
+import math
+
 import structlog
 
 from db import supabase
@@ -46,12 +48,10 @@ MODEL_PRICES: dict[str, dict[str, float]] = {
     "anthropic/claude-opus-4.7": {"in": 5.00, "out": 25.00},
     "moonshotai/kimi-k2.6":      {"in": 0.73, "out": 3.49},
     "qwen/qwen3.6-flash":        {"in": 0.19, "out": 1.13},
-    # Active stack. Prices reuse the models these replaced (deepseek-v4-pro for
-    # the qwen chat/multimodal model, hy3-preview for the glm swarm worker) so
-    # metering keeps charging a sane non-zero rate.
-    # TODO: confirm real pricing
-    "qwen/qwen3.7-plus":         {"in": 0.44, "out": 0.88},
-    "z-ai/glm-5.2":              {"in": 0.07, "out": 0.26},
+    # Active OpenRouter stack. These are fallback list-price estimates only;
+    # exact per-request usage.cost wins whenever it is available.
+    "qwen/qwen3.7-plus":         {"in": 0.32, "out": 1.28},
+    "z-ai/glm-5.2":              {"in": 0.93, "out": 3.00},
     # Retired but retained so historical ChatUsage rows still price correctly.
     "deepseek/deepseek-v4-pro":  {"in": 0.44, "out": 0.88},
     "tencent/hy3-preview":       {"in": 0.07, "out": 0.26},
@@ -80,6 +80,7 @@ async def record_chat_usage(
     runtime: str = "modal",
     cached_tokens: int = 0,
     route: str = "agent",
+    cost_usd: float | None = None,
 ) -> None:
     """Insert one ChatUsage row for a completed interactive chat turn.
 
@@ -118,7 +119,15 @@ async def record_chat_usage(
                 "cachedTokens": cached_tokens,
                 "provider": provider,
                 "route": route,
-                "costUsd": _calculate_cost(model, prompt_tokens, completion_tokens),
+                "costUsd": (
+                    float(cost_usd)
+                    if (
+                        cost_usd is not None
+                        and math.isfinite(float(cost_usd))
+                        and float(cost_usd) >= 0
+                    )
+                    else _calculate_cost(model, prompt_tokens, completion_tokens)
+                ),
                 "runtime": runtime,
             })
             .execute()

@@ -90,7 +90,13 @@ export interface DirectChatResult {
   /** Provider prefix derived from model. For ChatUsage.provider telemetry. */
   provider: string;
   /** Token usage if the provider returned it (OpenRouter does for most). */
-  usage: { promptTokens: number; completionTokens: number; cachedTokens: number };
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    cachedTokens: number;
+    /** Exact OpenRouter request cost when the provider includes usage.cost. */
+    costUsd?: number;
+  };
   /** Fallback note from the multimodal builder; '' when all attachments
    *  were accepted by the provider. Surfaced to the UI as a soft toast. */
   fallbackNote: string;
@@ -159,16 +165,23 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
   // OpenRouter normalizes to the OpenAI shape but the cached-tokens field
   // is provider-specific.
   const u = res.usage as
-    | (typeof res.usage & { prompt_tokens_details?: { cached_tokens?: number } })
+    | (typeof res.usage & {
+        prompt_tokens_details?: { cached_tokens?: number };
+        cost?: number;
+      })
     | undefined;
   const promptTokens = u?.prompt_tokens ?? 0;
   const completionTokens = u?.completion_tokens ?? 0;
   const cachedTokens = u?.prompt_tokens_details?.cached_tokens ?? 0;
+  const costUsd =
+    typeof u?.cost === 'number' && Number.isFinite(u.cost) && u.cost >= 0
+      ? u.cost
+      : undefined;
 
   return {
     text: finalText,
     provider,
-    usage: { promptTokens, completionTokens, cachedTokens },
+    usage: { promptTokens, completionTokens, cachedTokens, costUsd },
     fallbackNote: userBlocks.fallbackNote,
   };
 }

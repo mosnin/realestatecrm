@@ -38,8 +38,8 @@ logger = structlog.get_logger(__name__)
 _SWARM_DAILY_TOKEN_BUDGET = 50_000
 
 
-def _usage_from_completion(response: object) -> tuple[int, int, int]:
-    """Return (prompt, completion, cached) tokens from a chat.completions result.
+def _usage_from_completion(response: object) -> tuple[int, int, int, float | None]:
+    """Return (prompt, completion, cached, cost) from a chat.completions result.
 
     The planner and auditor call the OpenAI client directly, so usage lives on
     `response.usage` (prompt_tokens / completion_tokens), with cached prompt
@@ -48,14 +48,16 @@ def _usage_from_completion(response: object) -> tuple[int, int, int]:
     """
     usage = getattr(response, "usage", None)
     if usage is None:
-        return (0, 0, 0)
+        return (0, 0, 0, None)
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion = int(getattr(usage, "completion_tokens", 0) or 0)
     cached = 0
     details = getattr(usage, "prompt_tokens_details", None)
     if details is not None:
         cached = int(getattr(details, "cached_tokens", 0) or 0)
-    return (prompt, completion, cached)
+    raw_cost = getattr(usage, "cost", None)
+    cost = float(raw_cost) if isinstance(raw_cost, (int, float)) and raw_cost >= 0 else None
+    return (prompt, completion, cached, cost)
 
 
 async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_id: str | None = None) -> None:
@@ -113,13 +115,14 @@ Rules:
     )
     # Bill the planner call. Direct chat.completions usage shape, recorded as
     # one ChatUsage row so the credit trigger fires. Best-effort: never raises.
-    p_in, p_out, p_cached = _usage_from_completion(response)
+    p_in, p_out, p_cached, p_cost = _usage_from_completion(response)
     await record_chat_usage(
         space_id=space_id,
         model=planner_model,
         prompt_tokens=p_in,
         completion_tokens=p_out,
         cached_tokens=p_cached,
+        cost_usd=p_cost,
         route="agent",
     )
     plan_text = response.choices[0].message.content or "{}"
@@ -251,13 +254,14 @@ Format with markdown headers for readability."""
         max_tokens=2000,
     )
     # Bill the auditor call — one ChatUsage row, same as the planner.
-    a_in, a_out, a_cached = _usage_from_completion(response)
+    a_in, a_out, a_cached, a_cost = _usage_from_completion(response)
     await record_chat_usage(
         space_id=space_id,
         model=auditor_model,
         prompt_tokens=a_in,
         completion_tokens=a_out,
         cached_tokens=a_cached,
+        cost_usd=a_cost,
         route="agent",
     )
     return response.choices[0].message.content or "No synthesis produced."

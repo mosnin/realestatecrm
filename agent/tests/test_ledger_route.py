@@ -128,3 +128,17 @@ async def test_zero_token_turn_is_skipped_regardless_of_route() -> None:
             route="direct",
         )
     assert "payload" not in captured
+
+
+@pytest.mark.asyncio
+async def test_exact_provider_cost_overrides_fallback_estimate() -> None:
+    supabase, captured = _capture_table_insert()
+    with patch("ledger.supabase", supabase):
+        await record_chat_usage(
+            space_id="sp1",
+            model="qwen/qwen3.7-plus",
+            prompt_tokens=1_000,
+            completion_tokens=500,
+            cost_usd=0.004321,
+        )
+    assert captured["payload"]["costUsd"] == 0.004321

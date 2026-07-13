@@ -37,12 +37,10 @@ const MODEL_PRICES: Record<string, { in: number; out: number }> = {
   'anthropic/claude-opus-4.7': { in: 5.0, out: 25.0 },
   'moonshotai/kimi-k2.6': { in: 0.73, out: 3.49 },
   'qwen/qwen3.6-flash': { in: 0.19, out: 1.13 },
-  // Active stack. Prices reuse the models these replaced (deepseek-v4-pro for
-  // the qwen chat/multimodal model, hy3-preview for the glm swarm worker) so
-  // metering keeps charging a sane non-zero rate.
-  // TODO: confirm real pricing
-  'qwen/qwen3.7-plus': { in: 0.44, out: 0.88 },
-  'z-ai/glm-5.2': { in: 0.07, out: 0.26 },
+  // Active OpenRouter stack. These are fallback list-price estimates only;
+  // OpenRouter's exact per-request usage.cost wins whenever it is returned.
+  'qwen/qwen3.7-plus': { in: 0.32, out: 1.28 },
+  'z-ai/glm-5.2': { in: 0.93, out: 3.0 },
   // Retired but retained so historical ChatUsage rows still price correctly.
   'deepseek/deepseek-v4-pro': { in: 0.44, out: 0.88 },
   'tencent/hy3-preview': { in: 0.07, out: 0.26 },
@@ -64,6 +62,8 @@ export interface RecordChatUsageInput {
   promptTokens: number;
   completionTokens: number;
   cachedTokens?: number;
+  /** Exact provider-reported request cost. Preferred over the fallback table. */
+  costUsd?: number;
   userId?: string | null;
   conversationId?: string | null;
   /** Phase 4 router outcome. */
@@ -91,7 +91,12 @@ export async function recordChatUsage(input: RecordChatUsageInput): Promise<void
       cachedTokens,
       provider: detectProvider(input.model),
       route: input.route,
-      costUsd: calculateCost(input.model, promptTokens, completionTokens),
+      costUsd:
+        typeof input.costUsd === 'number' &&
+        Number.isFinite(input.costUsd) &&
+        input.costUsd >= 0
+          ? input.costUsd
+          : calculateCost(input.model, promptTokens, completionTokens),
       runtime: input.runtime ?? 'ts',
     });
   } catch (err) {

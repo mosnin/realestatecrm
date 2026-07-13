@@ -141,6 +141,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             promptTokens: result.usage.promptTokens,
             completionTokens: result.usage.completionTokens,
             cachedTokens: result.usage.cachedTokens,
+            costUsd: result.usage.costUsd,
             route: 'direct→agent' as ChatRoute,
             runtime: 'ts',
           });
@@ -207,6 +208,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           promptTokens: result.usage.promptTokens,
           completionTokens: result.usage.completionTokens,
           cachedTokens: result.usage.cachedTokens,
+          costUsd: result.usage.costUsd,
           route: 'direct',
           runtime: 'ts',
         });
