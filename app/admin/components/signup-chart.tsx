@@ -24,7 +24,12 @@ export function SignupChart({ data }: SignupChartProps) {
 
   return (
     <div className="h-[200px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+        minWidth={0}
+        initialDimension={{ width: 640, height: 200 }}
+      >
         <AreaChart data={formatted} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="signupGradient" x1="0" y1="0" x2="0" y2="1">

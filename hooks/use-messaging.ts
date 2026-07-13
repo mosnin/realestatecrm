@@ -105,7 +105,7 @@ export function useMessagingRealtime(opts: {
     };
     const onPresence = () => void syncPresence();
 
-    presence.presence.subscribe(onPresence);
+    void presence.presence.subscribe(onPresence).catch(() => {});
     void presence.presence.enter({ name: meName ?? '' }).then(syncPresence).catch(() => {});
 
     const onInbox = (msg: Ably.Message) => {
@@ -114,8 +114,8 @@ export function useMessagingRealtime(opts: {
         kind: msg.name === 'channel_added' ? 'channel_added' : 'inbox',
       });
     };
-    userLane.subscribe('inbox', onInbox);
-    userLane.subscribe('channel_added', onInbox);
+    void userLane.subscribe('inbox', onInbox).catch(() => {});
+    void userLane.subscribe('channel_added', onInbox).catch(() => {});
 
     return () => {
       try {
@@ -148,9 +148,9 @@ export function useMessagingRealtime(opts: {
 
     // Attach; if the channel isn't in our token yet (a just-opened DM), a
     // capability error fires → re-mint and re-attach once.
-    chan.subscribe('message', onMessage);
-    chan.subscribe('read', onRead);
-    chan.subscribe('typing', onTyping);
+    void chan.subscribe('message', onMessage).catch(() => {});
+    void chan.subscribe('read', onRead).catch(() => {});
+    void chan.subscribe('typing', onTyping).catch(() => {});
     const onFailed = (state: Ably.ChannelStateChange) => {
       if (state.current === 'failed') void reauthorize().then(() => chan.attach().catch(() => {}));
     };
