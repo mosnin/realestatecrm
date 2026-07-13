@@ -114,21 +114,38 @@ const insertedRow = {
   createdAt: '2026-06-02T00:00:00.000Z',
   updatedAt: '2026-06-02T00:00:00.000Z',
 };
+const supabaseState = vi.hoisted(() => ({
+  callRows: [] as Array<Record<string, unknown>>,
+  contacts: [] as Array<{ id: string; name: string | null }>,
+  callListError: null as { message: string } | null,
+}));
 vi.mock('@/lib/supabase', () => {
-  const builder: any = {
-    insert: vi.fn(() => builder),
-    update: vi.fn(() => builder),
-    select: vi.fn(() => builder),
-    eq: vi.fn(() => builder),
-    order: vi.fn(() => builder),
-    limit: vi.fn(async () => ({ data: [], error: null })),
-    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-    single: vi.fn(async () => ({ data: insertedRow, error: null })),
+  const resultFor = (table: string) =>
+    table === 'CallLog'
+      ? { data: supabaseState.callRows, error: supabaseState.callListError }
+      : table === 'Contact'
+        ? { data: supabaseState.contacts, error: null }
+        : { data: [], error: null };
+  const makeBuilder = (table: string): any => {
+    const builder: any = {
+      insert: vi.fn(() => builder),
+      update: vi.fn(() => builder),
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      in: vi.fn(() => builder),
+      order: vi.fn(() => builder),
+      limit: vi.fn(async () => resultFor(table)),
+      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+      single: vi.fn(async () => ({ data: insertedRow, error: null })),
+      then: (resolve: (value: ReturnType<typeof resultFor>) => unknown) =>
+        Promise.resolve(resultFor(table)).then(resolve),
+    };
+    return builder;
   };
-  return { supabase: { from: vi.fn(() => builder) } };
+  return { supabase: { from: vi.fn((table: string) => makeBuilder(table)) } };
 });
 
-import { POST } from '@/app/api/calls/route';
+import { GET, POST } from '@/app/api/calls/route';
 import { requireSpaceOwner } from '@/lib/api-auth';
 
 const mockRequireSpaceOwner = vi.mocked(requireSpaceOwner);
@@ -146,6 +163,9 @@ const fakeSpace = { id: 'space_1', phoneNumber: null } as any;
 describe('POST /api/calls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    supabaseState.callRows = [];
+    supabaseState.contacts = [];
+    supabaseState.callListError = null;
     delete process.env.TELNYX_API_KEY;
     delete process.env.TELNYX_VOICE_CONNECTION_ID;
     delete process.env.TELNYX_FROM_NUMBER;
@@ -178,5 +198,26 @@ describe('POST /api/calls', () => {
     const json = (await res.json()) as { configured: boolean; call: { status: string } };
     expect(json.configured).toBe(false);
     expect(json.call.status).toBe('failed');
+  });
+});
+
+describe('GET /api/calls', () => {
+  it('loads contact names without requiring a PostgREST embedded relation', async () => {
+    mockRequireSpaceOwner.mockResolvedValue({ userId: 'u1', space: fakeSpace });
+    supabaseState.callRows = [
+      { ...insertedRow, contactId: 'contact_1' },
+      { ...insertedRow, id: 'call_2', contactId: null },
+    ];
+    supabaseState.contacts = [{ id: 'contact_1', name: 'Ada Lovelace' }];
+
+    const res = await GET(new NextRequest('http://localhost/api/calls?slug=acme'));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      calls: [
+        expect.objectContaining({ id: 'call_1', contactName: 'Ada Lovelace' }),
+        expect.objectContaining({ id: 'call_2', contactName: null }),
+      ],
+    });
   });
 });
