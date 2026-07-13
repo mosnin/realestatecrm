@@ -78,6 +78,26 @@ export function formatCompact(n: number): string {
 }
 
 /**
+ * Formats a date-only business value without letting the server and browser
+ * time zones shift it to different calendar days. Supabase date columns arrive
+ * as ISO strings; rendering them in the runtime's local zone can make Vercel
+ * (UTC) and a US browser disagree during hydration.
+ */
+export function formatCalendarDateUtc(
+  dateVal: Date | string | null | undefined,
+): string {
+  if (!dateVal) return '—';
+  const date = new Date(dateVal);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
  * Returns up to 2 uppercase initials from a display name.
  * e.g. "Jane Doe" → "JD", "Alice" → "AL".
  *
