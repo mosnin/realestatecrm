@@ -64,7 +64,7 @@ export async function requireActiveSubscription(
   userId?: string,
 ): Promise<NextResponse | null> {
   const status = space.stripeSubscriptionStatus ?? 'inactive';
-  if (status === 'active' || status === 'trialing') return null;
+  if (hasCurrentSubscription(status, space.stripePeriodEnd)) return null;
 
   // Check if user is a platform admin (admins bypass paywall)
   if (userId) {
@@ -90,6 +90,41 @@ export async function requireActiveSubscription(
  */
 export function isSubscriptionDelinquent(status: string | null | undefined): boolean {
   return status === 'past_due' || status === 'canceled' || status === 'unpaid';
+}
+
+const ACTIVE_PERIOD_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Treat active/trialing as entitled only while the persisted Stripe period is
+ * current. A one-day grace for active subscriptions absorbs normal webhook
+ * delivery delay at renewal; trials have an exact end and receive no grace.
+ * Missing or malformed period data fails closed for a paid entitlement.
+ */
+export function hasCurrentSubscription(
+  status: string | null | undefined,
+  periodEnd: string | Date | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (status !== 'active' && status !== 'trialing') return false;
+  if (!periodEnd) return false;
+  const endMs = periodEnd instanceof Date ? periodEnd.getTime() : Date.parse(periodEnd);
+  if (!Number.isFinite(endMs)) return false;
+  const graceMs = status === 'active' ? ACTIVE_PERIOD_GRACE_MS : 0;
+  return endMs + graceMs > now.getTime();
+}
+
+/** Free/inactive accounts may use their included credits; only lapsed paid
+ * states and stale active/trial periods pause premium AI. */
+export function isPremiumAccessBlocked(
+  status: string | null | undefined,
+  periodEnd: string | Date | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (isSubscriptionDelinquent(status)) return true;
+  if (status === 'active' || status === 'trialing') {
+    return !hasCurrentSubscription(status, periodEnd, now);
+  }
+  return false;
 }
 
 /**

@@ -16,7 +16,9 @@ export const getSpaceFromSlug = cache(async function getSpaceFromSlug(
   const slug = normalizeSlug(inputSlug);
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus')
+    .select(
+      'id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus, stripePeriodEnd',
+    )
     .eq('slug', slug)
     .limit(1)
     .maybeSingle();
@@ -72,8 +74,8 @@ export const getSpaceForUser = cache(async function getSpaceForUser(
   // Two queries but they're simple index lookups — keeping sequential to avoid
   // PostgREST FK constraint name ambiguity with inline references.
   //
-  // The SELECT mirrors getSpaceFromSlug exactly — stripeSubscriptionStatus
-  // is critical: requireActiveSubscription reads it directly from this row.
+  // The SELECT mirrors getSpaceFromSlug exactly — stripeSubscriptionStatus and
+  // stripePeriodEnd are critical: requireActiveSubscription reads them directly.
   // Previously this query omitted the column, so `space.stripeSubscriptionStatus`
   // came back undefined → coerced to 'inactive' → every paying realtor was
   // blocked from any route that combined getSpaceForUser + requireActiveSubscription
@@ -91,7 +93,9 @@ export const getSpaceForUser = cache(async function getSpaceForUser(
 
   const { data, error } = await supabase
     .from('Space')
-    .select('id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus')
+    .select(
+      'id, slug, name, emoji, ownerId, brokerageId, createdAt, stripeSubscriptionStatus, stripePeriodEnd',
+    )
     .eq('ownerId', user.id)
     .limit(1)
     .maybeSingle();
