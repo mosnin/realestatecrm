@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('CallLog')
-    .select(`${CALL_COLUMNS}, Contact(name)`)
+    .select(CALL_COLUMNS)
     .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(100);
@@ -48,11 +48,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Could not load your calls.' }, { status: 500 });
   }
 
-  // Flatten the embedded contact name onto each row for the client.
+  // CallLog.contactId intentionally has no database foreign key: a call can
+  // outlive a merged or deleted contact. Fetch the tenant-scoped names
+  // explicitly instead of relying on a PostgREST embedded relation.
+  const contactIds = Array.from(
+    new Set((data ?? []).map((call) => call.contactId).filter((id): id is string => Boolean(id))),
+  );
+  const contactNames = new Map<string, string | null>();
+  if (contactIds.length > 0) {
+    const { data: contacts, error: contactsError } = await supabase
+      .from('Contact')
+      .select('id, name')
+      .eq('spaceId', space.id)
+      .in('id', contactIds);
+    if (contactsError) {
+      logger.warn('[calls] contact name lookup failed', { spaceId: space.id, err: contactsError.message });
+    } else {
+      for (const contact of contacts ?? []) {
+        contactNames.set(contact.id, contact.name ?? null);
+      }
+    }
+  }
+
   const calls = (data ?? []).map((c: any) => ({
     ...c,
-    contactName: c.Contact?.name ?? null,
-    Contact: undefined,
+    contactName: c.contactId ? contactNames.get(c.contactId) ?? null : null,
   }));
 
   return NextResponse.json({ calls });
