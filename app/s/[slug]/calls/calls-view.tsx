@@ -108,6 +108,7 @@ export function CallsView({ slug }: { slug: string }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [number, setNumber] = useState('');
   const [placing, setPlacing] = useState(false);
+  const [voiceConfigured, setVoiceConfigured] = useState<boolean | null>(null);
 
   const fetchCalls = useCallback(async () => {
     try {
@@ -116,8 +117,9 @@ export function CallsView({ slug }: { slug: string }) {
         setCalls([]);
         return;
       }
-      const data = (await res.json()) as { calls?: Call[] };
+      const data = (await res.json()) as { calls?: Call[]; configured?: boolean };
       setCalls(data.calls ?? []);
+      setVoiceConfigured(data.configured === true);
     } catch {
       setCalls([]);
     } finally {
@@ -194,17 +196,26 @@ export function CallsView({ slug }: { slug: string }) {
             }}
             placeholder="+1 (555) 123-4567"
             className="flex-1"
-            disabled={placing}
+            disabled={placing || voiceConfigured !== true}
           />
-          <Button onClick={placeCall} disabled={placing || !number.trim()}>
+          <Button
+            onClick={placeCall}
+            disabled={placing || voiceConfigured !== true || !number.trim()}
+          >
             <Phone size={14} strokeWidth={2} className="mr-1.5" />
             {placing ? 'Calling…' : 'Call'}
           </Button>
         </div>
-        <p className={cn(CAPTION)}>
-          Your phone rings first; once you pick up, we connect you to the contact and record the
-          call. Chippi summarizes it when it ends.
-        </p>
+        {voiceConfigured === false ? (
+          <p className={cn(CAPTION, 'text-amber-700 dark:text-amber-400')}>
+            Calling is not available yet. Ask your administrator to finish phone setup.
+          </p>
+        ) : (
+          <p className={cn(CAPTION)}>
+            Your phone rings first; once you pick up, we connect you to the contact and record the
+            call. Chippi summarizes it when it ends.
+          </p>
+        )}
       </section>
 
       {/* ── List ───────────────────────────────────────────────────────── */}
@@ -219,7 +230,9 @@ export function CallsView({ slug }: { slug: string }) {
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
             <p className={cn(BODY)}>No calls yet.</p>
             <p className={cn(CAPTION, 'mt-1')}>
-              Call a contact and the recording, transcript, and summary show up here.
+              {voiceConfigured === false
+                ? 'Call history will appear here after phone setup is complete.'
+                : 'Call a contact and the recording, transcript, and summary show up here.'}
             </p>
           </div>
         ) : (

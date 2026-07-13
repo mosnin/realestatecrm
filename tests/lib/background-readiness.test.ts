@@ -33,6 +33,11 @@ const { supabaseMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/supabase', () => ({ supabase: supabaseMock }));
 
+const { redisMock } = vi.hoisted(() => ({
+  redisMock: { get: vi.fn() },
+}));
+vi.mock('@/lib/redis', () => ({ redis: redisMock }));
+
 import { getBackgroundReadiness } from '@/lib/diagnostics/background-readiness';
 
 // Every env key the module probes.
@@ -44,6 +49,7 @@ const KEYS = [
   'INNGEST_EVENT_KEY',
   'INNGEST_SIGNING_KEY',
   'COMPOSIO_API_KEY',
+  'COMPOSIO_WEBHOOK_SECRET',
 ] as const;
 
 // Sentinel secret values — used to prove no VALUE leaks into the report.
@@ -55,6 +61,7 @@ const SECRETS: Record<(typeof KEYS)[number], string> = {
   INNGEST_EVENT_KEY: 'inngest-event-SECRET',
   INNGEST_SIGNING_KEY: 'inngest-signing-SECRET',
   COMPOSIO_API_KEY: 'composio-SECRET',
+  COMPOSIO_WEBHOOK_SECRET: 'composio-webhook-SECRET',
 };
 
 let saved: Record<string, string | undefined>;
@@ -66,6 +73,8 @@ beforeEach(() => {
     saved[k] = process.env[k];
     delete process.env[k];
   }
+  redisMock.get.mockReset();
+  redisMock.get.mockResolvedValue(new Date().toISOString());
 });
 
 afterEach(() => {
@@ -104,6 +113,7 @@ describe('getBackgroundReadiness', () => {
     process.env.INNGEST_EVENT_KEY = SECRETS.INNGEST_EVENT_KEY;
     process.env.INNGEST_SIGNING_KEY = SECRETS.INNGEST_SIGNING_KEY;
     process.env.COMPOSIO_API_KEY = SECRETS.COMPOSIO_API_KEY;
+    process.env.COMPOSIO_WEBHOOK_SECRET = SECRETS.COMPOSIO_WEBHOOK_SECRET;
     // MODAL_WEBHOOK_URL / AGENT_INTERNAL_SECRET / MODAL_CHAT_URL deliberately unset.
 
     const report = await getBackgroundReadiness('space_1');
@@ -142,6 +152,16 @@ describe('getBackgroundReadiness', () => {
     // INNGEST_SIGNING_KEY intentionally absent.
     const report = await getBackgroundReadiness();
     expect(checkByKey(report.checks, 'inngest').status).toBe('missing');
+  });
+
+  it('reports Composio as degraded when no signed delivery has been verified', async () => {
+    process.env.COMPOSIO_API_KEY = SECRETS.COMPOSIO_API_KEY;
+    process.env.COMPOSIO_WEBHOOK_SECRET = SECRETS.COMPOSIO_WEBHOOK_SECRET;
+    redisMock.get.mockResolvedValue(null);
+
+    const report = await getBackgroundReadiness();
+
+    expect(checkByKey(report.checks, 'composio').status).toBe('degraded');
   });
 
   it('omitting spaceId excludes the per-space recent-activity check', async () => {

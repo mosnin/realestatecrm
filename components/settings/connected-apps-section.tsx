@@ -790,6 +790,7 @@ function IntegrationRow({
               <button
                 type="button"
                 onClick={onTogglePause}
+                aria-label={`${isPaused ? 'Turn on' : 'Pause'} ${app.name} trigger monitoring`}
                 className="text-foreground/70 hover:text-foreground underline-offset-2 hover:underline transition-colors"
               >
                 {isPaused ? 'Turn on' : 'Pause'}
@@ -799,6 +800,7 @@ function IntegrationRow({
         </div>
         {isNative ? (
           <NativeAction
+            appName={app.name}
             connected={isConnected}
             busy={nativeBusy}
             formOpen={formOpen}
@@ -809,7 +811,12 @@ function IntegrationRow({
             onDisconnect={disconnectNative}
           />
         ) : (
-          <Action action={action} onConnect={onConnect} onDisconnect={onDisconnect} />
+          <Action
+            appName={app.name}
+            action={action}
+            onConnect={onConnect}
+            onDisconnect={onDisconnect}
+          />
         )}
       </div>
 
@@ -850,6 +857,7 @@ function IntegrationRow({
             <button
               type="button"
               onClick={() => void submitNativeKey()}
+              aria-label={`Connect ${app.name}`}
               disabled={nativeBusy}
               className="inline-flex items-center h-8 px-3 rounded-full text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-60"
             >
@@ -882,12 +890,14 @@ function IntegrationRow({
  * Connect button opens the inline key form; Disconnect calls the native route.
  */
 function NativeAction({
+  appName,
   connected,
   busy,
   formOpen,
   onConnect,
   onDisconnect,
 }: {
+  appName: string;
   connected: boolean;
   busy: boolean;
   formOpen: boolean;
@@ -902,6 +912,7 @@ function NativeAction({
       <button
         type="button"
         onClick={onDisconnect}
+        aria-label={`Disconnect ${appName}`}
         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         Disconnect
@@ -915,6 +926,7 @@ function NativeAction({
     <button
       type="button"
       onClick={onConnect}
+      aria-label={`Connect ${appName}`}
       className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
     >
       Connect
@@ -950,16 +962,22 @@ export function pickRowAction(args: {
 }
 
 function Action({
+  appName,
   action,
   onConnect,
   onDisconnect,
 }: {
+  appName: string;
   action: RowAction;
   onConnect: () => void;
   onDisconnect: () => void;
 }) {
   if (action.kind === 'busy') {
-    return <Loader2 size={14} className="animate-spin text-muted-foreground" />;
+    return (
+      <span role="status" aria-label={`Updating ${appName} connection`}>
+        <Loader2 size={14} aria-hidden="true" className="animate-spin text-muted-foreground" />
+      </span>
+    );
   }
   if (action.kind === 'coming-soon') {
     // Disabled, no click target. The realtor can read the row, can see
@@ -967,6 +985,7 @@ function Action({
     return (
       <span
         aria-disabled="true"
+        aria-label={`${appName} coming soon`}
         className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-muted text-muted-foreground"
       >
         Coming soon
@@ -978,6 +997,7 @@ function Action({
       <button
         type="button"
         onClick={onDisconnect}
+        aria-label={`Disconnect ${appName}`}
         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         Disconnect
@@ -989,6 +1009,7 @@ function Action({
       <button
         type="button"
         onClick={onConnect}
+        aria-label={`Reconnect ${appName}`}
         className="text-xs text-foreground hover:opacity-80 transition-opacity font-medium"
       >
         Reconnect
@@ -999,6 +1020,7 @@ function Action({
     <button
       type="button"
       onClick={onConnect}
+      aria-label={`Connect ${appName}`}
       className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
     >
       Connect
