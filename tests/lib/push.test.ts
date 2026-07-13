@@ -12,9 +12,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // ── Mocks shared across both suites ──────────────────────────────────────────
 
-const { sendNotificationMock, setVapidDetailsMock } = vi.hoisted(() => ({
+const { afterMock, sendNotificationMock, setVapidDetailsMock } = vi.hoisted(() => ({
+  afterMock: vi.fn(),
   sendNotificationMock: vi.fn(),
   setVapidDetailsMock: vi.fn(),
+}));
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: afterMock,
 }));
 vi.mock('web-push', () => ({
   default: {
@@ -60,6 +65,8 @@ describe('lib/push gating', () => {
     expect(sendNotificationMock).not.toHaveBeenCalled();
     // It must not even query the DB when unconfigured.
     expect(fromMock).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(afterMock.mock.calls[0]?.[0]).toBeTypeOf('function');
   });
 });
 

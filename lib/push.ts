@@ -25,6 +25,7 @@
 import webpush from 'web-push';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -78,7 +79,7 @@ interface SubscriptionRow {
  *
  * Returns the number of notifications successfully handed to push services.
  */
-export async function sendPushToSpace(spaceId: string, payload: PushPayload): Promise<number> {
+async function performPushToSpace(spaceId: string, payload: PushPayload): Promise<number> {
   if (!ensureVapid()) {
     logger.warn('[push] skipped — VAPID not configured', { spaceId });
     return 0;
@@ -145,4 +146,15 @@ export async function sendPushToSpace(spaceId: string, payload: PushPayload): Pr
 
   logger.info('[push] dispatch complete', { spaceId, sent, total: rows.length, pruned: dead.length });
   return sent;
+}
+
+/** Retain best-effort push delivery after a serverless caller returns. */
+export async function sendPushToSpace(spaceId: string, payload: PushPayload): Promise<number> {
+  const task = performPushToSpace(spaceId, payload);
+  try {
+    after(() => task);
+  } catch {
+    // Background workers and unit tests may run outside a request context.
+  }
+  return task;
 }

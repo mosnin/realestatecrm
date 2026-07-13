@@ -20,6 +20,7 @@
  */
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 
 export type TelemetryEventName =
   | 'signup_completed'
@@ -65,7 +66,7 @@ function capPayload(payload: Record<string, unknown>): Record<string, unknown> {
  * detach explicitly, but callers SHOULD treat it as fire-and-forget — never
  * gate user-visible behavior on the result.
  */
-export async function emit(args: EmitArgs): Promise<void> {
+async function persistTelemetry(args: EmitArgs): Promise<void> {
   try {
     const { error } = await supabase.from('TelemetryEvent').insert({
       id: crypto.randomUUID(),
@@ -80,6 +81,17 @@ export async function emit(args: EmitArgs): Promise<void> {
   } catch (err) {
     logger.warn('[telemetry] emit threw', { event: args.event }, err);
   }
+}
+
+/** Retain the same in-flight analytics write for fire-and-forget callers. */
+export async function emit(args: EmitArgs): Promise<void> {
+  const task = persistTelemetry(args);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  await task;
 }
 
 /**

@@ -17,4 +17,20 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     expect(source).toContain('after(() => task)');
     expect(source).toContain('await task');
   });
+
+  it('retains detached operational writes and notification delivery', () => {
+    const usage = readFileSync('lib/usage/record-chat-usage.ts', 'utf8');
+    const telemetry = readFileSync('lib/telemetry.ts', 'utf8');
+    const push = readFileSync('lib/push.ts', 'utf8');
+    const connections = readFileSync('lib/integrations/connections.ts', 'utf8');
+
+    expect(usage).toContain('const task = persistChatUsage(input)');
+    expect(usage).toContain('after(() => task)');
+    expect(telemetry).toContain('const task = persistTelemetry(args)');
+    expect(telemetry).toContain('after(() => task)');
+    expect(push).toContain('const task = performPushToSpace(spaceId, payload)');
+    expect(push).toContain('after(() => task)');
+    expect(connections).toContain('const task = persistExpiredByToolkit(args)');
+    expect(connections).toContain('after(() => task)');
+  });
 });
