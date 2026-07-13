@@ -51,6 +51,9 @@ const KEYS = [
   'CRON_SECRET',
   'INNGEST_EVENT_KEY',
   'INNGEST_SIGNING_KEY',
+  'NEXT_PUBLIC_VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY',
+  'VAPID_SUBJECT',
   'COMPOSIO_API_KEY',
   'COMPOSIO_WEBHOOK_SECRET',
 ] as const;
@@ -63,6 +66,9 @@ const SECRETS: Record<(typeof KEYS)[number], string> = {
   CRON_SECRET: 'cron-SECRET',
   INNGEST_EVENT_KEY: 'inngest-event-SECRET',
   INNGEST_SIGNING_KEY: 'inngest-signing-SECRET',
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'vapid-public-SECRET',
+  VAPID_PRIVATE_KEY: 'vapid-private-SECRET',
+  VAPID_SUBJECT: 'mailto:security-SECRET@example.test',
   COMPOSIO_API_KEY: 'composio-SECRET',
   COMPOSIO_WEBHOOK_SECRET: 'composio-webhook-SECRET',
 };
@@ -108,6 +114,7 @@ describe('getBackgroundReadiness', () => {
     expect(checkByKey(report.checks, 'chat-offload').status).toBe('ok');
     expect(checkByKey(report.checks, 'cron').status).toBe('ok');
     expect(checkByKey(report.checks, 'inngest').status).toBe('ok');
+    expect(checkByKey(report.checks, 'web-push').status).toBe('ok');
     expect(checkByKey(report.checks, 'composio').status).toBe('ok');
   });
 
@@ -115,6 +122,9 @@ describe('getBackgroundReadiness', () => {
     process.env.CRON_SECRET = SECRETS.CRON_SECRET;
     process.env.INNGEST_EVENT_KEY = SECRETS.INNGEST_EVENT_KEY;
     process.env.INNGEST_SIGNING_KEY = SECRETS.INNGEST_SIGNING_KEY;
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = SECRETS.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    process.env.VAPID_PRIVATE_KEY = SECRETS.VAPID_PRIVATE_KEY;
+    process.env.VAPID_SUBJECT = SECRETS.VAPID_SUBJECT;
     process.env.COMPOSIO_API_KEY = SECRETS.COMPOSIO_API_KEY;
     process.env.COMPOSIO_WEBHOOK_SECRET = SECRETS.COMPOSIO_WEBHOOK_SECRET;
     // MODAL_WEBHOOK_URL / AGENT_INTERNAL_SECRET / MODAL_CHAT_URL deliberately unset.
@@ -131,6 +141,7 @@ describe('getBackgroundReadiness', () => {
     // The hard-gap checks are all satisfied → none 'missing'.
     expect(checkByKey(report.checks, 'cron').status).toBe('ok');
     expect(checkByKey(report.checks, 'inngest').status).toBe('ok');
+    expect(checkByKey(report.checks, 'web-push').status).toBe('ok');
     expect(checkByKey(report.checks, 'composio').status).toBe('ok');
     expect(report.checks.some((c) => c.status === 'missing')).toBe(false);
   });
@@ -145,6 +156,7 @@ describe('getBackgroundReadiness', () => {
     expect(report.overall).toBe('down');
     expect(checkByKey(report.checks, 'cron').status).toBe('missing');
     expect(checkByKey(report.checks, 'inngest').status).toBe('missing');
+    expect(checkByKey(report.checks, 'web-push').status).toBe('missing');
     expect(checkByKey(report.checks, 'composio').status).toBe('missing');
     // Executor IS configured here → 'ok'.
     expect(checkByKey(report.checks, 'executor').status).toBe('ok');
@@ -155,6 +167,12 @@ describe('getBackgroundReadiness', () => {
     // INNGEST_SIGNING_KEY intentionally absent.
     const report = await getBackgroundReadiness();
     expect(checkByKey(report.checks, 'inngest').status).toBe('missing');
+  });
+
+  it("partial VAPID configuration → web push is 'missing'", async () => {
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = SECRETS.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const report = await getBackgroundReadiness();
+    expect(checkByKey(report.checks, 'web-push').status).toBe('missing');
   });
 
   it('reports Composio as degraded when no signed delivery has been verified', async () => {
