@@ -33,6 +33,7 @@ import {
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { after } from 'next/server';
 import { getWasabiClient, getWasabiBucket } from './client';
 
 /** Default signed URL lifetime (seconds). 1 hour — enough for the realtor
@@ -160,11 +161,26 @@ export async function copyObject(args: {
   );
 }
 
-/** Delete an object. Idempotent — S3 doesn't error on missing keys. */
-export async function deleteObject(key: string): Promise<void> {
+async function performDeleteObject(key: string): Promise<void> {
   const client = getWasabiClient();
   const bucket = getWasabiBucket();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+/**
+ * Delete an object. Idempotent — S3 doesn't error on missing keys. The same
+ * in-flight request is registered with after() so callers may keep cleanup
+ * off the response path without Vercel suspending it. Awaited callers retain
+ * exactly the same success/error semantics.
+ */
+export async function deleteObject(key: string): Promise<void> {
+  const task = performDeleteObject(key);
+  try {
+    after(() => task);
+  } catch {
+    // Storage workers and unit tests may run outside a request context.
+  }
+  await task;
 }
 
 /**
