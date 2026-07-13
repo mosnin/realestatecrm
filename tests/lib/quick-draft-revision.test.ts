@@ -44,6 +44,32 @@ beforeEach(() => {
 });
 
 describe('composeDraftWithOpenAI — voice self-critique', () => {
+  it('keeps a foreground compose alive for 15 seconds before aborting', async () => {
+    vi.useFakeTimers();
+    try {
+      createMock.mockImplementationOnce(
+        (_request: unknown, options: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      );
+
+      let settled = false;
+      const pending = composeDraftWithOpenAI(baseArgs).finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(pending).resolves.toBeNull();
+      expect(settled).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('revises a slop draft and returns the cleaner rewrite', async () => {
     createMock
       .mockResolvedValueOnce(
