@@ -12,7 +12,7 @@
  * seats until someone notices on the invoice.
  *
  * This sweep closes that gap. For every Brokerage with a live subscription
- * (stripeSubscriptionStatus active|trialing AND a stripeSubscriptionId) it
+ * (a current active|trialing Stripe period AND a stripeSubscriptionId) it
  * re-runs the SAME idempotent sync the membership paths use. The sync recomputes
  * the correct billable add-on count from the live BrokerageMembership count and
  * converges Stripe to it — a no-op when already correct, a corrective Stripe
@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { monitorCron } from '@/lib/cron-monitor';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -59,12 +60,12 @@ async function handler(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Fetch every brokerage with a live subscription ──────────────────────────
-  // Only active/trialing subs with a real subscription id can carry a per-seat
-  // line; everything else (canceled, past_due, no sub) is skipped by the sync
-  // anyway, so we narrow the query up front to keep the sweep cheap.
+  // Only active/trialing rows with a real subscription id can carry a per-seat
+  // line. The period-aware check below removes stale rows before any Stripe
+  // call; the status filter still narrows the database sweep up front.
   const { data: brokerages, error } = await supabase
     .from('Brokerage')
-    .select('id, plan, stripeSubscriptionId, stripeSubscriptionStatus')
+    .select('id, plan, stripeSubscriptionId, stripeSubscriptionStatus, stripePeriodEnd')
     .in('stripeSubscriptionStatus', ['active', 'trialing'])
     .not('stripeSubscriptionId', 'is', null);
 
@@ -83,6 +84,18 @@ async function handler(req: NextRequest): Promise<NextResponse> {
   };
 
   for (const brokerage of brokerages ?? []) {
+    if (
+      !hasCurrentSubscription(
+        brokerage.stripeSubscriptionStatus,
+        brokerage.stripePeriodEnd,
+      )
+    ) {
+      // A stale active/trialing row is not a live billing entitlement. Avoid a
+      // Stripe quantity mutation until a verified webhook refreshes its period.
+      summary.skipped++;
+      continue;
+    }
+
     try {
       // Re-run the same idempotent sync the membership paths use. It recomputes
       // the billable add-on seats from the live member count and converges

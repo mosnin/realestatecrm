@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 import { StatGrid } from '@/app/admin/components/stat-grid';
 import { SECTION_LABEL, CAPTION } from '@/lib/typography';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export const metadata = { title: 'Cohorts — Admin — Chippi' };
 
@@ -16,8 +17,16 @@ type UserRow = {
   createdAt: string;
   onboard: boolean;
   Space:
-    | { id: string; stripeSubscriptionStatus: SubscriptionStatus | null }
-    | { id: string; stripeSubscriptionStatus: SubscriptionStatus | null }[]
+    | {
+        id: string;
+        stripeSubscriptionStatus: SubscriptionStatus | null;
+        stripePeriodEnd: string | null;
+      }
+    | {
+        id: string;
+        stripeSubscriptionStatus: SubscriptionStatus | null;
+        stripePeriodEnd: string | null;
+      }[]
     | null;
 };
 
@@ -100,7 +109,7 @@ export default async function AdminCohortsPage() {
   try {
     const { data, error } = await supabase
       .from('User')
-      .select('id, createdAt, onboard, Space(id, stripeSubscriptionStatus)')
+      .select('id, createdAt, onboard, Space(id, stripeSubscriptionStatus, stripePeriodEnd)')
       .gte('createdAt', earliestIso)
       .order('createdAt', { ascending: true });
 
@@ -119,26 +128,33 @@ export default async function AdminCohortsPage() {
       if (space) {
         bucket.workspace += 1;
         const status = space.stripeSubscriptionStatus;
-        if (status === 'trialing') bucket.trialing += 1;
-        if (status === 'active' || status === 'past_due') bucket.paid += 1;
+        const current = hasCurrentSubscription(status, space.stripePeriodEnd, now);
+        if (status === 'trialing' && current) bucket.trialing += 1;
+        if ((status === 'active' && current) || status === 'past_due') bucket.paid += 1;
         if (status === 'canceled') bucket.churned += 1;
-        if (status === 'active') bucket.active += 1;
+        if (status === 'active' && current) bucket.active += 1;
       }
     }
 
     // Totals from ALL users (not just last 12 weeks) for accurate top-level stats
     const [totalUsersRes, subStatusRes] = await Promise.all([
       supabase.from('User').select('*', { count: 'exact', head: true }),
-      supabase.from('Space').select('stripeSubscriptionStatus'),
+      supabase.from('Space').select('stripeSubscriptionStatus, stripePeriodEnd'),
     ]);
 
     totalSignups = totalUsersRes.count ?? 0;
     const statuses = (subStatusRes.data ?? []) as {
       stripeSubscriptionStatus: SubscriptionStatus | null;
+      stripePeriodEnd: string | null;
     }[];
     for (const s of statuses) {
-      if (s.stripeSubscriptionStatus === 'active') totalPaid += 1;
-      else if (s.stripeSubscriptionStatus === 'trialing') totalTrial += 1;
+      const current = hasCurrentSubscription(
+        s.stripeSubscriptionStatus,
+        s.stripePeriodEnd,
+        now,
+      );
+      if (s.stripeSubscriptionStatus === 'active' && current) totalPaid += 1;
+      else if (s.stripeSubscriptionStatus === 'trialing' && current) totalTrial += 1;
       else if (s.stripeSubscriptionStatus === 'past_due') totalPastDue += 1;
       else if (s.stripeSubscriptionStatus === 'canceled') totalCanceled += 1;
     }

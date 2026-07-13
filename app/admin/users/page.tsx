@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { UserListClient } from './user-list-client';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export const metadata = { title: 'Users — Admin — Chippi' };
 
@@ -20,7 +21,7 @@ export default async function AdminUsersPage({
   let supaQuery = supabase
     .from('User')
     .select(
-      'id, name, email, onboard, createdAt, onboardingCurrentStep, platformRole, Space(slug, name, stripeSubscriptionStatus)',
+      'id, name, email, onboard, createdAt, onboardingCurrentStep, platformRole, Space(slug, name, stripeSubscriptionStatus, stripePeriodEnd)',
     );
 
   if (filter === 'onboarded') supaQuery = supaQuery.eq('onboard', true);
@@ -60,7 +61,10 @@ export default async function AdminUsersPage({
   if (filter === 'trialing')
     results = results.filter((r: any) => {
       const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
-      return sp?.stripeSubscriptionStatus === 'trialing';
+      return (
+        sp?.stripeSubscriptionStatus === 'trialing' &&
+        hasCurrentSubscription('trialing', sp.stripePeriodEnd)
+      );
     });
   if (filter === 'past-due')
     results = results.filter((r: any) => {
@@ -75,11 +79,24 @@ export default async function AdminUsersPage({
       const sp = Array.isArray(r.Space) ? r.Space[0] : r.Space;
       if (!sp) return false;
       const s = sp.stripeSubscriptionStatus;
-      return !s || s === 'inactive' || s === 'canceled' || s === 'unpaid';
+      return (
+        !s ||
+        s === 'inactive' ||
+        s === 'canceled' ||
+        s === 'unpaid' ||
+        ((s === 'active' || s === 'trialing') &&
+          !hasCurrentSubscription(s, sp.stripePeriodEnd))
+      );
     });
 
   const users = results.map((row: any) => {
     const spaceData = Array.isArray(row.Space) ? row.Space[0] : row.Space;
+    const rawStatus = (spaceData?.stripeSubscriptionStatus as string | null) ?? null;
+    const displayedStatus =
+      (rawStatus === 'active' || rawStatus === 'trialing') &&
+      !hasCurrentSubscription(rawStatus, spaceData?.stripePeriodEnd)
+        ? 'expired'
+        : rawStatus;
     return {
       id: row.id as string,
       name: row.name as string | null,
@@ -92,7 +109,7 @@ export default async function AdminUsersPage({
         ? {
             slug: spaceData.slug as string,
             name: spaceData.name as string,
-            subscriptionStatus: (spaceData.stripeSubscriptionStatus as string | null) ?? null,
+            subscriptionStatus: displayedStatus,
           }
         : null,
     };
