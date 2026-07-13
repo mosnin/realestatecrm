@@ -27,11 +27,27 @@ export default async function BrokerPipelinePage() {
 
   const { brokerage } = ctx;
 
-  // Get all realtor members with their spaces
+  // A broker owner or admin can also own a realtor workspace with active
+  // deals. Keep this scope aligned with Deals and Forecast: every workspace
+  // owned by a brokerage member belongs in the brokerage-wide pipeline.
   const allMembers = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
-  const members = allMembers.filter((m) => m.role === 'realtor_member');
+  const members = allMembers;
 
-  const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
+  const memberSpaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
+
+  // Defensive fallback for older brokerages whose owner membership predates
+  // the membership/space linkage used by getBrokerageMembers().
+  const ownerSpaceIds: string[] = [];
+  if (memberSpaceIds.length === 0) {
+    const { data: ownerSpaces } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('ownerId', brokerage.ownerId)
+      .limit(10);
+    ownerSpaceIds.push(...((ownerSpaces ?? []).map((s: { id: string }) => s.id)));
+  }
+
+  const spaceIds = [...new Set([...memberSpaceIds, ...ownerSpaceIds])];
 
   // Build space -> realtor lookup
   const spaceToRealtor = new Map<string, { userId: string; name: string }>();
