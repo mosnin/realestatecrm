@@ -2,14 +2,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const ROOTS = ['app', 'components', 'lib'];
-const CONFIG_FILES = ['.env.example'];
+const ROOTS = ['app', 'components', 'lib', 'plugins'];
+const CONFIG_FILES = ['.env.example', 'tests/lib/briefing-sms-template.test.ts'];
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) return sourceFiles(path);
-    return /\.(?:ts|tsx)$/.test(entry.name) ? [path] : [];
+    return /\.(?:json|ts|tsx)$/.test(entry.name) ? [path] : [];
   });
 }
 

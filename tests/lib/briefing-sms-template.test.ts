@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildBriefSms } from '@/lib/briefing/sms-template';
 
-const ORIGIN = 'https://my.usechippi.com';
+const ORIGIN = 'https://www.usechippi.com';
 
 describe('briefing — SMS template builder', () => {
   it('produces a single-segment body for a short headline', () => {
