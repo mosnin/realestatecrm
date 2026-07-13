@@ -34,4 +34,13 @@ describe('marketing claims', () => {
     expect(careers).not.toContain('Head of Growth Marketing');
     expect(careers).toContain('No open roles right now.');
   });
+
+  it('does not publish sample research as completed studies', () => {
+    const research = readFileSync('app/(marketing)/research/page.tsx', 'utf8');
+
+    expect(research).not.toContain('1,200 Inbound Inquiries');
+    expect(research).not.toContain('540 shadowed hours');
+    expect(research).not.toContain('Interviews with 80 agents');
+    expect(research).toContain('Publication in progress.');
+  });
 });
