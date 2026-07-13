@@ -40,4 +40,12 @@ describe('production origin contract', () => {
     expect(openGraph).not.toContain('chippi.app');
     expect(onboarding).toContain("urlPrefix = 'usechippi.com/'");
   });
+
+  it('prefers the configured app URL and adds a scheme to Vercel hosts', () => {
+    const delivery = readFileSync('lib/briefing/delivery.ts', 'utf8');
+
+    expect(delivery).toContain('process.env.NEXT_PUBLIC_APP_URL');
+    expect(delivery).toContain('`https://${vercelHost.replace(');
+    expect(delivery).toContain("return 'https://www.usechippi.com'");
+  });
 });
