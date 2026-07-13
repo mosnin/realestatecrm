@@ -30,6 +30,7 @@ function happyResponse(text: string, usage?: {
   prompt_tokens?: number;
   completion_tokens?: number;
   prompt_tokens_details?: { cached_tokens?: number };
+  cost?: number;
 }) {
   return {
     choices: [{ message: { content: text } }],
@@ -80,6 +81,21 @@ describe('runDirectChat — wiring', () => {
     expect(call.messages.length).toBeLessThanOrEqual(10);
     // Last history message preserved is t11 (latest).
     expect(call.messages[call.messages.length - 2].content).toBe('t11');
+  });
+
+  it('preserves OpenRouter exact request cost for downstream metering', async () => {
+    createMock.mockResolvedValue(happyResponse('ok', {
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      cost: 0.000123,
+    }));
+    const result = await runDirectChat({
+      model: 'qwen/qwen3.7-plus',
+      systemMessage: 'sys',
+      history: [],
+      userMessage: 'hello',
+    });
+    expect(result.usage.costUsd).toBe(0.000123);
   });
 
   it('sends Anthropic-shaped image block for an image attachment under an anthropic model', async () => {
