@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getBrokerContext, canEditSettings } from '@/lib/permissions';
-import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
+import { BrokerConnectedAppsSection } from '@/components/broker/broker-connected-apps-section';
 import {
   H1,
   TITLE_FONT,
@@ -74,16 +74,7 @@ export default async function BrokerIntegrationsPage({
           </p>
         </div>
       ) : (
-        <ConnectedAppsSection
-          callbackResult={callbackResult}
-          endpoints={{
-            list: '/api/broker/integrations',
-            connect: (toolkit) => `/api/broker/integrations/connect/${toolkit}`,
-            item: (id) => `/api/broker/integrations/${id}`,
-            // No health endpoint at the brokerage level yet — the panel falls
-            // back to the static status pill.
-          }}
-        />
+        <BrokerConnectedAppsSection callbackResult={callbackResult} />
       )}
     </div>
   );
