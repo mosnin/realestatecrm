@@ -99,17 +99,17 @@ export interface ListIssuesOptions {
 
 /**
  * Returns up to 25 recent unresolved issues for the configured project.
- * Returns an empty array on any failure.
+ * Returns null on failure so callers cannot mistake an outage for zero issues.
  */
-export async function listIssues(opts: ListIssuesOptions = {}): Promise<SentryIssue[]> {
-  if (!sentryConfigured()) return [];
+export async function listIssues(opts: ListIssuesOptions = {}): Promise<SentryIssue[] | null> {
+  if (!sentryConfigured()) return null;
 
   const q = encodeURIComponent(opts.query ?? 'is:unresolved');
   const period = encodeURIComponent(opts.statsPeriod ?? '14d');
   const path = `/projects/${org()}/${project()}/issues/?query=${q}&statsPeriod=${period}&limit=25`;
 
   const raw = await sentryFetch(path);
-  if (!raw || !Array.isArray(raw)) return [];
+  if (!raw || !Array.isArray(raw)) return null;
 
   return (raw as Record<string, unknown>[]).map((item) => ({
     id: String(item.id ?? ''),
