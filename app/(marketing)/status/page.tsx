@@ -29,8 +29,10 @@
 
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { supabase } from '@/lib/supabase';
-import { hasLLMKey } from '@/lib/llm';
-import { composioConfigured } from '@/lib/integrations/composio';
+import {
+  getComposioReadinessStatus,
+  type ReadinessStatus,
+} from '@/lib/diagnostics/background-readiness';
 
 export const metadata = { title: 'Status · Chippi' };
 
@@ -61,31 +63,30 @@ async function checkDatabase(): Promise<Health> {
 }
 
 /**
- * The agent (Chippi) needs two things to do real work: an LLM provider key
- * and a Modal runtime URL. We can only verify CONFIGURATION from here, not a
- * live round-trip (that path is authenticated and rate-shaped). Missing config
- * is reported as "unknown" rather than "operational", we won't claim the
- * agent is up when we can't see the keys it needs.
+ * A public request cannot perform the authenticated, rate-shaped agent probe,
+ * and key/URL presence alone does not prove that the model or runtime can
+ * answer. Keep this unknown until a non-billable live probe exists rather than
+ * painting configuration green as service health.
  */
 function checkAgent(): Health {
-  try {
-    const hasModel = hasLLMKey();
-    const hasModal = Boolean(process.env.MODAL_CHAT_URL || process.env.MODAL_WEBHOOK_URL);
-    if (hasModel && hasModal) return 'operational';
-    return 'unknown';
-  } catch {
-    return 'unknown';
-  }
+  return 'unknown';
 }
 
 /**
- * Integrations ride on Composio. Without the API key the whole layer is
- * inert, so config presence is the honest public signal. Per-connection
- * health (this realtor's Gmail token) is auth-gated and not shown here.
+ * Integrations ride on Composio. Reuse the admin readiness probe so a green
+ * public status requires a recently verified signed webhook delivery, not
+ * merely the presence of credentials. Per-connection health (this realtor's
+ * Gmail token) remains auth-gated and is not shown here.
  */
-function checkIntegrations(): Health {
+function integrationsHealth(status: ReadinessStatus): Health {
+  if (status === 'ok') return 'operational';
+  if (status === 'degraded') return 'degraded';
+  return 'unknown';
+}
+
+async function checkIntegrations(): Promise<Health> {
   try {
-    return composioConfigured() ? 'operational' : 'unknown';
+    return integrationsHealth(await getComposioReadinessStatus());
   } catch {
     return 'unknown';
   }
@@ -124,7 +125,7 @@ export default async function StatusPage() {
   const [database, agent, integrations] = await Promise.all([
     checkDatabase(),
     Promise.resolve(checkAgent()),
-    Promise.resolve(checkIntegrations()),
+    checkIntegrations(),
   ]);
 
   const subsystems: Subsystem[] = [

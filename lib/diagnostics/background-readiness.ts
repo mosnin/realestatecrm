@@ -206,6 +206,15 @@ async function checkComposio(): Promise<ReadinessCheck> {
 }
 
 /**
+ * Public, detail-free Composio readiness signal for server-rendered status
+ * surfaces. This deliberately reuses the same verified-webhook probe as the
+ * admin diagnostics page so public and internal health cannot disagree.
+ */
+export async function getComposioReadinessStatus(): Promise<ReadinessStatus> {
+  return (await checkComposio()).status;
+}
+
+/**
  * f. Recent activity (per-space). Only included when a spaceId is given. Reads
  * the most recent routine run for the space and reports:
  *   - ok       — a routine ran inside the recency window
