@@ -99,4 +99,16 @@ describe('POST /api/messages/channels', () => {
     const res = await channelsPost(jsonReq({ name: '   ' }));
     expect(res.status).toBe(400);
   });
+
+  it('returns a retryable error when persistence fails', async () => {
+    ctx.membership.role = 'broker_admin';
+    createNamedChannel.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const res = await channelsPost(jsonReq({ name: 'deals-desk' }));
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Channel creation is temporarily unavailable. Please try again.',
+    });
+  });
 });

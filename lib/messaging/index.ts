@@ -13,6 +13,7 @@ import 'server-only';
  */
 
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 import {
   publishMessageEvent,
   publishUserEvent,
@@ -281,10 +282,15 @@ export async function ensureDmChannel(
   }
 
   const channel = created as Channel;
-  await supabase.from('ChannelMember').insert([
+  const { error: memberError } = await supabase.from('ChannelMember').insert([
     { channelId: channel.id, userId, role: 'member' },
     { channelId: channel.id, userId: otherUserId, role: 'member' },
   ]);
+  if (memberError) {
+    await supabase.from('Channel').delete().eq('id', channel.id);
+    logger.error('[messaging] failed to create DM memberships', { brokerageId, channelId: channel.id }, memberError);
+    throw new Error('Failed to open direct message');
+  }
   return { channel, created: true };
 }
 
@@ -306,17 +312,25 @@ export async function createNamedChannel(
     })
     .select('*')
     .single();
-  if (error || !data) throw new Error('Failed to create channel');
+  if (error || !data) {
+    logger.error('[messaging] failed to insert channel', { brokerageId }, error);
+    throw new Error('Failed to create channel');
+  }
   const channel = data as Channel;
 
   const memberSet = Array.from(new Set([createdById, ...opts.memberIds]));
-  await supabase.from('ChannelMember').insert(
+  const { error: memberError } = await supabase.from('ChannelMember').insert(
     memberSet.map((uid) => ({
       channelId: channel.id,
       userId: uid,
       role: uid === createdById ? 'owner' : 'member',
     })),
   );
+  if (memberError) {
+    await supabase.from('Channel').delete().eq('id', channel.id);
+    logger.error('[messaging] failed to create channel memberships', { brokerageId, channelId: channel.id }, memberError);
+    throw new Error('Failed to create channel');
+  }
   return channel;
 }
 
