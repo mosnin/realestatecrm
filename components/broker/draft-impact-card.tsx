@@ -1,3 +1,5 @@
+'use client';
+
 import type { DraftStats } from '@/lib/draft-stats';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 
