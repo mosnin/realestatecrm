@@ -207,12 +207,17 @@ export function formatAnswerValue(
     case 'date':
       // Try to format nicely, fall back to raw string
       try {
-        const d = new Date(rawValue);
+        const value = String(rawValue);
+        const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+        const d = dateOnly
+          ? new Date(Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])))
+          : new Date(rawValue);
         if (!isNaN(d.getTime())) {
           return d.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
+            ...(dateOnly ? { timeZone: 'UTC' } : {}),
           });
         }
       } catch {

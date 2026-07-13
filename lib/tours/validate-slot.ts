@@ -92,9 +92,11 @@ export async function validateTourSlot(
   // "use noon to avoid DST edge cases" approach for the per-day offset.
   const cursor = new Date(Date.UTC(year, month, dayOfMonth, 12, 0, 0, 0));
   const tzOffset = getTimezoneOffsetMs(cursor, timezone);
-  const localDate = new Date(cursor.getTime() + tzOffset);
-  const dayOfWeek = localDate.getDay();
-  const dateKey = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
+  // Keep the shifted "local wall clock" representation in UTC getters. Using
+  // getFullYear()/new Date(y,m,d,...) here makes validation depend on the
+  // server process timezone (UTC on Vercel, local timezone in development).
+  const dayOfWeek = new Date(Date.UTC(year, month, dayOfMonth)).getUTCDay();
+  const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`;
 
   // ── Build the effective override for this single date (single + recurring) ──
   const { data: overridesRaw } = await supabase
@@ -124,9 +126,9 @@ export async function validateTourSlot(
 
       // Does this recurring override land on dateKey? Walk forward from its
       // start the same way available/route.ts expands it.
-      const oStart = new Date(o.date + 'T12:00:00');
-      const targetDay = new Date(dateKey + 'T12:00:00');
-      const oEnd = o.endDate ? new Date(o.endDate + 'T12:00:00') : targetDay;
+      const oStart = new Date(o.date + 'T12:00:00Z');
+      const targetDay = new Date(dateKey + 'T12:00:00Z');
+      const oEnd = o.endDate ? new Date(o.endDate + 'T12:00:00Z') : targetDay;
       if (targetDay < oStart || targetDay > oEnd) continue;
 
       const cur = new Date(oStart);
@@ -134,11 +136,11 @@ export async function validateTourSlot(
       // Bound the walk; the 14-day availability horizon means recurrences never
       // need to expand far, but cap iterations defensively.
       for (let i = 0; i < 1000 && cur <= oEnd; i++) {
-        const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        const key = `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, '0')}-${String(cur.getUTCDate()).padStart(2, '0')}`;
         if (key === dateKey) { lands = true; break; }
-        if (o.recurrence === 'weekly') cur.setDate(cur.getDate() + 7);
-        else if (o.recurrence === 'biweekly') cur.setDate(cur.getDate() + 14);
-        else if (o.recurrence === 'monthly') cur.setMonth(cur.getMonth() + 1);
+        if (o.recurrence === 'weekly') cur.setUTCDate(cur.getUTCDate() + 7);
+        else if (o.recurrence === 'biweekly') cur.setUTCDate(cur.getUTCDate() + 14);
+        else if (o.recurrence === 'monthly') cur.setUTCMonth(cur.getUTCMonth() + 1);
         else break;
       }
       if (lands) {
@@ -170,23 +172,18 @@ export async function validateTourSlot(
   }
 
   // ── Regenerate the day's candidate slot start times, look for an exact match.
-  const dayEndMs = new Date(
-    localDate.getFullYear(),
-    localDate.getMonth(),
-    localDate.getDate(),
+  const dayEndMs = Date.UTC(
+    year,
+    month,
+    dayOfMonth,
     dayEnd % 24, 0, 0, 0,
-  ).getTime() + (dayEnd >= 24 ? 24 * 60 * 60_000 : 0);
+  ) + (dayEnd >= 24 ? 24 * 60 * 60_000 : 0);
 
   const requestedMs = startsAt.getTime();
 
   for (let hour = dayStart; hour < dayEnd; hour++) {
     for (let min = 0; min < 60; min += duration) {
-      const localSlotMs = new Date(
-        localDate.getFullYear(),
-        localDate.getMonth(),
-        localDate.getDate(),
-        hour, min, 0, 0,
-      ).getTime();
+      const localSlotMs = Date.UTC(year, month, dayOfMonth, hour, min, 0, 0);
       if (localSlotMs + duration * 60_000 > dayEndMs) continue;
 
       const utcSlotMs = localSlotMs - tzOffset;

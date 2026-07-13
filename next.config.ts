@@ -58,6 +58,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Do not advertise framework internals on every response.
+  poweredByHeader: false,
   // jsdom (via isomorphic-dompurify on the server) ships a runtime CSS
   // file. Webpack bundling rewrites the relative path so the file can't
   // be found at request time, crashing /apply/[slug]/privacy's page-data
