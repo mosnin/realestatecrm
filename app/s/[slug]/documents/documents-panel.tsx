@@ -15,7 +15,7 @@
  * caller might pre-seed the content field from somewhere we don't trust).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   FileText,
@@ -27,7 +27,6 @@ import {
   Eye,
   Pencil,
 } from 'lucide-react';
-import DOMPurify from 'isomorphic-dompurify';
 import { motion } from 'framer-motion';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
@@ -87,6 +86,7 @@ export function DocumentsPanel() {
   const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [saving, setSaving] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [sanitizedHtml, setSanitizedHtml] = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -182,14 +182,23 @@ export function DocumentsPanel() {
     [refresh, backToList],
   );
 
-  // Sanitize the HTML content before rendering inside Preview. TipTap's
-  // own serializer is well-formed but the content field can in theory be
-  // seeded from external sources (paste, API import, future Chippi
-  // export) — sanitize defensively.
-  const sanitizedHtml = useMemo(
-    () => (draft ? DOMPurify.sanitize(draft.content ?? '') : ''),
-    [draft],
-  );
+  // Sanitize the HTML content before rendering inside Preview. The package's
+  // server entry initializes JSDOM, so loading it dynamically keeps that
+  // Node-only path out of this client-side editor's server render.
+  useEffect(() => {
+    let cancelled = false;
+    setSanitizedHtml('');
+    if (!draft) return () => {
+      cancelled = true;
+    };
+
+    void import('isomorphic-dompurify').then(({ default: DOMPurify }) => {
+      if (!cancelled) setSanitizedHtml(DOMPurify.sanitize(draft.content ?? ''));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft]);
 
   // ── Editor ────────────────────────────────────────────────────────────────
   if (mode === 'edit' && draft) {
