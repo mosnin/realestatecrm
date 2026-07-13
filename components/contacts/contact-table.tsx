@@ -46,6 +46,7 @@ import {
 import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ApplicationCompare } from './application-compare';
 import {
   DropdownMenu,
@@ -149,9 +150,11 @@ function ScoreChip({ score }: { score: number | null }) {
 
 interface ContactTableProps {
   slug: string;
+  openCreateForm?: boolean;
 }
 
-export function ContactTable({ slug }: ContactTableProps) {
+export function ContactTable({ slug, openCreateForm = false }: ContactTableProps) {
+  const router = useRouter();
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -166,7 +169,7 @@ export function ContactTable({ slug }: ContactTableProps) {
   >('agent-priority');
   const [importOpen, setImportOpen] = useState(false);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(openCreateForm);
   const [editContact, setEditContact] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   // Set on fetchContacts failure. Used to render an inline banner above the
@@ -192,6 +195,20 @@ export function ContactTable({ slug }: ContactTableProps) {
   const [savingView, setSavingView] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirm();
+
+  // The global quick-create menu can open this form from any realtor route.
+  // Keep the URL as the cross-route hand-off, then remove the flag when the
+  // dialog closes so choosing "New contact" again always re-opens it.
+  useEffect(() => {
+    if (openCreateForm) setAddOpen(true);
+  }, [openCreateForm]);
+
+  function handleAddOpenChange(open: boolean) {
+    setAddOpen(open);
+    if (!open && openCreateForm) {
+      router.replace(`/s/${slug}/contacts`, { scroll: false });
+    }
+  }
 
   // The complete cut a saved view restores. Captures the WHOLE filter set
   // (not just the stage) so reloading a complex view — "Buyers · hot · tagged
@@ -1471,7 +1488,7 @@ export function ContactTable({ slug }: ContactTableProps) {
       )}
       <ContactForm
         open={addOpen}
-        onOpenChange={setAddOpen}
+        onOpenChange={handleAddOpenChange}
         onSubmit={handleAdd}
         mode="add"
         slug={slug}
