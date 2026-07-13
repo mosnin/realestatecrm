@@ -32,7 +32,6 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import { BarChart2 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -239,22 +238,19 @@ export default async function BrokerUsagePage() {
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Total tokens</p>
               <p className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')} style={TITLE_FONT}>
-                <AnimatedNumber value={totalTokens} format={(n) => fmtTokens(Math.round(n))} />
+                {fmtTokens(totalTokens)}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Total cost</p>
               <p className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')} style={TITLE_FONT}>
-                <AnimatedNumber value={totalCost} format={fmtCost} />
+                {fmtCost(totalCost)}
               </p>
             </div>
             <div className="bg-background px-4 py-4 space-y-0.5">
               <p className={SECTION_LABEL}>Turns</p>
               <p className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')} style={TITLE_FONT}>
-                <AnimatedNumber
-                  value={totalTurns}
-                  format={(n) => Math.round(n).toLocaleString()}
-                />
+                {totalTurns.toLocaleString()}
               </p>
             </div>
           </section>

@@ -26,7 +26,6 @@ import {
   CHIPPI_PILL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
 
@@ -506,7 +505,7 @@ export default async function BrokerForecastPage() {
           <section className="space-y-1">
             <p className={SECTION_LABEL}>Projected GCI, {monthName}</p>
             <p className={cn(STAT_NUMBER)} style={TITLE_FONT}>
-              <AnimatedNumber value={totalForecast} format={formatCurrency} />
+              {formatCurrency(totalForecast)}
             </p>
             <p className={cn(CAPTION, 'tabular-nums')}>
               {activeCount} active {pluralize(activeCount, 'deal')} in the model
@@ -523,7 +522,7 @@ export default async function BrokerForecastPage() {
           >
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={wonGci} format={formatCompact} />
+                {formatCompact(wonGci)}
               </p>
               <p className={cn(CAPTION, 'mt-1')}>
                 Won so far
@@ -534,13 +533,13 @@ export default async function BrokerForecastPage() {
             </div>
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={totalProjectedGci} format={formatCompact} />
+                {formatCompact(totalProjectedGci)}
               </p>
               <p className={cn(CAPTION, 'mt-1')}>In flight (weighted)</p>
             </div>
             <div className="bg-background px-4 py-4">
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                <AnimatedNumber value={totalForecast} format={formatCompact} />
+                {formatCompact(totalForecast)}
               </p>
               <p className={cn(CAPTION, 'mt-1')}>Total projected</p>
             </div>

@@ -21,7 +21,6 @@ import { BrokerMorningStory } from '@/components/broker/broker-morning-story';
 import { DraftImpactCard } from '@/components/broker/draft-impact-card';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
-import { AnimatedNumber } from '@/components/motion/animated-number';
 import {
   aggregateDraftStats,
   draftStatsWindowStart,
@@ -526,14 +525,12 @@ export default async function BrokerBriefPage() {
       >
         <BriefKpiTile
           label="Pipeline"
-          value={totalPipeline}
-          format={(n) => `$${formatCompact(n)}`}
+          display={`$${formatCompact(totalPipeline)}`}
           sub={`${totalDeals} active deal${totalDeals === 1 ? '' : 's'}`}
         />
         <BriefKpiTile
           label="Won"
-          value={totalWonValue}
-          format={(n) => `$${formatCompact(n)}`}
+          display={`$${formatCompact(totalWonValue)}`}
           sub="closed this period"
         />
         <BriefKpiTile
@@ -563,8 +560,8 @@ export default async function BrokerBriefPage() {
           />
         </Link>
         <div className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70 mt-4">
-          <BriefKpiTile label="MTD commission" value={mtdCommission} format={formatCompact} />
-          <BriefKpiTile label="YTD commission" value={ytdCommission} format={formatCompact} />
+          <BriefKpiTile label="MTD commission" display={formatCompact(mtdCommission)} />
+          <BriefKpiTile label="YTD commission" display={formatCompact(ytdCommission)} />
           <BriefKpiTile
             label="Top realtor (MTD)"
             display={
@@ -614,7 +611,7 @@ export default async function BrokerBriefPage() {
                 className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')}
                 style={TITLE_FONT}
               >
-                <AnimatedNumber value={revTotalForecast} format={formatCurrency} />
+                {formatCurrency(revTotalForecast)}
               </p>
               {revPaceSentence && (
                 <p className={cn(CAPTION, 'mt-1')}>
@@ -631,7 +628,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  <AnimatedNumber value={revWonGci} format={formatCompact} />
+                  {formatCompact(revWonGci)}
                 </p>
               </div>
               <div className="bg-background px-4 py-3">
@@ -640,7 +637,7 @@ export default async function BrokerBriefPage() {
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
                   style={TITLE_FONT}
                 >
-                  <AnimatedNumber value={revInFlightGci} format={formatCompact} />
+                  {formatCompact(revInFlightGci)}
                 </p>
               </div>
             </div>

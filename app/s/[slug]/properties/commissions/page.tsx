@@ -129,25 +129,21 @@ export default async function PropertiesCommissionsPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <CommissionStatCell
           value={closedNet}
-          format={formatCompact}
           label="Closed net YTD"
           sub={`${closedYtd.length} won ${pluralize(closedYtd.length, 'deal')}`}
         />
         <CommissionStatCell
           value={closedGci}
-          format={formatCompact}
           label="Closed GCI YTD"
           sub="before splits"
         />
         <CommissionStatCell
           value={expectedNet}
-          format={formatCompact}
           label="Expected net"
           sub={`${inFlight.length} active ${pluralize(inFlight.length, 'deal')}`}
         />
         <CommissionStatCell
           value={stillOwedOut}
-          format={formatCompact}
           label="Still owed out"
           sub="unpaid splits across closed"
         />
@@ -266,4 +262,3 @@ function CommissionTable({
     </div>
   );
 }
-
