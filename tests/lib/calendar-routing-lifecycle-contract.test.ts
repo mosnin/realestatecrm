@@ -38,4 +38,14 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     expect(executionSteps).toContain('const task = persistToolCallError(');
     expect(executionSteps.match(/after\(\(\) => task\)/g)).toHaveLength(3);
   });
+
+  it('retains detached agent dispatch and task activity logging', () => {
+    const delegation = readFileSync('lib/ai-tools/tools/delegate-task.ts', 'utf8');
+    const taskStatus = readFileSync('app/api/agent/tasks/[taskId]/status/route.ts', 'utf8');
+
+    expect(delegation).toContain('const triggerTask = fetch(modalSwarmUrl');
+    expect(delegation).toContain('after(() => triggerTask)');
+    expect(taskStatus).toContain('const activityTask = Promise.resolve(');
+    expect(taskStatus).toContain('after(() => activityTask)');
+  });
 });
