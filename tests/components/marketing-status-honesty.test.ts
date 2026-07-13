@@ -10,4 +10,16 @@ describe('public status honesty', () => {
     expect(source).toContain("if (status === 'degraded') return 'degraded'");
     expect(source).toContain("return 'unknown'");
   });
+
+  it('does not present agent configuration as live service health', () => {
+    const source = readFileSync('app/(marketing)/status/page.tsx', 'utf8');
+    const agentProbe = source.slice(
+      source.indexOf('function checkAgent'),
+      source.indexOf('/**\n * Integrations ride on Composio'),
+    );
+
+    expect(agentProbe).toContain("return 'unknown'");
+    expect(agentProbe).not.toContain("return 'operational'");
+    expect(source).not.toContain('hasLLMKey');
+  });
 });
