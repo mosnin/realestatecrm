@@ -132,6 +132,7 @@ function queueTick(opts: {
   activeSpaceIds: string[];
   ownersBySpace?: Record<string, string>;
   clerkIdByOwner?: Record<string, string>;
+  periodEndsBySpace?: Record<string, string>;
   runnableCount?: number;
 }) {
   const stamps = opts.runnableCount ?? opts.due.length;
@@ -139,6 +140,9 @@ function queueTick(opts: {
     id: r.spaceId,
     ownerId: opts.ownersBySpace?.[r.spaceId] ?? null,
     stripeSubscriptionStatus: opts.activeSpaceIds.includes(r.spaceId) ? 'active' : 'cancelled',
+    stripePeriodEnd: opts.activeSpaceIds.includes(r.spaceId)
+      ? (opts.periodEndsBySpace?.[r.spaceId] ?? '2099-01-01T00:00:00.000Z')
+      : null,
   }));
   const ownerIds = Object.values(opts.ownersBySpace ?? {});
   const userRows = ownerIds.map((id) => ({ id, clerkId: opts.clerkIdByOwner?.[id] ?? null }));
@@ -268,6 +272,20 @@ describe('GET /api/cron/routines', () => {
     const updateArgs = stamp!.chain.find(([m]) => m === 'update')![1][0] as Record<string, unknown>;
     expect(updateArgs.lastRunStatus).toBe('ok');
     expect(typeof updateArgs.lastRunAt).toBe('string');
+  });
+
+  it('does not spend on a stale active entitlement whose Stripe period expired', async () => {
+    queueTick({
+      due: [{ id: 'r_expired', spaceId: 's_expired', instruction: 'should not run' }],
+      activeSpaceIds: ['s_expired'],
+      periodEndsBySpace: { s_expired: '2026-01-01T00:00:00.000Z' },
+      runnableCount: 0,
+    });
+
+    const res = await invoke('Bearer test-secret');
+    const body = await res.json();
+    expect(body).toMatchObject({ due: 1, fired: 0, skipped: 1 });
+    expect(modalCalls).toHaveLength(0);
   });
 
   it('threads the owner Clerk userId into the Modal payload when known', async () => {

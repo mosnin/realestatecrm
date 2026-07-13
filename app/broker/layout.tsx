@@ -10,6 +10,7 @@ import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { BrokerMain } from '@/components/broker/broker-main';
 import { supabase } from '@/lib/supabase';
 import { isAccountComped } from '@/lib/billing/comp';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { pickGreeting } from '@/lib/greetings';
@@ -84,26 +85,32 @@ export default async function BrokerLayout({ children }: { children: React.React
       // 1) The brokerage's OWN subscription — the current, correct billing entity.
       const { data: brokerageSub, error: brokerageSubError } = await supabase
         .from('Brokerage')
-        .select('stripeSubscriptionStatus')
+        .select('stripeSubscriptionStatus, stripePeriodEnd')
         .eq('id', ctx.brokerage.id)
         .maybeSingle();
       if (brokerageSubError) throw brokerageSubError;
       const brokerageStatus = brokerageSub?.stripeSubscriptionStatus ?? 'inactive';
-      const brokerageSubscribed = brokerageStatus === 'active' || brokerageStatus === 'trialing';
+      const brokerageSubscribed = hasCurrentSubscription(
+        brokerageStatus,
+        brokerageSub?.stripePeriodEnd,
+      );
 
       // 2) Legacy fallback: brokerages that subscribed through the OLD Space flow
       //    (on the owner's personal Space) before brokerage billing existed. An
-      //    active/trialing Space sub keeps those owners working — we must NOT
-      //    lock them out just because the Brokerage row has no sub yet.
+      //    current active/trialing Space sub keeps those owners working — we must
+      //    NOT lock them out just because the Brokerage row has no sub yet.
       let legacySpaceSubscribed = false;
       if (!brokerageSubscribed) {
         const { data: legacySpace } = await supabase
           .from('Space')
-          .select('stripeSubscriptionStatus')
+          .select('stripeSubscriptionStatus, stripePeriodEnd')
           .eq('ownerId', ctx.brokerage.ownerId)
           .maybeSingle();
         const legacyStatus = legacySpace?.stripeSubscriptionStatus ?? 'inactive';
-        legacySpaceSubscribed = legacyStatus === 'active' || legacyStatus === 'trialing';
+        legacySpaceSubscribed = hasCurrentSubscription(
+          legacyStatus,
+          legacySpace?.stripePeriodEnd,
+        );
       }
 
       // Not subscribed on EITHER entity → send to the brokerage billing surface

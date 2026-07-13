@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { sendStatusUpdateEmail } from '@/lib/email';
@@ -94,10 +94,13 @@ export async function PATCH(
     // Non-fatal — status was updated successfully
   }
 
-  // Send email notification to applicant (fire and forget)
+  // Keep the serverless invocation alive long enough to deliver the email
+  // without adding notification latency to the API response.
   if (contact.email) {
-    sendStatusNotification(contact, status, note?.trim() || null).catch((err) =>
-      console.error('[status] Email notification failed:', err),
+    after(() =>
+      sendStatusNotification(contact, status, note?.trim() || null).catch((err) =>
+        console.error('[status] Email notification failed:', err),
+      ),
     );
   }
 

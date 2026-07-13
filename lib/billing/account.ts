@@ -20,9 +20,11 @@ export interface BillingContext {
   /** The plan that governs grants/limits for this account. */
   plan: PlanId;
   /** Live Stripe subscription status of the FUNDING account (space or pooled
-   *  brokerage). Used by the spend gate to refuse delinquent (canceled /
-   *  past_due / unpaid) accounts. null when the account never subscribed. */
+   *  brokerage). Used with subscriptionPeriodEnd to refuse lapsed paid access.
+   *  null when the account never subscribed. */
   subscriptionStatus: string | null;
+  /** Persisted end of the current Stripe billing/trial period. */
+  subscriptionPeriodEnd: string | null;
   /** True when the account has admin-granted complimentary (free) access —
    *  unlimited usage, no Stripe required. Independent of subscriptionStatus. */
   isComped: boolean;
@@ -39,7 +41,7 @@ const BROKERAGE_PLANS = new Set<string>(['team', 'team_plus']);
 export async function resolveBillingAccount(spaceId: string): Promise<BillingContext> {
   const { data: space, error } = await supabase
     .from('Space')
-    .select('id, plan, brokerageId, ownerId, stripeSubscriptionStatus')
+    .select('id, plan, brokerageId, ownerId, stripeSubscriptionStatus, stripePeriodEnd')
     .eq('id', spaceId)
     .maybeSingle();
   if (error) throw error;
@@ -57,6 +59,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
       account: { type: 'space', id: space.id as string },
       plan: await getCompSpacePlan(space.id as string),
       subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
+      subscriptionPeriodEnd: (space.stripePeriodEnd as string) ?? null,
       isComped: true,
     };
   }
@@ -64,7 +67,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
   if (space.brokerageId) {
     const { data: brokerage } = await supabase
       .from('Brokerage')
-      .select('id, plan, stripeSubscriptionStatus')
+      .select('id, plan, stripeSubscriptionStatus, stripePeriodEnd')
       .eq('id', space.brokerageId)
       .maybeSingle();
     if (brokerage && BROKERAGE_PLANS.has(brokerage.plan as string)) {
@@ -84,6 +87,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
           account: { type: 'brokerage', id: brokerage.id as string },
           plan: brokerageComped ? COMP_BROKERAGE_PLAN : (brokerage.plan as PlanId),
           subscriptionStatus: (brokerage.stripeSubscriptionStatus as string) ?? null,
+          subscriptionPeriodEnd: (brokerage.stripePeriodEnd as string) ?? null,
           isComped: brokerageComped,
         };
       }
@@ -94,6 +98,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
     account: { type: 'space', id: space.id as string },
     plan: ((space.plan as string) ?? 'free') as PlanId,
     subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
+    subscriptionPeriodEnd: (space.stripePeriodEnd as string) ?? null,
     isComped: false,
   };
 }

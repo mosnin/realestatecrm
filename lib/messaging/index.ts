@@ -373,8 +373,9 @@ export async function postMessage(
     .eq('channelId', channel.id)
     .eq('userId', senderId);
 
-  // Live fan-out (best-effort).
-  void publishMessageEvent(channel.brokerageId, channel.id, 'message', {
+  // Live fan-out is best-effort inside the publisher, but await its completion
+  // so the serverless invocation cannot be suspended before Ably receives it.
+  await publishMessageEvent(channel.brokerageId, channel.id, 'message', {
     message: serializeMessage(message),
   });
   // Ping other members' personal lanes so their channel list re-sorts + badges,
@@ -383,11 +384,15 @@ export async function postMessage(
     .from('ChannelMember')
     .select('userId')
     .eq('channelId', channel.id);
+  const inboxPublishes: Promise<void>[] = [];
   for (const m of members ?? []) {
     const uid = (m as { userId: string }).userId;
     if (uid === senderId) continue;
-    void publishUserEvent(channel.brokerageId, uid, 'inbox', { channelId: channel.id });
+    inboxPublishes.push(
+      publishUserEvent(channel.brokerageId, uid, 'inbox', { channelId: channel.id }),
+    );
   }
+  await Promise.all(inboxPublishes);
 
   return message;
 }
@@ -413,7 +418,7 @@ export async function markRead(
     .eq('channelId', channel.id)
     .eq('userId', userId);
 
-  void publishMessageEvent(channel.brokerageId, channel.id, 'read', {
+  await publishMessageEvent(channel.brokerageId, channel.id, 'read', {
     userId,
     lastReadMessageId: messageId,
     lastReadAt: createdAt,

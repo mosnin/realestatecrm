@@ -15,7 +15,7 @@
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getCreditBalance, spendCredits, workflowCost } from '@/lib/billing/credits';
 import { isPlatformAdmin } from '@/lib/permissions';
-import { isSubscriptionDelinquent } from '@/lib/api-auth';
+import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import type { Workflow } from '@/lib/plans';
 
@@ -73,21 +73,17 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
     // only the up-front gate is skipped. Checked after the enforcement guard so it
     // adds zero overhead while CREDITS_ENFORCED is off.
     if (await isPlatformAdmin()) return;
-    const { account, subscriptionStatus, isComped } = await resolveBillingAccount(spaceId);
+    const { account, subscriptionStatus, subscriptionPeriodEnd, isComped } =
+      await resolveBillingAccount(spaceId);
     // Complimentary (admin-granted) accounts get unlimited usage — never blocked
-    // by the delinquency or credit gate, same posture as the platform-admin
+    // by the subscription or credit gate, same posture as the platform-admin
     // exemption above. Demos must never hit a wall.
     if (isComped) return;
-    // Delinquency gate (Fix #4): a canceled / past_due / unpaid funding account
-    // can't keep spending even if it has a leftover balance. Reuses the canonical
-    // isSubscriptionDelinquent (same set the chat/broker dunning gates use) so the
-    // "which statuses are delinquent" rule lives in ONE place. Runs only under
-    // CREDITS_ENFORCED and after the admin exemption, matching the existing gate
-    // semantics. The webhook downgrades canceled accounts' plan separately, so
-    // that change still happens regardless of whether enforcement is on. (The chat
-    // route also has an UNCONDITIONAL dunning gate; this extends the same
-    // protection to the metered-workflow entry points, which lacked it.)
-    if (isSubscriptionDelinquent(subscriptionStatus)) {
+    // Dunning gate: refuse premium AI for a delinquent status or stale paid
+    // period, even if credits remain. The period-aware rule lives in one place.
+    // This runs only under CREDITS_ENFORCED and after the admin exemption, matching
+    // existing metered-workflow semantics; chat routes enforce it unconditionally.
+    if (isPremiumAccessBlocked(subscriptionStatus, subscriptionPeriodEnd)) {
       throw new SubscriptionDelinquentError(workflow, subscriptionStatus ?? 'unknown');
     }
     const balance = await getCreditBalance(account);

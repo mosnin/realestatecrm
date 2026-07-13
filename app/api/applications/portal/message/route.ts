@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
@@ -108,9 +108,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
   }
 
-  // Notify realtor via email (fire and forget)
-  notifyRealtorOfMessage(contact.spaceId, contact.name, sanitized).catch((err) =>
-    console.error('[portal/message] Realtor notification failed:', err),
+  // Run after the response while keeping the serverless invocation alive.
+  after(() =>
+    notifyRealtorOfMessage(contact.spaceId, contact.name, sanitized).catch((err) =>
+      console.error('[portal/message] Realtor notification failed:', err),
+    ),
   );
 
   return NextResponse.json({ message }, { status: 201 });

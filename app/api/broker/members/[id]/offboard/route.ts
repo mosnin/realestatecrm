@@ -177,7 +177,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
   }
 
-  // Real-run: fire-and-forget audit.
+  // Real-run: persist the audit after the response.
   void audit({
     actorClerkId: clerkId ?? null,
     action: 'OFFBOARD',

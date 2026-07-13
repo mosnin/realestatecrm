@@ -6,6 +6,7 @@ import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { ApplicationStatusClient } from './application-status-client';
 import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
 // Disable caching so status updates show immediately
 export const dynamic = 'force-dynamic';
@@ -119,8 +120,10 @@ export default async function ApplicationStatusPage({
     ),
   ]);
   const agentName = ownerData?.name || businessName;
-  const hidePoweredBy =
-    space.stripeSubscriptionStatus === 'active' || space.stripeSubscriptionStatus === 'trialing';
+  const hidePoweredBy = hasCurrentSubscription(
+    space.stripeSubscriptionStatus,
+    space.stripePeriodEnd,
+  );
 
   // Shared immersive wrapper for every status-page outcome (error + portal).
   const Shell = ({ children }: { children: ReactNode }) => (

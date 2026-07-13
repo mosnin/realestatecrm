@@ -172,7 +172,7 @@ export function BillingPage({
   trialDays = 7,
   usageStats,
   canceledAccessEnd,
-  supportUrl = 'mailto:support@chippi.com',
+  supportUrl = 'mailto:support@usechippi.com',
   endpoints,
   hideSubscribe = false,
   plan = 'solo',

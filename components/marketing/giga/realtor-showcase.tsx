@@ -163,7 +163,7 @@ const STEPS: ShowcaseStep[] = [
             </div>
           ))}
         </motion.div>
-        <Row icon={Eye} title="chippi.com/alex-rivera" meta="1,240 views this month" right={<Chip label="Share" tone="bg-white/10 text-white/60" />} />
+        <Row icon={Eye} title="usechippi.com/p/alex-rivera" meta="1,240 views this month" right={<Chip label="Share" tone="bg-white/10 text-white/60" />} />
       </Frost>
     ),
   },

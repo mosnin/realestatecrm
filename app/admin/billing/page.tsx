@@ -19,8 +19,16 @@ import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 import { StatGrid } from '@/app/admin/components/stat-grid';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BillingCreditTool } from './credit-tool';
+import { hasCurrentSubscription } from '@/lib/api-auth';
 
-type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | 'inactive';
+type SubscriptionStatus =
+  | 'active'
+  | 'trialing'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'inactive'
+  | 'expired';
 
 // Entry-tier price (Solo, $97 — lib/plans.ts). MRR here is approximate: it
 // prices every active Space sub at the entry tier because Space rows don't
@@ -40,7 +48,22 @@ const statusBarColors: Record<SubscriptionStatus, string> = {
   canceled: 'bg-red-500',
   unpaid: 'bg-red-400',
   inactive: 'bg-muted-foreground/40',
+  expired: 'bg-muted-foreground/70',
 };
+
+function effectiveSubscriptionStatus(
+  status: SubscriptionStatus | null | undefined,
+  periodEnd: string | null | undefined,
+  now: Date,
+): SubscriptionStatus {
+  if (
+    (status === 'active' || status === 'trialing') &&
+    !hasCurrentSubscription(status, periodEnd, now)
+  ) {
+    return 'expired';
+  }
+  return status ?? 'inactive';
+}
 
 export default async function AdminBillingPage() {
   const isAdmin = await isPlatformAdmin();
@@ -56,6 +79,7 @@ export default async function AdminBillingPage() {
     canceled: 0,
     unpaid: 0,
     inactive: 0,
+    expired: 0,
   };
   let totalSpaces = 0;
   let recentSubscriptions: {
@@ -91,7 +115,7 @@ export default async function AdminBillingPage() {
       // All spaces for status counts
       supabase
         .from('Space')
-        .select('stripeSubscriptionStatus'),
+        .select('stripeSubscriptionStatus, stripePeriodEnd'),
       // Recent subscriptions (non-inactive, ordered by period end)
       supabase
         .from('Space')
@@ -118,10 +142,17 @@ export default async function AdminBillingPage() {
     ]);
 
     // Count by status
-    const allSpaces = (allSpacesRes.data ?? []) as { stripeSubscriptionStatus: SubscriptionStatus }[];
+    const allSpaces = (allSpacesRes.data ?? []) as {
+      stripeSubscriptionStatus: SubscriptionStatus;
+      stripePeriodEnd: string | null;
+    }[];
     totalSpaces = allSpaces.length;
     for (const space of allSpaces) {
-      const status = space.stripeSubscriptionStatus as SubscriptionStatus;
+      const status = effectiveSubscriptionStatus(
+        space.stripeSubscriptionStatus,
+        space.stripePeriodEnd,
+        now,
+      );
       if (status in statusCounts) {
         statusCounts[status]++;
       }
@@ -133,7 +164,11 @@ export default async function AdminBillingPage() {
       name: row.name,
       ownerId: row.ownerId,
       ownerEmail: row.User?.email ?? '',
-      stripeSubscriptionStatus: row.stripeSubscriptionStatus as SubscriptionStatus,
+      stripeSubscriptionStatus: effectiveSubscriptionStatus(
+        row.stripeSubscriptionStatus as SubscriptionStatus,
+        row.stripePeriodEnd,
+        now,
+      ),
       stripePeriodEnd: row.stripePeriodEnd,
       stripeCustomerId: row.stripeCustomerId,
       stripeSubscriptionId: row.stripeSubscriptionId,
@@ -143,7 +178,11 @@ export default async function AdminBillingPage() {
       id: row.id,
       name: row.name,
       plan: row.plan ?? '—',
-      stripeSubscriptionStatus: row.stripeSubscriptionStatus as SubscriptionStatus,
+      stripeSubscriptionStatus: effectiveSubscriptionStatus(
+        row.stripeSubscriptionStatus as SubscriptionStatus,
+        row.stripePeriodEnd,
+        now,
+      ),
       stripePeriodEnd: row.stripePeriodEnd,
       stripeCustomerId: row.stripeCustomerId,
       stripeSubscriptionId: row.stripeSubscriptionId,
@@ -179,7 +218,15 @@ export default async function AdminBillingPage() {
 
   const mrr = statusCounts.active * PRICE_PER_SEAT;
   const paidStatuses: SubscriptionStatus[] = ['active', 'trialing', 'past_due', 'canceled', 'unpaid'];
-  const displayStatuses: SubscriptionStatus[] = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'inactive'];
+  const displayStatuses: SubscriptionStatus[] = [
+    'active',
+    'trialing',
+    'past_due',
+    'canceled',
+    'unpaid',
+    'expired',
+    'inactive',
+  ];
 
   return (
     <div className="space-y-8 pb-12">

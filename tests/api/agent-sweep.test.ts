@@ -165,11 +165,23 @@ function invoke(authHeader?: string) {
 
 /** Queue the two supabase reads: spaces list, then pending drafts list. */
 function queueSweep(opts: {
-  spaces: Array<{ id: string; slug: string }>;
+  spaces: Array<{
+    id: string;
+    slug: string;
+    stripeSubscriptionStatus?: string;
+    stripePeriodEnd?: string | null;
+  }>;
   pending: Array<{ spaceId: string }>;
 }) {
   supabaseQueue = [
-    { data: opts.spaces, error: null },
+    {
+      data: opts.spaces.map((space) => ({
+        stripeSubscriptionStatus: 'active',
+        stripePeriodEnd: '2099-01-01T00:00:00.000Z',
+        ...space,
+      })),
+      error: null,
+    },
     { data: opts.pending, error: null },
   ];
 }
@@ -295,6 +307,23 @@ describe('GET /api/cron/agent-sweep', () => {
       .filter(([k]) => k.toLowerCase() === 'authorization')
       .map(([, v]) => v);
     expect(authValues).toContain('Bearer agent-secret');
+  });
+
+  it('does not spend on a stale active entitlement whose Stripe period expired', async () => {
+    queueSweep({
+      spaces: [
+        {
+          id: 'space_expired',
+          slug: 'expired',
+          stripePeriodEnd: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      pending: [],
+    });
+
+    const res = await invoke('Bearer test-secret');
+    expect(await res.json()).toEqual({ totalSpaces: 0, started: 0, skipped: 0, errored: 0 });
+    expect(modalCalls).toHaveLength(0);
   });
 
   it('paginates the active-space fetch with .range (no silent PostgREST row cap)', async () => {

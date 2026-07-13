@@ -50,7 +50,7 @@ import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
-import { isSubscriptionDelinquent } from '@/lib/api-auth';
+import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { z } from 'zod';
 import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
 
@@ -438,16 +438,22 @@ export async function POST(req: NextRequest) {
   // Dunning gate — a broker's seats are funded by the BROKERAGE subscription, so
   // gate on the brokerage's status. The realtor route (app/api/ai/task) gates
   // its funding account too; broker-task previously had NO dunning gate, so a
-  // lapsed Team kept full premium AI for every seat. Only past_due / canceled /
-  // unpaid are gated; active / trialing / inactive pass. Platform admins bypass.
-  // Fails OPEN so a DB hiccup can't lock out a paying brokerage.
+  // lapsed Team kept full premium AI for every seat. Past-due, canceled, unpaid,
+  // and active/trialing rows whose Stripe period has expired are gated; inactive
+  // accounts keep their included free access. Platform admins bypass. Fails OPEN
+  // so a DB hiccup can't lock out a paying brokerage.
   try {
     const { data: bRow } = await supabase
       .from('Brokerage')
-      .select('stripeSubscriptionStatus')
+      .select('stripeSubscriptionStatus, stripePeriodEnd')
       .eq('id', brokerageId)
       .maybeSingle();
-    if (isSubscriptionDelinquent(bRow?.stripeSubscriptionStatus ?? 'inactive')) {
+    if (
+      isPremiumAccessBlocked(
+        bRow?.stripeSubscriptionStatus ?? 'inactive',
+        bRow?.stripePeriodEnd,
+      )
+    ) {
       const { data: userRow } = await supabase
         .from('User')
         .select('platformRole')

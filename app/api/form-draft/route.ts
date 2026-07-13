@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
@@ -150,17 +150,19 @@ export async function POST(req: NextRequest) {
 
     const businessName = settings?.businessName || space.name;
 
-    // Send the resume email (fire-and-forget — don't block the response)
+    // Send after the response while keeping the serverless invocation alive.
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
     const resumeUrl = `${appUrl}/apply/${space.slug}?resume=${resumeToken}`;
 
-    sendDraftResumeEmail({
-      toEmail: normalizedEmail,
-      businessName,
-      resumeUrl,
-    }).catch((err) => {
-      console.error('[form-draft] Failed to send resume email:', err);
-    });
+    after(() =>
+      sendDraftResumeEmail({
+        toEmail: normalizedEmail,
+        businessName,
+        resumeUrl,
+      }).catch((err) => {
+        console.error('[form-draft] Failed to send resume email:', err);
+      }),
+    );
 
     return NextResponse.json({
       draftId: newDraft.id,

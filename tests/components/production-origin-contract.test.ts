@@ -36,10 +36,25 @@ describe('production origin contract', () => {
   it('uses the supported public domain in generated marketing assets', () => {
     const openGraph = readFileSync('app/(marketing)/opengraph-image.tsx', 'utf8');
     const onboarding = readFileSync('components/onboarding/onboarding-steps.tsx', 'utf8');
+    const workspaceSettings = readFileSync(
+      'app/s/[slug]/settings/general-settings-form.tsx',
+      'utf8',
+    );
+    const realtorShowcase = readFileSync(
+      'components/marketing/giga/realtor-showcase.tsx',
+      'utf8',
+    );
+    const billing = readFileSync('components/billing/billing-page.tsx', 'utf8');
 
     expect(openGraph).toContain('usechippi.com');
     expect(openGraph).not.toContain('chippi.app');
     expect(onboarding).toContain("urlPrefix = 'usechippi.com/'");
+    expect(workspaceSettings).toContain('usechippi.com/apply/{newSlug}');
+    expect(workspaceSettings).not.toContain('Your intake link: chippi.com/');
+    expect(realtorShowcase).toContain('usechippi.com/p/alex-rivera');
+    expect(realtorShowcase).not.toContain('chippi.com/alex-rivera');
+    expect(billing).toContain("mailto:support@usechippi.com");
+    expect(billing).not.toContain("mailto:support@chippi.com");
   });
 
   it('prefers the configured app URL and adds a scheme to Vercel hosts', () => {

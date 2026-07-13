@@ -1,9 +1,7 @@
 /**
- * pickGreeting — the server-picked splash greeting. It's random, so pin the
- * invariants that hold across every draw: the result is always a real pool
- * member (never undefined), it embeds the TRIMMED name when one is given and
- * never the raw untrimmed string, and a blank/whitespace name falls back to
- * the no-name pool. Drawing many times exercises the whole pool.
+ * pickGreeting — deterministic server-picked splash greeting. The invariant
+ * that matters most is identical text across repeated server/RSC renders so
+ * the client never hydrates a different greeting.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -37,10 +35,9 @@ describe('pickGreeting', () => {
     }
   });
 
-  it('eventually surfaces every named variant (random covers the pool)', () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < 400; i++) seen.add(pickGreeting('Sam'));
-    expect(seen.size).toBe(NAMED_POOL('Sam').length);
+  it('is deterministic across repeated renders for hydration safety', () => {
+    const first = pickGreeting('Sam');
+    for (let i = 0; i < 100; i++) expect(pickGreeting('Sam')).toBe(first);
   });
 
   it('trims the name and never echoes surrounding whitespace', () => {
