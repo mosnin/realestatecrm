@@ -8,10 +8,10 @@ describe('realtor quick-create shortcuts', () => {
   it('targets actual creation flows instead of list pages', () => {
     const sidebar = readFileSync(resolve(root, 'components/dashboard/sidebar.tsx'), 'utf8');
 
-    expect(sidebar).toContain("{ href: \`${base}/contacts?new=contact\`, label: 'New contact' }");
-    expect(sidebar).toContain("{ href: \`${base}/deals/new\`, label: 'New deal' }");
-    expect(sidebar).not.toContain("{ href: \`${base}/contacts\`, label: 'New contact' }");
-    expect(sidebar).not.toContain("{ href: \`${base}/deals\`, label: 'New deal' }");
+    expect(sidebar).toContain("{ href: `${base}/contacts?new=contact`, label: 'New contact' }");
+    expect(sidebar).toContain("{ href: `${base}/deals/new`, label: 'New deal' }");
+    expect(sidebar).not.toContain("{ href: `${base}/contacts`, label: 'New contact' }");
+    expect(sidebar).not.toContain("{ href: `${base}/deals`, label: 'New deal' }");
   });
 
   it('hands the contact-create flag into the client table and clears it on close', () => {
@@ -21,6 +21,6 @@ describe('realtor quick-create shortcuts', () => {
     expect(page).toContain("openCreateForm={sp.new === 'contact'}");
     expect(table).toContain('if (openCreateForm) setAddOpen(true)');
     expect(table).toContain('onOpenChange={handleAddOpenChange}');
-    expect(table).toContain("router.replace(\`/s/${slug}/contacts\`, { scroll: false })");
+    expect(table).toContain("router.replace(`/s/${slug}/contacts`, { scroll: false })");
   });
 });
