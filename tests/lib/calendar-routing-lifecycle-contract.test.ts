@@ -23,6 +23,7 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     const telemetry = readFileSync('lib/telemetry.ts', 'utf8');
     const push = readFileSync('lib/push.ts', 'utf8');
     const connections = readFileSync('lib/integrations/connections.ts', 'utf8');
+    const executionSteps = readFileSync('lib/agent/tool-call-logger.ts', 'utf8');
 
     expect(usage).toContain('const task = persistChatUsage(input)');
     expect(usage).toContain('after(() => task)');
@@ -32,5 +33,9 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     expect(push).toContain('after(() => task)');
     expect(connections).toContain('const task = persistExpiredByToolkit(args)');
     expect(connections).toContain('after(() => task)');
+    expect(executionSteps).toContain('const task = persistToolCallStart(');
+    expect(executionSteps).toContain('const task = persistToolCallComplete(');
+    expect(executionSteps).toContain('const task = persistToolCallError(');
+    expect(executionSteps.match(/after\(\(\) => task\)/g)).toHaveLength(3);
   });
 });
