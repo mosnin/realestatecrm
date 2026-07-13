@@ -30,7 +30,10 @@
 import { PageHero } from '@/components/marketing/site/page-hero';
 import { supabase } from '@/lib/supabase';
 import { hasLLMKey } from '@/lib/llm';
-import { composioConfigured } from '@/lib/integrations/composio';
+import {
+  getComposioReadinessStatus,
+  type ReadinessStatus,
+} from '@/lib/diagnostics/background-readiness';
 
 export const metadata = { title: 'Status · Chippi' };
 
@@ -79,13 +82,20 @@ function checkAgent(): Health {
 }
 
 /**
- * Integrations ride on Composio. Without the API key the whole layer is
- * inert, so config presence is the honest public signal. Per-connection
- * health (this realtor's Gmail token) is auth-gated and not shown here.
+ * Integrations ride on Composio. Reuse the admin readiness probe so a green
+ * public status requires a recently verified signed webhook delivery, not
+ * merely the presence of credentials. Per-connection health (this realtor's
+ * Gmail token) remains auth-gated and is not shown here.
  */
-function checkIntegrations(): Health {
+function integrationsHealth(status: ReadinessStatus): Health {
+  if (status === 'ok') return 'operational';
+  if (status === 'degraded') return 'degraded';
+  return 'unknown';
+}
+
+async function checkIntegrations(): Promise<Health> {
   try {
-    return composioConfigured() ? 'operational' : 'unknown';
+    return integrationsHealth(await getComposioReadinessStatus());
   } catch {
     return 'unknown';
   }
@@ -124,7 +134,7 @@ export default async function StatusPage() {
   const [database, agent, integrations] = await Promise.all([
     checkDatabase(),
     Promise.resolve(checkAgent()),
-    Promise.resolve(checkIntegrations()),
+    checkIntegrations(),
   ]);
 
   const subsystems: Subsystem[] = [

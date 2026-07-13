@@ -38,7 +38,10 @@ const { redisMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/redis', () => ({ redis: redisMock }));
 
-import { getBackgroundReadiness } from '@/lib/diagnostics/background-readiness';
+import {
+  getBackgroundReadiness,
+  getComposioReadinessStatus,
+} from '@/lib/diagnostics/background-readiness';
 
 // Every env key the module probes.
 const KEYS = [
@@ -162,6 +165,21 @@ describe('getBackgroundReadiness', () => {
     const report = await getBackgroundReadiness();
 
     expect(checkByKey(report.checks, 'composio').status).toBe('degraded');
+  });
+
+  it('exposes the same verified-delivery status to public server surfaces', async () => {
+    process.env.COMPOSIO_API_KEY = SECRETS.COMPOSIO_API_KEY;
+    process.env.COMPOSIO_WEBHOOK_SECRET = SECRETS.COMPOSIO_WEBHOOK_SECRET;
+
+    redisMock.get.mockResolvedValue(null);
+    await expect(getComposioReadinessStatus()).resolves.toBe('degraded');
+
+    redisMock.get.mockResolvedValue(new Date().toISOString());
+    await expect(getComposioReadinessStatus()).resolves.toBe('ok');
+  });
+
+  it('reports public Composio readiness as missing when credentials are absent', async () => {
+    await expect(getComposioReadinessStatus()).resolves.toBe('missing');
   });
 
   it('omitting spaceId excludes the per-space recent-activity check', async () => {
