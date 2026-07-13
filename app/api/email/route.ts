@@ -37,6 +37,8 @@ import {
   PROVIDER_MAIL_SLUGS,
   type MailConnection,
 } from '@/lib/communication/connect';
+import { markExpiredByToolkit } from '@/lib/integrations/connections';
+import { isComposioAuthError } from '@/lib/integrations/composio-errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -262,12 +264,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(payload);
   }
 
-  const { items, nextPageToken } = await fetchGmailPage({
-    conn,
-    filter,
-    pageToken,
-    q,
-  });
+  let page;
+  try {
+    page = await fetchGmailPage({ conn, filter, pageToken, q });
+  } catch (error) {
+    if (isComposioAuthError(error)) {
+      await markExpiredByToolkit({
+        spaceId: space.id,
+        userId: conn.userId,
+        toolkit: conn.toolkit,
+        error,
+      }).catch((dbError) => {
+        logger.warn('[api/email] failed to mark disconnected provider expired', { spaceId: space.id }, dbError);
+      });
+      logger.warn('[api/email] provider connection is no longer active', {
+        spaceId: space.id,
+        toolkit: conn.toolkit,
+      });
+      const payload: NotConnectedPayload = { connected: false };
+      return NextResponse.json(payload);
+    }
+
+    logger.error('[api/email] gmail list threw', { spaceId: space.id }, error);
+    return NextResponse.json({ error: 'Could not load your email.' }, { status: 502 });
+  }
+
+  const { items, nextPageToken } = page;
 
   const payload: ConnectedPayload = {
     connected: true,
