@@ -28,6 +28,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { afterMock } = vi.hoisted(() => ({ afterMock: vi.fn() }));
+
+vi.mock('next/server', () => ({ after: afterMock }));
+
 // ── Supabase table-keyed chain mock ───────────────────────────────────────
 interface TableMock {
   rows?: Array<Record<string, unknown>>;
@@ -176,6 +180,7 @@ async function callRouter(): Promise<unknown> {
 }
 
 beforeEach(() => {
+  afterMock.mockReset();
   mockByTable = {};
   for (const key of Object.keys(fromCalls)) delete fromCalls[key];
   for (const key of Object.keys(updateCalls)) delete updateCalls[key];
@@ -279,7 +284,7 @@ describe('routeBrokerageLead — round_robin', () => {
     expect(result?.agentUserId).toBe('u_a');
   });
 
-  it('updates lastAssignedUserId after picking (fire-and-forget)', async () => {
+  it('updates and retains lastAssignedUserId after picking', async () => {
     seedThreeAgents({ assignmentMethod: 'round_robin', lastAssignedUserId: 'u_a' });
     const result = (await callRouter()) as { agentUserId: string } | null;
     expect(result?.agentUserId).toBe('u_b');
@@ -291,6 +296,8 @@ describe('routeBrokerageLead — round_robin', () => {
     expect(writes.length).toBeGreaterThanOrEqual(1);
     const last = writes[writes.length - 1] ?? {};
     expect(last.lastAssignedUserId).toBe('u_b');
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(afterMock.mock.calls[0]?.[0]).toBeTypeOf('function');
   });
 
   it('ignores offboarded agents (eligibility filter)', async () => {

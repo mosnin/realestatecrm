@@ -17,6 +17,7 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { detectProvider } from '@/lib/llm';
+import { after } from 'next/server';
 
 /**
  * Per-million-token pricing in USD. Mirrors agent/ledger.py:MODEL_PRICES —
@@ -72,7 +73,7 @@ export interface RecordChatUsageInput {
   runtime?: 'modal' | 'ts';
 }
 
-export async function recordChatUsage(input: RecordChatUsageInput): Promise<void> {
+async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
   const promptTokens = Math.max(0, Math.floor(input.promptTokens || 0));
   const completionTokens = Math.max(0, Math.floor(input.completionTokens || 0));
   const cachedTokens = Math.max(
@@ -102,4 +103,15 @@ export async function recordChatUsage(input: RecordChatUsageInput): Promise<void
   } catch (err) {
     logger.warn('[record-chat-usage] insert failed', { spaceId: input.spaceId }, err);
   }
+}
+
+/** Retain usage attribution even when the streaming caller does not await it. */
+export async function recordChatUsage(input: RecordChatUsageInput): Promise<void> {
+  const task = persistChatUsage(input);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  await task;
 }

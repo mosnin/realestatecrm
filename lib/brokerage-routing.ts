@@ -34,6 +34,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 
 export type RoutingMethod = 'round_robin' | 'score_based' | 'rule';
 
@@ -324,11 +325,8 @@ function pickNextAfterCursor(
   return next;
 }
 
-/**
- * Fire-and-forget update of the round-robin cursor. Failures are logged
- * but never propagate — the routing decision has already been made.
- */
-async function updateCursor(brokerageId: string, newCursorUserId: string): Promise<void> {
+/** Persist the round-robin cursor. Failures are logged and never propagate. */
+async function persistCursor(brokerageId: string, newCursorUserId: string): Promise<void> {
   try {
     const { error } = await supabase
       .from('Brokerage')
@@ -345,6 +343,21 @@ async function updateCursor(brokerageId: string, newCursorUserId: string): Promi
   } catch (err) {
     logger.warn('[brokerage-routing] cursor update threw', { brokerageId, newCursorUserId }, err);
   }
+}
+
+/**
+ * Retain the cursor write through the end of a serverless invocation. Routing
+ * callers intentionally do not await this best-effort bookkeeping, but losing
+ * it after the response would repeatedly select the same realtor.
+ */
+async function updateCursor(brokerageId: string, newCursorUserId: string): Promise<void> {
+  const task = persistCursor(brokerageId, newCursorUserId);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  await task;
 }
 
 /**

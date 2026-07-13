@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
@@ -101,7 +101,7 @@ async function handleStatusTransition(
   };
   const actionType = actionTypeMap[status];
   if (actionType) {
-    void Promise.resolve(
+    const activityTask = Promise.resolve(
       supabase
         .from('AgentActivityLog')
         .insert({
@@ -114,6 +114,11 @@ async function handleStatusTransition(
           metadata: { previousStatus, triggeredBy: 'user', userId },
         }),
     ).catch(() => {});
+    try {
+      after(() => activityTask);
+    } catch {
+      // Unit tests may call the handler outside a Next.js request context.
+    }
   }
 
   return NextResponse.json({ ok: true, task: { id: taskId, status } });

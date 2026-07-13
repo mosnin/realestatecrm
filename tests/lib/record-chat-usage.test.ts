@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { insertMock, fromMock } = vi.hoisted(() => ({
+const { afterMock, insertMock, fromMock } = vi.hoisted(() => ({
+  afterMock: vi.fn(),
   insertMock: vi.fn(),
   fromMock: vi.fn(),
 }));
+
+vi.mock('next/server', () => ({ after: afterMock }));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: { from: fromMock },
@@ -16,6 +19,7 @@ vi.mock('@/lib/logger', () => ({
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 
 beforeEach(() => {
+  afterMock.mockReset();
   insertMock.mockReset().mockResolvedValue({ error: null });
   fromMock.mockReset().mockReturnValue({ insert: insertMock });
 });
@@ -34,6 +38,8 @@ describe('recordChatUsage cost accounting', () => {
     expect(insertMock).toHaveBeenCalledWith(
       expect.objectContaining({ costUsd: 0.004321 }),
     );
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(afterMock.mock.calls[0]?.[0]).toBeTypeOf('function');
   });
 
   it('uses the current fallback rate when exact cost is absent', async () => {

@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { after } from 'next/server';
 import { defineTool, type ToolContext } from '../types';
 
 const parameters = z.object({
@@ -147,7 +148,7 @@ export function buildDelegateTaskTool() {
 
       // Fire-and-forget to Modal. Do NOT await — the chat turn must not block
       // on the sub-agent. The UI's stream subscription carries progress.
-      void fetch(modalSwarmUrl, {
+      const triggerTask = fetch(modalSwarmUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,6 +162,11 @@ export function buildDelegateTaskTool() {
       }).catch((err) => {
         logger.error('[delegate_task] Modal swarm trigger failed', { spaceId: ctx.space.id, runId }, err);
       });
+      try {
+        after(() => triggerTask);
+      } catch {
+        // Unit tests and non-Next workers may not have a request context.
+      }
 
       const shortGoal = goal.length > 120 ? `${goal.slice(0, 117)}…` : goal;
       return {

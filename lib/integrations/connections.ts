@@ -7,6 +7,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { after } from 'next/server';
 import { deleteConnection as composioDelete, listConnectedAccountsForEntity } from './composio';
 import { findIntegration } from './catalog';
 
@@ -390,7 +391,7 @@ export async function markExpiredByComposioId(
  * for, but not necessarily the Composio connected-account id (the SDK
  * doesn't always surface it on the error). Idempotent.
  */
-export async function markExpiredByToolkit(args: {
+async function persistExpiredByToolkit(args: {
   spaceId: string;
   userId: string;
   toolkit: string;
@@ -409,6 +410,22 @@ export async function markExpiredByToolkit(args: {
     toolkit: args.toolkit,
     err: message,
   });
+}
+
+/** Retain the status correction when chat intentionally keeps it off-path. */
+export async function markExpiredByToolkit(args: {
+  spaceId: string;
+  userId: string;
+  toolkit: string;
+  error: unknown;
+}): Promise<void> {
+  const task = persistExpiredByToolkit(args);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  await task;
 }
 
 /** Find any active row for this (space, user, toolkit). Helper for callback. */
