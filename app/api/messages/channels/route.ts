@@ -82,10 +82,13 @@ export async function POST(req: Request) {
     );
   }
 
-  for (const uid of new Set([...initialMembers, ctx.dbUserId])) {
-    if (uid === ctx.dbUserId) continue;
-    void publishUserEvent(ctx.brokerage.id, uid, 'channel_added', { channelId: channel.id });
-  }
+  await Promise.all(
+    [...new Set([...initialMembers, ctx.dbUserId])]
+      .filter((uid) => uid !== ctx.dbUserId)
+      .map((uid) =>
+        publishUserEvent(ctx.brokerage.id, uid, 'channel_added', { channelId: channel.id }),
+      ),
+  );
 
   return NextResponse.json({ channel }, { status: 201 });
 }

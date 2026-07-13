@@ -20,7 +20,7 @@ export async function POST(_req: Request, { params }: Params) {
   const membership = await getMembership(ctx.brokerage.id, id, ctx.dbUserId);
   if (!membership) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  void publishMessageEvent(ctx.brokerage.id, id, 'typing', {
+  await publishMessageEvent(ctx.brokerage.id, id, 'typing', {
     userId: ctx.dbUserId,
     name: ctx.membership.displayName ?? null,
   });

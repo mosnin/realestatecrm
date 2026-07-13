@@ -38,7 +38,9 @@ export async function POST(req: Request) {
   );
 
   if (created) {
-    void publishUserEvent(ctx.brokerage.id, otherUserId, 'channel_added', { channelId: channel.id });
+    await publishUserEvent(ctx.brokerage.id, otherUserId, 'channel_added', {
+      channelId: channel.id,
+    });
   }
 
   return NextResponse.json({ channel }, { status: created ? 201 : 200 });
