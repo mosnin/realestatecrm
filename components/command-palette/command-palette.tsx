@@ -76,8 +76,8 @@ export function CommandPalette({ slug }: Props) {
 
     // Create
     { kind: 'route', id: 'new-deal',    group: 'Create', label: 'New deal',      icon: Plus,      href: `${base}/deals/new` },
-    { kind: 'route', id: 'new-contact', group: 'Create', label: 'Add contact',   icon: UserPlus,  href: `${base}/contacts` },
-    { kind: 'route', id: 'new-tour',    group: 'Create', label: 'Schedule tour', icon: PhoneCall, href: `${base}/calendar` },
+    { kind: 'route', id: 'new-contact', group: 'Create', label: 'Add contact',   icon: UserPlus,  href: `${base}/contacts?new=contact` },
+    { kind: 'route', id: 'new-tour',    group: 'Create', label: 'Schedule tour', icon: PhoneCall, href: `${base}/calendar?new=event` },
   ], [base]);
 
   // Global shortcut
