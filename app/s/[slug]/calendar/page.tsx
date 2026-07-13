@@ -31,10 +31,12 @@ export async function generateMetadata({
  */
 export default async function CalendarPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ new?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
@@ -46,6 +48,7 @@ export default async function CalendarPage({
         slug={slug}
         initialConnected={Boolean(connection)}
         initialProvider={connection?.toolkit ?? null}
+        openCreateForm={sp.new === 'event'}
       />
     </div>
   );

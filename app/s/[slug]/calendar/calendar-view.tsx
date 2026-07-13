@@ -27,6 +27,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw, Search, X } from 'lucide-react';
@@ -147,6 +148,7 @@ interface CalendarViewProps {
   slug: string;
   initialConnected: boolean;
   initialProvider: string | null;
+  openCreateForm?: boolean;
 }
 
 type ViewMode = 'month' | 'week' | 'day' | 'agenda';
@@ -197,7 +199,9 @@ export function CalendarView({
   slug,
   initialConnected,
   initialProvider,
+  openCreateForm = false,
 }: CalendarViewProps) {
+  const router = useRouter();
   const [connected, setConnected] = useState(initialConnected);
   const [provider, setProvider] = useState<string | null>(initialProvider);
   const [events, setEvents] = useState<CalendarEventOut[]>([]);
@@ -264,6 +268,21 @@ export function CalendarView({
     setModalPrefill({ date, hour });
     setModalOpen(true);
   }, []);
+
+  // The command palette can hand off directly to the existing event form.
+  // Clear the URL intent when the dialog closes so the shortcut is repeatable.
+  useEffect(() => {
+    if (openCreateForm && connected) {
+      openAddModal(startOfLocalDay(new Date()));
+    }
+  }, [connected, openAddModal, openCreateForm]);
+
+  const closeAddModal = useCallback(() => {
+    setModalOpen(false);
+    if (openCreateForm) {
+      router.replace(`/s/${slug}/calendar`, { scroll: false });
+    }
+  }, [openCreateForm, router, slug]);
 
   // Fetch on connect. Same shape as before.
   useEffect(() => {
@@ -480,7 +499,7 @@ export function CalendarView({
         {connected && (
           <AddEventModal
             open={modalOpen}
-            onClose={() => setModalOpen(false)}
+            onClose={closeAddModal}
             prefill={modalPrefill}
             slug={slug}
             onCreated={handleEventCreated}
