@@ -28,14 +28,18 @@ export default async function ObservabilityPage() {
   const configured = sentryConfigured();
 
   // Fetch in parallel; both are graceful on failure.
-  const [issues, stats] = configured
+  const [issuesResult, stats] = configured
     ? await Promise.all([listIssues(), getEventStats()])
-    : [[], null];
+    : [null, null];
+  const issuesAvailable = issuesResult !== null;
+  const issues = issuesResult ?? [];
 
   const unresolvedCount = issues.filter((i) => i.status === 'unresolved').length;
 
   const statusSentence = !configured
     ? 'Sentry is not connected — set the three env vars to enable this view.'
+    : !issuesAvailable
+    ? 'Sentry issue data is unavailable — monitoring health cannot be confirmed.'
     : unresolvedCount === 0
     ? 'No unresolved issues. All clear.'
     : `${unresolvedCount} unresolved ${pluralize(unresolvedCount, 'issue')} in the last 14 days.`;
@@ -54,6 +58,7 @@ export default async function ObservabilityPage() {
       {/* ── Client component ────────────────────────────────────────────── */}
       <ObservabilityClient
         configured={configured}
+        issuesAvailable={issuesAvailable}
         issues={issues}
         stats={stats}
         fetchedAt={new Date().toISOString()}

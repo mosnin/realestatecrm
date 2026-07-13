@@ -22,12 +22,13 @@ export async function GET() {
   }
 
   const configured = sentryConfigured();
-  const [issues, stats] = configured
+  const [issuesResult, stats] = configured
     ? await Promise.all([listIssues(), getEventStats()])
-    : [[], null];
+    : [null, null];
 
   return NextResponse.json({
-    issues,
+    issues: issuesResult ?? [],
+    issuesAvailable: issuesResult !== null,
     stats,
     fetchedAt: new Date().toISOString(),
   });
