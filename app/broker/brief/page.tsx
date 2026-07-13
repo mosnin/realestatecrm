@@ -525,14 +525,12 @@ export default async function BrokerBriefPage() {
       >
         <BriefKpiTile
           label="Pipeline"
-          value={totalPipeline}
-          format={(n) => `$${formatCompact(n)}`}
+          display={`$${formatCompact(totalPipeline)}`}
           sub={`${totalDeals} active deal${totalDeals === 1 ? '' : 's'}`}
         />
         <BriefKpiTile
           label="Won"
-          value={totalWonValue}
-          format={(n) => `$${formatCompact(n)}`}
+          display={`$${formatCompact(totalWonValue)}`}
           sub="closed this period"
         />
         <BriefKpiTile
@@ -562,8 +560,8 @@ export default async function BrokerBriefPage() {
           />
         </Link>
         <div className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70 mt-4">
-          <BriefKpiTile label="MTD commission" value={mtdCommission} format={formatCompact} />
-          <BriefKpiTile label="YTD commission" value={ytdCommission} format={formatCompact} />
+          <BriefKpiTile label="MTD commission" display={formatCompact(mtdCommission)} />
+          <BriefKpiTile label="YTD commission" display={formatCompact(ytdCommission)} />
           <BriefKpiTile
             label="Top realtor (MTD)"
             display={
