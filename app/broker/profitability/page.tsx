@@ -203,7 +203,7 @@ export default async function BrokerProfitabilityPage() {
               <p className={SECTION_LABEL}>Lead to deal</p>
               <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
                 {totals.teamLeadToDealRate != null ? (
-                  {`${Math.round(totals.teamLeadToDealRate * 10) / 10}%`}
+                  `${Math.round(totals.teamLeadToDealRate * 10) / 10}%`
                 ) : (
                   '—'
                 )}
