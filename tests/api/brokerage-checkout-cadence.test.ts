@@ -196,4 +196,18 @@ describe('POST /api/billing/checkout (brokerage) — billing cadence', () => {
     expect(subscriptionsRetrieveMock).toHaveBeenCalledWith('sub_live');
     expect(sessionsCreateMock).not.toHaveBeenCalled();
   });
+
+  it('fails closed without claiming active when Stripe verification is unavailable', async () => {
+    dbState.subscriptionId = 'sub_unknown';
+    dbState.subscriptionStatus = 'active';
+    dbState.periodEnd = '2026-04-24T00:00:00.000Z';
+    subscriptionsRetrieveMock.mockRejectedValue(new Error('Stripe unavailable'));
+
+    const res = await POST(req({ scope: 'brokerage', plan: 'team' }));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      error: "Couldn't verify your brokerage subscription — usually temporary.",
+    });
+    expect(sessionsCreateMock).not.toHaveBeenCalled();
+  });
 });

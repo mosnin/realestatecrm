@@ -33,7 +33,7 @@ async function hasVerifiedCurrentSubscription(
   subscriptionId: string | null | undefined,
   status: string | null | undefined,
   periodEnd: string | null | undefined,
-): Promise<boolean> {
+): Promise<boolean | null> {
   if (status !== 'active' && status !== 'trialing') return false;
   if (hasCurrentSubscription(status, periodEnd)) return true;
   if (!subscriptionId) return false;
@@ -50,7 +50,7 @@ async function hasVerifiedCurrentSubscription(
     );
   } catch (err) {
     console.error('[checkout] Could not verify stale subscription against Stripe:', err);
-    return true;
+    return null;
   }
 }
 
@@ -114,14 +114,19 @@ export async function POST(req: NextRequest) {
     // Block a verified current subscription. A stale row is checked against
     // Stripe so a canceled customer can renew without risking a duplicate sub.
     const currentStatus = stripeData?.stripeSubscriptionStatus;
-    if (
-      await hasVerifiedCurrentSubscription(
-        stripe,
-        stripeData?.stripeSubscriptionId,
-        currentStatus,
-        stripeData?.stripePeriodEnd,
-      )
-    ) {
+    const subscriptionIsCurrent = await hasVerifiedCurrentSubscription(
+      stripe,
+      stripeData?.stripeSubscriptionId,
+      currentStatus,
+      stripeData?.stripePeriodEnd,
+    );
+    if (subscriptionIsCurrent === null) {
+      return NextResponse.json(
+        { error: "Couldn't verify your existing subscription — usually temporary." },
+        { status: 503 },
+      );
+    }
+    if (subscriptionIsCurrent) {
       return NextResponse.json({ error: 'You already have an active subscription.' }, { status: 400 });
     }
 
@@ -316,14 +321,19 @@ async function handleBrokerageCheckout(
   // Block a verified current subscription. Live Stripe verification lets an
   // actually canceled brokerage renew even when its webhook-backed row is stale.
   const currentStatus = brokerageStripe.stripeSubscriptionStatus;
-  if (
-    await hasVerifiedCurrentSubscription(
-      stripe,
-      brokerageStripe.stripeSubscriptionId,
-      currentStatus,
-      brokerageStripe.stripePeriodEnd,
-    )
-  ) {
+  const subscriptionIsCurrent = await hasVerifiedCurrentSubscription(
+    stripe,
+    brokerageStripe.stripeSubscriptionId,
+    currentStatus,
+    brokerageStripe.stripePeriodEnd,
+  );
+  if (subscriptionIsCurrent === null) {
+    return NextResponse.json(
+      { error: "Couldn't verify your brokerage subscription — usually temporary." },
+      { status: 503 },
+    );
+  }
+  if (subscriptionIsCurrent) {
     return NextResponse.json(
       { error: 'Your brokerage already has an active subscription.' },
       { status: 400 },
