@@ -40,14 +40,9 @@ async function hasVerifiedCurrentSubscription(
 
   try {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    const livePeriodEnd =
-      subscription.items.data[0]?.current_period_end ??
-      subscription.trial_end ??
-      subscription.start_date;
-    return hasCurrentSubscription(
-      subscription.status,
-      new Date(livePeriodEnd * 1000),
-    );
+    // Stripe is authoritative once queried live. A live active/trialing status
+    // blocks checkout even if a period timestamp is delayed or unusual.
+    return subscription.status === 'active' || subscription.status === 'trialing';
   } catch (err) {
     console.error('[checkout] Could not verify stale subscription against Stripe:', err);
     return null;
