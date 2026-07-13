@@ -7,6 +7,7 @@ import {
   createNamedChannel,
 } from '@/lib/messaging';
 import { publishUserEvent } from '@/lib/realtime/ably';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/messages/channels — the messaging sidebar payload: the caller's
@@ -65,12 +66,21 @@ export async function POST(req: Request) {
   // A public channel includes the whole brokerage; a private one only the picks.
   const initialMembers = vis === 'public' ? roster.map((r) => r.userId) : requested;
 
-  const channel = await createNamedChannel(ctx.brokerage.id, ctx.dbUserId, {
-    name: cleanName,
-    topic: typeof topic === 'string' ? topic.trim().slice(0, 200) : null,
-    visibility: vis,
-    memberIds: initialMembers,
-  });
+  let channel;
+  try {
+    channel = await createNamedChannel(ctx.brokerage.id, ctx.dbUserId, {
+      name: cleanName,
+      topic: typeof topic === 'string' ? topic.trim().slice(0, 200) : null,
+      visibility: vis,
+      memberIds: initialMembers,
+    });
+  } catch (error) {
+    logger.error('[messages/channels] channel creation failed', { brokerageId: ctx.brokerage.id }, error);
+    return NextResponse.json(
+      { error: 'Channel creation is temporarily unavailable. Please try again.' },
+      { status: 503 },
+    );
+  }
 
   for (const uid of new Set([...initialMembers, ctx.dbUserId])) {
     if (uid === ctx.dbUserId) continue;
