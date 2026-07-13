@@ -7,8 +7,8 @@
  * under dark gradient scrims. Centered: a glassy eyebrow pill, a HUGE two-line
  * thin serif headline (clamped ~40→92px, light weight, tight leading), a
  * one-line muted subhead, and a white rounded-full pill CTA. A small glassy
- * video/testimonial card sits bottom-left; a grayscale logo cloud fades in
- * along the very bottom. Every element blur-rises in on load (the redesign's
+ * capability band fades in along the very bottom. Every element blur-rises in
+ * on load (the redesign's
  * entrance language); respects prefers-reduced-motion via BlurRise.
  */
 
@@ -17,10 +17,7 @@ import { ShimmeringText } from '@/components/ui/shimmering-text';
 import { LogosCarousel } from '@/components/ui/logos-carousel';
 import { HeroChat } from './hero-chat';
 
-/* Brokerage wordmarks for the social-proof marquee. Rendered as uniform styled
- * text so every mark reads at the same size/weight (image logos had wildly
- * different intrinsic ratios). Swap for real partner marks when available. */
-const LOGOS = ['Compass', 'RE/MAX', 'Coldwell Banker', 'Keller Williams', 'eXp Realty', 'Sotheby’s'];
+const CAPABILITIES = ['Lead routing', 'Audit trails', 'Team analytics', 'Shared templates', 'Role controls', 'Automations'];
 
 export function Hero() {
   return (
@@ -83,7 +80,8 @@ export function Hero() {
         </BlurRise>
       </div>
 
-      {/* Logo cloud, fading in along the bottom */}
+      {/* Product capabilities, fading in along the bottom. Do not present
+          brokerage names here unless a public customer approval exists. */}
       <BlurRise
         trigger="load"
         delay={0.7}
@@ -91,21 +89,20 @@ export function Hero() {
         className="absolute inset-x-0 bottom-0 z-10 border-t border-white/[0.08] bg-gradient-to-t from-black/80 to-transparent"
       >
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-6 sm:px-8">
-          <Mono className="text-[10px] text-white/40">Trusted across modern brokerages</Mono>
-          {/* Staggered-wave logos carousel (replaces the linear marquee): marks
-              cycle column by column in a ripple — calmer than a conveyor belt
-              and each name gets a still moment to be read. Handles reduced
+          <Mono className="text-[10px] text-white/40">Built for modern brokerages</Mono>
+          {/* Staggered-wave capability carousel: items cycle column by column
+              in a ripple. Handles reduced
               motion internally (renders static). */}
           <LogosCarousel
             columnCount={3}
             className="w-full max-w-3xl place-items-center gap-x-10"
           >
-            {LOGOS.map((name) => (
+            {CAPABILITIES.map((capability) => (
               <span
-                key={name}
+                key={capability}
                 className="whitespace-nowrap text-[17px] font-semibold tracking-tight text-white/40"
               >
-                {name}
+                {capability}
               </span>
             ))}
           </LogosCarousel>
