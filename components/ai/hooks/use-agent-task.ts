@@ -107,6 +107,13 @@ export interface UseAgentTaskResult {
   /** Accumulated reasoning tokens for the current streaming turn. Empty string when not streaming. */
   streamingReasoning: string;
   /**
+   * The live action line for the thinking indicator ("Reading your
+   * workspace…", "Running Find contacts…"). Driven by server `status` events
+   * and tool_call_start/result; cleared on the first text_delta of the turn
+   * and on every terminal event. Null when there's nothing to say.
+   */
+  currentAction: string | null;
+  /**
    * The plan emitted by the most recent `create_plan` tool call during the
    * current streaming turn. Null when not streaming or when no plan has been
    * created yet. Cleared automatically on `turn_complete`.
@@ -164,6 +171,20 @@ function newId(): string {
   return Math.random().toString(36).slice(2);
 }
 
+/**
+ * Turn a snake_case tool name into a thinking-indicator action line:
+ * "find_contacts" → "Running Find Contacts". delegate_task gets bespoke copy
+ * since it kicks off a longer background job.
+ */
+function friendlyToolAction(name: string): string {
+  if (name === 'delegate_task') return 'Starting a background task';
+  const words = name
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+  return `Running ${words}`;
+}
+
 export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const {
     spaceSlug,
@@ -193,6 +214,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [currentAction, setCurrentAction] = useState<string | null>(null);
   const [allowedTools, setAllowedTools] = useState<Set<string>>(new Set());
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [streamingReasoning, setStreamingReasoning] = useState('');
@@ -316,6 +338,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const landChippiError = useCallback((message: string) => {
     turnTerminalRef.current = true;
     setError(message);
+    setCurrentAction(null);
     const targetId = streamingMsgIdRef.current;
     const errorBlock: MessageBlock = { type: 'text', content: message };
     setMessages((prev) => {
@@ -362,6 +385,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const abort = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    setCurrentAction(null);
   }, []);
 
   /**
@@ -373,6 +397,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     switch (event.type) {
       case 'text_delta': {
         if (!event.delta) return;
+        // Real text is on screen — the action line's job is done.
+        setCurrentAction(null);
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setMessages((prev) => {
@@ -408,6 +434,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       case 'tool_call_start': {
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
+        setCurrentAction(`${friendlyToolAction(event.name)}…`);
         // delegate_task is represented by its own live task card (mounted on
         // the subagent_spawned event), not a generic tool row — skip the
         // tool_call block so the realtor sees one clean card, not both.
@@ -441,6 +468,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           next.delete(event.callId);
           return next;
         });
+        // The tool finished; the model is reading its result. Next
+        // text_delta (or the next tool_call_start label) replaces this.
+        setCurrentAction('Thinking…');
         setMessages((prev) =>
           prev.map((m) => ({
             ...m,
@@ -563,6 +593,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
         setStreamingReasoning('');
         setActivePlan(null);
+        setCurrentAction(null);
+        return;
+      }
+
+      case 'status': {
+        // Renders in the thinking indicator; the next text_delta clears it.
+        setCurrentAction(event.label || null);
         return;
       }
 
@@ -574,6 +611,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
             ? event.message
             : chippiErrorMessage(event.code ?? 'internal');
         landChippiError(text);
+        setCurrentAction(null);
         return;
       }
     }
@@ -816,6 +854,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = assistantMsgId;
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
       setPendingApproval(null);
+      // Instant signal — the server's first status event is a network
+      // round-trip away; the indicator must not wait for it.
+      setCurrentAction('Thinking…');
 
       let convId: string;
       try {
@@ -985,6 +1026,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     liveCallIds,
     error,
     streamingReasoning,
+    currentAction,
     activePlan,
     send,
     attachmentPreviewUrls,

@@ -254,6 +254,7 @@ export function ChippiWorkspace({
     liveCallIds,
     error: agentError,
     streamingReasoning,
+    currentAction: serverAction,
     activePlan,
     send,
     attachmentPreviewUrls,
@@ -1060,6 +1061,12 @@ export function ChippiWorkspace({
         }
       }
     }
+    // A concrete server-sent status ("Reading your workspace…",
+    // "Running Find Contacts…") beats the generic rotating filler — it's
+    // real signal about what the turn is actually doing right now. The
+    // generic "Thinking…" from the server falls through to the rotating
+    // set below so the line keeps breathing.
+    if (serverAction && serverAction !== 'Thinking…') return serverAction;
     // Streaming, no tool call active, no tokens yet → still warming up the
     // container / fetching tools / waiting on first model token. Fill the
     // dead air with a single calm status so the realtor knows Chippi is on
@@ -1084,6 +1091,7 @@ export function ChippiWorkspace({
     isStreaming,
     tailMessage,
     liveCallIds,
+    serverAction,
     activeTurnMode,
     isFirstAgentTurn,
     warmupIndex,
