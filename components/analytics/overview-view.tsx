@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
+import { TrendingUp } from 'lucide-react';
 import { countLabel, pluralize } from '@/lib/formatting';
 import {
   StatCell,
@@ -18,6 +19,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  InsightStrip,
   formatCurrency,
   PAPER_GRID,
 } from './chart-primitives';
@@ -36,6 +38,17 @@ const dealsConfig = {
 
 export function OverviewView({ data }: { data: OverviewData }) {
   const reduce = useReducedMotion();
+
+  // Honest month-over-month read for the insight strip: only when BOTH the
+  // current and previous month have real submissions — no fabricated trends.
+  const series = data.leadsOverTime;
+  const last = series.length >= 2 ? series[series.length - 1] : null;
+  const prev = series.length >= 2 ? series[series.length - 2] : null;
+  const leadsDeltaPct =
+    last && prev && prev.count > 0 && last.count > 0
+      ? Math.round(((last.count - prev.count) / prev.count) * 100)
+      : null;
+
   const statusSentence = data.totalContacts > 0
     ? `${countLabel(data.totalContacts, 'person', 'people')} in your book, ${data.totalDeals} active ${pluralize(data.totalDeals, 'deal')}.`
     : 'No data yet. Start by adding your first contact.';
@@ -65,6 +78,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
           value={data.totalPipelineValue}
           format={formatCurrency}
           sub="combined"
+          accent
         />
       </StatStrip>
 
