@@ -83,7 +83,19 @@ export function OverviewView({ data }: { data: OverviewData }) {
       </StatStrip>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Leads over time" sub="Applications submitted per month" index={0}>
+        <ChartSection
+          title="Leads over time"
+          sub="Applications submitted per month"
+          index={0}
+          insight={
+            leadsDeltaPct !== null && leadsDeltaPct !== 0 ? (
+              <InsightStrip icon={<TrendingUp size={14} aria-hidden />}>
+                Leads {leadsDeltaPct > 0 ? 'increased' : 'decreased'} by{' '}
+                {Math.abs(leadsDeltaPct)}% vs last month
+              </InsightStrip>
+            ) : undefined
+          }
+        >
           <ChartContainer config={leadsConfig} className="h-[200px] w-full">
             <AreaChart data={data.leadsOverTime}>
               <defs>
@@ -124,7 +136,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
 
         <ChartSection title="Pipeline by stage" sub="Deals per stage" index={1}>
           <ChartContainer config={dealsConfig} className="h-[200px] w-full">
-            <BarChart data={data.dealsByStage} barSize={18}>
+            <BarChart data={data.dealsByStage} barSize={26}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis
                 dataKey="name"
@@ -146,7 +158,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
                 dataKey="count"
                 name="Deals"
                 fill="var(--color-count)"
-                radius={[2, 2, 0, 0]}
+                radius={[6, 6, 0, 0]}
               />
             </BarChart>
           </ChartContainer>

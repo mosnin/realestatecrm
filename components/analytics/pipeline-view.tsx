@@ -23,6 +23,7 @@ import {
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  DotMatrix,
   EmptyState,
   formatCurrency,
   PAPER_SERIES,
@@ -82,6 +83,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
           value={data.totalPipelineValue}
           format={formatCurrency}
           sub="active deals"
+          accent
         />
         <StatCell
           label="Avg deal size"
