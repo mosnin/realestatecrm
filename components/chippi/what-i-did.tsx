@@ -9,7 +9,13 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
-import { SECTION_LABEL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import {
+  CARD_TITLE,
+  StatusPill,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 
 interface ActivityEntry {
   id: string;
@@ -95,18 +101,18 @@ export function WhatIDid({ slug }: { slug: string }) {
   if (!loading && entries.length === 0) return null;
 
   return (
-    <section>
-      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className={SECTION_LABEL}>
+    <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <div className="flex items-center gap-3">
+        <h2 className={CARD_TITLE}>
           What I did
         </h2>
         {!loading && entries.length > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">{entries.length}</span>
+          <StatusPill className="tabular-nums">{entries.length}</StatusPill>
         )}
         {!loading && entries.length > 0 && (
           <Link
             href={`/s/${slug}/chippi/activity`}
-            className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             See all
             <ArrowRight size={11} />
