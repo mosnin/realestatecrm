@@ -17,8 +17,8 @@
  * with a prefill that names the contact and the intent.
  */
 
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
@@ -45,6 +45,7 @@ const COMPOSE_INTENTS: ReadonlyArray<PeopleDetailActionIntent> = [
   'welcome',
   'reach-out',
 ];
+const QUICK_DRAFT_QUERY_KEY = 'quickDraft';
 
 function isComposeIntent(
   intent: PeopleDetailActionIntent,
@@ -59,12 +60,36 @@ export function ContactActionPills({
   actions,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const rawQueryIntent = searchParams.get(QUICK_DRAFT_QUERY_KEY);
+  const queryIntent =
+    rawQueryIntent &&
+    isComposeIntent(rawQueryIntent as PeopleDetailActionIntent)
+      ? (rawQueryIntent as MorningActionIntent)
+      : null;
   // Which pill is currently expanded into a draft sheet. One open at a time;
-  // tapping a different pill swaps the sheet contents.
+  // tapping a different pill swaps the sheet contents. The query parameter is
+  // load-bearing: a click can land while the streamed contact page is still
+  // settling and remount this client island. Persisting the intent in the URL
+  // lets the remounted island resume instead of silently dropping the draft.
   const [activeIntent, setActiveIntent] = useState<MorningActionIntent | null>(
-    null,
+    queryIntent,
   );
   const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    setActiveIntent(queryIntent);
+  }, [queryIntent]);
+
+  function setDurableIntent(intent: MorningActionIntent | null) {
+    setActiveIntent(intent);
+    const next = new URLSearchParams(searchParams.toString());
+    if (intent) next.set(QUICK_DRAFT_QUERY_KEY, intent);
+    else next.delete(QUICK_DRAFT_QUERY_KEY);
+    const query = next.toString();
+    router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+  }
 
   // Clear an overdue follow-up: null out Contact.followUpAt, then refresh so the
   // pills recompute. (This pill was previously mis-wired to the 'log-call'
@@ -94,7 +119,7 @@ export function ContactActionPills({
       return;
     }
     if (isComposeIntent(action.intent)) {
-      setActiveIntent(action.intent);
+      setDurableIntent(action.intent);
       return;
     }
     if (action.intent === 'schedule-tour') {
@@ -166,8 +191,8 @@ export function ContactActionPills({
                 id: contactId,
                 label: contactName,
               }}
-              onSent={() => setActiveIntent(null)}
-              onCancel={() => setActiveIntent(null)}
+              onSent={() => setDurableIntent(null)}
+              onCancel={() => setDurableIntent(null)}
             />
           </motion.div>
         )}
