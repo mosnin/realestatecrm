@@ -10,6 +10,8 @@ import { getSeatUsage } from '@/lib/brokerage-seats';
 import { H1, TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
+import { effectiveInvitationStatus } from '@/lib/invitation-status';
+import type { InvitationStatus } from '@/lib/types';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Invitations — Broker Dashboard' };
@@ -65,12 +67,15 @@ export default async function BrokerInvitationsPage() {
     id: string;
     email: string;
     roleToAssign: string;
-    status: string;
+    status: InvitationStatus;
     expiresAt: string;
     createdAt: string;
   }>;
 
-  const pendingCount = invs.filter((i) => i.status === 'pending').length;
+  const now = new Date();
+  const pendingCount = invs.filter(
+    (inv) => effectiveInvitationStatus(inv.status, inv.expiresAt, now) === 'pending',
+  ).length;
 
   // Status sentence — quietly names what matters. Pending count when there
   // are open invites, otherwise the total sent.
@@ -119,9 +124,15 @@ export default async function BrokerInvitationsPage() {
         ) : (
           <ul className="divide-y divide-border/60">
             {invs.map((inv) => {
-              const status = statusPill(inv.status);
-              const isPending = inv.status === 'pending';
-              const expiresOn = isPending
+              const effectiveStatus = effectiveInvitationStatus(
+                inv.status,
+                inv.expiresAt,
+                now,
+              );
+              const status = statusPill(effectiveStatus);
+              const isPending = effectiveStatus === 'pending';
+              const expiryDate =
+                inv.status === 'pending'
                 ? new Date(inv.expiresAt).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -153,10 +164,10 @@ export default async function BrokerInvitationsPage() {
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                       Invited {timeAgo(inv.createdAt)}
-                      {expiresOn && (
+                      {expiryDate && (
                         <>
                           <span className="text-muted-foreground/40"> · </span>
-                          expires {expiresOn}
+                          {isPending ? 'expires' : 'expired'} {expiryDate}
                         </>
                       )}
                     </p>

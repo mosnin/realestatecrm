@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { IntakeLinkRow } from './intake-link-row';
 import { timeAgo } from '@/lib/formatting';
+import { formatIntakeStatus } from '@/lib/realtor-page-status';
 import { ArrowRight } from 'lucide-react';
 import {
   H1,
@@ -98,22 +99,7 @@ export default async function IntakeOverviewPage({
   // Chippi narration ladder — one sentence describing the state of intake
   // right now. No counts in stat tiles; the count lives in the sentence so
   // the realtor reads it like a thought, not a dashboard.
-  const subtitle = (() => {
-    if (totalSubmissions === 0) {
-      return 'No submissions yet. Share the link.';
-    }
-    if (hotLeadCount > 0) {
-      const hot = hotLeadCount === 1 ? '1 was hot' : `${hotLeadCount} were hot`;
-      const subs =
-        totalSubmissions === 1
-          ? '1 submission this week.'
-          : `${totalSubmissions} submissions this week.`;
-      return `${subs} ${hot}.`;
-    }
-    return totalSubmissions === 1
-      ? '1 submission this week.'
-      : `${totalSubmissions} submissions this week.`;
-  })();
+  const subtitle = formatIntakeStatus(totalSubmissions, hotLeadCount);
 
   return (
     <div className={`${PAGE_RHYTHM} max-w-3xl mx-auto pb-12`}>
