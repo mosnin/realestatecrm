@@ -30,8 +30,8 @@ import { detectSlop, summarizeSlop } from '@/lib/voice/slop';
 // OpenRouter regularly needs more than five seconds to route and complete even
 // this small generation. The old 5s guard deterministically aborted healthy
 // production requests before the provider answered. Keep the interaction
-// bounded, but allow a 15s latency budget for foreground AI work; we still
-// make only one compose call, so this does not amplify spend.
+// bounded, but allow the same 15s latency budget used by other foreground AI
+// work; we still make only one compose call, so this does not amplify spend.
 const TIMEOUT_MS = 15_000;
 const MODEL = 'gpt-5-mini';
 
@@ -143,8 +143,7 @@ function buildVoiceMessage(samples: VoiceSample[]): string {
     lines.push(`${i + 1}. ${s.body}`);
     lines.push('');
   });
-  return lines.join('
-').trimEnd();
+  return lines.join('\n').trimEnd();
 }
 
 /**
