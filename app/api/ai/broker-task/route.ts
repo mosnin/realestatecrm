@@ -49,6 +49,7 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
+import { createStopPoller } from '@/lib/chat/stop-signal';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { z } from 'zod';
@@ -209,6 +210,12 @@ function proxyModalStream({
       const blocks: MessageBlock[] = [];
       let persisted = false;
       let sentTerminal = false;
+      // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence between
+      // Modal events. Distinct from disconnect (clientGone), which keeps the
+      // turn alive: Stop tears down the Modal fetch and commits whatever
+      // streamed. Mirrors the realtor SDK path (lib/ai-tools/sdk-chat-stream).
+      const shouldStop = createStopPoller(conversationId);
+      let stopRequested = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
         persisted = true;
@@ -226,6 +233,18 @@ function proxyModalStream({
 
       try {
         while (true) {
+          // Poll the Stop flag before each read. On Stop, abort the Modal fetch,
+          // persist whatever streamed, emit one terminal frame, and break — the
+          // finally's persistOnce is idempotent so this doesn't double-write.
+          if (!stopRequested && (await shouldStop())) {
+            stopRequested = true;
+            abortController.abort();
+            await persistOnce(textChunks.join(''));
+            push(controller, { type: 'turn_complete', reason: 'stopped' });
+            sentTerminal = true;
+            break;
+          }
+
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -311,8 +330,10 @@ function proxyModalStream({
           }
         }
 
-        // Flush trailing buffer.
-        if (lineBuf.startsWith('data: ')) {
+        // Flush trailing buffer — skip it on Stop: we already emitted the
+        // terminal frame and aborted, so a partial trailing line must not push
+        // a second turn_complete.
+        if (!stopRequested && lineBuf.startsWith('data: ')) {
           const raw = lineBuf.slice(6).trim();
           if (raw) {
             try {
@@ -332,8 +353,10 @@ function proxyModalStream({
           }
         }
       } catch (err) {
-        // We no longer abort on disconnect, so a thrown read is a real error.
-        if (!clientGone) {
+        // We no longer abort on disconnect, so a thrown read is a real error —
+        // UNLESS we aborted it ourselves for an explicit Stop (already emitted
+        // its terminal frame above) or the client left.
+        if (!clientGone && !stopRequested) {
           logger.error('[ai/broker-task] modal stream read error', { brokerageId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
           sentTerminal = true;

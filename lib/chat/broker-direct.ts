@@ -20,6 +20,7 @@ import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { runDirectChat, type DirectHistoryRow } from '@/lib/chat/direct-llm';
+import { createStopPoller, STOP_POLL_INTERVAL_MS } from '@/lib/chat/stop-signal';
 import { resolveChatModel } from '@/lib/llm';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { supabase } from '@/lib/supabase';
@@ -122,6 +123,22 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
 
       push({ type: 'route_picked', route: 'direct' });
 
+      // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence while
+      // the single LLM completion runs. On Stop we abort the completion (via
+      // the shared signal); disconnect is handled separately by cancel(). The
+      // realtor direct path polls per-delta; this path's completion is one
+      // blocking call, so we drive the poll from an interval instead.
+      const shouldStop = createStopPoller(input.conversationId);
+      let stopped = false;
+      const stopInterval = setInterval(() => {
+        void shouldStop().then((s) => {
+          if (s && !stopped) {
+            stopped = true;
+            input.abortController.abort();
+          }
+        });
+      }, STOP_POLL_INTERVAL_MS);
+
       try {
         const snapshot = await buildBrokerageSnapshot(input.brokerage);
         const systemMessage = `${BROKER_INSTRUCTIONS_LITE}\n\n${snapshot}`;
@@ -162,11 +179,17 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
         }
       } catch (err) {
         const aborted = (err as { name?: string })?.name === 'AbortError';
-        if (!aborted) {
+        if (aborted && stopped) {
+          // The abort was an explicit Stop, not a crash or a disconnect —
+          // close the turn honestly with a terminal frame (there is no partial
+          // text to commit; this path buffers the completion, not tokens).
+          push({ type: 'turn_complete', reason: 'stopped' });
+        } else if (!aborted) {
           logger.error('[broker-direct] crashed', { brokerageId: input.brokerage.id }, err);
           push({ type: 'error', message: chippiErrorMessage('internal') });
         }
       } finally {
+        clearInterval(stopInterval);
         try { controller.close(); } catch { /* already closed */ }
       }
     },

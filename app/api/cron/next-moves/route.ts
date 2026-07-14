@@ -102,9 +102,43 @@ async function handler(req: NextRequest) {
       .map((s) => s.id as string),
   );
 
-  const runnable = due.filter((d) => activeSpaces.has(d.spaceId));
+  const billingRunnable = due.filter((d) => activeSpaces.has(d.spaceId));
   const skippedDeals = due.filter((d) => !activeSpaces.has(d.spaceId));
   const skipped = skippedDeals.length;
+
+  // ── Per-space fairness ──────────────────────────────────────────────────
+  // The due query is globally ordered by nextMoveComputedAt, so a space with
+  // hundreds of active deals can fill the whole MAX_PER_TICK window every tick
+  // and permanently starve smaller spaces. Cap each space to a fair share of
+  // the tick; the deals over the cap are simply NOT computed this tick — their
+  // nextMoveComputedAt stays old, so they remain due and get picked up next
+  // tick. We deliberately do NOT stamp them (unlike billing-gated deals): they
+  // MUST stay due. Gated spaces were already removed above, so the share is
+  // computed over the spaces we'd actually serve.
+  const distinctSpaceCount = new Set(billingRunnable.map((d) => d.spaceId)).size;
+  const fairShare =
+    distinctSpaceCount > 0
+      ? Math.max(5, Math.ceil(MAX_PER_TICK / distinctSpaceCount))
+      : MAX_PER_TICK;
+  const perSpaceTaken = new Map<string, number>();
+  const runnable: DueDeal[] = [];
+  let deferredForFairness = 0;
+  for (const deal of billingRunnable) {
+    const taken = perSpaceTaken.get(deal.spaceId) ?? 0;
+    if (taken >= fairShare) {
+      deferredForFairness++;
+      continue;
+    }
+    perSpaceTaken.set(deal.spaceId, taken + 1);
+    runnable.push(deal);
+  }
+  if (deferredForFairness > 0) {
+    console.log('[cron/next-moves] deferred for per-space fairness', {
+      fairShare,
+      distinctSpaceCount,
+      deferred: deferredForFairness,
+    });
+  }
 
   // Stamp skipped deals too — without this, a billing-blocked space's deals
   // keep nextMoveComputedAt NULL forever and permanently occupy the front of
@@ -154,6 +188,7 @@ async function handler(req: NextRequest) {
     computed,
     errored,
     skipped,
+    deferred: deferredForFairness,
     durationMs: Date.now() - startedAt,
   };
   console.log('[cron/next-moves] Tick complete', summary);

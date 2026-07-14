@@ -25,6 +25,14 @@ work is Inngest (crons in `lib/inngest/cron-functions.ts` + events in
 3. **Tenant scoping.** Every Supabase query in request paths must scope by
    `spaceId` / `brokerageId` derived from the authenticated context. The
    service-role key bypasses RLS — the `.eq(...)` IS the security boundary.
+   New code should open tenant tables via `tenantTable(supabase, 'Table',
+   { spaceId })` (`lib/tenant-db.ts`), which pre-applies the scope so it
+   can't be forgotten; `TENANT_TABLES` there is the registry of tenant
+   tables → scope column. The `lib/supabase-guard.ts` observer (opt-in via
+   `TENANT_GUARD=1`; Sentry-log in prod, throw in dev/test) flags reads that
+   reach a tenant table with no scope filter — annotate the legitimate
+   non-`eq` patterns (post-fetch ownership check, capability token, admin
+   cross-tenant) with `.unscoped('why it is safe')`.
 4. **Billing accuracy.** LLM calls opt into OpenRouter usage accounting
    (`usageAccountingParams()` in `lib/llm.ts`, `usage_accounting_extra_body()`
    / `CostTrackingClient` in `agent/llm.py`) so exact `usage.cost` reaches

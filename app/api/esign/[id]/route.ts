@@ -34,7 +34,7 @@ export async function GET(
     .maybeSingle();
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const result = await refreshEnvelopeStatus({ userId, signatureRequestId: id });
+  const result = await refreshEnvelopeStatus({ userId, signatureRequestId: id, spaceId: space.id });
 
   if (result.ok) {
     return NextResponse.json({ request: result.signatureRequest });
