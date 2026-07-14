@@ -85,6 +85,9 @@ async function handler(req: NextRequest) {
       .select('id, spaceId, trigger, conditions, actions, autonomy, lastScheduledFireAt')
       .eq('enabled', true)
       .eq('trigger->>type', 'schedule')
+      // Deterministic order: without it, >MAX_PER_TICK schedule workflows
+      // would exclude an ARBITRARY stable subset forever.
+      .order('id', { ascending: true })
       .limit(MAX_PER_TICK);
     if (queryErr) {
       watermarkColumnAvailable = false;
@@ -97,6 +100,7 @@ async function handler(req: NextRequest) {
         .select('id, spaceId, trigger, conditions, actions, autonomy')
         .eq('enabled', true)
         .eq('trigger->>type', 'schedule')
+        .order('id', { ascending: true })
         .limit(MAX_PER_TICK);
       if (legacyErr) {
         console.error('[cron/workflows] Failed to load schedule workflows', legacyErr);

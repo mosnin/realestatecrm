@@ -29,6 +29,7 @@ import {
 } from './direct-llm';
 import { retrieveContext } from './vector-context';
 import { shouldEscalate } from './router';
+import { createStopPoller } from './stop-signal';
 import type { MultimodalAttachment } from './multimodal';
 
 export interface DirectStreamInput {
@@ -164,6 +165,11 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         let gateOpen = !input.onEscalate;
         let escalationLatched = false;
         let held = '';
+        // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence.
+        // Distinct from disconnect: disconnect keeps the turn alive; Stop
+        // aborts generation and commits whatever the user already saw.
+        const shouldStop = createStopPoller(input.conversationId);
+        let stopped = false;
         const result = await runDirectChatStream(
           {
             model: input.model,
@@ -174,16 +180,28 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             signal: input.abortController.signal,
           },
           (delta) => {
+            // Bounded-cadence stop poll (async; flips `stopped` within one
+            // interval). Returning false aborts the provider stream.
+            void shouldStop().then((s) => {
+              if (s) stopped = true;
+            });
+            if (stopped) return false;
+            if (escalationLatched) {
+              // Latched: drain silently to completion. The full reply is
+              // needed if the agent handoff fails (we commit it instead of
+              // a mid-sentence fragment), and the provider's final stream
+              // chunk carries the exact usage/cost for the ChatUsage row.
+              return;
+            }
             if (gateOpen) {
               push({ type: 'text_delta', delta });
               return;
             }
             held += delta;
             if (shouldEscalate(held)) {
-              // The reply opens with escalation language. Nothing was shown;
-              // stop paying for the rest of a reply we're about to discard.
+              // The reply opens with escalation language. Nothing was shown.
               escalationLatched = true;
-              return false;
+              return;
             }
             if (held.length >= ESCALATION_HOLDBACK_CHARS) {
               gateOpen = true;
@@ -197,8 +215,9 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         // "I'd need to actually...", hand off to the agent path with the
         // same user message. Streamed replies were vetted by the hold-back
         // window; short replies (never opened the gate) get the full-text
-        // check the pre-streaming implementation ran.
-        if (input.onEscalate && (escalationLatched || (!gateOpen && shouldEscalate(result.text)))) {
+        // check the pre-streaming implementation ran. A stopped turn never
+        // escalates — the user asked it to end.
+        if (!stopped && input.onEscalate && (escalationLatched || (!gateOpen && shouldEscalate(result.text)))) {
           // Tag this attempt with the escalation route. The agent path
           // will write its OWN ChatUsage row tagged 'agent' so the
           // breakdown shows both: a 'direct→agent' direct attempt that
@@ -258,7 +277,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         if (!gateOpen && result.text) {
           push({ type: 'text_delta', delta: result.text });
         }
-        push({ type: 'turn_complete', reason: 'complete' });
+        push({ type: 'turn_complete', reason: stopped ? 'aborted' : 'complete' });
 
         // Persist the assistant message + telemetry.
         if (result.text.trim()) {

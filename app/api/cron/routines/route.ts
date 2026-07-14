@@ -142,12 +142,28 @@ async function handler(req: NextRequest) {
       routineIds: skippedRoutines.map((r) => r.id),
     });
     await Promise.all(
-      skippedRoutines.map((r) =>
-        supabase
+      skippedRoutines.map(async (r) => {
+        const nowIso = new Date().toISOString();
+        const { error: stampErr } = await supabase
           .from('Routine')
-          .update({ lastRunAt: new Date().toISOString(), lastRunStatus: 'skipped' })
-          .eq('id', r.id),
-      ),
+          .update({ lastRunAt: nowIso, lastRunStatus: 'skipped' })
+          .eq('id', r.id);
+        if (stampErr) {
+          // Migration window: until 20260814000000 widens the lastRunStatus
+          // CHECK to include 'skipped', that write violates the constraint
+          // and the WHOLE update fails — leaving nextRunAt stale and the
+          // starvation bug alive while the log claims it was handled.
+          // Stamping lastRunAt alone still advances nextRunAt via the
+          // trigger, which is the part that matters.
+          const { error: fallbackErr } = await supabase
+            .from('Routine')
+            .update({ lastRunAt: nowIso })
+            .eq('id', r.id);
+          if (fallbackErr) {
+            console.error('[cron/routines] skip-stamp failed', { id: r.id }, fallbackErr);
+          }
+        }
+      }),
     );
   }
 

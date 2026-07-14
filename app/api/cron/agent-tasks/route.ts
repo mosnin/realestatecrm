@@ -81,8 +81,12 @@ async function handler(req: NextRequest) {
     .from('AgentTask')
     .select('id, spaceId, title, description, goalDescription')
     .eq('status', 'queued')
+    // updatedAt (not createdAt): gated tasks get their updatedAt touched
+    // below, rotating them BEHIND untouched runnable tasks — so a blocked
+    // space with >MAX_SCAN_PER_TICK queued tasks can't permanently occupy
+    // the whole scan window and starve every other tenant.
     .neq('triggerSource', 'sla')
-    .order('createdAt', { ascending: true })
+    .order('updatedAt', { ascending: true })
     .limit(MAX_SCAN_PER_TICK);
   if (queryErr) {
     console.error('[cron/agent-tasks] Failed to load queued tasks', queryErr);
@@ -161,11 +165,23 @@ async function handler(req: NextRequest) {
   }
 
   const runnable = queued.filter((t) => runnableSpaces.has(t.spaceId)).slice(0, MAX_RUNS_PER_TICK);
-  const skipped = queued.length - queued.filter((t) => runnableSpaces.has(t.spaceId)).length;
-  if (skipped > 0) {
+  const gatedTasks = queued.filter((t) => !runnableSpaces.has(t.spaceId));
+  const skipped = gatedTasks.length;
+  if (gatedTasks.length > 0) {
     console.warn('[cron/agent-tasks] tasks left queued (space gated)', {
-      taskIds: queued.filter((t) => !runnableSpaces.has(t.spaceId)).map((t) => t.id),
+      taskIds: gatedTasks.map((t) => t.id),
     });
+    // Rotate gated tasks to the back of the updatedAt-ascending scan window
+    // (they stay 'queued' and run when the space unblocks) — without this,
+    // one blocked space with >MAX_SCAN_PER_TICK queued tasks permanently
+    // fills the window and starves every other tenant's tasks.
+    const { error: touchErr } = await supabase
+      .from('AgentTask')
+      .update({ updatedAt: new Date().toISOString() })
+      .in('id', gatedTasks.map((t) => t.id));
+    if (touchErr) {
+      console.warn('[cron/agent-tasks] gated-task rotation failed', touchErr);
+    }
   }
 
   // ── 3. Execute with bounded concurrency ─────────────────────────────────

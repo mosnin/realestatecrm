@@ -110,12 +110,24 @@ async function handler(req: NextRequest) {
       routineIds: skippedRoutines.map((r) => r.id),
     });
     await Promise.all(
-      skippedRoutines.map((r) =>
-        supabase
+      skippedRoutines.map(async (r) => {
+        const nowIso = new Date().toISOString();
+        const { error: stampErr } = await supabase
           .from('BrokerRoutine')
-          .update({ lastRunAt: new Date().toISOString(), lastRunStatus: 'skipped' })
-          .eq('id', r.id),
-      ),
+          .update({ lastRunAt: nowIso, lastRunStatus: 'skipped' })
+          .eq('id', r.id);
+        if (stampErr) {
+          // Pre-migration fallback — see cron/routines: stamping lastRunAt
+          // alone still advances nextRunAt, which is the anti-starvation part.
+          const { error: fallbackErr } = await supabase
+            .from('BrokerRoutine')
+            .update({ lastRunAt: nowIso })
+            .eq('id', r.id);
+          if (fallbackErr) {
+            console.error('[cron/broker-routines] skip-stamp failed', { id: r.id }, fallbackErr);
+          }
+        }
+      }),
     );
   }
 
