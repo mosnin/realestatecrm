@@ -1,19 +1,22 @@
 /**
  * POST /api/internal/notify — the Python agent runtime's push-notification
  * door. Behavioral tests: auth fail-closed (missing secret 500, bad bearer
- * 401), body validation + length caps, the sendPushToSpace fan-out, the rate
- * limit, and the never-throw contract when push dispatch itself blows up.
+ * 401), body validation + length caps, the sendPushToSpace fan-out, the
+ * durable in-app record (createAppNotification), the rate limit, and the
+ * never-throw contract when push dispatch itself blows up.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const { sendPushToSpaceMock, checkRateLimitMock } = vi.hoisted(() => ({
+const { sendPushToSpaceMock, checkRateLimitMock, createAppNotificationMock } = vi.hoisted(() => ({
   sendPushToSpaceMock: vi.fn(),
   checkRateLimitMock: vi.fn(),
+  createAppNotificationMock: vi.fn(),
 }));
 
 vi.mock('@/lib/push', () => ({ sendPushToSpace: sendPushToSpaceMock }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock('@/lib/notifications', () => ({ createAppNotification: createAppNotificationMock }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -47,6 +50,7 @@ beforeEach(() => {
   process.env.AGENT_INTERNAL_SECRET = SECRET;
   checkRateLimitMock.mockResolvedValue({ allowed: true });
   sendPushToSpaceMock.mockResolvedValue(2);
+  createAppNotificationMock.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -142,5 +146,57 @@ describe('POST /api/internal/notify', () => {
     const res = await post(VALID, `Bearer ${SECRET}`);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true, sent: 0 });
+  });
+
+  describe('durable in-app record', () => {
+    it('writes an agent_run record with the same title/body/url as the push', async () => {
+      const res = await post({ ...VALID, url: '/tasks' }, `Bearer ${SECRET}`);
+      expect(res.status).toBe(200);
+      expect(createAppNotificationMock).toHaveBeenCalledTimes(1);
+      expect(createAppNotificationMock).toHaveBeenCalledWith({
+        spaceId: 'space-1',
+        type: 'agent_run',
+        title: VALID.title,
+        body: VALID.body,
+        href: '/tasks',
+      });
+    });
+
+    it('records href: null when no url is provided', async () => {
+      await post(VALID, `Bearer ${SECRET}`);
+      expect(createAppNotificationMock).toHaveBeenCalledWith(
+        expect.objectContaining({ href: null }),
+      );
+    });
+
+    it('writes the record with the capped title/body', async () => {
+      await post(
+        { spaceId: 'space-1', title: 'T'.repeat(1000), body: 'B'.repeat(5000) },
+        `Bearer ${SECRET}`,
+      );
+      const [record] = createAppNotificationMock.mock.calls[0] as [
+        { title: string; body: string },
+      ];
+      expect(record.title).toHaveLength(200);
+      expect(record.body).toHaveLength(500);
+    });
+
+    it('writes no record on auth failure, bad body, or rate limit', async () => {
+      await post(VALID); // no auth
+      await post(VALID, 'Bearer nope'); // wrong bearer
+      await post({ ...VALID, spaceId: undefined }, `Bearer ${SECRET}`); // invalid body
+      checkRateLimitMock.mockResolvedValue({ allowed: false });
+      const res = await post(VALID, `Bearer ${SECRET}`); // rate-limited
+      expect(res.status).toBe(429);
+      expect(createAppNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('still pushes and returns 200 when the record write throws (belt)', async () => {
+      createAppNotificationMock.mockRejectedValueOnce(new Error('db down'));
+      const res = await post(VALID, `Bearer ${SECRET}`);
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ ok: true, sent: 2 });
+      expect(sendPushToSpaceMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

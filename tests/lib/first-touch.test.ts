@@ -6,8 +6,9 @@
  *
  * Contract under test:
  *   - Happy path creates a PENDING AgentDraft (reasoning, idempotencyKey,
- *     spaceId scoping, priority) and pushes "first touch ready" with a URL
- *     to the inbox surface.
+ *     spaceId scoping, priority), pushes "first touch ready" with a URL
+ *     to the inbox surface, AND writes the durable in-app record
+ *     (createAppNotification) so the bell keeps the outcome after the push.
  *   - Channel choice: email wins when present; sms when only a phone; skip
  *     when neither.
  *   - Per-contact dedupe (existing first-touch draft → nothing happens).
@@ -21,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Collaborator mocks ───────────────────────────────────────────────────────
 
-const { checkRateLimitMock, sendPushMock, composeMock } = vi.hoisted(() => ({
+const { checkRateLimitMock, sendPushMock, composeMock, createAppNotificationMock } = vi.hoisted(() => ({
   checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
   sendPushMock: vi.fn(async () => 1),
   composeMock: vi.fn(
@@ -31,10 +32,12 @@ const { checkRateLimitMock, sendPushMock, composeMock } = vi.hoisted(() => ({
       subjectLabel: 'Jane Doe',
     }),
   ),
+  createAppNotificationMock: vi.fn(async () => true),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
 vi.mock('@/lib/push', () => ({ sendPushToSpace: sendPushMock }));
+vi.mock('@/lib/notifications', () => ({ createAppNotification: createAppNotificationMock }));
 vi.mock('@/lib/agent/quick-draft', () => ({ composeQuickDraft: composeMock }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -160,6 +163,18 @@ describe('fireFirstTouch', () => {
     expect(pushSpaceId).toBe('space_1');
     expect(payload.title).toBe('New lead: Jane Doe — first touch ready');
     expect(payload.url).toBe('/s/acme/chippi/inbox');
+
+    // Durable in-app record: same honest title, deep link to the inbox where
+    // the draft is reviewed, scoped to the tenant.
+    expect(createAppNotificationMock).toHaveBeenCalledOnce();
+    expect(createAppNotificationMock).toHaveBeenCalledWith({
+      spaceId: 'space_1',
+      type: 'first_touch',
+      title: 'New lead: Jane Doe — first touch ready',
+      body: 'Review and send the intro email I drafted.',
+      href: '/s/acme/chippi/inbox',
+      priority: 'high',
+    });
   });
 
   it('chooses sms when the contact has a phone but no email', async () => {
@@ -193,6 +208,7 @@ describe('fireFirstTouch', () => {
     expect(outcome).toEqual({ created: false, reason: 'no_channel' });
     expect(inserts).toHaveLength(0);
     expect(sendPushMock).not.toHaveBeenCalled();
+    expect(createAppNotificationMock).not.toHaveBeenCalled();
     expect(composeMock).not.toHaveBeenCalled();
   });
 
@@ -206,6 +222,7 @@ describe('fireFirstTouch', () => {
     expect(outcome).toEqual({ created: false, reason: 'duplicate' });
     expect(inserts).toHaveLength(0);
     expect(sendPushMock).not.toHaveBeenCalled();
+    expect(createAppNotificationMock).not.toHaveBeenCalled();
     // The daily-cap budget is not consumed by duplicates.
     expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
@@ -220,6 +237,7 @@ describe('fireFirstTouch', () => {
 
     expect(outcome).toEqual({ created: false, reason: 'duplicate' });
     expect(sendPushMock).not.toHaveBeenCalled();
+    expect(createAppNotificationMock).not.toHaveBeenCalled();
   });
 
   it('enforces the per-space daily cap', async () => {
@@ -286,6 +304,20 @@ describe('fireFirstTouch', () => {
 
     expect(outcome).toEqual({ created: false, reason: 'insert_failed' });
     expect(sendPushMock).not.toHaveBeenCalled();
+    expect(createAppNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it('still succeeds when the in-app record write fails (draft + push already landed)', async () => {
+    queueSpace();
+    queueContact();
+    queueNoExistingDraft();
+    queueInsertOk();
+    createAppNotificationMock.mockResolvedValueOnce(false);
+
+    const outcome = await fireFirstTouch({ spaceId: 'space_1', contactId: 'c_1' });
+
+    expect(outcome).toEqual({ created: true, draftId: 'draft_1' });
+    expect(sendPushMock).toHaveBeenCalledOnce();
   });
 
   it('never rejects: a thrown DB error resolves to created:false', async () => {

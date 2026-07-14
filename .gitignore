@@ -36,6 +36,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# committed browser-e2e stub env — FAKE values only (see e2e-browser/README.md)
+!e2e-browser/.env.e2e
+
+# playwright browser e2e artifacts
+/e2e-browser/test-results/
+/e2e-browser/playwright-report/
 
 # vercel
 .vercel

@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:browser": "playwright test",
     "test:contract": "node --test scripts/*.test.mjs",
     "eval": "RUN_EVALS=1 vitest run tests/evals/",
     "agent:eval": "python3 tests/agent-eval/run.py",
@@ -93,6 +94,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "^4.1.6",
     "@types/node": "^22.15.17",
     "@types/papaparse": "^5.5.2",

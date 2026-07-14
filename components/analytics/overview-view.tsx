@@ -10,8 +10,13 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Zap } from 'lucide-react';
 import { countLabel, pluralize } from '@/lib/formatting';
+import {
+  SPEED_TO_LEAD_WINDOW_DAYS,
+  formatSpeedToLead,
+  meaningfulSpeedToLead,
+} from '@/lib/analytics/speed-to-lead';
 import {
   StatCell,
   StatStrip,
@@ -49,6 +54,10 @@ export function OverviewView({ data }: { data: OverviewData }) {
       ? Math.round(((last.count - prev.count) / prev.count) * 100)
       : null;
 
+  // Speed to lead: shown only when it clears the honest-display bar
+  // (>= 3 leads reached in the window — no fake precision from 1-2 samples).
+  const speed = meaningfulSpeedToLead(data.speedToLead);
+
   const statusSentence = data.totalContacts > 0
     ? `${countLabel(data.totalContacts, 'person', 'people')} in your book, ${data.totalDeals} active ${pluralize(data.totalDeals, 'deal')}.`
     : 'No data yet. Start by adding your first contact.';
@@ -69,10 +78,17 @@ export function OverviewView({ data }: { data: OverviewData }) {
       </motion.header>
 
       {/* Stats strip */}
-      <StatStrip>
+      <StatStrip cols={speed ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : undefined}>
         <StatCell label="New people" value={data.totalLeads} sub="all time" />
         <StatCell label="Total people" value={data.totalContacts} sub="in your book" />
         <StatCell label="Active deals" value={data.totalDeals} />
+        {speed && (
+          <StatCell
+            label="Speed to lead"
+            value={formatSpeedToLead(speed.medianMinutes)}
+            sub={`median · p90 ${formatSpeedToLead(speed.p90Minutes)} · ${SPEED_TO_LEAD_WINDOW_DAYS} days`}
+          />
+        )}
         <StatCell
           label="Pipeline value"
           value={data.totalPipelineValue}
@@ -81,6 +97,16 @@ export function OverviewView({ data }: { data: OverviewData }) {
           accent
         />
       </StatStrip>
+
+      {/* Honest computed read: how often Chippi's instant first-touch draft
+          was the lead's actual first touch. Hidden unless it happened. */}
+      {speed && speed.chippiFirstCount > 0 && (
+        <InsightStrip icon={<Zap size={14} aria-hidden />}>
+          Chippi sent the first touch on {speed.chippiFirstCount} of{' '}
+          {countLabel(speed.touchedCount, 'new lead')} reached in the last{' '}
+          {SPEED_TO_LEAD_WINDOW_DAYS} days
+        </InsightStrip>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <ChartSection

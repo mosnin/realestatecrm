@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
+import type { SpeedToLeadResult } from '@/lib/analytics/speed-to-lead';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,13 @@ export interface OverviewData {
   totalPipelineValue: number;
   leadsOverTime: MonthBucket[];
   dealsByStage: StageBar[];
+  /**
+   * Speed-to-lead for the rolling window (attached by the overview page, not
+   * buildOverviewData — it comes from lib/analytics/speed-to-lead-data.ts).
+   * null/absent when the fetch failed or wasn't run: the card hides rather
+   * than fabricate a number.
+   */
+  speedToLead?: SpeedToLeadResult | null;
 }
 
 export interface LeadsAnalyticsData {

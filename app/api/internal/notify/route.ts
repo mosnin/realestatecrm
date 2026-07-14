@@ -4,9 +4,10 @@
  * Background runs (swarms, delegated Modal work) finish inside Python, which
  * has no path to lib/push.ts — so a completed run used to write its result to
  * the DB and tell NOBODY. This route closes that gap: Modal POSTs here and we
- * fan the payload out to every push subscription for the space via
- * sendPushToSpace (which is itself a VAPID-gated, never-throwing no-op when
- * push is unconfigured).
+ * (1) write a durable in-app record (createAppNotification → the dashboard
+ * bell) and (2) fan the payload out to every push subscription for the space
+ * via sendPushToSpace (which is itself a VAPID-gated, never-throwing no-op
+ * when push is unconfigured).
  *
  * Authed by AGENT_INTERNAL_SECRET (Modal/Python runtime), not Clerk — same
  * contract as /api/internal/messages/send. Fail-closed: missing secret is a
@@ -16,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -59,6 +61,21 @@ export async function POST(req: NextRequest) {
   const rl = await checkRateLimit(`notify:internal:${spaceId}`, 60, 3600);
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too many notifications this hour.' }, { status: 429 });
+  }
+
+  // Durable in-app record FIRST — push is ephemeral; this row is what keeps
+  // the outcome visible in the dashboard bell after the push is gone.
+  // createAppNotification never throws, but belt-and-suspenders like below.
+  try {
+    await createAppNotification({
+      spaceId,
+      type: 'agent_run',
+      title,
+      body: message,
+      href: url ?? null,
+    });
+  } catch (err) {
+    logger.error('[internal/notify] in-app record write threw', { spaceId }, err);
   }
 
   // sendPushToSpace never throws (VAPID-gated no-op when unconfigured), but

@@ -1,7 +1,8 @@
 /**
  * Cron dead-man monitoring.
  *
- * The 10 Vercel crons run unattended. The failure mode that actually hurts is
+ * The scheduled crons (Inngest-fired — lib/inngest/cron-functions.ts) run
+ * unattended. The failure mode that actually hurts is
  * SILENT: a sweep stops firing, or starts returning 500s, and nobody notices
  * until the data is stale and a customer complains. This wrapper closes that
  * gap with the cheapest mechanism that works — Sentry Cron Monitoring
@@ -33,10 +34,12 @@ import * as Sentry from '@sentry/nextjs';
  *  (some take `req`, some take none) without per-route generics. */
 type CronHandler = (...args: never[]) => Promise<Response>;
 
-/** Schedule for one cron — the same crontab string that's in vercel.json.
- *  Vercel crons evaluate in UTC, so the monitor is pinned to UTC too. */
+/** Schedule for one cron — the same crontab string the Inngest cron trigger
+ *  fires on (lib/inngest/cron-functions.ts). Inngest evaluates crons in UTC,
+ *  so the monitor is pinned to UTC too. */
 export interface CronSchedule {
-  /** Crontab expression, e.g. '*\/15 * * * *'. Must match vercel.json. */
+  /** Crontab expression, e.g. '*\/15 * * * *'. Must match the CRON_MANIFEST
+   *  entry in lib/inngest/cron-functions.ts. */
   crontab: string;
   /** Grace window (minutes) before a late/missed run is flagged. Defaults to
    *  5; override for jobs with bursty runtime. */

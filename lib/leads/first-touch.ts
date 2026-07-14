@@ -42,6 +42,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 import { composeQuickDraft } from '@/lib/agent/quick-draft';
 import { leadSourceLabel } from '@/lib/lead-source';
 
@@ -269,15 +270,26 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
   }
   const draftId = (inserted as { id: string }).id;
 
-  // ── Notify the realtor. Only after the draft actually exists — the push
-  //    says "first touch ready", so it must be true. sendPushToSpace never
-  //    throws and no-ops without VAPID config/subscriptions. ─────────────
+  // ── Notify the realtor. Only after the draft actually exists — the
+  //    notification says "first touch ready", so it must be true. The durable
+  //    in-app record (dashboard bell) lands alongside the ephemeral push;
+  //    both are best-effort and never throw. ─────────────────────────────
   const leadName = (contact.name ?? '').trim() || 'New lead';
-  await sendPushToSpace(spaceId, {
-    title: `New lead: ${leadName} — first touch ready`,
-    body: channel === 'email' ? 'Review and send the intro email I drafted.' : 'Review and send the intro text I drafted.',
-    url: `/s/${space.slug}/chippi/inbox`,
-  });
+  const notifyTitle = `New lead: ${leadName} — first touch ready`;
+  const notifyBody =
+    channel === 'email' ? 'Review and send the intro email I drafted.' : 'Review and send the intro text I drafted.';
+  const notifyUrl = `/s/${space.slug}/chippi/inbox`;
+  await Promise.allSettled([
+    createAppNotification({
+      spaceId,
+      type: 'first_touch',
+      title: notifyTitle,
+      body: notifyBody,
+      href: notifyUrl,
+      priority: 'high',
+    }),
+    sendPushToSpace(spaceId, { title: notifyTitle, body: notifyBody, url: notifyUrl }),
+  ]);
 
   logger.info('[first-touch] draft created', { spaceId, contactId, draftId, channel });
   return { created: true, draftId };

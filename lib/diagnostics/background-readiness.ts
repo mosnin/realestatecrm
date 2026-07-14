@@ -113,8 +113,10 @@ function checkChatOffload(): ReadinessCheck {
 }
 
 /**
- * c. Scheduled runs (cron auth). No fallback — the hourly routine cron 401s
- * without CRON_SECRET, so scheduled routines silently never fire.
+ * c. Scheduled runs (cron auth). Still required post-Inngest-cutover: the
+ * Inngest cron functions authenticate to the /api/cron/* routes with
+ * `Bearer ${CRON_SECRET}`. No fallback — without it every tick 401s and
+ * scheduled routines silently never fire.
  */
 function checkCron(): ReadinessCheck {
   if (isSet('CRON_SECRET')) {
@@ -122,37 +124,38 @@ function checkCron(): ReadinessCheck {
       key: 'cron',
       label: 'Scheduled runs (cron auth)',
       status: 'ok',
-      detail: 'CRON_SECRET set — the hourly routine cron authenticates and fires.',
+      detail: 'CRON_SECRET set — the Inngest cron ticks authenticate to the cron routes and fire.',
     };
   }
   return {
     key: 'cron',
     label: 'Scheduled runs (cron auth)',
     status: 'missing',
-    detail: 'The hourly routine cron 401s without CRON_SECRET — scheduled routines never run.',
-    fix: 'Set CRON_SECRET on Vercel (and in the cron job header) and redeploy.',
+    detail:
+      'The cron routes 401 without CRON_SECRET — the Inngest cron ticks cannot authenticate, so scheduled routines never run.',
+    fix: 'Set CRON_SECRET and redeploy — the Inngest cron functions send it as their Bearer token.',
   };
 }
 
 /**
- * d. Integration triggers (Inngest). Both keys are required for the
- * Composio → Inngest dispatch to deliver; without them background app events
- * never fire.
+ * d. Background jobs (Inngest). Both keys are required for Inngest to execute
+ * functions — scheduled crons AND Composio → Inngest trigger dispatch; without
+ * them scheduled ticks and background app events never fire.
  */
 function checkInngest(): ReadinessCheck {
   if (isSet('INNGEST_EVENT_KEY') && isSet('INNGEST_SIGNING_KEY')) {
     return {
       key: 'inngest',
-      label: 'Integration triggers (Inngest)',
+      label: 'Background jobs (Inngest)',
       status: 'ok',
-      detail: 'Inngest keys set — Composio → Inngest trigger delivery is wired.',
+      detail: 'Inngest keys set — cron scheduling and Composio trigger delivery are wired.',
     };
   }
   return {
     key: 'inngest',
-    label: 'Integration triggers (Inngest)',
+    label: 'Background jobs (Inngest)',
     status: 'missing',
-    detail: "Composio → Inngest trigger delivery won't fire without both Inngest keys.",
+    detail: "Scheduled crons and Composio trigger delivery won't fire without both Inngest keys.",
     fix: 'Set INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY and redeploy.',
   };
 }

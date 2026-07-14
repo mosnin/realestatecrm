@@ -25,6 +25,7 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 import { evaluateConditions } from './conditions';
 import { executeAction, type WorkflowContext, type ActionStepResult } from './actions';
 import { walkGraph } from './graph-walk';
@@ -274,6 +275,17 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
       await finishRun({ runId, status: 'failed', summary: 'one or more actions failed' });
       await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'error' });
       if (workflow.notifyOnError) {
+        // Durable in-app record + ephemeral push — a failed automation must
+        // stay visible in the bell after the push is gone (honest degraded
+        // state). Both are best-effort.
+        createAppNotification({
+          spaceId: workflow.spaceId,
+          type: 'automation',
+          title: 'Automation failed',
+          body: 'One or more steps in your workflow failed. Check the run history for details.',
+          spacePath: '/automations',
+          priority: 'high',
+        }).catch(() => {/* best-effort */});
         sendPushToSpace(workflow.spaceId, {
           title: 'Automation failed',
           body: `One or more steps in your workflow failed. Check the run history for details.`,
@@ -296,6 +308,14 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
     });
     await updateWorkflowLastRun({ workflowId: workflow.id, lastRunStatus: 'error' });
     if (workflow.notifyOnError) {
+      createAppNotification({
+        spaceId: workflow.spaceId,
+        type: 'automation',
+        title: 'Automation errored',
+        body: 'An unexpected error occurred in your workflow. Check the run history for details.',
+        spacePath: '/automations',
+        priority: 'high',
+      }).catch(() => {/* best-effort */});
       sendPushToSpace(workflow.spaceId, {
         title: 'Automation errored',
         body: `An unexpected error occurred in your workflow. Check the run history for details.`,

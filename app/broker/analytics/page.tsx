@@ -21,8 +21,16 @@ import {
   BODY_MUTED,
   SECTION_RHYTHM,
 } from '@/lib/typography';
-import { StatCard, SURFACE_CARD } from '@/components/ui/surface-card';
+import { StatCard, SURFACE_CARD, InsightStrip } from '@/components/ui/surface-card';
+import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  SPEED_TO_LEAD_WINDOW_DAYS,
+  formatSpeedToLead,
+  lastNDaysWindow,
+  meaningfulSpeedToLead,
+} from '@/lib/analytics/speed-to-lead';
+import { fetchSpeedToLead } from '@/lib/analytics/speed-to-lead-data';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 import { AnalyticsBreakdowns } from './breakdowns';
 import {
@@ -54,7 +62,7 @@ export default async function BrokerAnalyticsPage() {
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
   // Fetch contacts and deals across all member spaces.
-  const [contactsRes, dealsRes] = await Promise.all([
+  const [contactsRes, dealsRes, speedToLeadRes] = await Promise.all([
     spaceIds.length > 0
       ? supabase
           .from('Contact')
@@ -69,7 +77,18 @@ export default async function BrokerAnalyticsPage() {
           .in('spaceId', spaceIds)
           .limit(50000)
       : Promise.resolve({ data: [] }),
+    // Brokerage-wide speed-to-lead. Additive: a failure hides the card
+    // (never a fabricated number) instead of taking down the page.
+    spaceIds.length > 0
+      ? fetchSpeedToLead(spaceIds, lastNDaysWindow()).catch((err) => {
+          console.error('[broker/analytics] speed-to-lead failed', err);
+          return null;
+        })
+      : Promise.resolve(null),
   ]);
+
+  // Honest-display gate: hidden below 3 leads reached in the window.
+  const speed = meaningfulSpeedToLead(speedToLeadRes);
 
   const contacts = (contactsRes.data ?? []) as {
     id: string;
@@ -220,14 +239,35 @@ export default async function BrokerAnalyticsPage() {
               borderless, large radius, accent-bar labels). "Lead to win" is
               the view's ONE solid accent card. */}
           <section
-            className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+            className={cn(
+              'grid grid-cols-2 gap-4',
+              speed ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4',
+            )}
             aria-label="Team totals"
           >
             <StatCard label="Total leads" value={totalLeads.toLocaleString()} />
             <StatCard label="Deals won" value={totalWon.toLocaleString()} />
+            {speed && (
+              <StatCard
+                label="Speed to lead"
+                value={formatSpeedToLead(speed.medianMinutes)}
+                sub={`median · p90 ${formatSpeedToLead(speed.p90Minutes)} · ${SPEED_TO_LEAD_WINDOW_DAYS} days`}
+              />
+            )}
             <StatCard label="Pipeline value" value={formatCompact(totalPipelineValue)} />
             <StatCard label="Lead to win" value={`${teamConversion}%`} accent />
           </section>
+
+          {/* Honest computed read: how often Chippi's instant first-touch
+              draft was the lead's actual first touch. Hidden unless it
+              happened at least once in the window. */}
+          {speed && speed.chippiFirstCount > 0 && (
+            <InsightStrip icon={<Zap size={14} aria-hidden />}>
+              Chippi sent the first touch on {speed.chippiFirstCount} of{' '}
+              {speed.touchedCount} new leads reached in the last {SPEED_TO_LEAD_WINDOW_DAYS}{' '}
+              days
+            </InsightStrip>
+          )}
 
           {/* Agent funnel + table -- all client interactivity */}
           <AnalyticsClient agents={agentData} />

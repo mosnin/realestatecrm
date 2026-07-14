@@ -26,6 +26,70 @@ interface NotificationStateRow {
   sourceCreatedAt: string | null;
 }
 
+/** Stored agent-outcome records: how far back and how many the bell shows. */
+const STORED_WINDOW_DAYS = 30;
+const STORED_LIMIT = 25;
+
+/**
+ * Loads the DURABLE agent-outcome notifications for a space — rows written by
+ * lib/notifications.ts (createAppNotification) when background work finishes
+ * (swarm runs via /api/internal/notify, first-touch drafts, workflow sends and
+ * failures, work-session completions). Mapped into the same shape as the
+ * computed items so read/dismiss state (keyed by id) applies identically.
+ *
+ * Best-effort: if the table is unavailable (e.g. the migration hasn't been
+ * applied to this environment yet) the bell degrades to computed-only rather
+ * than erroring.
+ */
+async function fetchStoredNotifications(
+  spaceId: string,
+  slug: string,
+): Promise<ComputedNotification[]> {
+  try {
+    const since = new Date(Date.now() - STORED_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const { data, error } = await supabase
+      .from('AppNotification')
+      .select('id, type, title, body, href, priority, createdAt')
+      .eq('spaceId', spaceId)
+      .gte('createdAt', since.toISOString())
+      .order('createdAt', { ascending: false })
+      .limit(STORED_LIMIT);
+    if (error) {
+      console.error('[notifications] stored lookup failed', error.message);
+      return [];
+    }
+    return (data ?? []).map((row: any): ComputedNotification => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      description: row.body ?? '',
+      // Records written without a deep link land on the space dashboard.
+      href: row.href || `/s/${slug}`,
+      createdAt: row.createdAt,
+      priority: row.priority === 'high' || row.priority === 'low' ? row.priority : 'medium',
+    }));
+  } catch (err) {
+    console.error('[notifications] stored lookup threw', err);
+    return [];
+  }
+}
+
+/**
+ * The full unfiltered list the bell operates on: computed CRM items + stored
+ * agent-outcome records. Both GET and PATCH{all:true} MUST use this so
+ * "mark all read" covers exactly what the realtor sees.
+ */
+async function listNotifications(
+  spaceId: string,
+  slug: string,
+): Promise<ComputedNotification[]> {
+  const [computed, stored] = await Promise.all([
+    computeNotifications(spaceId, slug),
+    fetchStoredNotifications(spaceId, slug),
+  ]);
+  return [...computed, ...stored];
+}
+
 /**
  * Computes the live, CRM-derived notifications for a space. These are NOT
  * stored — they're re-derived on every request. Read/dismiss state is layered
@@ -195,9 +259,9 @@ async function computeNotifications(
 }
 
 /**
- * GET — Returns the realtor's actionable notifications for the dashboard,
- * computed in real time from CRM data and then filtered by persisted
- * read/dismiss state.
+ * GET — Returns the realtor's actionable notifications for the dashboard:
+ * items computed in real time from CRM data PLUS durable agent-outcome
+ * records (AppNotification rows), filtered by persisted read/dismiss state.
  *
  * State semantics (see migration 20260706000000_notification_state.sql):
  *  - DISMISSED keys are dropped entirely.
@@ -215,7 +279,7 @@ export async function GET(req: NextRequest) {
 
   let notifications: ComputedNotification[];
   try {
-    notifications = await computeNotifications(space.id, slug);
+    notifications = await listNotifications(space.id, slug);
   } catch (err) {
     console.error('[notifications] query failed', err);
     return NextResponse.json({ error: 'Failed to load notifications' }, { status: 500 });
@@ -320,11 +384,12 @@ export async function PATCH(req: NextRequest) {
 
   try {
     if (body.all) {
-      // Re-derive the current set so we can snapshot each item's source
-      // timestamp; a key with no stored sourceCreatedAt would re-surface on the
-      // next fetch (current > null is false, but we want the timestamp recorded
-      // so fresher activity is detectable).
-      const current = await computeNotifications(space.id, slug);
+      // Re-derive the current set (computed + stored agent-outcome records) so
+      // we can snapshot each item's source timestamp; a key with no stored
+      // sourceCreatedAt would re-surface on the next fetch (current > null is
+      // false, but we want the timestamp recorded so fresher activity is
+      // detectable).
+      const current = await listNotifications(space.id, slug);
       if (current.length === 0) return NextResponse.json({ success: true });
       await supabase.from('NotificationState').upsert(
         current.map((n) => ({

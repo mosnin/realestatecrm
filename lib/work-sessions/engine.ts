@@ -29,6 +29,7 @@ import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import type { ToolContext, ToolDefinition } from '@/lib/ai-tools/types';
 import { uploadObject, buildKey } from '@/lib/storage';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // Shared with the client strip via lib/work-sessions/types.ts (types-only
@@ -326,7 +327,16 @@ async function assembleArtifact(
   });
 
   // Best-effort completion ping — the whole point of a background run is
-  // that you left; this is how you learn it's done.
+  // that you left; this is how you learn it's done. The durable in-app
+  // record (dashboard bell, deep-linked to the Chippi workspace where the
+  // sessions strip lives) outlives the ephemeral push.
+  void createAppNotification({
+    spaceId: session.spaceId,
+    type: 'work_session',
+    title: 'Chippi finished a work session',
+    body: title,
+    spacePath: '/chippi',
+  }).catch(() => {});
   void sendPushToSpace(session.spaceId, {
     title: 'Chippi finished a work session',
     body: title,

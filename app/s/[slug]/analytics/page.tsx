@@ -2,6 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildOverviewData } from '@/lib/analytics-data';
+import { lastNDaysWindow } from '@/lib/analytics/speed-to-lead';
+import { getSpaceSpeedToLead } from '@/lib/analytics/speed-to-lead-data';
 import { OverviewView } from '@/components/analytics/overview-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 
@@ -18,8 +20,16 @@ export default async function AnalyticsOverviewPage({
   if (!space) notFound();
 
   try {
-    const raw = await fetchRawAnalyticsData(space.id);
-    const data = buildOverviewData(raw);
+    const [raw, speedToLead] = await Promise.all([
+      fetchRawAnalyticsData(space.id),
+      // Speed-to-lead is additive: a failure hides the card instead of
+      // taking down the whole overview (and never shows a fabricated stat).
+      getSpaceSpeedToLead(space.id, lastNDaysWindow()).catch((err) => {
+        console.error('[analytics/overview] speed-to-lead failed', err);
+        return null;
+      }),
+    ]);
+    const data = { ...buildOverviewData(raw), speedToLead };
     return <OverviewView data={data} />;
   } catch (err) {
     console.error('[analytics/overview] DB queries failed', err);
