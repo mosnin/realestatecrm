@@ -1417,6 +1417,9 @@
     0 0 18px 1px rgba(255, 138, 10, 0.14),
     0 0 48px 6px rgba(255, 106, 0, 0.07);
   animation: chippi-agent-breathe 3.2s ease-in-out infinite;
+  /* Ease the idle ⇄ streaming handoff — the bloom tightens rather than
+     snapping when a turn starts or settles. */
+  transition: box-shadow 0.4s ease;
   pointer-events: none;
 }
 /* Streaming in agent mode: tighter, a touch brighter, slightly quicker —

@@ -39,7 +39,7 @@ vi.mock('@/lib/supabase', () => {
 
 // ── Executor mock ───────────────────────────────────────────────────────────
 const { runWorkflowMock } = vi.hoisted(() => ({
-  runWorkflowMock: vi.fn(async () => undefined),
+  runWorkflowMock: vi.fn(async (_input: unknown) => undefined),
 }));
 vi.mock('@/lib/workflows/executor', () => ({ runWorkflow: runWorkflowMock }));
 
