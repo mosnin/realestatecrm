@@ -46,6 +46,8 @@ export type Channel = 'email' | 'sms' | 'note';
 const SYSTEM_PROMPT =
   "You are Chippi, an AI assistant for a real-estate CRM. Compose ONE short outbound message the realtor can send right now. " +
   "Voice: warm, direct, human. Write like a sharp colleague, not a chatbot. Lead with the actual reason for the message. " +
+  "GROUNDING: Use ONLY facts explicitly present in the user JSON. Never imply a prior conversation, new listings, available properties, attachments, appointments, tours, offers, or completed actions unless that exact fact appears in the user JSON. " +
+  "When context is thin, write a neutral check-in and ask what would be useful; do not fill gaps with plausible real-estate details. " +
   "BANNED (these mark a message as machine-written): stock openers ('I hope this email finds you well', 'I wanted to reach out', 'I'm reaching out'); " +
   "assistant filler ('Great question', \"I'd be happy to\", 'Happy to help', 'Certainly', 'Absolutely!'); " +
   "hollow sign-offs ('Let me know if you have any questions', 'Please don't hesitate to reach out', 'Feel free to reach out', 'Looking forward to hearing from you'); " +
@@ -55,6 +57,43 @@ const SYSTEM_PROMPT =
   "Note body (when channel is 'note'): a single line summarizing what was discussed on a call, past tense, factual. " +
   "Output strict JSON with this shape and nothing else: {\"subject\": string|null, \"body\": string}. " +
   "Subject is a non-empty string for emails, null for notes.";
+
+/**
+ * High-risk factual claims that a polished real-estate draft can easily invent.
+ * Prompt grounding is the first line of defence; this deterministic check is
+ * the release valve when a provider ignores it. A phrase is allowed when the
+ * same fact is actually present in the structured subject/activity payload.
+ */
+const CLAIM_GUARDS: ReadonlyArray<{ reason: string; pattern: RegExp }> = [
+  {
+    reason: 'invented_prior_conversation',
+    pattern: /\b(?:as|like) we (?:discussed|talked about)|\bwe (?:discussed|spoke about|talked about)\b/i,
+  },
+  {
+    reason: 'invented_inventory',
+    pattern: /\b(?:new|fresh|just-listed) (?:listings?|properties|options)\b/i,
+  },
+  {
+    reason: 'invented_inventory',
+    pattern: /\bI (?:have|found|pulled) (?:some|a few|several|two|three)?\s*(?:listings?|properties|options)\b/i,
+  },
+  {
+    reason: 'invented_appointment',
+    pattern: /\b(?:your|the) (?:tour|showing|appointment) (?:is|has been) (?:scheduled|booked|confirmed)\b/i,
+  },
+  {
+    reason: 'invented_attachment',
+    pattern: /\b(?:I|we)(?:'ve| have)? (?:attached|sent) (?:the|a|an|some|those|these)\b/i,
+  },
+];
+
+function unsupportedClaimReason(body: string, facts: unknown): string | null {
+  const factCorpus = JSON.stringify(facts);
+  for (const guard of CLAIM_GUARDS) {
+    if (guard.pattern.test(body) && !guard.pattern.test(factCorpus)) return guard.reason;
+  }
+  return null;
+}
 
 /** How long the optional one-shot voice revision pass is allowed to take. */
 const REVISE_TIMEOUT_MS = 4_000;
@@ -228,10 +267,20 @@ export async function composeDraftWithOpenAI(args: {
     // slop detector and revise once if it reads like a bot. Notes are terse
     // internal call logs, not voice-sensitive, so they skip this. Best-effort:
     // a clean draft (the common case) does no extra work.
+    const finalDraft =
+      args.channel === 'email'
+        ? await reviseAwaySlop(client, { subject, body })
+        : { subject, body };
+
     if (args.channel === 'email') {
-      return await reviseAwaySlop(client, { subject, body });
+      const unsupportedReason = unsupportedClaimReason(finalDraft.body, userPayload);
+      if (unsupportedReason) {
+        logger.warn('[quick-draft] compose rejected', { reason: unsupportedReason });
+        return null;
+      }
     }
-    return { subject, body };
+
+    return finalDraft;
   } catch (err) {
     logger.warn('[quick-draft] compose failed', { err: err instanceof Error ? err.message : String(err) });
     return null;
