@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { RightPanelTab } from '@/components/chippi/right-panel-tabs';
 
-export type RightPanelTab = 'people' | 'deals' | 'properties';
+// Canonical tab union lives next to the tab bar (right-panel-tabs.tsx);
+// re-exported here so existing importers keep working.
+export type { RightPanelTab };
 
 interface SplitPanelState {
   isSplit: boolean;
@@ -49,7 +52,7 @@ function persistState(next: SplitPanelState): void {
  *
  * - `isSplit` — whether the panel is in split view
  * - `toggle` — toggles between split and single view
- * - `rightTab` — active tab in the right panel ('people' | 'deals' | 'properties')
+ * - `rightTab` — active tab in the right panel (see `RightPanelTab`)
  * - `setRightTab` — sets the active right tab
  * - `leftWidthPercent` — left panel width as a percentage (clamped 30–75, default 58)
  * - `setLeftWidthPercent` — sets the left panel width (auto-clamped)

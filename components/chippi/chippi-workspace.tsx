@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
@@ -219,6 +219,10 @@ export function ChippiWorkspace({
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Single switch for every bespoke animation on this surface: the hero→dock
+  // composer glide, the user-bubble lift, and the hero exit's vertical drift
+  // all collapse to plain crossfades/snaps when the OS asks for less motion.
+  const reduceMotion = useReducedMotion() ?? false;
 
   // Track which assistant message ids have already mounted so we only run the
   // 8px slide-in entrance the FIRST time a bubble appears. Loading a
@@ -440,7 +444,10 @@ export function ChippiWorkspace({
     // use them immediately (zero extra round-trip).
     if (targetId === initialConversationId && initialMessages.length > 0) {
       loadedConvIdRef.current = targetId;
-      setMessages(legacyToUi(initialMessages));
+      const history = legacyToUi(initialMessages);
+      // Pre-warm the seen-set: history arrives settled, never animated.
+      for (const m of history) seenMessageIdsRef.current.add(m.id);
+      setMessages(history);
       return;
     }
 
@@ -451,7 +458,10 @@ export function ChippiWorkspace({
       if (cancelled) return;
       if (data) {
         loadedConvIdRef.current = targetId;
-        setMessages(legacyToUi(data));
+        const history = legacyToUi(data);
+        // Pre-warm the seen-set: history arrives settled, never animated.
+        for (const m of history) seenMessageIdsRef.current.add(m.id);
+        setMessages(history);
         return;
       }
 
@@ -1365,31 +1375,33 @@ export function ChippiWorkspace({
           <span className="sr-only">Loading conversation…</span>
         </>
       ) : (
-        /* Empty → active swap.
-           AnimatePresence with mode="wait" guarantees the hero unmounts
-           fully before the active-conversation tree mounts. This is the
-           load-bearing constraint here: a previous attempt wrapped both
-           branches with `mode="popLayout"` and a shared
-           `layoutId="chippi-composer"` to morph the composer between hero
-           and docked positions, but popLayout keeps the exiting node alive
-           through the exit animation, so the realtor briefly had TWO
-           textareas in the DOM whenever `isEmpty` flipped false. mode="wait"
-           + distinct keys keeps only one composer alive at any time, at the
-           cost of a small dead-time window (~180ms) between the hero exit
-           and the conversation enter — reads as "Chippi heard you, getting
-           ready" rather than a hard cut. Do NOT reintroduce a shared
-           layoutId here. `initial={false}` suppresses the entrance
-           animation on initial page load — the transition is for the
-           empty→active flip only, not for the first paint. */
-        <AnimatePresence mode="wait" initial={false}>
-          {isEmpty && (
+        /* Empty ⇄ active — ONE composer, two homes.
+           The composer renders exactly once, OUTSIDE the AnimatePresence
+           below, as a `layout`-animated motion.div near the bottom of this
+           flex column. In the empty state, the flex spacer after it holds
+           it at the vertical center under the greeting; when the first
+           message sends, the hero region swaps for the transcript, the
+           spacer unmounts, and framer-motion's FLIP layout animation GLIDES
+           the composer down to its docked position — no remount, no focus
+           loss, and structurally never two textareas in the DOM (the
+           failure mode of the earlier shared-layoutId attempt; a layoutId
+           stays unnecessary because the element itself persists). The
+           optimistic user bubble + thinking indicator mount in the same
+           React commit as the flip — popLayout pops the exiting hero out of
+           flow immediately, so there is NO dead-time window before the
+           first visible signal. `initial={false}` keeps the first paint
+           static. Reduced motion: the glide collapses to an instant snap
+           (layout={false}) and the region swap is a plain crossfade. */
+        <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
+        <AnimatePresence mode="popLayout" initial={false}>
+          {isEmpty ? (
             <motion.div
               key="empty-hero"
-              initial={{ opacity: 1, y: 0 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: reduceMotion ? 0 : -12 }}
+              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+              className="flex-1 min-h-0 flex flex-col items-center justify-end px-4 sm:px-6"
             >
               {/* The daily brief lives at /chippi/brief (sidebar entry).
                   It used to render inline above the composer here on the
@@ -1407,18 +1419,15 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
-                  {renderInput()}
                 </div>
               </motion.div>
-            )}
-
-          {!isEmpty && (
+            ) : (
             <motion.div
               key="active-conversation"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
               className="flex flex-col flex-1 min-h-0 overflow-hidden"
             >
               {/* Active thread */}
@@ -1443,15 +1452,23 @@ export function ChippiWorkspace({
                     ) {
                       return null;
                     }
-                    // First time we see this id → run the 8px slide-in.
+                    // First time we see this id → run the entrance animation.
                     // Subsequent renders (re-mount during scroll virtualization
                     // would also hit this code path, though we don't virtualize)
-                    // skip the animation. User messages: no entrance animation
-                    // — typed text reading "instantly there" is the realtor's
-                    // own action, not Chippi delivering something.
+                    // skip it, and loading a conversation from history mounts
+                    // silently (the seen-set is pre-warmed per conversation).
+                    // Assistant bubbles: 8px slide-in. User bubbles: a short
+                    // upward lift (+12px) from the direction of the composer,
+                    // so a sent message reads as lifting OUT of the input and
+                    // into the transcript — one continuous gesture with the
+                    // hero→dock composer glide on the first send. Both are
+                    // suppressed under reduced motion.
                     const isFresh = !seenMessageIdsRef.current.has(msg.id);
                     if (isFresh) seenMessageIdsRef.current.add(msg.id);
-                    const animateEntrance = isFresh && msg.role === 'assistant';
+                    const animateEntrance =
+                      isFresh && !reduceMotion && msg.role === 'assistant';
+                    const animateUserLift =
+                      isFresh && !reduceMotion && msg.role === 'user';
 
                     if (msg.role === 'assistant') {
                       // Find any create_plan tool call in this message and
@@ -1541,18 +1558,24 @@ export function ChippiWorkspace({
                       );
                     }
                     return (
-                      <Transcript
+                      <motion.div
                         key={msg.id}
-                        blocks={msg.blocks}
-                        messageId={msg.id}
-                        role={msg.role}
-                        streaming={msg.streaming && isStreaming}
-                        liveCallIds={liveCallIds}
-                        localUrls={attachmentPreviewUrls}
-                        onUserIntent={(text) => {
-                          void handleSend(text, [], undefined);
-                        }}
-                      />
+                        initial={animateUserLift ? { opacity: 0, y: 12 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
+                      >
+                        <Transcript
+                          blocks={msg.blocks}
+                          messageId={msg.id}
+                          role={msg.role}
+                          streaming={msg.streaming && isStreaming}
+                          liveCallIds={liveCallIds}
+                          localUrls={attachmentPreviewUrls}
+                          onUserIntent={(text) => {
+                            void handleSend(text, [], undefined);
+                          }}
+                        />
+                      </motion.div>
                     );
                   })}
 
@@ -1623,18 +1646,33 @@ export function ChippiWorkspace({
             </ScrollArea>
           </div>
 
+            </motion.div>
+          )}
+        </AnimatePresence>
+
           {/* The standalone Stop button used to live here — moved into the
               composer's right-slot (Send → Stop swap) so the abort affordance
               sits exactly where the user's eye is. ChatGPT / Claude pattern. */}
 
-          {/* Docked input — pinned to the bottom of the active thread.
-              Previously a `motion.div` with `layoutId="chippi-composer"`
-              shared with the empty-state hero composer above. The shared
-              layoutId + popLayout AnimatePresence combo briefly mounted
-              both composers (= two textareas in the DOM). Plain <div>
-              keeps only one composer alive at a time. */}
-          <div
-            className="sticky bottom-0 z-10 w-full max-w-3xl mx-auto chat-content-wrap pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0"
+          {/* The ONE composer — hero-centered or bottom-docked, same element.
+              `layout="position"` FLIP-glides it between the two homes when
+              `isEmpty` flips (see the architecture note above); width is
+              max-w-3xl in both states so the glide is pure translation, no
+              scale distortion of the textarea. The docked state keeps the
+              sticky pin + bottom fade so long transcripts scroll under it. */}
+          <motion.div
+            layout={reduceMotion ? false : 'position'}
+            // Only re-measure (and glide) when the hero⇄dock state flips —
+            // without this, every keystroke that grows the textarea or adds a
+            // queued-message chip would animate the composer's position too.
+            layoutDependency={isEmpty}
+            transition={{ layout: { duration: 0.5, ease: [0.32, 0.72, 0, 1] } }}
+            className={cn(
+              'w-full max-w-3xl mx-auto chat-content-wrap',
+              isEmpty
+                ? 'pb-2'
+                : 'sticky bottom-0 z-10 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background to-background/0',
+            )}
           >
             {atLimit ? (
               <SystemMessage
@@ -1654,10 +1692,15 @@ export function ChippiWorkspace({
             ) : (
               renderInput()
             )}
-          </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </motion.div>
+
+          {/* Hero balance spacer — grows slightly more than the greeting
+              region above so the composer rests a touch above true center
+              (the same optical bias the old pb-16 hero carried). Unmounts
+              the instant a conversation starts, which is what hands the
+              composer its docked position to glide to. */}
+          {isEmpty && <div className="flex-[1.15] min-h-10" aria-hidden />}
+        </div>
       )}
 
         </div>{/* end left panel */}
