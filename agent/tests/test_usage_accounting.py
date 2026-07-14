@@ -34,3 +34,54 @@ def test_opts_in_when_openrouter_configured():
 def test_empty_on_direct_openai(monkeypatch):
     monkeypatch.setattr(settings, "openrouter_api_key", "")
     assert llm.usage_accounting_extra_body() == {}
+
+
+class _FakeCompletions:
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = []
+
+    async def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self._responses.pop(0)
+
+
+class _FakeChat:
+    def __init__(self, completions):
+        self.completions = completions
+
+
+class _FakeClient:
+    def __init__(self, completions):
+        self.chat = _FakeChat(completions)
+
+
+class _Usage:
+    def __init__(self, cost):
+        self.cost = cost
+
+
+class _Resp:
+    def __init__(self, cost):
+        self.usage = _Usage(cost) if cost is not None else None
+
+
+import asyncio  # noqa: E402
+
+
+def test_cost_tracker_accumulates_and_injects_opt_in():
+    completions = _FakeCompletions([_Resp(0.001), _Resp(0.002)])
+    tracker = llm.CostTrackingClient(_FakeClient(completions))
+    asyncio.run(tracker.chat.completions.create(model="m", messages=[]))
+    asyncio.run(tracker.chat.completions.create(model="m", messages=[]))
+    assert tracker.cost_usd == 0.003
+    # Every outgoing call carried the OpenRouter usage-accounting opt-in.
+    for call in completions.calls:
+        assert call["extra_body"]["usage"] == {"include": True}
+
+
+def test_cost_tracker_none_when_no_cost_seen():
+    completions = _FakeCompletions([_Resp(None)])
+    tracker = llm.CostTrackingClient(_FakeClient(completions))
+    asyncio.run(tracker.chat.completions.create(model="m", messages=[]))
+    assert tracker.cost_usd is None
