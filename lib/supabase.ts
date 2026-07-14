@@ -1,9 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { wrapGuard } from '@/lib/supabase-guard';
 
 // Lazy-initialized Supabase client.
 // Created on first use so the build can succeed without env vars.
 // Auth is handled by Clerk — we use the service role key (bypasses RLS)
-// because all database access is server-side only.
+// because all database access is server-side only. Because the service role
+// bypasses RLS, the `.eq('spaceId'|'brokerageId', …)` filter on each query IS
+// the tenant boundary — so the client is wrapped in the tenant-scope guard
+// (lib/supabase-guard.ts), which is a no-op unless TENANT_GUARD=1.
 let _client: SupabaseClient | undefined;
 
 export function getSupabase(): SupabaseClient {
@@ -19,7 +23,7 @@ export function getSupabase(): SupabaseClient {
     );
   }
 
-  _client = createClient(url, key);
+  _client = wrapGuard(createClient(url, key));
   return _client;
 }
 

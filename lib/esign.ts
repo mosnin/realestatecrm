@@ -475,6 +475,14 @@ function extractDocumentBase64(data: unknown): string | null {
 export interface RefreshEnvelopeStatusInput {
   userId: string;
   signatureRequestId: string;
+  /**
+   * The caller's space. Required: the lookup below is scoped by it, so this
+   * helper can't leak another tenant's envelope status + signed-PDF URL even
+   * if a future caller forgets to pre-scope. The current caller already
+   * pre-scopes; this makes the isolation intrinsic to the helper (audit
+   * 2026-08 flagged the previously-unscoped internal fetch as fragile).
+   */
+  spaceId: string;
 }
 
 /**
@@ -489,6 +497,7 @@ export async function refreshEnvelopeStatus(
     .from('SignatureRequest')
     .select(REQUEST_COLUMNS)
     .eq('id', input.signatureRequestId)
+    .eq('spaceId', input.spaceId)
     .maybeSingle();
 
   if (rowError || !row) return { ok: false, reason: 'not_found' };

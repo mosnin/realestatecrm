@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { requestChatStop } from '@/lib/chat/stop-signal';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { resolveBrokerContext } from '@/lib/agent/broker-context';
 
 export const runtime = 'nodejs';
 
@@ -32,26 +33,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });
   }
 
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  // The conversation must belong to the caller's space — without this,
-  // any authed user could stop any tenant's turns by id. Reserved broker/
-  // team conversations share the owner's spaceId but are NOT realtor-surface
+  // ── Realtor surface ─────────────────────────────────────────────────────
+  // The conversation must belong to the caller's space — without this, any
+  // authed user could stop any tenant's turns by id. Reserved broker/team
+  // conversations share the owner's spaceId but are NOT realtor-surface
   // conversations, so they're rejected here like every other realtor route
-  // (see lib/chat/conversation-access.ts).
-  const { data: convo } = await supabase
-    .from('Conversation')
-    .select('id, title')
-    .eq('id', conversationId)
-    .eq('spaceId', space.id)
-    .maybeSingle();
-  if (!convo || isReservedConversationTitle((convo as { title?: string | null }).title)) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // (see lib/chat/conversation-access.ts) and fall through to the broker
+  // branch below.
+  const space = await getSpaceForUser(userId);
+  if (space) {
+    const { data: convo } = await supabase
+      .from('Conversation')
+      .select('id, title')
+      .eq('id', conversationId)
+      .eq('spaceId', space.id)
+      .maybeSingle();
+    if (convo && !isReservedConversationTitle((convo as { title?: string | null }).title)) {
+      const signalled = await requestChatStop(conversationId);
+      // signalled=false means Redis isn't configured — Stop degrades to
+      // client-side rendering stop. Honest response either way.
+      return NextResponse.json({ ok: true, signalled });
+    }
   }
 
-  const signalled = await requestChatStop(conversationId);
-  // signalled=false means Redis isn't configured — Stop degrades to
-  // client-side rendering stop. Honest response either way.
-  return NextResponse.json({ ok: true, signalled });
+  // ── Broker surface ──────────────────────────────────────────────────────
+  // Broker conversations live in the SEPARATE "BrokerConversation" table keyed
+  // by brokerageId — not the realtor "Conversation" table — so the realtor
+  // lookup above always misses them (a broker owner owns a personal space too,
+  // which is why we can't 403 before getting here). Authenticate as a broker
+  // exactly the way /api/ai/broker-task does (resolveBrokerContext →
+  // getBrokerMemberContext) and confirm the conversation belongs to THEIR
+  // brokerage before signalling, so a broker can stop their own broker turn
+  // but not another brokerage's.
+  const brokerCtx = await resolveBrokerContext();
+  if (brokerCtx) {
+    const { data: brokerConvo } = await supabase
+      .from('BrokerConversation')
+      .select('id')
+      .eq('id', conversationId)
+      .eq('brokerageId', brokerCtx.brokerage.id)
+      .maybeSingle();
+    if (brokerConvo) {
+      const signalled = await requestChatStop(conversationId);
+      return NextResponse.json({ ok: true, signalled });
+    }
+  }
+
+  return NextResponse.json({ error: 'Not found' }, { status: 404 });
 }

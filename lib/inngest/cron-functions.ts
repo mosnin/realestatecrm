@@ -169,6 +169,12 @@ export const CRON_MANIFEST: readonly CronManifestEntry[] = [
     cron: '0 10 * * *',
     load: () => import('@/app/api/cron/next-moves/route'),
   },
+  {
+    id: 'cron-extraction-backfill',
+    path: '/api/cron/extraction-backfill',
+    cron: '15 * * * *',
+    load: () => import('@/app/api/cron/extraction-backfill/route'),
+  },
 ];
 
 /**

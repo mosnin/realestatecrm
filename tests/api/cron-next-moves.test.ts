@@ -223,6 +223,51 @@ describe('GET /api/cron/next-moves — selection and gating', () => {
     expect(body).toMatchObject({ due: 2, computed: 1, errored: 1 });
   });
 
+  it('caps each space to a fair share so one big space cannot starve small spaces', async () => {
+    // 3 spaces: s_big has 90 due deals, s_a has 2, s_b has 3. With
+    // MAX_PER_TICK=100 and 3 distinct spaces, fairShare = ceil(100/3) = 34.
+    // s_big must be capped at 34; s_a and s_b must be fully served.
+    const due = [
+      ...Array.from({ length: 90 }, (_, i) => ({ id: `big${i}`, spaceId: 's_big' })),
+      { id: 'a0', spaceId: 's_a' },
+      { id: 'a1', spaceId: 's_a' },
+      { id: 'b0', spaceId: 's_b' },
+      { id: 'b1', spaceId: 's_b' },
+      { id: 'b2', spaceId: 's_b' },
+    ];
+    queueTick({ due, activeSpaceIds: ['s_big', 's_a', 's_b'] });
+
+    const res = await invoke('Bearer test-secret');
+    const body = await res.json();
+
+    const perSpace: Record<string, number> = {};
+    for (const [spaceId] of computeNextMoveMock.mock.calls as Array<[string, string]>) {
+      perSpace[spaceId] = (perSpace[spaceId] ?? 0) + 1;
+    }
+    // No space exceeds its fair share (34).
+    expect(perSpace['s_big']).toBe(34);
+    // Small spaces are always fully served — never starved.
+    expect(perSpace['s_a']).toBe(2);
+    expect(perSpace['s_b']).toBe(3);
+    // The over-cap deals are deferred (not computed, not stamped) so they stay
+    // due for the next tick.
+    expect(body).toMatchObject({ due: 95, computed: 39, deferred: 56, skipped: 0 });
+  });
+
+  it('does not stamp fairness-deferred deals — no Deal.update when all spaces are billing-active', async () => {
+    const due = Array.from({ length: 90 }, (_, i) => ({ id: `d${i}`, spaceId: 's1' }));
+    queueTick({ due, activeSpaceIds: ['s1'] });
+
+    await invoke('Bearer test-secret');
+    // Only the Deal (due) read and the Space (billing) read run — no update.
+    // A single space's fairShare is max(5, ceil(100/1)) = 100, so with 90 due
+    // all are runnable; the point is the skip-stamp path never fires here.
+    const updateCalls = supabaseCalls.filter((c) =>
+      c.chain.some(([m]) => m === 'update'),
+    );
+    expect(updateCalls).toHaveLength(0);
+  });
+
   it('caps compute at 4 in flight even with 12 due deals', async () => {
     let inFlight = 0;
     let maxInFlight = 0;

@@ -68,6 +68,11 @@ const EXPECTED: Array<{ id: string; path: string; cron: string }> = [
   { id: 'cron-daily-briefing', path: '/api/cron/daily-briefing', cron: '0 * * * *' },
   { id: 'cron-notification-digest', path: '/api/cron/notification-digest', cron: '0 8 * * *' },
   { id: 'cron-next-moves', path: '/api/cron/next-moves', cron: '0 10 * * *' },
+  {
+    id: 'cron-extraction-backfill',
+    path: '/api/cron/extraction-backfill',
+    cron: '15 * * * *',
+  },
 ];
 
 // Shape produced by the mocked inngest.createFunction above.
