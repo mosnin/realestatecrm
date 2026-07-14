@@ -825,6 +825,7 @@ export async function POST(req: NextRequest) {
     filename: a.filename,
     mimeType: a.mime_type,
     url: a.public_url,
+    extractedText: a.extracted_text,
   }));
   const { model: turnModel, upgraded } = pickModelForAttachments(
     baseModel,

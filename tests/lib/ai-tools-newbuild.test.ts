@@ -203,7 +203,7 @@ describe('readAttachmentTool', () => {
     expect(readAttachmentTool.requiresApproval).toBe(false);
   });
 
-  it('returns metadata without leaking blob content', async () => {
+  it('returns the extracted document contents', async () => {
     mockByTable = {
       Attachment: {
         single: {
@@ -222,15 +222,54 @@ describe('readAttachmentTool', () => {
     const data = result.data as {
       filename: string;
       mimeType: string;
-      hasExtractedText: boolean;
-      description: string | null;
+      content: string | null;
+      totalChars: number;
     };
     expect(data.filename).toBe('disclosure.pdf');
     expect(data.mimeType).toBe('application/pdf');
-    expect(data.hasExtractedText).toBe(true);
-    // Description is the FIRST line only — never the full body.
-    expect(data.description).toMatch(/Property disclosure/);
-    expect(data.description).not.toMatch(/Line two/);
+    expect(data.content).toContain('Property disclosure for 412 Elm St.');
+    expect(data.content).toContain('Line two.');
+    expect(data.totalChars).toBe(45);
+  });
+
+  it('pages long extractions via offset', async () => {
+    mockByTable = {
+      Attachment: {
+        single: {
+          id: 'a_1',
+          filename: 'big.csv',
+          mimeType: 'text/csv',
+          sizeBytes: 1_000_000,
+          extractionStatus: 'done',
+          extractedText: 'x'.repeat(25_000),
+        },
+      },
+    };
+    const result = await readAttachmentTool.handler(
+      { attachmentId: 'a_1', offset: 20_000 },
+      makeCtx(),
+    );
+    const data = result.data as { content: string | null; totalChars: number };
+    expect(data.content).toHaveLength(5_000);
+    expect(data.totalChars).toBe(25_000);
+  });
+
+  it('explains image attachments instead of returning content', async () => {
+    mockByTable = {
+      Attachment: {
+        single: {
+          id: 'a_2',
+          filename: 'kitchen.png',
+          mimeType: 'image/png',
+          sizeBytes: 50_000,
+          extractionStatus: 'skipped',
+          extractedText: null,
+        },
+      },
+    };
+    const result = await readAttachmentTool.handler({ attachmentId: 'a_2' }, makeCtx());
+    expect(result.summary).toMatch(/image/i);
+    expect((result.data as { content: string | null }).content).toBeNull();
   });
 
   it('errors when the attachment is missing in this workspace', async () => {

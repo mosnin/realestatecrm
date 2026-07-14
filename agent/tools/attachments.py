@@ -234,8 +234,16 @@ async def read_attachment(
 
     # ---- pending: extract now ----
     if not public_url:
-        await _persist_extraction(db, attachment_id, space_id, "", "failed")
-        return {"error": "attachment has no public url"}
+        # New uploads live in a private bucket (publicUrl is intentionally
+        # empty) and are extracted at upload time by the web app — a pending
+        # row with no URL is a legacy edge case. Leave it pending rather than
+        # poisoning it as failed; the web runtime can still fill it in.
+        return {
+            "filename": filename,
+            "mime_type": mime_type,
+            "text": None,
+            "error": "attachment content is not extracted yet and has no downloadable url",
+        }
 
     try:
         data = await _download(public_url)
