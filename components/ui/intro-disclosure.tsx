@@ -24,6 +24,7 @@ import {
 import {
   Drawer,
   DrawerContent,
+  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer"
@@ -568,6 +569,9 @@ export function IntroDisclosure({
               />
             )}
             <DrawerTitle>{steps[currentStep]?.title}</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Review the product&apos;s key features step by step.
+            </DrawerDescription>
           </DrawerHeader>
 
           <div className="flex-1 overflow-y-auto">

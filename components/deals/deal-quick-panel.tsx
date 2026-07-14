@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -127,6 +128,9 @@ export function DealQuickPanel({
         {/* Hidden title for a11y; the visible H2 is below. */}
         <SheetHeader className="sr-only">
           <SheetTitle>{deal.title}</SheetTitle>
+          <SheetDescription>
+            View and update this deal&apos;s details, people, activity, and status.
+          </SheetDescription>
         </SheetHeader>
 
         {/* Header — title + meta */}
