@@ -43,7 +43,8 @@ export type AgentRunTrigger =
   | 'routine'
   | 'run_now'
   | 'composio_trigger'
-  | 'broker_routine';
+  | 'broker_routine'
+  | 'agent_task';
 
 const TABLE = 'AgentRunLedger';
 

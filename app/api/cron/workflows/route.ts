@@ -71,28 +71,60 @@ async function handler(req: NextRequest) {
   // ── 1. Enabled schedule-triggered workflows ────────────────────────────
   // trigger is jsonb; trigger->>'type' = 'schedule' selects the schedule ones
   // server-side so we don't pull every workflow into memory.
-  const { data: rows, error: queryErr } = await supabase
-    .from('Workflow')
-    .select('id, spaceId, trigger, conditions, actions, autonomy')
-    .eq('enabled', true)
-    .eq('trigger->>type', 'schedule')
-    .limit(MAX_PER_TICK);
-  if (queryErr) {
-    console.error('[cron/workflows] Failed to load schedule workflows', queryErr);
-    return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
+  //
+  // The lastScheduledFireAt watermark column ships in migration
+  // 20260815000000, which is applied through the human-gated workflow — the
+  // code can deploy before the column exists. Fall back to a column-less
+  // select in that window (watermark reads as null → old strict-hour rule,
+  // and stamping is skipped) instead of 500ing the tick.
+  let rows: ScheduleWorkflowRow[] = [];
+  let watermarkColumnAvailable = true;
+  {
+    const { data, error: queryErr } = await supabase
+      .from('Workflow')
+      .select('id, spaceId, trigger, conditions, actions, autonomy, lastScheduledFireAt')
+      .eq('enabled', true)
+      .eq('trigger->>type', 'schedule')
+      .limit(MAX_PER_TICK);
+    if (queryErr) {
+      watermarkColumnAvailable = false;
+      console.warn(
+        '[cron/workflows] watermark select failed — retrying without lastScheduledFireAt (migration not applied yet?)',
+        queryErr,
+      );
+      const { data: legacyData, error: legacyErr } = await supabase
+        .from('Workflow')
+        .select('id, spaceId, trigger, conditions, actions, autonomy')
+        .eq('enabled', true)
+        .eq('trigger->>type', 'schedule')
+        .limit(MAX_PER_TICK);
+      if (legacyErr) {
+        console.error('[cron/workflows] Failed to load schedule workflows', legacyErr);
+        return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
+      }
+      rows = (legacyData ?? []) as unknown as ScheduleWorkflowRow[];
+    } else {
+      rows = (data ?? []) as unknown as ScheduleWorkflowRow[];
+    }
   }
 
-  const scheduled = (rows ?? []) as unknown as ScheduleWorkflowRow[];
+  const scheduled = rows;
 
-  // ── 2. Keep only the ones due THIS hour ────────────────────────────────
-  // FOLLOW-UP: due-ness is computed purely from the current UTC hour, so a missed
-  // tick (cron outage) drops that hour's schedules. Persist a per-workflow
-  // last-fired watermark and catch up missed hours instead of relying on "this hour".
-  const due = scheduled.filter((w) => {
+  // ── 2. Keep only the DUE ones (watermark-aware) ─────────────────────────
+  // Due = the most recent scheduled slot is later than the last slot fired
+  // (lastScheduledFireAt). A late tick fires a missed slot exactly once; a
+  // second tick inside the same slot compares equal and doesn't double-fire.
+  const due: Array<{ row: ScheduleWorkflowRow; slot: Date | null }> = [];
+  for (const w of scheduled) {
     const config = w.trigger?.config;
-    if (!config || typeof config.cadence !== 'string') return false;
-    return isScheduleDue(config, now);
-  });
+    if (!config || typeof config.cadence !== 'string') continue;
+    const { due: isDue, slot } = isScheduleDueWithWatermark(
+      config,
+      now,
+      w.lastScheduledFireAt ?? null,
+    );
+    if (isDue) due.push({ row: w, slot });
+  }
 
   if (due.length === 0) {
     return NextResponse.json({
@@ -112,7 +144,7 @@ async function handler(req: NextRequest) {
 
   async function worker() {
     while (cursor < due.length) {
-      const row = due[cursor++];
+      const { row, slot } = due[cursor++];
       try {
         await runWorkflow({
           workflow: {
@@ -132,6 +164,20 @@ async function handler(req: NextRequest) {
         // suspenders so one bad workflow can't abort the loop.
         console.error('[cron/workflows] workflow run threw', { id: row.id }, err);
         errored++;
+      }
+
+      // Stamp the SLOT (not `now`) as the watermark — even on error, mirroring
+      // /api/cron/routines, so a permanently failing workflow can't refire
+      // every tick forever. Best-effort: a failed stamp only means the next
+      // tick may refire this slot once (at-least-once, never silently dropped).
+      if (watermarkColumnAvailable && slot) {
+        const { error: stampErr } = await supabase
+          .from('Workflow')
+          .update({ lastScheduledFireAt: slot.toISOString() })
+          .eq('id', row.id);
+        if (stampErr) {
+          console.warn('[cron/workflows] failed to stamp watermark', { id: row.id }, stampErr);
+        }
       }
     }
   }
