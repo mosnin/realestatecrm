@@ -187,7 +187,9 @@ async def run_space(space_id: str) -> None:
 # Web endpoint — autonomous run from the UI / trigger queue
 # ---------------------------------------------------------------------------
 
-@app.function(secrets=secrets, timeout=600)
+# Snapshot-restored cold starts (~1-2s instead of re-importing the SDK stack).
+# No always-warm floor here — nobody is watching a cron/trigger run start.
+@app.function(secrets=secrets, timeout=600, enable_memory_snapshot=True)
 @modal.fastapi_endpoint(method="POST")
 async def run_now_webhook(item: dict) -> dict:
     """HTTP webhook that runs Chippi autonomously for a space.
@@ -278,6 +280,7 @@ async def run_now_webhook(item: dict) -> dict:
     secrets=[modal.Secret.from_name("chippi-secrets")],
     timeout=600,  # 10 min max for swarm runs
     max_containers=10,
+    enable_memory_snapshot=True,
 )
 @modal.fastapi_endpoint(method="POST", label="run-swarm")
 async def run_swarm_endpoint(payload: dict) -> dict:
@@ -326,7 +329,18 @@ async def run_swarm_endpoint(payload: dict) -> dict:
 # request instead of Modal's default 60s, so a burst of turns reuses warm
 # capacity before scaling back down to the min_containers=1 floor.
 
-@app.function(secrets=secrets, timeout=600, scaledown_window=150, min_containers=1)
+# enable_memory_snapshot: burst containers (spun up past the min_containers=1
+# floor under concurrent load) restore from a post-import memory snapshot
+# instead of re-importing the agents SDK + Composio stack from scratch —
+# cutting their cold start from ~5-15s to ~1-2s. The always-warm floor covers
+# the first message; snapshots cover everyone who lands on a fresh container.
+@app.function(
+    secrets=secrets,
+    timeout=600,
+    scaledown_window=150,
+    min_containers=1,
+    enable_memory_snapshot=True,
+)
 @modal.fastapi_endpoint(method="POST")
 async def chat_turn(item: dict):
     """Run one chat turn for the realtor and stream SDK events as SSE."""
