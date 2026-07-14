@@ -12,11 +12,19 @@ import {
   workSessionPlan,
   workSessionExecute,
 } from '@/lib/inngest/functions';
+import { cronFunctions } from '@/lib/inngest/cron-functions';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [publishScheduledPost, handleComposioTrigger, workSessionPlan, workSessionExecute],
+  functions: [
+    publishScheduledPost,
+    handleComposioTrigger,
+    workSessionPlan,
+    workSessionExecute,
+    // Scheduled ticks (formerly vercel.json crons) — see lib/inngest/cron-functions.ts.
+    ...cronFunctions,
+  ],
 });

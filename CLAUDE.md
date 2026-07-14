@@ -3,8 +3,9 @@
 Real-estate CRM SaaS ("Chippi"): Next.js 15 App Router + React 19 on Vercel,
 Clerk auth, Supabase Postgres (service-role + manual `spaceId` scoping — RLS is
 defense-in-depth only), OpenAI Agents SDK (TS in `lib/ai-tools/`, Python on
-Modal in `agent/`), OpenRouter for all text LLM calls (`lib/llm.ts`), Inngest
-absent — background work is Vercel crons (`vercel.json`) + Modal.
+Modal in `agent/`), OpenRouter for all text LLM calls (`lib/llm.ts`), background
+work is Inngest (crons in `lib/inngest/cron-functions.ts` + events in
+`lib/inngest/functions.ts`) + Modal — Vercel cron removed.
 
 ## Product non-negotiables (do not regress these)
 

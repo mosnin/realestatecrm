@@ -62,6 +62,14 @@ export function NotificationCenter({ slug, spaceId }: { slug: string; spaceId?: 
         { event: '*', schema: 'public', table: 'Tour', filter: `spaceId=eq.${spaceId}` },
         () => { loadNotifications(); },
       )
+      .on(
+        // Durable agent-outcome records (swarm runs, first-touch drafts,
+        // workflow sends, work sessions) written by lib/notifications.ts —
+        // refetch so the badge reflects them without waiting for the poll.
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'AppNotification', filter: `spaceId=eq.${spaceId}` },
+        () => { loadNotifications(); },
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

@@ -28,6 +28,7 @@ import { sendNewDealNotification } from '@/lib/email';
 import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 import { formatCompact } from '@/lib/formatting';
 import { logger } from '@/lib/logger';
 import {
@@ -351,6 +352,18 @@ export async function notifyDraftReady(params: NotifyWorkflowDispatchParams): Pr
   const who = params.recipient ? ` to ${params.recipient}` : '';
   const promises: Promise<unknown>[] = [];
 
+  // Durable in-app record — NOT channel-gated: the bell is where the realtor
+  // finds the draft after the (ephemeral) push/SMS has come and gone.
+  promises.push(
+    createAppNotification({
+      spaceId: params.spaceId,
+      type: 'agent_send',
+      title: 'Chippi drafted a message',
+      body: `A ${params.channel} draft${who} is ready to review and send.`,
+      href: `/s/${info.spaceSlug}`,
+    }),
+  );
+
   if (info.pushEnabled) {
     promises.push(
       sendPushToSpace(params.spaceId, {
@@ -385,6 +398,18 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
 
   const who = params.recipient ? ` to ${params.recipient}` : '';
   const promises: Promise<unknown>[] = [];
+
+  // Durable in-app record — NOT channel-gated: every autonomous send must
+  // leave an audit trail the realtor can find later, even with push/SMS off.
+  promises.push(
+    createAppNotification({
+      spaceId: params.spaceId,
+      type: 'agent_send',
+      title: 'Chippi sent a message',
+      body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+      href: `/s/${info.spaceSlug}`,
+    }),
+  );
 
   if (info.pushEnabled) {
     promises.push(

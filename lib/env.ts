@@ -183,7 +183,8 @@ const optionalSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),             // lib/crypto.ts
   MCP_JWT_SECRET: z.string().optional(),             // app/api/mcp + oauth/token
 
-  // Inngest (Studio scheduled posts + Composio trigger dispatch); SDK reads env
+  // Inngest (scheduled crons + Studio scheduled posts + Composio trigger
+  // dispatch + work sessions); SDK reads env
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
@@ -223,11 +224,16 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     keys: ['TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
   },
   // Cutover-critical secrets that boot GREEN when missing but then fail
-  // silently: without CRON_SECRET every cron route 401s (sweeps / briefings /
-  // SLA stop); without AGENT_INTERNAL_SECRET the Modal agent's callbacks 503
-  // (Chippi goes dark). Kept optional so CI/preview boot without them, but
-  // warned individually so a real deploy notices.
-  { label: 'Cron auth — cron routes 401 without CRON_SECRET', keys: ['CRON_SECRET'] },
+  // silently: without CRON_SECRET every cron route 401s — the Inngest cron
+  // functions authenticate to the /api/cron/* routes with it, so sweeps /
+  // briefings / SLA stop; without AGENT_INTERNAL_SECRET the Modal agent's
+  // callbacks 503 (Chippi goes dark). Kept optional so CI/preview boot
+  // without them, but warned individually so a real deploy notices.
+  {
+    label:
+      'Cron auth — the Inngest cron functions authenticate to the cron routes with CRON_SECRET; every scheduled tick 401s without it',
+    keys: ['CRON_SECRET'],
+  },
   {
     label: 'Agent↔Modal auth — agent callbacks 503 without AGENT_INTERNAL_SECRET',
     keys: ['AGENT_INTERNAL_SECRET'],
@@ -246,7 +252,7 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     keys: ['MODAL_CHAT_URL'],
   },
   {
-    label: 'Integration triggers (Composio → Inngest) — background app events never fire without the Inngest keys',
+    label: 'Inngest background jobs — scheduled crons and Composio trigger events never fire without the Inngest keys',
     keys: ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'],
   },
   {

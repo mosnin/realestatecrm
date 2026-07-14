@@ -23,6 +23,7 @@ import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { sendPushToSpace } from '@/lib/push';
+import { createAppNotification } from '@/lib/notifications';
 import { evaluateConditions, resolveField } from './conditions';
 import { assertPublicHttpTarget, getSafeDispatcher } from '@/lib/net/ssrf-guard';
 import type { WorkflowAction, WorkflowAutonomy } from './schema';
@@ -761,10 +762,21 @@ async function runNotifyAgent(
 ): Promise<ActionStepResult> {
   const title = resolveTokens(action.config.title, context);
   const body = action.config.body ? resolveTokens(action.config.body, context) : '';
-  const sent = await sendPushToSpace(spaceId, { title, body });
+  // Durable in-app record beside the ephemeral push, so the workflow's
+  // "notify me" lands in the dashboard bell even if no device is subscribed.
+  const [recorded, sent] = await Promise.all([
+    createAppNotification({ spaceId, type: 'automation', title, body, spacePath: '/automations' }),
+    sendPushToSpace(spaceId, { title, body }),
+  ]);
   return {
     status: 'ok',
-    detail: { title, body, sent, note: sent === 0 ? 'No subscribed devices or push not configured.' : undefined },
+    detail: {
+      title,
+      body,
+      sent,
+      recorded,
+      note: sent === 0 ? 'No subscribed devices or push not configured.' : undefined,
+    },
   };
 }
 
