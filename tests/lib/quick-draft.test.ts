@@ -161,6 +161,8 @@ describe('POST /api/agent/quick-draft — preview mode', () => {
     expect(body.contactId).toBe('c_chen');
     expect(body.dealId).toBe('d_chen');
     expect(openaiCreateMock).toHaveBeenCalledOnce();
+    const requestArgs = (openaiCreateMock.mock.calls[0] as unknown as [{ model: string }])[0];
+    expect(requestArgs).toMatchObject({ model: 'gpt-4.1-mini' });
   });
 
   it('composes a note draft for log-call intent (channel coerced to note)', async () => {
@@ -191,17 +193,34 @@ describe('POST /api/agent/quick-draft — preview mode', () => {
     expect(body.subjectLabel).toBe('Sarah');
   });
 
-  it('returns 502 when OpenAI yields nothing usable', async () => {
+  it('serves a safe email fallback when the provider yields nothing usable', async () => {
     openaiCreateMock.mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ subject: 's', body: '' }) } }] } as never);
     mockByTable.Deal = { single: { id: 'd_x', title: 'X', contactId: null, updatedAt: null } };
     const res = await POST(makeReq({ context: 'deal', id: 'd_x', intent: 'check-in' }) as never);
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      channel: 'email',
+      subject: 'Checking in',
+      body: expect.stringContaining('X'),
+    });
   });
 
-  it('returns 502 when OPENAI_API_KEY is missing', async () => {
+  it('serves a safe email fallback when the LLM key is missing', async () => {
     delete process.env.OPENAI_API_KEY;
     mockByTable.Deal = { single: { id: 'd_x', title: 'X', contactId: null, updatedAt: null } };
     const res = await POST(makeReq({ context: 'deal', id: 'd_x', intent: 'check-in' }) as never);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      channel: 'email',
+      subject: 'Checking in',
+      body: expect.stringContaining('X'),
+    });
+  });
+
+  it('does not fabricate a call note when the provider yields nothing', async () => {
+    openaiCreateMock.mockResolvedValueOnce({ choices: [{ message: { content: '' } }] } as never);
+    mockByTable.Deal = { single: { id: 'd_x', title: 'X', contactId: null, updatedAt: null } };
+    const res = await POST(makeReq({ context: 'deal', id: 'd_x', intent: 'log-call' }) as never);
     expect(res.status).toBe(502);
   });
 });

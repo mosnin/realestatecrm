@@ -74,6 +74,33 @@ function channelForIntent(intent: Intent): Channel {
   return intent === 'log-call' ? 'note' : 'email';
 }
 
+/**
+ * A provider miss should not strand a realtor on the highest-frequency
+ * outbound action. This fallback is deliberately generic and factual: it
+ * makes no claims about the person or deal, and the realtor still sees it
+ * before choosing Send. Internal call notes do not get a fallback because a
+ * fabricated call summary would pollute the CRM audit trail.
+ */
+function fallbackEmailDraft(context: Context, subjectLabel: string, intent: Intent) {
+  if (intent === 'welcome') {
+    return {
+      subject: 'Welcome',
+      body:
+        context === 'deal'
+          ? `Thanks for connecting about ${subjectLabel}. What would be most helpful as you get started?`
+          : 'Thanks for connecting. What would be most helpful as you get started?',
+    };
+  }
+
+  return {
+    subject: 'Checking in',
+    body:
+      context === 'deal'
+        ? `Checking in about ${subjectLabel}. Is there anything you would like to review or move forward this week?`
+        : 'Checking in to see how things are going. Is there anything you would like to review or move forward this week?',
+  };
+}
+
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
@@ -152,14 +179,24 @@ export async function POST(req: NextRequest) {
       spaceId: space.id,
     });
 
-    if (!composed) {
+    const preview =
+      composed ??
+      (channel === 'email'
+        ? { ...fallbackEmailDraft(body.context, subjectLabel, body.intent), subjectLabel }
+        : null);
+
+    if (!preview) {
       return NextResponse.json({ error: 'compose_failed' }, { status: 502 });
+    }
+
+    if (!composed) {
+      logger.warn('[quick-draft] serving safe email fallback', { reason: 'compose_failed' });
     }
 
     return NextResponse.json({
       channel,
-      subject: channel === 'email' ? composed.subject ?? `Quick check-in` : null,
-      body: composed.body,
+      subject: channel === 'email' ? preview.subject ?? `Quick check-in` : null,
+      body: preview.body,
       contactId,
       dealId,
       subjectLabel,

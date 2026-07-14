@@ -33,7 +33,11 @@ import { detectSlop, summarizeSlop } from '@/lib/voice/slop';
 // bounded, but allow the same 15s latency budget used by other foreground AI
 // work; we still make only one compose call, so this does not amplify spend.
 const TIMEOUT_MS = 15_000;
-const MODEL = 'gpt-5-mini';
+// This is a short structured copy task, not a reasoning task. gpt-5-mini can
+// spend a small completion budget on hidden reasoning and return no visible
+// JSON; gpt-4.1-mini is faster and reliably uses the budget for the requested
+// subject/body payload.
+const MODEL = 'gpt-4.1-mini';
 
 export type Intent = 'check-in' | 'log-call' | 'welcome' | 'reach-out';
 export type Context = 'deal' | 'person';
@@ -163,7 +167,10 @@ export async function composeDraftWithOpenAI(args: {
   leadScore?: number | null;
   voiceSamples: VoiceSample[];
 }): Promise<{ subject: string | null; body: string } | null> {
-  if (!hasLLMKey()) return null;
+  if (!hasLLMKey()) {
+    logger.warn('[quick-draft] compose unavailable', { reason: 'missing_llm_key' });
+    return null;
+  }
 
   const userPayload = {
     intent: args.intent,
@@ -202,10 +209,16 @@ export async function composeDraftWithOpenAI(args: {
       { signal: controller.signal },
     );
     const raw = response.choices?.[0]?.message?.content?.trim();
-    if (!raw) return null;
+    if (!raw) {
+      logger.warn('[quick-draft] compose unusable', { reason: 'empty_response' });
+      return null;
+    }
     const parsed = JSON.parse(raw) as { subject?: unknown; body?: unknown };
     const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
-    if (!body) return null;
+    if (!body) {
+      logger.warn('[quick-draft] compose unusable', { reason: 'empty_body' });
+      return null;
+    }
     const subject =
       typeof parsed.subject === 'string' && parsed.subject.trim().length > 0
         ? parsed.subject.trim()
