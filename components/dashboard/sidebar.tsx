@@ -1166,14 +1166,21 @@ function RealtorNav({
   // More disclosure state: closed by default (the whole point), auto-open
   // when the active route lives inside it, manual choice remembered.
   const moreOwnsPath = moreItems.some((item) => doesItemOwnPath(item, pathname, base));
-  const [moreOpen, setMoreOpen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
+  // The server cannot see localStorage. Reading it in the state initializer
+  // made the server render More collapsed while a returning browser rendered
+  // it expanded on the first client pass, forcing every realtor route through
+  // React hydration recovery. Start identically closed, then restore the
+  // preference after hydration.
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
     try {
-      return window.localStorage.getItem(MORE_STORAGE_KEY) === '1';
+      if (window.localStorage.getItem(MORE_STORAGE_KEY) === '1') {
+        setMoreOpen(true);
+      }
     } catch {
-      return false;
+      /* private mode — session-only state is fine */
     }
-  });
+  }, []);
   const moreVisible = moreOpen || moreOwnsPath;
   const toggleMore = () => {
     setMoreOpen((prev) => {
