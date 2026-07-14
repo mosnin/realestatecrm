@@ -44,6 +44,10 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
   const [phase, setPhase] = useState<Phase>('loading');
   const [draft, setDraft] = useState<DraftPreview | null>(null);
   const [celebrationKind, setCelebrationKind] = useState<ApprovalKind | null>(null);
+  // Stable across ambiguous transport failures so a retry cannot deliver the
+  // same reviewed message twice. Rotate only after a definitive server-side
+  // delivery failure, where a fresh click is an intentional new attempt.
+  const [sendRequestId, setSendRequestId] = useState(() => crypto.randomUUID());
 
   // Fetch the draft on mount. Each mount = one fresh compose; closing and
   // reopening the panel re-drafts (the realtor can re-roll by re-tapping).
@@ -86,6 +90,7 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'send',
+          idempotencyKey: sendRequestId,
           context: context.kind,
           id: context.id,
           intent,
@@ -95,6 +100,29 @@ export function MorningActionSheet({ slug, intent, context, onSent, onCancel }: 
         }),
       });
       if (!res.ok) {
+        const failure = (await res.json().catch(() => null)) as {
+          error?: string;
+          status?: string;
+        } | null;
+        if (failure?.error === 'already_processed') {
+          if (failure.status === 'sent') {
+            const kind: ApprovalKind =
+              draft.channel === 'note'
+                ? 'note'
+                : draft.channel === 'email'
+                  ? 'email'
+                  : 'sms';
+            setCelebrationKind(kind);
+            setPhase('celebrating');
+            return;
+          }
+          toast.error('That send was already processed. Check activity before trying again.');
+          setPhase('preview');
+          return;
+        }
+        if (failure?.error === 'delivery_failed') {
+          setSendRequestId(crypto.randomUUID());
+        }
         toast.error("Couldn't send that. Try again.");
         setPhase('preview');
         return;
