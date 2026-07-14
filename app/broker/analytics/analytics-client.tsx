@@ -29,6 +29,12 @@ import { useState, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { SECTION_LABEL, TITLE_FONT, BODY_MUTED, CAPTION, META } from '@/lib/typography';
+import {
+  CARD_TITLE,
+  InsightStrip,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { AnimatedNumber } from '@/components/motion/animated-number';
@@ -197,7 +203,7 @@ function AgentFunnelCard({
   const delta = agent.overallConversion - teamConversion;
 
   return (
-    <section className="rounded-xl border border-border/70 bg-background px-4 py-4 space-y-3">
+    <section className={cn(SURFACE_CARD, 'p-5 sm:p-6 space-y-3')}>
       {/* Header row: avatar + name + focal conversion % */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-medium text-foreground flex-shrink-0">
@@ -419,14 +425,14 @@ export function AnalyticsClient({ agents }: Props) {
 
       {/* ── Team funnel summary ─────────────────────────────────────────────── */}
       <motion.section
-        className="rounded-xl border border-border/70 bg-background px-4 sm:px-5 py-5 space-y-4"
+        className={cn(SURFACE_CARD, SURFACE_CARD_PAD, 'space-y-4')}
         initial={reduce ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
       >
-        <div className="flex items-end justify-between gap-4 pb-3 border-b border-border/60">
+        <div className="flex items-end justify-between gap-4 pb-2">
           <div className="space-y-0.5">
-            <p className={SECTION_LABEL}>Team funnel</p>
+            <p className={CARD_TITLE}>Team funnel</p>
             <p className={BODY_MUTED}>Rental pipeline, all agents.</p>
           </div>
           {/* Focal number for the section */}
@@ -455,13 +461,16 @@ export function AnalyticsClient({ agents }: Props) {
           <FunnelBar label="Won" value={teamTotals.wonDeals} maxValue={teamTotals.totalLeads} />
         </div>
 
-        {/* The team's single coaching headline — where the pipeline leaks most. */}
+        {/* The team's single coaching headline — where the pipeline leaks
+            most. Rendered as the card's bottom insight strip; the numbers
+            come straight from the funnel above. */}
         {teamLeak && (
-          <p className={cn(CAPTION, 'pt-1')}>
+          <InsightStrip icon={<ArrowDown size={14} aria-hidden />} className="mt-1">
             The team loses the most at{' '}
-            <span className="text-foreground font-medium">{STEP_LABEL[teamLeak.key]}</span>{' '}
-            — only <span className="tabular-nums">{teamLeak.pct}%</span> get through.
-          </p>
+            <span className="font-medium">{STEP_LABEL[teamLeak.key]}</span>
+            {' — only '}
+            <span className="tabular-nums">{teamLeak.pct}%</span> get through.
+          </InsightStrip>
         )}
       </motion.section>
 
@@ -531,7 +540,7 @@ export function AnalyticsClient({ agents }: Props) {
             ))}
           </StaggerList>
         ) : (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className={cn(SURFACE_CARD, 'px-5 py-10 text-center')}>
             <p className="text-sm text-foreground">No agents with data yet.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Lead activity will appear here once realtors are active.

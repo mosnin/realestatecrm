@@ -18,6 +18,7 @@ import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 import { logger } from '@/lib/logger';
 import { routeBrokerageLead } from '@/lib/brokerage-routing';
+import { fireFirstTouch } from '@/lib/leads/first-touch';
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -677,6 +678,17 @@ export async function POST(req: NextRequest) {
 
     await Promise.all([brokerNotification, applicantConfirmation]);
     logger.debug('[apply/brokerage] notifications dispatched', { contactId: contact.id });
+
+    // ── Instant First Touch (fire-and-forget) ──────────────────────────────
+    // The lead landed in the ASSIGNED agent's space (or the owner fallback),
+    // so the draft + push go to spaceIdForInsert. fireFirstTouch never throws
+    // and registers its own after() keep-alive — zero latency added to the
+    // applicant's response. try/catch is belt-and-suspenders.
+    try {
+      void fireFirstTouch({ spaceId: spaceIdForInsert, contactId: contact.id });
+    } catch (e) {
+      logger.error('[apply/brokerage] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
+    }
 
     return NextResponse.json(
       {

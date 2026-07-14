@@ -19,10 +19,9 @@ import {
   H1,
   TITLE_FONT,
   BODY_MUTED,
-  SECTION_LABEL,
-  STAT_NUMBER_COMPACT,
   SECTION_RHYTHM,
 } from '@/lib/typography';
+import { StatCard, SURFACE_CARD } from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 import { AnalyticsBreakdowns } from './breakdowns';
@@ -207,8 +206,8 @@ export default async function BrokerAnalyticsPage() {
       </header>
 
       {isEmpty ? (
-        /* Empty state -- dashed-border house style per STYLESHEET Empty states */
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        /* Empty state -- flat surface card, calm copy */
+        <div className={cn(SURFACE_CARD, 'px-5 py-10 text-center')}>
           <p className="text-sm text-foreground">No activity yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Lead and deal data across your member realtors will appear here.
@@ -217,35 +216,17 @@ export default async function BrokerAnalyticsPage() {
       ) : (
         <div className={SECTION_RHYTHM}>
 
-          {/* KPI strip -- hairline-divider grid per STYLESHEET Surfaces */}
+          {/* KPI strip -- floating stat cards (reference language: flat,
+              borderless, large radius, accent-bar labels). "Lead to win" is
+              the view's ONE solid accent card. */}
           <section
-            className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-4"
             aria-label="Team totals"
           >
-            <div className="bg-background px-4 py-4 space-y-0.5">
-              <p className={SECTION_LABEL}>Total leads</p>
-              <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {totalLeads.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-background px-4 py-4 space-y-0.5">
-              <p className={SECTION_LABEL}>Deals won</p>
-              <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {totalWon.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-background px-4 py-4 space-y-0.5">
-              <p className={SECTION_LABEL}>Pipeline value</p>
-              <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {formatCompact(totalPipelineValue)}
-              </p>
-            </div>
-            <div className="bg-background px-4 py-4 space-y-0.5">
-              <p className={SECTION_LABEL}>Lead to win</p>
-              <p className={cn(STAT_NUMBER_COMPACT)} style={TITLE_FONT}>
-                {`${teamConversion}%`}
-              </p>
-            </div>
+            <StatCard label="Total leads" value={totalLeads.toLocaleString()} />
+            <StatCard label="Deals won" value={totalWon.toLocaleString()} />
+            <StatCard label="Pipeline value" value={formatCompact(totalPipelineValue)} />
+            <StatCard label="Lead to win" value={`${teamConversion}%`} accent />
           </section>
 
           {/* Agent funnel + table -- all client interactivity */}

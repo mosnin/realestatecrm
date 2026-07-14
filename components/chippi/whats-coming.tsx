@@ -6,7 +6,13 @@ import { motion } from 'framer-motion';
 import { MapPin, Phone, Mail, ChevronRight } from 'lucide-react';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
-import { SECTION_LABEL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+import {
+  CARD_TITLE,
+  StatusPill,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 
 interface FollowUpDue {
   id: string;
@@ -81,13 +87,13 @@ export function WhatsComing({ slug }: { slug: string }) {
   if (!loading && total === 0) return null;
 
   return (
-    <section>
-      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className={SECTION_LABEL}>
+    <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <div className="flex items-center gap-3">
+        <h2 className={CARD_TITLE}>
           What&apos;s coming
         </h2>
         {!loading && total > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">{total}</span>
+          <StatusPill className="tabular-nums">{total}</StatusPill>
         )}
       </div>
 

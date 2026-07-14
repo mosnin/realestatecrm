@@ -10,6 +10,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { motion, useReducedMotion } from 'framer-motion';
+import { TrendingUp } from 'lucide-react';
 import { countLabel, pluralize } from '@/lib/formatting';
 import {
   StatCell,
@@ -18,6 +19,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  InsightStrip,
   formatCurrency,
   PAPER_GRID,
 } from './chart-primitives';
@@ -36,6 +38,17 @@ const dealsConfig = {
 
 export function OverviewView({ data }: { data: OverviewData }) {
   const reduce = useReducedMotion();
+
+  // Honest month-over-month read for the insight strip: only when BOTH the
+  // current and previous month have real submissions — no fabricated trends.
+  const series = data.leadsOverTime;
+  const last = series.length >= 2 ? series[series.length - 1] : null;
+  const prev = series.length >= 2 ? series[series.length - 2] : null;
+  const leadsDeltaPct =
+    last && prev && prev.count > 0 && last.count > 0
+      ? Math.round(((last.count - prev.count) / prev.count) * 100)
+      : null;
+
   const statusSentence = data.totalContacts > 0
     ? `${countLabel(data.totalContacts, 'person', 'people')} in your book, ${data.totalDeals} active ${pluralize(data.totalDeals, 'deal')}.`
     : 'No data yet. Start by adding your first contact.';
@@ -65,11 +78,24 @@ export function OverviewView({ data }: { data: OverviewData }) {
           value={data.totalPipelineValue}
           format={formatCurrency}
           sub="combined"
+          accent
         />
       </StatStrip>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Leads over time" sub="Applications submitted per month" index={0}>
+        <ChartSection
+          title="Leads over time"
+          sub="Applications submitted per month"
+          index={0}
+          insight={
+            leadsDeltaPct !== null && leadsDeltaPct !== 0 ? (
+              <InsightStrip icon={<TrendingUp size={14} aria-hidden />}>
+                Leads {leadsDeltaPct > 0 ? 'increased' : 'decreased'} by{' '}
+                {Math.abs(leadsDeltaPct)}% vs last month
+              </InsightStrip>
+            ) : undefined
+          }
+        >
           <ChartContainer config={leadsConfig} className="h-[200px] w-full">
             <AreaChart data={data.leadsOverTime}>
               <defs>
@@ -110,7 +136,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
 
         <ChartSection title="Pipeline by stage" sub="Deals per stage" index={1}>
           <ChartContainer config={dealsConfig} className="h-[200px] w-full">
-            <BarChart data={data.dealsByStage} barSize={18}>
+            <BarChart data={data.dealsByStage} barSize={26}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis
                 dataKey="name"
@@ -132,7 +158,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
                 dataKey="count"
                 name="Deals"
                 fill="var(--color-count)"
-                radius={[2, 2, 0, 0]}
+                radius={[6, 6, 0, 0]}
               />
             </BarChart>
           </ChartContainer>

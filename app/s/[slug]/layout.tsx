@@ -14,6 +14,7 @@ import { LiveNotifications } from '@/components/dashboard/live-notifications';
 import { PlatformBanner } from '@/components/platform-banner';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import { ChippiBar } from '@/components/chippi/chippi-bar';
+import { ChippiIsland } from '@/components/island/chippi-island';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
@@ -301,6 +302,10 @@ export default async function DashboardLayout({
         </div>
       </SidebarCollapseProvider>
       <MobileNav slug={slug} isBroker={isBroker} />
+      {/* The Island — ambient pill for background work sessions, floating
+          top-center. Hidden on the Chippi surface (the strip owns it there)
+          and in ?embed=1 mode; renders null when nothing is running. */}
+      <ChippiIsland slug={slug} spaceId={space.id} />
       <ChippiBar slug={slug} />
       <CommandPalette slug={slug} />
       {/* FirstPromoter attribution. FprScript loads fpr.js here (the dashboard

@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
-import { SECTION_LABEL } from '@/lib/typography';
+import {
+  CARD_TITLE,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 import type { MorningResponse, MorningSummary } from '@/app/api/agent/morning/route';
 import { composeMorningStory, countMorningCandidates } from '@/lib/morning-story';
 import { buildMorningActions, type MorningAction } from './morning-actions';
@@ -113,9 +117,9 @@ export function MorningStory({ slug, isFresh = false }: Props) {
   // separate hero treatment.
   function Frame({ children }: { children: ReactNode }) {
     return (
-      <section>
-        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className={SECTION_LABEL}>What&apos;s new</h2>
+      <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <div className="flex items-center gap-3 pb-2">
+          <h2 className={CARD_TITLE}>What&apos;s new</h2>
         </div>
         <div className="divide-y divide-border/60">{children}</div>
       </section>
@@ -192,9 +196,9 @@ export function MorningStory({ slug, isFresh = false }: Props) {
 
   return (
     <div ref={containerRef} className="relative">
-      <section>
-        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className={SECTION_LABEL}>What&apos;s new</h2>
+      <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <div className="flex items-center gap-3 pb-2">
+          <h2 className={CARD_TITLE}>What&apos;s new</h2>
           {hasNext && (
             <button
               type="button"

@@ -33,7 +33,10 @@ export function BrokerMain({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+    // Soft muted wash (light mode) so the dashboard's flat white cards
+    // float; dark mode keeps the plain canvas — cards are already the
+    // elevated surface there.
+    <main className="flex-1 overflow-y-auto flex flex-col bg-muted/40 dark:bg-background text-foreground">
       <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28')}>
         <PageTransition>{children}</PageTransition>
       </div>

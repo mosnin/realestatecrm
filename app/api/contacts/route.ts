@@ -4,6 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { fireFirstTouch } from '@/lib/leads/first-touch';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
 import type { Contact } from '@/lib/types';
@@ -200,6 +201,14 @@ export async function POST(req: NextRequest) {
   try {
     await fireAgentTrigger({ spaceId: space.id, event: 'new_lead', contactId: contact.id });
   } catch (e) { console.error('[contacts] agent trigger failed:', e); }
+
+  // Instant First Touch (fire-and-forget) — this endpoint is a genuinely-new
+  // single lead (dupes returned early above; bulk CSV import is a separate
+  // route that deliberately does NOT get this). fireFirstTouch never throws
+  // and registers its own after() keep-alive, so it adds zero latency here.
+  try {
+    void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+  } catch (e) { console.error('[contacts] first-touch dispatch failed:', e); }
 
   // Also dispatch the lead_created WORKFLOW trigger for manually-created leads.
   // Previously lead_created was emitted ONLY from the public /apply form, so a

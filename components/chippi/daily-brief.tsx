@@ -32,6 +32,13 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
+import {
+  ACCENT_CARD,
+  ACCENT_CARD_PILL,
+  CARD_TITLE,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
 import { DURATION_BASE, EASE_OUT, CHAT_STAGGER_DELAY } from '@/lib/motion';
 import type { Brief, BriefCard, SignalKind, SignalSource } from '@/lib/briefing/types';
@@ -315,10 +322,10 @@ function LiveBrief({
   const nextDelay = () => 0.04 + sectionIndex++ * CHAT_STAGGER_DELAY;
 
   return (
-    <div className={cn(FOCUS_CARD_MAX, 'mx-auto space-y-12')}>
+    <div className={cn(FOCUS_CARD_MAX, 'mx-auto space-y-4 sm:space-y-5')}>
       {hasOnDeck && (
-        <BriefSection label="ON DECK" delay={nextDelay()}>
-          <ul className="divide-y divide-border/60">
+        <BriefSection label="On deck" delay={nextDelay()} accent>
+          <ul className="divide-y divide-white/20">
             {brief.cards.map((card, idx) => (
               <BriefCardRow
                 key={`${card.subject.id}-${idx}`}
@@ -326,6 +333,7 @@ function LiveBrief({
                 card={card}
                 cardIndex={idx}
                 onAct={onAct}
+                onAccent
               />
             ))}
             {brief.tip && (
@@ -335,6 +343,7 @@ function LiveBrief({
                 card={brief.tip}
                 cardIndex={brief.cards.length}
                 onAct={onAct}
+                onAccent
               />
             )}
           </ul>
@@ -342,19 +351,19 @@ function LiveBrief({
       )}
 
       {hasYourDay && (
-        <BriefSection label="YOUR DAY" delay={nextDelay()}>
+        <BriefSection label="Your day" delay={nextDelay()}>
           <YourDayList events={events} />
         </BriefSection>
       )}
 
       {hasPipeline && sections?.pipeline && (
-        <BriefSection label="PIPELINE" delay={nextDelay()}>
+        <BriefSection label="Pipeline" delay={nextDelay()}>
           <PipelineLine summary={sections.pipeline} tomorrow={brief.tomorrow} />
         </BriefSection>
       )}
 
       {hasOvernight && sections?.overnight && (
-        <BriefSection label="OVERNIGHT" delay={nextDelay()}>
+        <BriefSection label="Overnight" delay={nextDelay()}>
           <OvernightLine summary={sections.overnight} momentum={brief.momentum} />
         </BriefSection>
       )}
@@ -370,6 +379,7 @@ function BriefSection({
   label,
   children,
   delay = 0,
+  accent = false,
 }: {
   label: string;
   children: React.ReactNode;
@@ -377,15 +387,17 @@ function BriefSection({
    *  surfaces that don't use the brief's four-up cascade get a plain
    *  fade-in. */
   delay?: number;
+  /** The view's ONE solid accent card (On deck — the day's actions). */
+  accent?: boolean;
 }) {
   return (
     <motion.section
-      className="space-y-3"
+      className={cn(accent ? ACCENT_CARD : SURFACE_CARD, SURFACE_CARD_PAD, 'space-y-3')}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay }}
     >
-      <h2 className={SECTION_LABEL}>{label}</h2>
+      <h2 className={cn(CARD_TITLE, accent && 'text-white')}>{label}</h2>
       {children}
     </motion.section>
   );
@@ -398,11 +410,14 @@ function BriefCardRow({
   card,
   cardIndex,
   onAct,
+  onAccent = false,
 }: {
   slug: string;
   card: BriefCard;
   cardIndex: number;
   onAct: (cardIndex: number, source: SignalSource, kind: SignalKind) => void;
+  /** Row lives on the accent card — white ink + translucent white pill. */
+  onAccent?: boolean;
 }) {
   const tag = ACTION_LABEL[card.kind];
   const verb = VERB[card.kind];
@@ -413,16 +428,36 @@ function BriefCardRow({
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-start sm:gap-6 py-4 gap-2">
-      <span className={cn(SECTION_LABEL, 'sm:pt-0.5 sm:w-14 sm:shrink-0 tabular-nums')}>{tag}</span>
+      <span
+        className={cn(
+          SECTION_LABEL,
+          'sm:pt-0.5 sm:w-14 sm:shrink-0 tabular-nums',
+          onAccent && 'text-white/75',
+        )}
+      >
+        {tag}
+      </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{card.subject.name}</p>
-        <p className={cn(BODY_MUTED, 'mt-0.5')}>{card.evidence}</p>
+        <p
+          className={cn(
+            'text-sm font-medium truncate',
+            onAccent ? 'text-white' : 'text-foreground',
+          )}
+        >
+          {card.subject.name}
+        </p>
+        <p className={cn(onAccent ? 'text-sm text-white/80' : BODY_MUTED, 'mt-0.5')}>
+          {card.evidence}
+        </p>
       </div>
       <div className="flex justify-end sm:contents">
         <Link
           href={href}
           onClick={() => onAct(cardIndex, card.source, card.kind)}
-          className={cn(GHOST_PILL, 'shrink-0 min-h-[44px] sm:min-h-0')}
+          className={cn(
+            onAccent ? ACCENT_CARD_PILL : GHOST_PILL,
+            'shrink-0 min-h-[44px] sm:min-h-0',
+          )}
         >
           {verb}
         </Link>
@@ -785,7 +820,7 @@ function YesterdayBrief({ slug, onCollapse }: { slug: string; onCollapse: () => 
           Hide
         </button>
       </div>
-      <div className="rounded-lg border border-border/40 bg-card px-6 py-5 space-y-2">
+      <div className={cn(SURFACE_CARD, 'px-6 py-5 space-y-2')}>
         {hadCards ? (
           <ul className="space-y-1.5">
             {yBrief.cards.slice(0, 3).map((c, i) => (

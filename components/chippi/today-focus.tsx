@@ -8,7 +8,12 @@ import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
-import { SECTION_LABEL } from '@/lib/typography';
+import {
+  CARD_TITLE,
+  StatusPill,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 
 interface PriorityItem {
   contactId: string;
@@ -60,15 +65,13 @@ export function TodayFocus({ slug }: { slug: string }) {
   if (!loading && data.items.length === 0) return null;
 
   return (
-    <section>
-      <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-        <h2 className={SECTION_LABEL}>
+    <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <div className="flex items-center gap-3">
+        <h2 className={CARD_TITLE}>
           Who to reach today
         </h2>
         {!loading && data.items.length > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {data.items.length}
-          </span>
+          <StatusPill className="tabular-nums">{data.items.length}</StatusPill>
         )}
         {data.generatedAt && (
           <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
@@ -117,9 +120,9 @@ export function TodayFocus({ slug }: { slug: string }) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground truncate">{item.name}</span>
                         {item.leadScore >= HOT_LEAD_THRESHOLD && (
-                          <span className="inline-flex items-center rounded-full bg-foreground/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-foreground/70">
+                          <StatusPill className="px-2 py-0 text-[10px] uppercase tracking-wide">
                             hot
-                          </span>
+                          </StatusPill>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">{item.reason}</p>

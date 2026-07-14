@@ -65,6 +65,7 @@ import {
 import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AccentBarLabel, CARD_TITLE } from '@/components/ui/surface-card';
 import { BriefCell, useBriefMotionEnabled } from './brief-motion';
 import type { BriefDashboard as DashboardData } from '@/lib/briefing/dashboard';
 import type { BriefCard, SignalKind } from '@/lib/briefing/types';
@@ -134,9 +135,9 @@ export function BriefDashboard({ slug, data }: Props) {
   const delay = () => 0.04 + i++ * CHAT_STAGGER_DELAY;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
-      {/* GREETING — wide hero row */}
-      <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()} plain>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
+      {/* GREETING — wide hero row. The view's ONE solid accent card. */}
+      <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()} accent>
         <GreetingCell ownerName={data.ownerName} momentum={brief.momentum} tomorrow={brief.tomorrow} />
       </BriefCell>
 
@@ -185,7 +186,7 @@ export function BriefDashboard({ slug, data }: Props) {
 
 // ── Cell header ───────────────────────────────────────────────────────────────
 
-/** Card heading: small-caps label + optional "view all" affordance. */
+/** Card heading: friendly semibold title + a quiet top-right control. */
 function CellHeader({
   label,
   href,
@@ -199,14 +200,14 @@ function CellHeader({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-1.5">
-        {Icon && <Icon size={13} className="text-muted-foreground/70" />}
-        <h2 className={SECTION_LABEL}>{label}</h2>
+      <div className="flex items-center gap-2">
+        {Icon && <Icon size={15} className="text-muted-foreground/70" />}
+        <h2 className={CARD_TITLE}>{label}</h2>
       </div>
       {href && (
         <Link
           href={href}
-          className="group/cta inline-flex items-center gap-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="group/cta inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           {cta ?? 'View'}
           <ArrowUpRight
@@ -233,18 +234,21 @@ function GreetingCell({
   // ChippiPageShell already renders "Today." above; the bento greeting names
   // the date and (when present) the realtor, with the momentum/tomorrow prose
   // as a quiet sub-line. No fabricated copy — momentum/tomorrow are null when
-  // there's nothing real to say.
+  // there's nothing real to say. This cell is the view's ONE accent card, so
+  // every line rides white ink on the agent-orange surface.
   const line = ownerName ? `Good morning, ${ownerName}.` : 'Good morning.';
   return (
-    <div className="pt-1 pb-2">
-      <p className={SECTION_LABEL}>{formatToday()}</p>
-      <h1 className={cn(H1, 'mt-1.5')} style={TITLE_FONT}>
+    <div className="p-6 sm:p-7">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-white/85">
+        {formatToday()}
+      </p>
+      <h1 className={cn(H1, 'mt-1.5 text-white')} style={TITLE_FONT}>
         {line}
       </h1>
       {(momentum || tomorrow) && (
         <div className="mt-3 space-y-0.5">
-          {momentum && <p className={BODY_MUTED}>{momentum}</p>}
-          {tomorrow && <p className={BODY_MUTED}>{tomorrow}</p>}
+          {momentum && <p className="text-sm text-white/85">{momentum}</p>}
+          {tomorrow && <p className="text-sm text-white/85">{tomorrow}</p>}
         </div>
       )}
     </div>
@@ -287,7 +291,7 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
   const allClear = tiles.every((t) => t.n === 0);
 
   return (
-    <div className="flex h-full flex-col p-4 sm:p-5">
+    <div className="flex h-full flex-col p-6 sm:p-7">
       <CellHeader label="What needs you" />
       <div className="mt-3 flex-1 divide-y divide-border/60">
         {tiles.map((t) => {
@@ -370,7 +374,7 @@ function OnDeckCell({
   const hidden = overflow > 0 ? rows.slice(ON_DECK_COMPACT) : [];
 
   return (
-    <div className="p-4 sm:p-5">
+    <div className="p-6 sm:p-7">
       <CellHeader label="On deck" icon={Sparkles} />
       <ul className="mt-2 divide-y divide-border/60">
         {visible.map((card, idx) => (
@@ -453,7 +457,7 @@ function OnDeckRowInner({ slug, card }: { slug: string; card: BriefCard }) {
 
 function ToursCell({ slug, tours }: { slug: string; tours: DashboardData['tours'] }) {
   return (
-    <div className="p-4 sm:p-5">
+    <div className="p-6 sm:p-7">
       <CellHeader label="Today" icon={CalendarClock} href={`/s/${slug}/calendar`} cta="Calendar" />
       <ul className="mt-2 space-y-1">
         {tours.map((t) => {
@@ -488,7 +492,7 @@ function ToursCell({ slug, tours }: { slug: string; tours: DashboardData['tours'
 
 function PipelineCell({ slug, pipeline }: { slug: string; pipeline: NonNullable<DashboardData['pipeline']> }) {
   return (
-    <div className="p-4 sm:p-5">
+    <div className="p-6 sm:p-7">
       <CellHeader label="Pipeline" icon={TrendingUp} href={`/s/${slug}/deals`} cta="Deals" />
       <div className="mt-3 grid grid-cols-2 gap-y-4 gap-x-3">
         <Stat
@@ -533,12 +537,15 @@ function Stat({
   dim?: boolean;
   warn?: boolean;
 }) {
+  // Small-stat pattern from the reference: short vertical accent bar beside
+  // the label, focal number beneath.
   return (
     <div className="min-w-0">
+      <AccentBarLabel>{label}</AccentBarLabel>
       <p
         className={cn(
           STAT_NUMBER_COMPACT,
-          'leading-none tabular-nums',
+          'leading-none tabular-nums mt-1.5',
           dim && 'text-muted-foreground/60',
           warn && 'text-foreground',
         )}
@@ -546,7 +553,6 @@ function Stat({
       >
         {value}
       </p>
-      <p className={cn(BODY_MUTED, 'text-xs mt-1')}>{label}</p>
     </div>
   );
 }
@@ -555,7 +561,7 @@ function Stat({
 
 function HotLeadsCell({ slug, hotLeads }: { slug: string; hotLeads: DashboardData['hotLeads'] }) {
   return (
-    <div className="p-4 sm:p-5">
+    <div className="p-6 sm:p-7">
       <CellHeader label="Hot leads" icon={Flame} href={`/s/${slug}/leads`} cta="People" />
       <ul className="mt-2 divide-y divide-border/60">
         {hotLeads.map((lead) => {
@@ -602,20 +608,23 @@ function OvernightCell({
   overnight: NonNullable<DashboardData['overnight']>;
 }) {
   return (
-    <div className="p-4 sm:p-5">
+    <div className="p-6 sm:p-7">
       <CellHeader
         label="Overnight"
         icon={Sparkles}
         href={`/s/${slug}/chippi/activity`}
         cta="Activity"
       />
-      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-4">
+      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
         {overnight.buckets.map((b) => (
           <div key={b.label} className="min-w-0">
-            <p className={cn(STAT_NUMBER_COMPACT, 'leading-none tabular-nums')} style={TITLE_FONT}>
+            <AccentBarLabel>{singularize(b.label, b.count)}</AccentBarLabel>
+            <p
+              className={cn(STAT_NUMBER_COMPACT, 'leading-none tabular-nums mt-1.5')}
+              style={TITLE_FONT}
+            >
               <AnimatedNumber value={b.count} />
             </p>
-            <p className={cn(BODY_MUTED, 'text-xs mt-1')}>{singularize(b.label, b.count)}</p>
           </div>
         ))}
       </div>

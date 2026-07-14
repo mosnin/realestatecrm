@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { ACCENT_CARD, SURFACE_CARD } from '@/components/ui/surface-card';
 
 /**
  * Reduced-motion-aware hook. Returns true only after mount on the client,
@@ -49,14 +50,17 @@ export function BriefCell({
   span,
   delay = 0,
   plain = false,
+  accent = false,
   className,
 }: {
   children: React.ReactNode;
   span: string;
   delay?: number;
-  /** Plain cells skip the card chrome (border + bg) — used for the greeting
-   *  so the hero line reads as the page's voice, not a boxed stat. */
+  /** Plain cells skip the card chrome (bg + shadow) — for content that
+   *  should read as the page's voice, not a boxed stat. */
   plain?: boolean;
+  /** The bento's ONE solid accent card (agent-orange, white ink). */
+  accent?: boolean;
   className?: string;
 }) {
   const motionOn = useBriefMotionEnabled();
@@ -66,13 +70,9 @@ export function BriefCell({
       className={cn(
         span,
         'min-w-0',
-        !plain && [
-          'group/cell relative rounded-xl border border-border/70 bg-card',
-          // Hover: hairline brightens + an almost-imperceptible surface lift.
-          // No shadow bloom — the brief stays paper-flat; the border carries
-          // the affordance, matching the rest of Chippi.
-          'transition-colors duration-200 hover:border-border',
-        ],
+        // Card chrome: large radius, borderless, whisper-soft shadow — the
+        // reference language. Exactly one cell per view takes the accent.
+        !plain && ['group/cell relative', accent ? ACCENT_CARD : SURFACE_CARD],
         className,
       )}
       initial={motionOn ? { opacity: 0, y: 10 } : false}

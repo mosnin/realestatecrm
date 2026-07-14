@@ -108,7 +108,7 @@ export function LeadsView({ data }: { data: LeadsAnalyticsData }) {
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <StatStrip>
-        <StatCell label="Total leads" value={data.totalLeads} sub="all time" />
+        <StatCell label="Total leads" value={data.totalLeads} sub="all time" accent />
         <StatCell
           label="Avg score"
           value={data.avgLeadScore != null ? Math.round(data.avgLeadScore) : '--'}

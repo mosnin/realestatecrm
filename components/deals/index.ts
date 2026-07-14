@@ -1,6 +1,7 @@
 export { KanbanBoard } from './kanban-board';
 export { DealsPageClient } from './deals-page-client';
 export { DealCard } from './deal-card';
+export { NextMoveChip } from './next-move-chip';
 export { KanbanColumn } from './kanban-column';
 export { PipelineSummary } from './pipeline-summary';
 export { DealDetailClient } from './deal-detail-client';

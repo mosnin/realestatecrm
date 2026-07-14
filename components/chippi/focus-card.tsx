@@ -24,6 +24,7 @@ import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
 import { FOCUS_CARD_MAX } from '@/lib/geometry';
 import { BODY_MUTED, QUIET_LINK, TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { buildIntakeUrl } from '@/lib/intake';
 import { levenshtein } from '@/lib/draft-feedback';
 import { ChippiWordmarkInline } from '@/components/agent/chippi-authored';
@@ -266,7 +267,7 @@ export function FocusCard({
 
   if (loading) {
     return (
-      <div className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6')}>
+      <div className={cn(FOCUS_CARD_MAX, 'mx-auto p-6 sm:p-7', SURFACE_CARD)}>
         <p className={cn(BODY_MUTED, 'mb-4')}>Looking at your day.</p>
         <div className="space-y-2 animate-pulse">
           <div className="h-3 w-full rounded bg-muted/40" />
@@ -318,7 +319,7 @@ export function FocusCard({
     return (
       <article
         key={current.id}
-        className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150')}
+        className={cn(FOCUS_CARD_MAX, 'mx-auto p-6 sm:p-7 transition-opacity duration-150', SURFACE_CARD)}
       >
         {/* Meta line */}
         <div className="flex items-center gap-3 text-sm">
@@ -463,7 +464,7 @@ export function FocusCard({
   return (
     <article
       key={current.id}
-      className={cn(FOCUS_CARD_MAX, 'mx-auto rounded-lg border border-border/70 bg-card p-6 transition-opacity duration-150')}
+      className={cn(FOCUS_CARD_MAX, 'mx-auto p-6 sm:p-7 transition-opacity duration-150', SURFACE_CARD)}
     >
       <div className="flex items-center gap-3 text-sm">
         <span className="text-sm font-medium text-foreground">Chippi has a question</span>

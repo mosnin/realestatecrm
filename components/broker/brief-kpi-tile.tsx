@@ -1,17 +1,20 @@
 'use client';
 
 /**
- * BriefKpiTile — the brokerage brief's hairline-grid stat cell, with the
- * focal numeral counting up on entry.
+ * BriefKpiTile — the brokerage brief's small stat card, with the focal
+ * numeral counting up on entry.
  *
- * This is the broker-side sibling of components/properties/commission-stat-cell
- * and components/motion/animated-stat-cell: identical paper-flat geometry
- * (bg-background, SECTION_LABEL → serif focal number → optional sub) so the
- * brief's numeric vocabulary is unchanged. The only lift is motion — the
- * number ticks up via the shared AnimatedNumber (which honors
- * prefers-reduced-motion, so reduced-motion users see the final figure
- * instantly). Money and counts are the loudest signal on the broker's
- * dashboard; letting them land makes the figure something the owner *watches*.
+ * Post-restyle this is the reference language's stat card: flat bg-card
+ * surface, large radius, no border, whisper-soft shadow, and a short
+ * vertical accent bar beside the label (AccentBarLabel from
+ * components/ui/surface-card). Tiles live in plain gap-4 grids — the old
+ * hairline gap-px strip is gone.
+ *
+ * The only motion is the number ticking up via the shared AnimatedNumber
+ * (which honors prefers-reduced-motion, so reduced-motion users see the
+ * final figure instantly). Money and counts are the loudest signal on the
+ * broker's dashboard; letting them land makes the figure something the
+ * owner *watches*.
  *
  * Nothing here changes data, links, counts, or actions — the same numbers the
  * server computed are handed in as props. A tile can render:
@@ -22,7 +25,8 @@
 
 import type { ReactNode } from 'react';
 import { AnimatedNumber } from '@/components/motion/animated-number';
-import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
+import { TITLE_FONT } from '@/lib/typography';
+import { AccentBarLabel, SURFACE_CARD } from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 
 interface BriefKpiTileProps {
@@ -53,14 +57,16 @@ export function BriefKpiTile({
   className,
 }: BriefKpiTileProps) {
   return (
-    <div className={cn('bg-background p-4', className)}>
-      <p className={cn(SECTION_LABEL, Icon && 'flex items-center gap-1.5')}>
-        {Icon && <Icon size={11} className="text-muted-foreground" aria-hidden />}
-        {label}
-      </p>
+    <div className={cn(SURFACE_CARD, 'p-5 sm:p-6', className)}>
+      <AccentBarLabel>
+        <span className={cn(Icon && 'inline-flex items-center gap-1.5')}>
+          {Icon && <Icon size={11} className="text-muted-foreground" aria-hidden />}
+          {label}
+        </span>
+      </AccentBarLabel>
       <p
         className={cn(
-          'text-2xl tracking-tight tabular-nums mt-1.5 text-foreground',
+          'text-2xl tracking-tight tabular-nums mt-2 text-foreground',
           dim && 'text-muted-foreground/60',
         )}
         style={TITLE_FONT}

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { formatCompact, formatCurrency } from '@/lib/formatting';
 import { dealHealth, inferNextAction, HEALTH_META } from '@/lib/deals/health';
 import { summarizeChecklist, type DealChecklistItem } from '@/lib/deals/checklist';
+import { NextMoveChip } from './next-move-chip';
 import { EASE_APPLE } from '@/lib/motion';
 import { TITLE_FONT } from '@/lib/typography';
 
@@ -232,6 +233,17 @@ export function DealCard({
               >
                 {nextAction.label}
               </p>
+            )}
+
+            {/* Agent-computed next move — one grounded suggestion, kind-tinted.
+                Null text → no chip (never a placeholder). */}
+            {isActive && deal.nextMoveText && (
+              <NextMoveChip
+                text={deal.nextMoveText}
+                kind={deal.nextMoveKind}
+                computedAt={deal.nextMoveComputedAt}
+                className="mt-2"
+              />
             )}
 
             {/* Closing-checklist chip — progress + soonest deadline */}

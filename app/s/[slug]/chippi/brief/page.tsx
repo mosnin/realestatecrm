@@ -48,7 +48,7 @@ export default async function ChippiBriefPage({
   const dashboard = await composeBriefDashboard(space.id, space.ownerId);
 
   return (
-    <ChippiPageShell greeting="Today.">
+    <ChippiPageShell greeting="Today." washed>
       <BriefDashboard slug={slug} data={dashboard} />
     </ChippiPageShell>
   );

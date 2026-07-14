@@ -23,6 +23,7 @@ import {
   ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
+  DotMatrix,
   EmptyState,
   formatCurrency,
   PAPER_SERIES,
@@ -38,10 +39,6 @@ import {
 } from '@/lib/typography';
 import { DURATION_SLOW, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
-
-const dealsByStageCountConfig = {
-  count: { label: 'Deals', color: 'hsl(var(--foreground))' },
-} satisfies ChartConfig;
 
 const dealsByStageValueConfig = {
   value: { label: 'Value', color: 'hsl(var(--foreground))' },
@@ -82,6 +79,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
           value={data.totalPipelineValue}
           format={formatCurrency}
           sub="active deals"
+          accent
         />
         <StatCell
           label="Avg deal size"
@@ -97,21 +95,28 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
 
       {/* Stage distribution */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <ChartSection title="Deals per stage" sub="Number of deals in each pipeline stage" index={0}>
-          <ChartContainer config={dealsByStageCountConfig} className="h-[220px] w-full">
-            <BarChart data={data.dealsByStage} barSize={22}>
-              <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
-              <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={28} tick={{ fontSize: 11 }} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" name="Deals" radius={[2, 2, 0, 0]} fill="var(--color-count)" />
-            </BarChart>
-          </ChartContainer>
+        <ChartSection title="Stage coverage" sub="Number of deals in each pipeline stage" index={0}>
+          {/* Dot-matrix coverage viz (the reference's circles grid): one row
+              per stage, filled dots scaled against the busiest stage, the
+              REAL count printed at the row's end so the encoding is never
+              dots-alone. */}
+          <DotMatrix
+            className="py-2"
+            rows={(() => {
+              const maxCount = Math.max(1, ...data.dealsByStage.map((s) => s.count));
+              return data.dealsByStage.map((s) => ({
+                label: s.name,
+                filled: s.count,
+                total: maxCount,
+                value: s.count,
+              }));
+            })()}
+          />
         </ChartSection>
 
         <ChartSection title="Value per stage" sub="Total deal value per pipeline stage" index={1}>
           <ChartContainer config={dealsByStageValueConfig} className="h-[220px] w-full">
-            <BarChart data={data.dealsByStage} barSize={22}>
+            <BarChart data={data.dealsByStage} barSize={26}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
               <YAxis
@@ -123,7 +128,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                 tickFormatter={(v) => formatCurrency(v)}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="value" name="Value" radius={[2, 2, 0, 0]} fill="var(--color-value)" />
+              <Bar dataKey="value" name="Value" radius={[6, 6, 0, 0]} fill="var(--color-value)" />
             </BarChart>
           </ChartContainer>
         </ChartSection>

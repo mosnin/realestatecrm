@@ -53,6 +53,12 @@ interface ChippiPageShellProps {
    * History destinations to the correct route family.
    */
   variant?: 'realtor' | 'broker';
+  /**
+   * Soft muted wash behind the page content so flat white cards float
+   * (the dashboard-card language). Opt-in — card-heavy pages (the brief)
+   * set it; reading pages keep the plain canvas.
+   */
+  washed?: boolean;
 }
 
 export function ChippiPageShell({
@@ -61,10 +67,11 @@ export function ChippiPageShell({
   subtitle,
   children,
   variant = 'realtor',
+  washed = false,
 }: ChippiPageShellProps) {
   void variant; // consumed by callers for route resolution — no visual branch today
   return (
-    <div className="h-full overflow-y-auto">
+    <div className={cn('h-full overflow-y-auto', washed && 'bg-muted/40 dark:bg-transparent')}>
       {/* Match the Automations page frame: the wider max-w-5xl reading column
           and the space-y-8 section rhythm, so every Chippi non-chat sub-page
           (brief, inbox, activity, …) sits in the same premium People/Deals

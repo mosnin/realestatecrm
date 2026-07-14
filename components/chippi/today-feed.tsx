@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { FirstTouchCard } from '@/components/leads/first-touch-card';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { AgentQuestionsPanel } from '@/components/agent/agent-questions-panel';
 import { AgentGoalsPanel } from '@/components/agent/agent-goals-panel';
@@ -39,34 +40,40 @@ export function TodayFeed({
 }) {
   const [showFull, setShowFull] = useState(false);
 
-  if (showFull) {
-    return (
-      <div className="space-y-12">
-        <button
-          type="button"
-          onClick={() => setShowFull(false)}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={12} />
-          Back to focus
-        </button>
-        <AgentDraftInbox slug={slug} />
-        <AgentQuestionsPanel />
-        <TodayFocus slug={slug} />
-        <WhatsComing slug={slug} />
-        <WhatIDid slug={slug} />
-        <AgentGoalsPanel />
-      </div>
-    );
-  }
-
+  // Instant First Touch spotlight — a brand-new lead with a ready-to-review
+  // intro draft outranks everything else on the surface (speed-to-lead).
+  // Sourced client-side from /api/leads/first-touch, the same fetch pattern
+  // the focus card uses for its draft/question queues; renders nothing when
+  // no first-touch draft is pending. Mounted once, above BOTH views.
   return (
-    <FocusCard
-      slug={slug}
-      onShowFullDay={() => setShowFull(true)}
-      isFresh={isFresh}
-      firstName={firstName}
-      onTellMeAboutLead={onTellMeAboutLead}
-    />
+    <div className="space-y-8">
+      <FirstTouchCard slug={slug} />
+      {showFull ? (
+        <div className="space-y-12">
+          <button
+            type="button"
+            onClick={() => setShowFull(false)}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={12} />
+            Back to focus
+          </button>
+          <AgentDraftInbox slug={slug} />
+          <AgentQuestionsPanel />
+          <TodayFocus slug={slug} />
+          <WhatsComing slug={slug} />
+          <WhatIDid slug={slug} />
+          <AgentGoalsPanel />
+        </div>
+      ) : (
+        <FocusCard
+          slug={slug}
+          onShowFullDay={() => setShowFull(true)}
+          isFresh={isFresh}
+          firstName={firstName}
+          onTellMeAboutLead={onTellMeAboutLead}
+        />
+      )}
+    </div>
   );
 }

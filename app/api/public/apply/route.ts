@@ -7,6 +7,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import type { LeadScoringResult } from '@/lib/lead-scoring';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
+import { fireFirstTouch } from '@/lib/leads/first-touch';
 import type { Contact } from '@/lib/types';
 import {
   applicationFingerprintKey,
@@ -710,6 +711,19 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       logger.error('[apply] agent trigger failed (non-fatal)', { contactId: contact.id }, e);
+    }
+
+    // ── Instant First Touch (fire-and-forget) ──────────────────────────────
+    // Compose a grounded intro draft + "first touch ready" push while the
+    // lead is still warm. Placed after scoring so the draft grounds on the
+    // scored contact. fireFirstTouch never throws and registers its own
+    // after() keep-alive — zero latency added to the applicant's response.
+    // The try/catch is belt-and-suspenders: a bug in that module must never
+    // fail the submission.
+    try {
+      void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+    } catch (e) {
+      logger.error('[apply] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
     }
 
     // ── Workflow engine dispatch (fire-and-forget) ─────────────────────────

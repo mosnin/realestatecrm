@@ -1,10 +1,21 @@
 'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { formatCompact as formatCurrency } from '@/lib/formatting';
-import { STAT_NUMBER, TITLE_FONT, CAPTION, H3, BODY_MUTED } from '@/lib/typography';
+import { STAT_NUMBER, TITLE_FONT, CAPTION, BODY_MUTED } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
+import {
+  ACCENT_CARD,
+  AccentBarLabel,
+  CARD_TITLE,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
+
+// Re-export the shared card pieces so analytics views compose one vocabulary.
+export { DotMatrix, InsightStrip, StatusPill } from '@/components/ui/surface-card';
 
 // Re-export shadcn chart primitives
 export {
@@ -73,36 +84,41 @@ export function FadeUpItem({
   );
 }
 
-// Stat cell — for use inside the connected stat strip (gap-px, bg-border/70).
-// Wrap in a parent: <div className="grid grid-cols-X gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+// Stat cell — a small stat CARD: flat white surface, large radius, no
+// border, with the reference's short vertical accent bar beside the label.
+// Lives inside a StatStrip (a plain gap-4 grid — cards float on the canvas).
 //
 // Numbers render in the focal serif (TITLE_FONT) per the typography rules so
-// they read as data, not labels.
+// they read as data, not labels. Pass `accent` on AT MOST ONE cell per view
+// to make it the view's solid accent card.
 export function StatCell({
   label,
   value,
   sub,
   format,
+  accent = false,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   /** When `value` is numeric, an optional formatter (e.g. `formatCompact`). */
   format?: (n: number) => string;
+  /** The view's ONE solid accent card. */
+  accent?: boolean;
 }) {
   return (
-    // metrics-01 aesthetic: the mono uppercase micro-label sits ABOVE the
-    // number — the same eyebrow voice the marketing site speaks, so the
-    // dashboard and the storefront read as one product. Number stays
-    // tabular and counts up via AnimatedNumber.
-    <div className="bg-background p-5">
+    <div className={cn(accent ? ACCENT_CARD : SURFACE_CARD, 'p-5 sm:p-6')}>
+      {accent ? (
+        <p className="text-[11px] font-medium uppercase tracking-wider text-white/85">
+          {label}
+        </p>
+      ) : (
+        <AccentBarLabel>{label}</AccentBarLabel>
+      )}
       <p
-        style={{ fontFamily: 'var(--font-mono)' }}
-        className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground"
+        className={cn(STAT_NUMBER, 'mt-2 tabular-nums', accent && 'text-white')}
+        style={TITLE_FONT}
       >
-        {label}
-      </p>
-      <p className={`${STAT_NUMBER} mt-2 tabular-nums`} style={TITLE_FONT}>
         {typeof value === 'number' ? (
           <AnimatedNumber value={value} format={format} />
         ) : (
@@ -110,18 +126,20 @@ export function StatCell({
         )}
       </p>
       {sub && (
-        <p className="text-[11px] text-muted-foreground/70 mt-1">{sub}</p>
+        <p className={`text-[11px] mt-1 ${accent ? 'text-white/80' : 'text-muted-foreground/70'}`}>
+          {sub}
+        </p>
       )}
     </div>
   );
 }
 
 /**
- * Connected stat strip — the four-cell hairline-divided KPI row that opens
- * almost every analytics surface. Fades up as a single unit on mount so the
- * numbers arrive with the page (each focal number then counts up via the
- * StatCell's AnimatedNumber). Geometry is byte-identical to the inline grid it
- * replaces, so the loading skeleton dissolves straight into it.
+ * Stat strip — the KPI row that opens almost every analytics surface.
+ * Post-restyle it is a plain generous-gap grid of floating stat cards
+ * (no hairline dividers, no shared border). Fades up as a single unit on
+ * mount so the numbers arrive with the page (each focal number then counts
+ * up via the StatCell's AnimatedNumber).
  */
 export function StatStrip({
   children,
@@ -138,41 +156,46 @@ export function StatStrip({
       initial={reduce ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className={`grid ${cols} gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70`}
+      className={`grid ${cols} gap-4`}
     >
       {children}
     </motion.div>
   );
 }
 
-// Chart section — paper-flat surface for charts.
-// Title uses H3 (card heading) and sub uses caption-tone muted text so the
-// type hierarchy is consistent across analytics surfaces.
-//
-// The hairline border brightens a hair on hover so a dense grid of cards feels
-// alive under the cursor without any color or shadow bloom — pure neutral
-// fit-and-finish. Built on FadeUpItem so it fades up in the surface cascade.
+// Chart section — a flat, borderless, large-radius card for charts. Friendly
+// semibold title top-left, an optional quiet control top-right, and an
+// optional bottom "insight strip" (one HONEST computed line about the data
+// above — pass it pre-composed via the `insight` prop, e.g. an
+// <InsightStrip>). Built on FadeUpItem so it fades up in the surface cascade.
 export function ChartSection({
   title,
   sub,
   children,
   index = 0,
+  action,
+  insight,
 }: {
   title: string;
   sub?: string;
   children: React.ReactNode;
   /** Position in the surrounding fade-up cascade (caps the stagger delay). */
   index?: number;
+  /** Quiet top-right control (a link, select, or "…" menu). */
+  action?: React.ReactNode;
+  /** Bottom insight strip — must state a real computed fact. */
+  insight?: React.ReactNode;
 }) {
   return (
-    <FadeUpItem
-      index={index}
-      className="group rounded-xl border border-border/70 bg-background p-5 transition-colors duration-200 hover:border-border"
-    >
-      <p className={H3}>{title}</p>
+    <FadeUpItem index={index} className={`group ${SURFACE_CARD} ${SURFACE_CARD_PAD}`}>
+      <div className="flex items-start justify-between gap-3">
+        <p className={CARD_TITLE}>{title}</p>
+        {action != null && <div className="shrink-0">{action}</div>}
+      </div>
       {sub && <p className={`${CAPTION} mt-0.5 mb-4`}>{sub}</p>}
       {!sub && <div className="mb-4" />}
       <div className="overflow-x-auto -mx-1 px-1">{children}</div>
+      {insight}
     </FadeUpItem>
   );
 }
@@ -195,7 +218,7 @@ export function EmptyState({
       initial={reduce ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center"
+      className={`${SURFACE_CARD} px-6 py-12 text-center`}
     >
       {glyph && (
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.04] text-muted-foreground/70">

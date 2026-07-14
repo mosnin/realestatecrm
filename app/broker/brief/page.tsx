@@ -10,10 +10,22 @@ import {
   ArrowRight,
   ArrowUpRight,
   Mail,
+  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact, formatCurrency } from '@/lib/formatting';
-import { SECTION_LABEL, TITLE_FONT, CHIPPI_PILL, CAPTION, META, STAT_NUMBER_COMPACT } from '@/lib/typography';
+import { SECTION_LABEL, TITLE_FONT, META, STAT_NUMBER_COMPACT } from '@/lib/typography';
+import {
+  ACCENT_CARD,
+  ACCENT_CARD_PILL,
+  AccentBarLabel,
+  AddRow,
+  CARD_TITLE,
+  InsightStrip,
+  StatusPill,
+  SURFACE_CARD,
+  SURFACE_CARD_PAD,
+} from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 import { dealHealth } from '@/lib/deals/health';
 import { TeamActivityFeed } from '@/components/broker/team-activity-feed';
@@ -444,42 +456,46 @@ export default async function BrokerBriefPage() {
     });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 pb-12">
+    <div className="max-w-5xl mx-auto space-y-5 pb-12">
       {/* Header — canonical three-line pattern. Muted greeting (with the
           team name as the calm anchor), serif Times h1 from BrokerMorningStory
           carrying Chippi's chief-of-staff sentence, and the small hairline
           stats row inside the story handles the context numbers. No second
           muted line — two stat surfaces stacked read as noise. */}
-      <header className="space-y-1.5">
+      <header className="space-y-1.5 pb-3">
         <p className="text-sm text-muted-foreground">
           {getGreeting()}. {brokerage.name}.
         </p>
         <BrokerMorningStory />
       </header>
 
-      {/* Chippi — the focal entry. The broker's chief of staff is the home of
-          this page, not its fourth section. A calm, paper-flat doorway: serif
-          name, one line of what it does, a quiet pill into /broker/chippi.
-          No orange wash, no shadow — the surface stays out of the way and the
-          invitation is the loud note. */}
+      {/* Chippi — the focal entry, and the view's ONE solid accent card.
+          The broker's chief of staff is the home of this page, not its
+          fourth section: serif name and one line of what it does in white
+          ink on the agent-orange surface, with a translucent white pill
+          into /broker/chippi. */}
       <BriefReveal delay={0.02} as="div">
         <Link
           href="/broker"
-          className="group/chippi block rounded-xl border border-border/70 bg-card px-5 py-5 hover:bg-muted/30 hover:border-border transition-colors"
+          className={cn(
+            'group/chippi block transition-opacity hover:opacity-95',
+            ACCENT_CARD,
+            SURFACE_CARD_PAD,
+          )}
         >
           <div className="flex items-center gap-4">
             <div className="flex-1 min-w-0 space-y-1">
               <p
-                className="text-[21px] leading-snug tracking-tight text-foreground"
+                className="text-[21px] leading-snug tracking-tight text-white"
                 style={TITLE_FONT}
               >
                 Talk to Chippi
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-white/85">
                 Ask about team health, reassign a lead, flag a deal, send an announcement.
               </p>
             </div>
-            <span className={cn(CHIPPI_PILL, 'flex-shrink-0')}>
+            <span className={cn(ACCENT_CARD_PILL, 'flex-shrink-0')}>
               Open
               <ArrowUpRight
                 size={15}
@@ -494,7 +510,7 @@ export default async function BrokerBriefPage() {
           Neutral icon: this is a settings affordance, not Chippi speaking,
           so orange would be unearned. */}
       {!hasSettings && (
-        <section className="rounded-xl border border-border/70 bg-muted/30 px-4 py-3 flex items-start gap-3">
+        <section className={cn(SURFACE_CARD, 'px-5 py-4 flex items-start gap-3')}>
           <Building2 size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
           <div className="flex-1 space-y-0.5">
             <p className="text-sm font-medium">Finish setting up your team</p>
@@ -521,7 +537,7 @@ export default async function BrokerBriefPage() {
           is byte-identical to the prior server render. */}
       <BriefReveal
         delay={0.04}
-        className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
       >
         <BriefKpiTile
           label="Pipeline"
@@ -549,17 +565,20 @@ export default async function BrokerBriefPage() {
           drills into /broker/commissions for the per-deal breakdown. Focal
           figures count up on entry (BriefKpiTile, reduced-motion aware). */}
       <BriefReveal delay={0.08}>
-        <Link
-          href="/broker/commissions"
-          className="group/commission flex items-center gap-3 pb-3 border-b border-border/60"
-        >
-          <h2 className={SECTION_LABEL}>Commission</h2>
-          <ArrowRight
-            size={11}
-            className="text-muted-foreground/40 group-hover/commission:translate-x-0.5 group-hover/commission:text-muted-foreground transition-all duration-200"
-          />
-        </Link>
-        <div className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70 mt-4">
+        <div className="flex items-center justify-between gap-3 pb-3">
+          <h2 className={CARD_TITLE}>Commission</h2>
+          <Link
+            href="/broker/commissions"
+            className="group/commission inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            View
+            <ArrowRight
+              size={11}
+              className="transition-transform duration-200 group-hover/commission:translate-x-0.5"
+            />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <BriefKpiTile label="MTD commission" display={formatCompact(mtdCommission)} />
           <BriefKpiTile label="YTD commission" display={formatCompact(ytdCommission)} />
           <BriefKpiTile
@@ -587,42 +606,41 @@ export default async function BrokerBriefPage() {
           deal to watch. Computation mirrors app/broker/forecast/page.tsx.
           The projected figure and the won/in-flight strip count up on entry
           (AnimatedNumber, reduced-motion aware) — the loudest money beat. */}
-      <BriefReveal delay={0.12}>
-        <Link
-          href="/broker/forecast"
-          className="group/revenue flex items-center gap-3 pb-3 border-b border-border/60"
-        >
-          <h2 className={SECTION_LABEL}>Revenue</h2>
-          <ArrowRight
-            size={11}
-            className="text-muted-foreground/40 group-hover/revenue:translate-x-0.5 group-hover/revenue:text-muted-foreground transition-all duration-200"
-          />
-        </Link>
+      <BriefReveal delay={0.12} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={CARD_TITLE}>Revenue</h2>
+          <Link
+            href="/broker/forecast"
+            className="group/revenue inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Full forecast
+            <ArrowUpRight
+              size={11}
+              className="transition-transform duration-200 group-hover/revenue:translate-x-0.5 group-hover/revenue:-translate-y-0.5"
+            />
+          </Link>
+        </div>
 
         {!revHasPipeline ? (
           <p className="text-[13px] text-muted-foreground mt-3">
             No active pipeline yet.
           </p>
         ) : (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-4">
             {/* Focal projected number */}
             <div>
+              <AccentBarLabel>Projected this month</AccentBarLabel>
               <p
-                className={cn(STAT_NUMBER_COMPACT, 'tabular-nums')}
+                className={cn(STAT_NUMBER_COMPACT, 'tabular-nums mt-1.5')}
                 style={TITLE_FONT}
               >
                 {formatCurrency(revTotalForecast)}
               </p>
-              {revPaceSentence && (
-                <p className={cn(CAPTION, 'mt-1')}>
-                  {revPaceSentence}
-                </p>
-              )}
             </div>
 
-            {/* Stat strip: won + in flight */}
-            <div className="grid grid-cols-2 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
-              <div className="bg-background px-4 py-3">
+            {/* Won + in flight — quiet inner tiles on the card */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-muted/50 px-4 py-3">
                 <p className={SECTION_LABEL}>Won so far</p>
                 <p
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
@@ -631,7 +649,7 @@ export default async function BrokerBriefPage() {
                   {formatCompact(revWonGci)}
                 </p>
               </div>
-              <div className="bg-background px-4 py-3">
+              <div className="rounded-2xl bg-muted/50 px-4 py-3">
                 <p className={SECTION_LABEL}>In flight (weighted)</p>
                 <p
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
@@ -644,25 +662,24 @@ export default async function BrokerBriefPage() {
 
             {/* Biggest deal to watch */}
             {revTopDealTitle && (
-              <div className="flex items-center justify-between gap-4 pt-1">
-                <div className="min-w-0">
-                  <p className={SECTION_LABEL}>Biggest deal to watch</p>
-                  <p className="text-sm text-foreground mt-0.5 truncate">{revTopDealTitle}</p>
-                  <p className={cn(META, 'mt-0.5')}>
-                    {formatCompact(revTopDealGci)} projected &middot; {Math.round(revTopDealProb * 100)}% likely
-                  </p>
-                </div>
-                <Link
-                  href="/broker/forecast"
-                  className="group/fc inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                >
-                  Full forecast
-                  <ArrowUpRight
-                    size={11}
-                    className="transition-transform duration-200 group-hover/fc:translate-x-0.5 group-hover/fc:-translate-y-0.5"
-                  />
-                </Link>
+              <div className="min-w-0">
+                <p className={SECTION_LABEL}>Biggest deal to watch</p>
+                <p className="text-sm text-foreground mt-0.5 truncate">{revTopDealTitle}</p>
+                <p className={cn(META, 'mt-0.5')}>
+                  {formatCompact(revTopDealGci)} projected &middot; {Math.round(revTopDealProb * 100)}% likely
+                </p>
               </div>
+            )}
+
+            {/* Insight strip — the pace read, straight from the forecast math */}
+            {revPaceSentence && (
+              <InsightStrip
+                href="/broker/forecast"
+                icon={<TrendingUp size={14} aria-hidden />}
+                className="mt-1"
+              >
+                {revPaceSentence}
+              </InsightStrip>
             )}
           </div>
         )}
@@ -670,9 +687,9 @@ export default async function BrokerBriefPage() {
 
       {/* Speed to lead — only when slaEnabled is on */}
       {slaEnabled && (
-        <BriefReveal delay={0.14}>
-          <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-            <h2 className={SECTION_LABEL}>Speed to lead</h2>
+        <BriefReveal delay={0.14} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+          <div className="flex items-center gap-3">
+            <h2 className={CARD_TITLE}>Speed to lead</h2>
           </div>
           <p className="text-sm text-foreground mt-3">
             {needsResponse > 0 ? (
@@ -699,15 +716,13 @@ export default async function BrokerBriefPage() {
 
       {/* Pending invitations — only when there are some */}
       {pendingInvitations.length > 0 && (
-        <BriefReveal delay={0.16}>
-          <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-            <h2 className={SECTION_LABEL}>Pending invitations</h2>
-            <span className="text-[11px] text-muted-foreground tabular-nums">
-              {pendingInvitations.length}
-            </span>
+        <BriefReveal delay={0.16} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+          <div className="flex items-center gap-3 pb-1">
+            <h2 className={CARD_TITLE}>Pending invitations</h2>
+            <StatusPill className="tabular-nums">{pendingInvitations.length}</StatusPill>
             <Link
               href="/broker/invitations"
-              className="group/inv ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="group/inv ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
               Manage
               <ArrowRight
@@ -728,7 +743,7 @@ export default async function BrokerBriefPage() {
                 <li key={inv.id} className="py-3 flex items-center gap-3 text-sm">
                   <Mail size={13} className="text-muted-foreground flex-shrink-0" />
                   <span className="font-medium text-foreground truncate">{inv.email}</span>
-                  <span className="text-xs text-muted-foreground">{role}</span>
+                  <StatusPill>{role}</StatusPill>
                   <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
                     sent {new Date(inv.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                   </span>
@@ -740,15 +755,15 @@ export default async function BrokerBriefPage() {
       )}
 
       {/* The swarm — your team today */}
-      <BriefReveal delay={0.18}>
-        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className={SECTION_LABEL}>Your team</h2>
+      <BriefReveal delay={0.18} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <div className="flex items-center gap-3 pb-1">
+          <h2 className={CARD_TITLE}>Your team</h2>
           {activeMembers > 0 && (
-            <span className="text-[11px] text-muted-foreground tabular-nums">{activeMembers}</span>
+            <StatusPill className="tabular-nums">{activeMembers}</StatusPill>
           )}
           <Link
             href="/broker/members"
-            className="group/mng ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="group/mng ml-auto inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Manage
             <ArrowRight
@@ -759,7 +774,7 @@ export default async function BrokerBriefPage() {
         </div>
 
         {memberRows.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="mt-4 rounded-2xl bg-muted/40 px-5 py-10 text-center">
             <Building2 size={26} className="mx-auto mb-3 text-muted-foreground/55" aria-hidden />
             <p className="text-sm text-foreground">Your team, in here.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -796,7 +811,7 @@ export default async function BrokerBriefPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="font-medium text-foreground truncate">{name}</span>
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{role}</span>
+                        <StatusPill className="whitespace-nowrap">{role}</StatusPill>
                         {!onboard && (
                           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                             invited — not joined
@@ -839,6 +854,12 @@ export default async function BrokerBriefPage() {
                 </li>
               );
             })}
+            {/* Ghost add-row — the list card's quiet last action. */}
+            <li>
+              <AddRow href="/broker/members" className="-mx-2">
+                Invite a realtor
+              </AddRow>
+            </li>
           </ul>
         )}
       </BriefReveal>
@@ -851,9 +872,9 @@ export default async function BrokerBriefPage() {
       </BriefReveal>
 
       {/* What the team did — proof of work across the swarm */}
-      <BriefReveal delay={0.22}>
-        <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-          <h2 className={SECTION_LABEL}>What the team did</h2>
+      <BriefReveal delay={0.22} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <div className="flex items-center gap-3">
+          <h2 className={CARD_TITLE}>What the team did</h2>
         </div>
         <div className="pt-4">
           <TeamActivityFeed />
