@@ -57,7 +57,7 @@ function Section({
   const reduce = useReducedMotion();
   return (
     <motion.section
-      className="group rounded-xl border border-border/70 bg-background p-5 space-y-4 transition-colors duration-200 hover:border-border"
+      className="group rounded-3xl bg-card shadow-[0_1px_2px_rgb(17_17_19/0.03),0_12px_32px_-20px_rgb(17_17_19/0.12)] p-6 sm:p-7 space-y-4"
       initial={reduce ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: reduce ? 0 : index * 0.05 }}

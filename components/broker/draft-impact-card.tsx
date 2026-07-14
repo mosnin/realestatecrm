@@ -2,6 +2,8 @@
 
 import type { DraftStats } from '@/lib/draft-stats';
 import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AccentBarLabel, SURFACE_CARD } from '@/components/ui/surface-card';
+import { cn } from '@/lib/utils';
 
 /**
  * "Draft impact" — single card on the broker dashboard. Reports how Chippi's
@@ -23,10 +25,8 @@ import { AnimatedNumber } from '@/components/motion/animated-number';
  */
 export function DraftImpactCard({ stats }: { stats: DraftStats }) {
   return (
-    <section className="rounded-xl border border-border/70 bg-card px-5 py-4 space-y-1.5 transition-colors hover:border-border">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        Draft impact
-      </p>
+    <section className={cn(SURFACE_CARD, 'p-5 sm:p-6 space-y-1.5')}>
+      <AccentBarLabel>Draft impact</AccentBarLabel>
       <DraftImpactBody stats={stats} />
     </section>
   );

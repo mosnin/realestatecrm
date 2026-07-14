@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import { formatCompact as formatCurrency } from '@/lib/formatting';
 import { STAT_NUMBER, TITLE_FONT, CAPTION, BODY_MUTED } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
@@ -106,7 +107,7 @@ export function StatCell({
   accent?: boolean;
 }) {
   return (
-    <div className={`${accent ? ACCENT_CARD : SURFACE_CARD} p-5 sm:p-6`}>
+    <div className={cn(accent ? ACCENT_CARD : SURFACE_CARD, 'p-5 sm:p-6')}>
       {accent ? (
         <p className="text-[11px] font-medium uppercase tracking-wider text-white/85">
           {label}
@@ -115,7 +116,7 @@ export function StatCell({
         <AccentBarLabel>{label}</AccentBarLabel>
       )}
       <p
-        className={`${STAT_NUMBER} mt-2 tabular-nums ${accent ? 'text-white' : ''}`}
+        className={cn(STAT_NUMBER, 'mt-2 tabular-nums', accent && 'text-white')}
         style={TITLE_FONT}
       >
         {typeof value === 'number' ? (

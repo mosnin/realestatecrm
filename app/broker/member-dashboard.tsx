@@ -261,7 +261,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
           on entry (BriefKpiTile → AnimatedNumber, reduced-motion aware). ── */}
       <BriefReveal
         delay={0.04}
-        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-4"
       >
         {[
           { label: 'Leads assigned', value: assignedCount, icon: PhoneIncoming },

@@ -40,10 +40,6 @@ import {
 import { DURATION_SLOW, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 
-const dealsByStageCountConfig = {
-  count: { label: 'Deals', color: 'hsl(var(--foreground))' },
-} satisfies ChartConfig;
-
 const dealsByStageValueConfig = {
   value: { label: 'Value', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
@@ -120,7 +116,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
 
         <ChartSection title="Value per stage" sub="Total deal value per pipeline stage" index={1}>
           <ChartContainer config={dealsByStageValueConfig} className="h-[220px] w-full">
-            <BarChart data={data.dealsByStage} barSize={22}>
+            <BarChart data={data.dealsByStage} barSize={26}>
               <CartesianGrid vertical={false} stroke={PAPER_GRID} strokeDasharray="3 3" />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
               <YAxis
@@ -132,7 +128,7 @@ export function PipelineView({ data }: { data: PipelineAnalyticsData }) {
                 tickFormatter={(v) => formatCurrency(v)}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="value" name="Value" radius={[2, 2, 0, 0]} fill="var(--color-value)" />
+              <Bar dataKey="value" name="Value" radius={[6, 6, 0, 0]} fill="var(--color-value)" />
             </BarChart>
           </ChartContainer>
         </ChartSection>

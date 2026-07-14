@@ -55,7 +55,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <StatStrip>
-        <StatCell label="Total contacts" value={data.totalContacts} sub="in your book" />
+        <StatCell label="Total contacts" value={data.totalContacts} sub="in your book" accent />
         {stageCells.map((s) => (
           <StatCell key={s.label} label={s.label} value={s.count} />
         ))}
@@ -128,7 +128,7 @@ export function ClientsView({ data }: { data: ClientsAnalyticsData }) {
                   ease: EASE_OUT,
                   delay: reduce ? 0 : 0.1 + Math.min(i, 4) * 0.06,
                 }}
-                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 transition-colors duration-200 hover:border-border"
+                className="flex-1 rounded-2xl bg-muted/50 px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
               >
                 <p
                   className={STAT_NUMBER}

@@ -66,7 +66,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
     <div className={SECTION_RHYTHM}>
       {/* Summary strip */}
       <StatStrip>
-        <StatCell label="Total tours" value={data.totalTours} sub="all time" />
+        <StatCell label="Total tours" value={data.totalTours} sub="all time" accent />
         <StatCell label="Completed" value={data.completedTours} sub="tours finished" />
         <StatCell
           label="Cancelled / No-show"
@@ -166,7 +166,7 @@ export function ToursView({ data }: { data: ToursAnalyticsData }) {
                   ease: EASE_OUT,
                   delay: reduce ? 0 : 0.1 + i * 0.06,
                 }}
-                className="flex-1 rounded-xl border border-border/70 bg-background px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1 transition-colors duration-200 hover:border-border"
+                className="flex-1 rounded-2xl bg-muted/50 px-5 py-4 flex sm:flex-col items-center sm:items-start gap-3 sm:gap-1"
               >
                 <p
                   className={STAT_NUMBER}

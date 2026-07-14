@@ -180,21 +180,21 @@ function ScoreBadge({ label, score }: { label: string | null; score: number | nu
 function LoadingSkeleton() {
   return (
     <div className={`${SECTION_RHYTHM} animate-pulse`} aria-busy="true" aria-label="Loading form analytics">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-background p-5">
+          <div key={i} className="rounded-3xl bg-card p-5 sm:p-6">
             <div className="h-7 w-16 bg-foreground/[0.06] rounded" />
             <div className="h-3 w-20 bg-foreground/[0.06] rounded mt-3" />
           </div>
         ))}
       </div>
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-border/70 bg-background p-5">
+        <div className="rounded-3xl bg-card p-6 sm:p-7">
           <div className="h-4 w-32 bg-foreground/[0.06] rounded" />
           <div className="h-3 w-48 bg-foreground/[0.06] rounded mt-2" />
           <div className="h-[200px] bg-foreground/[0.04] rounded mt-4" />
         </div>
-        <div className="rounded-xl border border-border/70 bg-background p-5">
+        <div className="rounded-3xl bg-card p-6 sm:p-7">
           <div className="h-4 w-32 bg-foreground/[0.06] rounded" />
           <div className="h-3 w-48 bg-foreground/[0.06] rounded mt-2" />
           <div className="space-y-3 mt-4">
@@ -288,7 +288,7 @@ export function FormAnalytics({
         {StandaloneHeader}
         <div
           role="alert"
-          className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3"
+          className="rounded-3xl bg-card shadow-[0_1px_2px_rgb(17_17_19/0.03),0_12px_32px_-20px_rgb(17_17_19/0.12)] px-6 py-12 text-center space-y-3"
         >
           <p className="text-sm text-foreground font-medium">{error}</p>
           <button onClick={fetchData} className={PRIMARY_PILL}>
@@ -314,7 +314,7 @@ export function FormAnalytics({
           initial={reduce ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="rounded-xl border border-border/70 bg-background px-6 py-16 text-center"
+          className="rounded-3xl bg-card shadow-[0_1px_2px_rgb(17_17_19/0.03),0_12px_32px_-20px_rgb(17_17_19/0.12)] px-6 py-16 text-center"
         >
           <p className={H1} style={TITLE_FONT}>
             Nothing to chart yet.
@@ -389,6 +389,7 @@ export function FormAnalytics({
           value={data.totalStarts}
           format={fmtNumCount}
           sub={`${fmtNum(data.totalSessions)} unique sessions`}
+          accent
         />
         <StatCell
           label="Conversions"
@@ -601,7 +602,7 @@ export function FormAnalytics({
             </p>
           </div>
           <motion.div
-            className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70"
+            className="rounded-3xl bg-card shadow-[0_1px_2px_rgb(17_17_19/0.03),0_12px_32px_-20px_rgb(17_17_19/0.12)] overflow-hidden divide-y divide-border/60"
             initial="initial"
             animate="enter"
             variants={{
