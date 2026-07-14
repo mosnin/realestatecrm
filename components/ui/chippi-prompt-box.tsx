@@ -335,9 +335,15 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     // Chat (default) vs Agent. STICKY per conversation — the realtor's pick
     // stays for the thread across sends, restored from sessionStorage on
     // mount and whenever the conversation changes.
-    const [chatMode, setChatMode] = useState<ChatMode>(() =>
-      readStoredChatMode(conversationId),
-    );
+    // Start with the same value SSR renders, then restore browser state. A
+    // sessionStorage read in the initializer made remembered Agent threads
+    // hydrate differently from the server-rendered Chat control.
+    const [chatMode, setChatMode] = useState<ChatMode>('chat');
+    useEffect(() => {
+      setChatMode(readStoredChatMode(conversationId));
+      // Initial restore only; conversation changes are handled below.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const prevConversationIdRef = useRef<string | null>(conversationId);
     // Sync the choice when the active conversation changes. Two cases:
     //   1. A fresh thread (null id) just got a real id on its first send —

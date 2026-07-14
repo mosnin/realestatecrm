@@ -302,8 +302,13 @@ export function FormAnalyticsClient({
               </p>
             </div>
           </div>
-          <div className="h-[200px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[200px] w-full min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              initialDimension={{ width: 320, height: 200 }}
+            >
               <AreaChart
                 data={trendFormatted}
                 margin={{ top: 4, right: 4, left: -20, bottom: 0 }}

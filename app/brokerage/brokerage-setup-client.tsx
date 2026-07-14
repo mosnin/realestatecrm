@@ -201,12 +201,12 @@ export function BrokerageSetupClient({
             </p>
 
             <div className="mt-8 flex flex-col gap-3">
-              <Link href={`/s/${spaceSlug}`}>
-                <Button className="w-full gap-2">
+              <Button asChild className="w-full gap-2">
+                <Link href={`/s/${spaceSlug}`}>
                   <ArrowLeft size={15} />
                   Back to my workspace
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         </main>

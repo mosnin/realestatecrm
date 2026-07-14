@@ -558,16 +558,18 @@ export function BillingPage({
                     <InvoiceStatusBadge status={inv.status} />
                   </div>
                   {inv.pdf ? (
-                    <a
-                      href={inv.pdf}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-end"
-                    >
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <div className="flex items-center justify-end">
+                      <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <a
+                          href={inv.pdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Download invoice ${inv.number || inv.id}`}
+                        >
                         <Download size={13} />
+                        </a>
                       </Button>
-                    </a>
+                    </div>
                   ) : (
                     <div className="w-7" />
                   )}
@@ -593,12 +595,12 @@ export function BillingPage({
             Our support team is here to help with any questions.
           </p>
         </div>
-        <a href={supportUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="outline" size="sm" className="gap-1.5">
+        <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <a href={supportUrl} target="_blank" rel="noopener noreferrer">
             Contact support
             <ArrowRight size={13} />
-          </Button>
-        </a>
+          </a>
+        </Button>
       </div>
 
       {/* ── Cancel confirmation dialog ── */}

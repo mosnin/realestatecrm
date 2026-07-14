@@ -29,15 +29,10 @@ export function WeatherWidget({
   className,
   effects,
 }: WeatherWidgetRuntimeProps) {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return (
-      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false
-    );
-  });
+  // Match SSR on the first client render. The media preference is restored
+  // immediately after hydration; reading it in the initializer conditionally
+  // removed the effect compositor before React could hydrate server markup.
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
     if (

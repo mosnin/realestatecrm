@@ -6,16 +6,15 @@
  *
  * Header follows STYLESHEET.md § "The status-sentence pattern":
  *   muted greeting line (with period) → serif h1 → one-sentence status.
- * The status sentence is computed from File table totals so the realtor
- * lands on a calm fact, not a directive ("Drop a file here…" reads as a
- * tooltip; "27 files. 142 MB so far." reads as the workspace's state).
+ * The status sentence is computed from both File uploads and chat
+ * attachments, matching the union rendered by FilesPanel.
  */
 
 import { notFound } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { formatBytes } from '@/lib/storage/limits';
+import { formatFilesStatus } from '@/lib/realtor-page-status';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { FilesPanel } from './files-panel';
 
@@ -33,7 +32,11 @@ export default async function FilesPage({
   // Status-sentence data. We pull size + createdAt for the most recent few
   // rows + a head-count so the sentence stays honest without dragging the
   // full file list server-side (the client panel already does that).
-  const [{ count: fileCount }, { data: aggregateRows }] = await Promise.all([
+  const [
+    { count: fileCount },
+    { data: fileAggregateRows },
+    { count: attachmentCount, data: attachmentAggregateRows },
+  ] = await Promise.all([
     supabase
       .from('File')
       .select('*', { count: 'exact', head: true })
@@ -44,18 +47,23 @@ export default async function FilesPage({
       .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(500),
+    supabase
+      .from('Attachment')
+      .select('sizeBytes', { count: 'exact' })
+      .eq('spaceId', space.id)
+      .limit(500),
   ]);
 
-  const totalBytes = (aggregateRows ?? []).reduce(
+  const totalBytes = [
+    ...(fileAggregateRows ?? []),
+    ...(attachmentAggregateRows ?? []),
+  ].reduce(
     (sum, row) => sum + (row.sizeBytes ?? 0),
     0,
   );
-  const count = fileCount ?? 0;
+  const count = (fileCount ?? 0) + (attachmentCount ?? 0);
 
-  const statusSentence =
-    count === 0
-      ? 'Nothing uploaded yet — drop a file anywhere on this page.'
-      : `${count} ${count === 1 ? 'file' : 'files'}, ${formatBytes(totalBytes)} so far.`;
+  const statusSentence = formatFilesStatus(count, totalBytes);
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 space-y-6">
