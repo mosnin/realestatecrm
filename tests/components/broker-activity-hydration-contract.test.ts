@@ -10,6 +10,7 @@ describe('broker activity hydration contract', () => {
     expect(page).toContain('initialNow={renderedAt}');
     expect(client).toContain('const [relativeNow, setRelativeNow] = useState(initialNow)');
     expect(client).toContain('formatRelative(r.createdAt, relativeNow)');
+    expect(client).toContain("timeZone: 'UTC'");
     expect(client).not.toContain('const diffSec = Math.round((then - Date.now()) / 1000)');
   });
 });

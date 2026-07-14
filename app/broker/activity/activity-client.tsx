@@ -87,6 +87,10 @@ function formatRelative(iso: string, now: number): string {
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
+      // Vercel renders in UTC while the browser may not. Keeping the
+      // absolute fallback in one timezone prevents older rows near a day
+      // boundary from changing text during hydration.
+      timeZone: 'UTC',
     });
   }
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
