@@ -70,6 +70,11 @@ const CLAIM_GUARDS: ReadonlyArray<{ reason: string; pattern: RegExp }> = [
     pattern: /\b(?:as|like) we (?:discussed|talked about)|\bwe (?:discussed|spoke about|talked about)\b/i,
   },
   {
+    reason: 'invented_prior_followup',
+    pattern:
+      /\b(?:our|the) (?:last|previous) follow[- ]?up\b|\bsince we last (?:followed up|spoke|talked)\b|\bit(?:'|’)s been (?:a while|some time) since\b/i,
+  },
+  {
     reason: 'invented_inventory',
     pattern: /\b(?:new|fresh|just-listed) (?:listings?|properties|options)\b/i,
   },
