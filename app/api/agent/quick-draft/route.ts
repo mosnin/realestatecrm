@@ -12,7 +12,7 @@
  *
  *   • mode: 'preview' (default) — Looks up the deal/person, fetches a tight
  *     slice of recent activity, calls OpenAI to compose subject+body. Pure
- *     read; no DB writes. 5s timeout. Returns { channel, subject?, body }.
+ *     read; no DB writes. 15s timeout. Returns { channel, subject?, body }.
  *
  *   • mode: 'send' — Caller provides the (possibly edited) subject + body
  *     they saw. Inserts an AgentDraft (status: pending), reuses the
