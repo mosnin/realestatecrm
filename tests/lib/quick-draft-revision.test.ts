@@ -12,7 +12,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { createMock } = vi.hoisted(() => ({ createMock: vi.fn() }));
+const { createMock, warnMock } = vi.hoisted(() => ({
+  createMock: vi.fn(),
+  warnMock: vi.fn(),
+}));
 
 vi.mock('@/lib/llm', () => ({
   getLLMClient: () => ({ chat: { completions: { create: createMock } } }),
@@ -21,7 +24,7 @@ vi.mock('@/lib/llm', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  logger: { error: vi.fn(), warn: warnMock, info: vi.fn(), debug: vi.fn() },
 }));
 
 import { composeDraftWithOpenAI } from '@/lib/agent/quick-draft';
@@ -41,6 +44,7 @@ const baseArgs = {
 
 beforeEach(() => {
   createMock.mockReset();
+  warnMock.mockReset();
 });
 
 describe('composeDraftWithOpenAI — voice self-critique', () => {
@@ -68,6 +72,44 @@ describe('composeDraftWithOpenAI — voice self-critique', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('uses a completion budget that leaves room after minimal GPT-5 reasoning', async () => {
+    createMock.mockResolvedValueOnce(
+      reply({ subject: 'Quick check-in', body: 'Tuesday at 3 works. See you there.' }),
+    );
+
+    await composeDraftWithOpenAI(baseArgs);
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5-mini',
+        max_completion_tokens: 400,
+        reasoning_effort: 'minimal',
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('logs token-safe diagnostics when the provider returns no visible content', async () => {
+    createMock.mockResolvedValueOnce({
+      choices: [{ finish_reason: 'length', message: { content: '' } }],
+      usage: {
+        completion_tokens: 220,
+        completion_tokens_details: { reasoning_tokens: 220 },
+      },
+    });
+
+    await expect(composeDraftWithOpenAI(baseArgs)).resolves.toBeNull();
+    expect(warnMock).toHaveBeenCalledWith(
+      '[quick-draft] compose returned empty content',
+      {
+        model: 'gpt-5-mini',
+        finishReason: 'length',
+        completionTokens: 220,
+        reasoningTokens: 220,
+      },
+    );
   });
 
   it('revises a slop draft and returns the cleaner rewrite', async () => {
