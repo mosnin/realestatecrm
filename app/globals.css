@@ -1361,3 +1361,92 @@
   animation-range: 0 var(--scroll-buffer), calc(100% - var(--scroll-buffer)) 100%;
   animation-fill-mode: both;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Chippi composer — agent-mode glow.
+ *
+ * When the composer's runtime is Agent (data-agent="true" on the shell,
+ * set by ChippiPromptBox), the 1px neutral border is replaced by a 1px
+ * orange→amber gradient ring (mask-composite ring technique — the gradient
+ * paints only the 1px band, never the fill) plus a low-opacity outer bloom
+ * that breathes on a slow ease-in-out cycle. While a turn is streaming
+ * (data-streaming="true") the bloom tightens and brightens slightly and the
+ * cycle speeds up — "working" reads as a change in energy, not a new effect.
+ *
+ * Pure CSS on purpose: two pseudo-elements + one opacity keyframe = cheap,
+ * compositor-friendly, and trivially reduced-motion aware. Colors sit in the
+ * Apple-orange family (#FF9F0A → #FF6A00) and are deliberately NOT new
+ * design tokens — this is the one sanctioned "agent energy" accent, matching
+ * the demoted-orange --brand philosophy.
+ * ────────────────────────────────────────────────────────────────────────── */
+.chippi-composer-shell {
+  position: relative;
+}
+/* The gradient ring replaces the neutral border so the geometry never
+   shifts — same 1px, same radius, different paint. Unlayered rule, so it
+   wins over the Tailwind utility border-color regardless of specificity. */
+.chippi-composer-shell[data-agent='true'] {
+  border-color: transparent;
+}
+.chippi-composer-shell[data-agent='true']::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  /* rounded-3xl (1.5rem) + the 1px outset */
+  border-radius: calc(1.5rem + 1px);
+  padding: 1px;
+  background: linear-gradient(130deg, #ff9f0a 0%, #ff6a00 55%, #ff9f0a 100%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* Outer bloom — box-shadow only (no fill), so content and the page behind
+   the radius are never tinted. Breathes between 55% and 100% opacity. */
+.chippi-composer-shell[data-agent='true']::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(1.5rem + 1px);
+  box-shadow:
+    0 0 18px 1px rgba(255, 138, 10, 0.14),
+    0 0 48px 6px rgba(255, 106, 0, 0.07);
+  animation: chippi-agent-breathe 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Streaming in agent mode: tighter, a touch brighter, slightly quicker —
+   the glow leans in while Chippi works. */
+.chippi-composer-shell[data-agent='true'][data-streaming='true']::after {
+  box-shadow:
+    0 0 12px 1px rgba(255, 138, 10, 0.24),
+    0 0 32px 4px rgba(255, 106, 0, 0.12);
+  animation-duration: 2.1s;
+}
+/* Dark canvas carries an orange bloom further — lift the alphas a step so
+   the glow reads equally calm on #0c0c0d as on white. */
+.dark .chippi-composer-shell[data-agent='true']::after {
+  box-shadow:
+    0 0 20px 1px rgba(255, 138, 10, 0.2),
+    0 0 56px 8px rgba(255, 106, 0, 0.1);
+}
+.dark .chippi-composer-shell[data-agent='true'][data-streaming='true']::after {
+  box-shadow:
+    0 0 14px 1px rgba(255, 138, 10, 0.32),
+    0 0 36px 5px rgba(255, 106, 0, 0.16);
+}
+@keyframes chippi-agent-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the state signal (ring + steady bloom); drop the breathing. */
+  .chippi-composer-shell[data-agent='true']::after {
+    animation: none;
+    opacity: 0.8;
+  }
+}

@@ -2,14 +2,17 @@
  * GET /api/cron/workflows
  *
  * Hourly tick. Finds every enabled Workflow whose trigger is a `schedule` and
- * is DUE this hour, and runs it through the workflow executor.
+ * is DUE, and runs it through the workflow executor.
  *
- * There is no nextRunAt column on Workflow — UNLIKE the Routine table. The
- * schedule mechanism here is simply "the hourly cron fires + a cadence check":
- * each tick we scan every enabled schedule-triggered workflow and decide, from
- * its `trigger.config` cadence/hour, whether it's due in THIS UTC hour. So the
- * cron MUST run hourly (vercel.json '0 * * * *') for daily/weekdays workflows to
- * land on their hour. See isScheduleDue for the per-cadence rule.
+ * There is no nextRunAt column on Workflow — UNLIKE the Routine table. Due-ness
+ * is a per-workflow WATERMARK check instead: each tick computes the most recent
+ * scheduled slot (cadence/hour from `trigger.config`) and fires when that slot
+ * is later than the workflow's `lastScheduledFireAt`, stamping the slot after
+ * the run. A late or missed hourly tick therefore still fires the missed slot
+ * exactly once on the next tick, and a second tick inside the same slot cannot
+ * double-fire. Rows with a NULL watermark (pre-migration, or never fired) use
+ * the strict "due this hour" rule for their first fire. See
+ * isScheduleDueWithWatermark for the per-cadence rule.
  *
  * IMPORTANT: like every autonomous path, a workflow run DRAFTS — it never sends
  * an outbound channel unattended. The executor owns that contract.
@@ -21,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { monitorCron } from '@/lib/cron-monitor';
-import { isScheduleDue, type ScheduleConfig } from '@/lib/workflows/schedule';
+import { isScheduleDueWithWatermark, type ScheduleConfig } from '@/lib/workflows/schedule';
 
 export const runtime = 'nodejs';
 // A schedule workflow's actions drive the same headless agent runtime the
@@ -42,6 +45,9 @@ interface ScheduleWorkflowRow {
   conditions: WorkflowRow['conditions'];
   actions: WorkflowRow['actions'];
   autonomy: WorkflowRow['autonomy'];
+  /** Last scheduled slot this workflow fired for (watermark). Absent until the
+   *  20260815000000 migration is applied — the loader falls back gracefully. */
+  lastScheduledFireAt?: string | null;
 }
 
 async function handler(req: NextRequest) {

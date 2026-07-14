@@ -1106,11 +1106,21 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     return (
       <TooltipProvider>
         <div ref={containerRef} className={cn('relative', className)}>
+          {/* Shell — carries the agent-mode gradient ring + breathing bloom
+              via CSS (globals.css, `.chippi-composer-shell[data-agent]`).
+              data-agent flips with the Chat/Agent switch; data-streaming
+              tightens/brightens the bloom while a turn is running. Kept as
+              data-attributes + stylesheet keyframes so the glow costs zero
+              JS per frame. */}
           <div
+            data-agent={chatMode === 'agent' ? 'true' : undefined}
+            data-streaming={isLoading ? 'true' : undefined}
             className={cn(
-              'rounded-3xl border border-border/70 bg-background',
-              'transition-[border-color,box-shadow] duration-150',
-              'focus-within:border-foreground/30 focus-within:shadow-[0_1px_0_rgba(0,0,0,0.02)]',
+              'chippi-composer-shell rounded-3xl border border-border/70 bg-background',
+              'shadow-[0_1px_2px_rgba(0,0,0,0.03)]',
+              'transition-[border-color,box-shadow] duration-200 ease-out',
+              'focus-within:border-foreground/30',
+              'focus-within:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.06)]',
               disabled && 'opacity-60',
             )}
             onDragOver={(e) => e.preventDefault()}
@@ -1535,7 +1545,15 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                               : 'text-muted-foreground hover:text-foreground',
                           )}
                         >
-                          <Icon size={11} strokeWidth={2} />
+                          {/* Active Agent gets the glow family's orange on the
+                              bolt only — the label stays foreground so the
+                              pill and the composer ring read as one system
+                              without shouting. */}
+                          <Icon
+                            size={11}
+                            strokeWidth={2}
+                            className={cn(active && m === 'agent' && 'text-[#ff8a0a]')}
+                          />
                           {m === 'chat' ? 'Chat' : 'Agent'}
                         </button>
                       </TooltipTrigger>

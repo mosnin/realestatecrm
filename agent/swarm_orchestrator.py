@@ -28,6 +28,7 @@ from llm import (
     resolve_chat_model,
     usage_accounting_extra_body,
 )
+from notify import notify_space
 from security.budget import acquire_swarm_lock, check_budget, release_swarm_lock
 
 logger = structlog.get_logger(__name__)
@@ -60,6 +61,21 @@ def _usage_from_completion(response: object) -> tuple[int, int, int, float | Non
     raw_cost = getattr(usage, "cost", None)
     cost = float(raw_cost) if isinstance(raw_cost, (int, float)) and raw_cost >= 0 else None
     return (prompt, completion, cached, cost)
+
+
+async def _notify_run_outcome(space_id: str, goal: str, outcome: str) -> None:
+    """Best-effort completion push. Without it a finished background run is
+    indistinguishable from a dead one until the realtor happens to open the
+    app. notify_space swallows every failure by contract; the extra wrap here
+    is belt-and-suspenders so a notification can never fail the run."""
+    try:
+        snippet = (goal or "").strip()
+        if len(snippet) > 120:
+            snippet = snippet[:119].rstrip() + "…"
+        body = f"{snippet} — {outcome}" if snippet else outcome
+        await notify_space(space_id, "Chippi finished a background task", body)
+    except Exception as exc:  # noqa: BLE001 — never fail the run over a push
+        logger.warning("swarm_notify_failed", space_id=space_id, error=str(exc))
 
 
 async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_id: str | None = None) -> None:
@@ -302,6 +318,9 @@ async def run_swarm(payload: dict) -> None:
             db, swarm_run_id, "swarm_failed",
             {"error": "Another swarm is already running for this workspace."},
         )
+        # No completion push here on purpose: this is a double-submit and the
+        # realtor is looking at the immediate error in the UI; the swarm that
+        # holds the lock will send its own completion push.
         return
 
     try:
@@ -323,6 +342,9 @@ async def run_swarm(payload: dict) -> None:
             }).eq("id", swarm_run_id).execute()
             await emit_event(
                 db, swarm_run_id, "swarm_failed", {"error": "Daily token budget exhausted."}
+            )
+            await _notify_run_outcome(
+                space_id, goal, "did not run: daily token budget exhausted"
             )
             return
 
@@ -403,6 +425,7 @@ async def run_swarm(payload: dict) -> None:
             "completedAt": datetime.now(timezone.utc).isoformat(),
         }).eq("id", swarm_run_id).execute()
         await emit_event(db, swarm_run_id, "swarm_completed", {"result": final_result})
+        await _notify_run_outcome(space_id, goal, "completed")
 
     except Exception as exc:
         logger.error("swarm_failed", swarm_run_id=swarm_run_id, error=str(exc))
@@ -412,6 +435,7 @@ async def run_swarm(payload: dict) -> None:
             "completedAt": datetime.now(timezone.utc).isoformat(),
         }).eq("id", swarm_run_id).execute()
         await emit_event(db, swarm_run_id, "swarm_failed", {"error": str(exc)})
+        await _notify_run_outcome(space_id, goal, "failed")
 
     finally:
         await release_swarm_lock(space_id, swarm_run_id)

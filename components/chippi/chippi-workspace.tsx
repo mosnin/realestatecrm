@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
@@ -219,6 +219,10 @@ export function ChippiWorkspace({
   >(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Single switch for every bespoke animation on this surface: the hero→dock
+  // composer glide, the user-bubble lift, and the hero exit's vertical drift
+  // all collapse to plain crossfades/snaps when the OS asks for less motion.
+  const reduceMotion = useReducedMotion() ?? false;
 
   // Track which assistant message ids have already mounted so we only run the
   // 8px slide-in entrance the FIRST time a bubble appears. Loading a
