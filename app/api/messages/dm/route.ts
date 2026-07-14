@@ -3,6 +3,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { ensureDmChannel, rosterForBrokerage } from '@/lib/messaging';
 import { publishUserEvent } from '@/lib/realtime/ably';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/messages/dm — open (or reuse) a direct message with another member
@@ -30,12 +31,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'That person is not in your brokerage' }, { status: 404 });
   }
 
-  const { channel, created } = await ensureDmChannel(
-    ctx.brokerage.id,
-    ctx.dbUserId,
-    otherUserId,
-    ctx.dbUserId,
-  );
+  let channel, created;
+  try {
+    ({ channel, created } = await ensureDmChannel(
+      ctx.brokerage.id,
+      ctx.dbUserId,
+      otherUserId,
+      ctx.dbUserId,
+    ));
+  } catch (error) {
+    logger.error('[messages/dm] DM creation failed', { brokerageId: ctx.brokerage.id }, error);
+    return NextResponse.json(
+      { error: 'Direct messages are temporarily unavailable. Please try again.' },
+      { status: 503 },
+    );
+  }
 
   if (created) {
     await publishUserEvent(ctx.brokerage.id, otherUserId, 'channel_added', {

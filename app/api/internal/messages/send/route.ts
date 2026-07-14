@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { ensureDmChannel, postMessage, rosterForBrokerage } from '@/lib/messaging';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -101,7 +102,18 @@ export async function POST(req: NextRequest) {
   }
 
   const target = candidates[0];
-  const { channel } = await ensureDmChannel(brokerageId, senderId, target.userId, senderId);
+  // A 503 with a plain-language error lets the agent tell the realtor the
+  // send didn't happen, instead of an opaque 500 it can't explain.
+  let channel;
+  try {
+    ({ channel } = await ensureDmChannel(brokerageId, senderId, target.userId, senderId));
+  } catch (error) {
+    logger.error('[internal/messages/send] DM creation failed', { brokerageId }, error);
+    return NextResponse.json(
+      { error: 'Team messaging is temporarily unavailable. The message was not sent.' },
+      { status: 503 },
+    );
+  }
   const sent = await postMessage(channel, senderId, { body: message, kind: 'text' });
 
   return NextResponse.json({

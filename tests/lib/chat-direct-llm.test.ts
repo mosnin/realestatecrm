@@ -83,6 +83,40 @@ describe('runDirectChat — wiring', () => {
     expect(call.messages[call.messages.length - 2].content).toBe('t11');
   });
 
+  it('opts into OpenRouter usage accounting so usage.cost is actually returned', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'or-test-key');
+    try {
+      createMock.mockResolvedValue(happyResponse('ok'));
+      await runDirectChat({
+        model: 'qwen/qwen3.7-plus',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: 'hello',
+      });
+      const call = createMock.mock.calls[0][0];
+      expect(call.usage).toEqual({ include: true });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('omits the usage-accounting param on direct-OpenAI deploys, which reject it', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    try {
+      createMock.mockResolvedValue(happyResponse('ok'));
+      await runDirectChat({
+        model: 'gpt-4o-mini',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: 'hello',
+      });
+      const call = createMock.mock.calls[0][0];
+      expect(call).not.toHaveProperty('usage');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('preserves OpenRouter exact request cost for downstream metering', async () => {
     createMock.mockResolvedValue(happyResponse('ok', {
       prompt_tokens: 10,

@@ -77,6 +77,17 @@ describe('POST /api/messages/dm', () => {
     const res = await dmPost(jsonReq({}));
     expect(res.status).toBe(400);
   });
+
+  it('returns a retryable error when DM creation fails', async () => {
+    ensureDmChannel.mockRejectedValueOnce(new Error('ChannelMember insert failed'));
+
+    const res = await dmPost(jsonReq({ userId: 'u_2' }));
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Direct messages are temporarily unavailable. Please try again.',
+    });
+  });
 });
 
 describe('POST /api/messages/channels', () => {

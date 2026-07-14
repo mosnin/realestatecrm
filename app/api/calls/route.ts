@@ -48,9 +48,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Could not load your calls.' }, { status: 500 });
   }
 
-  // CallLog.contactId intentionally has no database foreign key: a call can
-  // outlive a merged or deleted contact. Fetch the tenant-scoped names
-  // explicitly instead of relying on a PostgREST embedded relation.
+  // CallLog.contactId has a real FK (ON DELETE SET NULL) since migration
+  // 20260713180000, but we still fetch the tenant-scoped names explicitly:
+  // a PostgREST embedded relation depends on the FK being present in the
+  // schema cache, and a lookup failure here degrades to null names instead
+  // of failing the whole list.
   const contactIds = Array.from(
     new Set((data ?? []).map((call) => call.contactId).filter((id): id is string => Boolean(id))),
   );

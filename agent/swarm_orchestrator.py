@@ -25,6 +25,7 @@ from llm import (
     make_chat_model,
     openai_model,
     resolve_chat_model,
+    usage_accounting_extra_body,
 )
 from security.budget import acquire_swarm_lock, check_budget, release_swarm_lock
 
@@ -112,6 +113,7 @@ Rules:
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         max_tokens=1000,
+        extra_body=usage_accounting_extra_body(),
     )
     # Bill the planner call. Direct chat.completions usage shape, recorded as
     # one ChatUsage row so the credit trigger fires. Best-effort: never raises.
@@ -252,6 +254,7 @@ Format with markdown headers for readability."""
         model=auditor_model,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
+        extra_body=usage_accounting_extra_body(),
     )
     # Bill the auditor call — one ChatUsage row, same as the planner.
     a_in, a_out, a_cached, a_cost = _usage_from_completion(response)

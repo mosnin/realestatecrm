@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { afterMock, insertMock, fromMock } = vi.hoisted(() => ({
+const { afterMock, insertMock, fromMock, infoMock } = vi.hoisted(() => ({
   afterMock: vi.fn(),
   insertMock: vi.fn(),
   fromMock: vi.fn(),
+  infoMock: vi.fn(),
 }));
 
 vi.mock('next/server', () => ({ after: afterMock }));
@@ -13,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { warn: vi.fn() },
+  logger: { info: infoMock, warn: vi.fn() },
 }));
 
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
@@ -22,6 +23,7 @@ beforeEach(() => {
   afterMock.mockReset();
   insertMock.mockReset().mockResolvedValue({ error: null });
   fromMock.mockReset().mockReturnValue({ insert: insertMock });
+  infoMock.mockReset();
 });
 
 describe('recordChatUsage cost accounting', () => {
@@ -38,6 +40,10 @@ describe('recordChatUsage cost accounting', () => {
     expect(insertMock).toHaveBeenCalledWith(
       expect.objectContaining({ costUsd: 0.004321 }),
     );
+    expect(infoMock).toHaveBeenCalledWith(
+      '[record-chat-usage] cost source',
+      expect.objectContaining({ costSource: 'provider' }),
+    );
     expect(afterMock).toHaveBeenCalledTimes(1);
     expect(afterMock.mock.calls[0]?.[0]).toBeTypeOf('function');
   });
@@ -53,6 +59,10 @@ describe('recordChatUsage cost accounting', () => {
 
     expect(insertMock).toHaveBeenCalledWith(
       expect.objectContaining({ costUsd: 1.6 }),
+    );
+    expect(infoMock).toHaveBeenCalledWith(
+      '[record-chat-usage] cost source',
+      expect.objectContaining({ costSource: 'estimated' }),
     );
   });
 });
