@@ -49,6 +49,7 @@ interface Props {
   initialRows: ActivityRow[];
   initialCursor: string | null;
   initialNow: number;
+  initialTimeZone: string;
   actors: Record<string, { name: string | null; email: string | null }>;
   spaceMap: Record<string, { slug: string | null }>;
   role: string;
@@ -75,7 +76,7 @@ const REL_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ['minute', 60],
   ['second', 1],
 ];
-function formatRelative(iso: string, now: number): string {
+function formatRelative(iso: string, now: number, timeZone: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';
   const diffSec = Math.round((then - now) / 1000);
@@ -87,10 +88,9 @@ function formatRelative(iso: string, now: number): string {
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      // Vercel renders in UTC while the browser may not. Keeping the
-      // absolute fallback in one timezone prevents older rows near a day
-      // boundary from changing text during hydration.
-      timeZone: 'UTC',
+      // Use the persisted viewer timezone on both server and client. Vercel
+      // otherwise renders in UTC while the browser uses its local timezone.
+      timeZone,
     });
   }
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -142,6 +142,7 @@ export function ActivityClient({
   initialRows,
   initialCursor,
   initialNow,
+  initialTimeZone,
   actors,
   spaceMap,
   role,
@@ -394,7 +395,7 @@ export function ActivityClient({
                       {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
                     <span className="text-[11px] text-muted-foreground w-24 shrink-0 tabular-nums">
-                      {formatRelative(r.createdAt, relativeNow)}
+                      {formatRelative(r.createdAt, relativeNow, initialTimeZone)}
                     </span>
                     <Badge
                       variant="secondary"

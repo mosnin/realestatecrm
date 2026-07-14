@@ -15,6 +15,22 @@ export default async function BrokerActivityPage() {
   // cannot cross a second/minute boundary between SSR and hydration.
   const renderedAt = Date.now();
 
+  const { data: viewer } = await supabase
+    .from('User')
+    .select('timezone')
+    .eq('id', ctx.dbUserId)
+    .maybeSingle();
+  const requestedTimeZone =
+    typeof viewer?.timezone === 'string' ? viewer.timezone : 'UTC';
+  const initialTimeZone = (() => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: requestedTimeZone }).format();
+      return requestedTimeZone;
+    } catch {
+      return 'UTC';
+    }
+  })();
+
   // 1. Resolve brokerage spaces.
   const { data: spaceRows } = await supabase
     .from('Space')
@@ -136,6 +152,7 @@ export default async function BrokerActivityPage() {
         initialRows={initialRows}
         initialCursor={nextCursor}
         initialNow={renderedAt}
+        initialTimeZone={initialTimeZone}
         actors={actorMap}
         spaceMap={spaceMap}
         role={ctx.membership.role}
