@@ -168,6 +168,20 @@ def openai_model(name: str) -> str:
     return f"openai/{name}" if settings.openrouter_api_key else name
 
 
+def usage_accounting_extra_body() -> dict:
+    """OpenRouter usage-accounting opt-in, for `extra_body=` on direct
+    chat.completions calls.
+
+    OpenRouter only returns the exact per-request cost (`usage.cost`) when
+    the request carries `usage: {"include": true}` — without it the ledger's
+    exact-cost branch never fires and rows are priced from the fallback
+    list-price table. Empty on direct-OpenAI deploys, where the API rejects
+    the unknown `usage` request parameter.
+    https://openrouter.ai/docs/use-cases/usage-accounting
+    """
+    return {"usage": {"include": True}} if settings.openrouter_api_key else {}
+
+
 # Models to fall through on a 429, in order. Bare OpenAI names; resolved
 # for the active provider by fallback_models(). Shared by the chat path
 # (modal_app.chat_turn) and the autonomous path (orchestrator).

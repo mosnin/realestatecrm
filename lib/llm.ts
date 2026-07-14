@@ -45,6 +45,19 @@ export {
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
+ * OpenRouter usage-accounting opt-in. OpenRouter only returns the exact
+ * per-request cost (`usage.cost`) when the request carries
+ * `usage: { include: true }` — without it, recordChatUsage's exact-cost
+ * branch never fires and every ChatUsage row is priced from the fallback
+ * list-price table. Returns {} on direct-OpenAI deploys, where the OpenAI
+ * API rejects the unknown `usage` request parameter.
+ * https://openrouter.ai/docs/use-cases/usage-accounting
+ */
+export function usageAccountingParams(): { usage?: { include: boolean } } {
+  return process.env.OPENROUTER_API_KEY ? { usage: { include: true } } : {};
+}
+
+/**
  * Bound third-party LLM latency and cost. The OpenAI SDK defaults to a 600s
  * (10 min) per-request timeout and 2 silent auto-retries, so a hung or degraded
  * OpenRouter upstream could hold a serverless function open for minutes and

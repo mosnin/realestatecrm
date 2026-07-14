@@ -81,6 +81,19 @@ async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
     Math.min(Math.floor(input.cachedTokens ?? 0), promptTokens),
   );
   if (promptTokens === 0 && completionTokens === 0) return;
+  const hasExactCost =
+    typeof input.costUsd === 'number' &&
+    Number.isFinite(input.costUsd) &&
+    input.costUsd >= 0;
+  // Observability for the exact-cost hit rate: if 'estimated' dominates in
+  // production, the provider isn't returning usage.cost (e.g. a call site is
+  // missing the OpenRouter usage-accounting opt-in) and billing is running on
+  // the fallback list-price table.
+  logger.info('[record-chat-usage] cost source', {
+    costSource: hasExactCost ? 'provider' : 'estimated',
+    model: input.model,
+    route: input.route,
+  });
   try {
     await supabase.from('ChatUsage').insert({
       spaceId: input.spaceId,
@@ -92,12 +105,9 @@ async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
       cachedTokens,
       provider: detectProvider(input.model),
       route: input.route,
-      costUsd:
-        typeof input.costUsd === 'number' &&
-        Number.isFinite(input.costUsd) &&
-        input.costUsd >= 0
-          ? input.costUsd
-          : calculateCost(input.model, promptTokens, completionTokens),
+      costUsd: hasExactCost
+        ? input.costUsd
+        : calculateCost(input.model, promptTokens, completionTokens),
       runtime: input.runtime ?? 'ts',
     });
   } catch (err) {

@@ -22,7 +22,7 @@
  */
 
 import OpenAI from 'openai';
-import { getLLMClient, detectProvider } from '@/lib/llm';
+import { getLLMClient, detectProvider, usageAccountingParams } from '@/lib/llm';
 import {
   buildMultimodalContent,
   type MultimodalAttachment,
@@ -143,6 +143,9 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
       // ceilings for long-form drafts.
       max_tokens: 800,
       stream: false,
+      // Cast: `usage` is an OpenRouter request extension the OpenAI SDK's
+      // param type doesn't know about; empty on direct-OpenAI deploys.
+      ...(usageAccountingParams() as Record<string, never>),
     },
     { signal: input.signal },
   );
