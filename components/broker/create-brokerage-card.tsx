@@ -30,12 +30,17 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
                 <p className="text-xs text-muted-foreground">Your brokerage</p>
               </div>
             </div>
-            <a href="/broker">
-              <Button variant="outline" size="sm" className="flex items-center gap-1.5 flex-shrink-0">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 flex-shrink-0"
+            >
+              <a href="/broker">
                 <ExternalLink size={13} />
                 Broker dashboard
-              </Button>
-            </a>
+              </a>
+            </Button>
           </div>
         </CardContent>
       </Card>

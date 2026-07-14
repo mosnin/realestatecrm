@@ -48,6 +48,8 @@ type Window = '7' | '30' | '90' | 'all';
 interface Props {
   initialRows: ActivityRow[];
   initialCursor: string | null;
+  initialNow: number;
+  initialTimeZone: string;
   actors: Record<string, { name: string | null; email: string | null }>;
   spaceMap: Record<string, { slug: string | null }>;
   role: string;
@@ -74,10 +76,10 @@ const REL_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ['minute', 60],
   ['second', 1],
 ];
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, now: number, timeZone: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return '';
-  const diffSec = Math.round((then - Date.now()) / 1000);
+  const diffSec = Math.round((then - now) / 1000);
   const abs = Math.abs(diffSec);
   const sevenDays = 7 * 86400;
   if (abs > sevenDays) {
@@ -86,6 +88,9 @@ function formatRelative(iso: string): string {
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
+      // Use the persisted viewer timezone on both server and client. Vercel
+      // otherwise renders in UTC while the browser uses its local timezone.
+      timeZone,
     });
   }
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -133,7 +138,15 @@ function actorLabel(row: ActivityRow): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, role }: Props) {
+export function ActivityClient({
+  initialRows,
+  initialCursor,
+  initialNow,
+  initialTimeZone,
+  actors,
+  spaceMap,
+  role,
+}: Props) {
   // `role` is forwarded for future role-gated affordances (e.g. IP column
   // visibility). Mark as read to satisfy no-unused-vars without widening prop
   // shape — same convention reviews-client uses.
@@ -143,6 +156,7 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
   const [actorIndex, setActorIndex] = useState(actors);
   const [spaceIndex, setSpaceIndex] = useState(spaceMap);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [relativeNow, setRelativeNow] = useState(initialNow);
 
   const [action, setAction] = useState<ActionFilter>('all');
   const [win, setWin] = useState<Window>('90');
@@ -157,6 +171,12 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
   // (action='all', win='90'). Skip the effect's fetch the very first time it
   // runs so we don't immediately re-request what we already have.
   const firstRun = useRef(true);
+
+  // The first render must use the server's clock. Refresh the reference only
+  // after hydration so the relative labels can advance without mismatching.
+  useEffect(() => {
+    setRelativeNow(Date.now());
+  }, []);
 
   const buildQuery = useCallback(
     (extraCursor?: string | null) => {
@@ -375,7 +395,7 @@ export function ActivityClient({ initialRows, initialCursor, actors, spaceMap, r
                       {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
                     <span className="text-[11px] text-muted-foreground w-24 shrink-0 tabular-nums">
-                      {formatRelative(r.createdAt)}
+                      {formatRelative(r.createdAt, relativeNow, initialTimeZone)}
                     </span>
                     <Badge
                       variant="secondary"
