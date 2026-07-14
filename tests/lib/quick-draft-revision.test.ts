@@ -44,6 +44,38 @@ beforeEach(() => {
 });
 
 describe('composeDraftWithOpenAI — voice self-critique', () => {
+  it('rejects an unsupported inventory/prior-conversation claim and pins the grounding prompt', async () => {
+    createMock.mockResolvedValueOnce(
+      reply({
+        subject: 'A few options',
+        body: 'I found two new listings based on what we discussed.',
+      }),
+    );
+
+    await expect(composeDraftWithOpenAI(baseArgs)).resolves.toBeNull();
+    expect(createMock).toHaveBeenCalledOnce();
+    const request = (createMock.mock.calls[0] as unknown as [
+      { messages: Array<{ role: string; content: string }> },
+    ])[0];
+    expect(request.messages[0]?.content).toMatch(/Use ONLY facts explicitly present/i);
+    expect(request.messages[0]?.content).toMatch(/do not fill gaps/i);
+  });
+
+  it('keeps a guarded claim when the same fact exists in recent activity', async () => {
+    createMock.mockResolvedValueOnce(
+      reply({
+        subject: 'Two new options',
+        body: 'I found two new listings that match your search.',
+      }),
+    );
+
+    const out = await composeDraftWithOpenAI({
+      ...baseArgs,
+      recentActivity: ['I found two new listings that match the search.'],
+    });
+    expect(out?.body).toContain('two new listings');
+  });
+
   it('keeps a foreground compose alive for 15 seconds before aborting', async () => {
     vi.useFakeTimers();
     try {
