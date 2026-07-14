@@ -23,6 +23,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import { uploadObject, deleteObject, getSignedDownloadUrl, buildKey } from '@/lib/storage';
+import { extractAttachmentText } from '@/lib/extraction/extract';
 
 /** TTL for the URL returned on POST. The chat UI uses it for the inline
  *  preview the moment the upload completes; 20 minutes is long enough for
@@ -196,9 +197,15 @@ export async function POST(req: NextRequest) {
   }
 
   const isImage = mimeType.startsWith('image/');
-  // Images go straight to the model via vision — no extraction needed. Anything
-  // else gets extracted on demand by the read_attachment tool inside the sandbox.
-  const extractionStatus = isImage ? 'skipped' : 'pending';
+  // Images go straight to the model via vision — no extraction needed.
+  // Documents/spreadsheets extract NOW, while the buffer is in memory, so
+  // both chat paths can inject the content inline and read_attachment can
+  // serve it on later turns. A parser failure records 'failed' honestly —
+  // the upload itself still succeeds.
+  const extraction = await extractAttachmentText(buffer, mimeType, sanitized);
+  if (extraction.status === 'failed') {
+    logger.warn('[ai/attachments] extraction failed', { spaceId: space.id, mimeType });
+  }
 
   const { error: insertError } = await supabase.from('Attachment').insert({
     id,
@@ -213,7 +220,8 @@ export async function POST(req: NextRequest) {
     // re-sign from storagePath. Keeping the column populated avoids schema
     // changes and keeps the migration path open for a follow-up drop.
     publicUrl: '',
-    extractionStatus,
+    extractedText: extraction.text,
+    extractionStatus: extraction.status,
   });
   if (insertError) {
     // Best-effort cleanup so we don't orphan the storage object.
@@ -232,7 +240,7 @@ export async function POST(req: NextRequest) {
     sizeBytes: file.size,
     publicUrl: previewUrl,
     isImage,
-    extractionStatus,
+    extractionStatus: extraction.status,
   });
 }
 

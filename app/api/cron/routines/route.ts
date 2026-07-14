@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireRoutineRun } from '@/lib/routines';
 import { monitorCron } from '@/lib/cron-monitor';
-import { hasCurrentSubscription } from '@/lib/api-auth';
+import { isPremiumAccessBlocked } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 // The Modal-free in-process fallback (lib/routines fireInProcessRun) blocks the
@@ -91,11 +91,18 @@ async function handler(req: NextRequest) {
     console.error('[cron/routines] Failed to load spaces', spaceErr);
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
   }
-  const activeSpaceRows = (spaceRows ?? []).filter((s) =>
-    hasCurrentSubscription(
-      s.stripeSubscriptionStatus as string,
-      s.stripePeriodEnd as string | null,
-    ),
+  // Gate on isPremiumAccessBlocked, not hasCurrentSubscription: free and
+  // inactive spaces may run their scheduled routines on included credits
+  // (the credit meter enforces spend); only lapsed-paid states are blocked.
+  // The old fail-closed gate silently skipped every space whose
+  // stripePeriodEnd was never backfilled — the user scheduled a routine,
+  // "Run now" worked, and the schedule then never fired.
+  const activeSpaceRows = (spaceRows ?? []).filter(
+    (s) =>
+      !isPremiumAccessBlocked(
+        s.stripeSubscriptionStatus as string,
+        s.stripePeriodEnd as string | null,
+      ),
   );
   const activeSpaces = new Set(activeSpaceRows.map((s) => s.id as string));
   const ownerIdsBySpace = new Map<string, string>();
@@ -121,7 +128,28 @@ async function handler(req: NextRequest) {
   }
 
   const runnable = due.filter((r) => activeSpaces.has(r.spaceId));
-  const skippedInactive = due.length - runnable.length;
+  const skippedRoutines = due.filter((r) => !activeSpaces.has(r.spaceId));
+  const skippedInactive = skippedRoutines.length;
+
+  // Stamp skipped routines too — otherwise their stale nextRunAt stays in
+  // the past forever and permanently occupies the front of the
+  // order(nextRunAt).limit(N) window, starving runnable routines behind
+  // them. Stamping advances nextRunAt via the same trigger the run path
+  // uses; 'skipped' is honest in lastRunStatus. Log WHICH routines were
+  // gated so a silent skip is diagnosable.
+  if (skippedRoutines.length > 0) {
+    console.warn('[cron/routines] skipped (subscription gate)', {
+      routineIds: skippedRoutines.map((r) => r.id),
+    });
+    await Promise.all(
+      skippedRoutines.map((r) =>
+        supabase
+          .from('Routine')
+          .update({ lastRunAt: new Date().toISOString(), lastRunStatus: 'skipped' })
+          .eq('id', r.id),
+      ),
+    );
+  }
 
   // ── 3. Fire with bounded concurrency ────────────────────────────────────
   let fired = 0;

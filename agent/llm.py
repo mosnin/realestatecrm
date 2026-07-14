@@ -331,7 +331,67 @@ def detect_provider(model: str | None) -> str:
 _CACHE_MARKER_PROVIDERS = frozenset({"anthropic", "google"})
 
 
-def make_chat_model(name: str):
+class _CostTrackingCompletions:
+    def __init__(self, tracker: "CostTrackingClient", inner: Any):
+        self._tracker = tracker
+        self._inner = inner
+
+    async def create(self, **kwargs: Any) -> Any:
+        # Opt into OpenRouter usage accounting so the response carries the
+        # exact request cost. Merged into any extra_body the SDK already set.
+        if settings.openrouter_api_key:
+            extra = dict(kwargs.get("extra_body") or {})
+            extra.setdefault("usage", {"include": True})
+            kwargs["extra_body"] = extra
+        response = await self._inner.create(**kwargs)
+        # Streaming responses report usage on the final chunk, which never
+        # passes through here — only non-streaming calls accumulate.
+        usage = getattr(response, "usage", None)
+        cost = getattr(usage, "cost", None) if usage is not None else None
+        if isinstance(cost, (int, float)) and cost >= 0:
+            self._tracker._total_cost += float(cost)
+            self._tracker._saw_cost = True
+        return response
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+class _CostTrackingChat:
+    def __init__(self, tracker: "CostTrackingClient", inner: Any):
+        self._inner = inner
+        self.completions = _CostTrackingCompletions(tracker, inner.completions)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+class CostTrackingClient:
+    """AsyncOpenAI proxy scoped to one agent run: opts every (non-streaming)
+    chat.completions.create into OpenRouter usage accounting and accumulates
+    the exact `usage.cost` the provider returns.
+
+    Build one per run, pass it to `make_chat_model(..., openai_client=...)`,
+    and read `.cost_usd` after the run for the ledger. `cost_usd` is None when
+    no call carried a cost (direct-OpenAI deploys, provider omissions,
+    streaming-only runs) so callers fall back to the price table.
+    """
+
+    def __init__(self, inner: AsyncOpenAI):
+        self._inner = inner
+        self._total_cost = 0.0
+        self._saw_cost = False
+        self.chat = _CostTrackingChat(self, inner.chat)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    @property
+    def cost_usd(self) -> float | None:
+        return self._total_cost if self._saw_cost else None
+
+
+def make_chat_model(name: str, openai_client: AsyncOpenAI | None = None):
     """Wrap a model slug in OpenAIChatCompletionsModel against our LLM client.
 
     openai-agents resolves a string `model` by prefix: `openai/...` ->
@@ -353,9 +413,10 @@ def make_chat_model(name: str):
     """
     from agents import OpenAIChatCompletionsModel
 
+    client = openai_client or get_llm_client()
     if detect_provider(name) in _CACHE_MARKER_PROVIDERS:
-        return _CachingChatModel(model=name, openai_client=get_llm_client())
-    return OpenAIChatCompletionsModel(model=name, openai_client=get_llm_client())
+        return _CachingChatModel(model=name, openai_client=client)
+    return OpenAIChatCompletionsModel(model=name, openai_client=client)
 
 
 def _build_cache_marker() -> dict[str, Any]:

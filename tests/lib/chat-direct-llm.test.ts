@@ -24,7 +24,27 @@ vi.mock('@/lib/llm', async () => {
   };
 });
 
-import { runDirectChat, CHIPPI_INSTRUCTIONS_LITE } from '@/lib/chat/direct-llm';
+import {
+  runDirectChat,
+  runDirectChatStream,
+  CHIPPI_INSTRUCTIONS_LITE,
+} from '@/lib/chat/direct-llm';
+
+/** Async-iterable stub matching the OpenAI SDK's streaming response shape. */
+function streamingResponse(
+  chunks: Array<{ content?: string; usage?: Record<string, unknown> }>,
+) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for (const c of chunks) {
+        yield {
+          choices: c.content !== undefined ? [{ delta: { content: c.content } }] : [],
+          usage: c.usage ?? null,
+        };
+      }
+    },
+  };
+}
 
 function happyResponse(text: string, usage?: {
   prompt_tokens?: number;
@@ -200,5 +220,66 @@ describe('CHIPPI_INSTRUCTIONS_LITE', () => {
 
   it('makes it clear there are no tools on this path', () => {
     expect(CHIPPI_INSTRUCTIONS_LITE.toLowerCase()).toMatch(/no.*action|do not take action|action path/);
+  });
+});
+
+describe('runDirectChatStream', () => {
+  it('forwards each delta as it arrives and returns the full text + final-chunk usage', async () => {
+    createMock.mockResolvedValue(
+      streamingResponse([
+        { content: 'A CMA ' },
+        { content: 'compares recent sales.' },
+        {
+          content: '',
+          usage: { prompt_tokens: 12, completion_tokens: 7, cost: 0.00042 },
+        },
+      ]),
+    );
+    const deltas: string[] = [];
+    const result = await runDirectChatStream(
+      {
+        model: 'qwen/qwen3.7-plus',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: "what's a CMA?",
+      },
+      (d) => {
+        deltas.push(d);
+      },
+    );
+    expect(deltas).toEqual(['A CMA ', 'compares recent sales.']);
+    expect(result.text).toBe('A CMA compares recent sales.');
+    expect(result.usage.promptTokens).toBe(12);
+    expect(result.usage.completionTokens).toBe(7);
+    expect(result.usage.costUsd).toBe(0.00042);
+    const call = createMock.mock.calls[0][0];
+    expect(call.stream).toBe(true);
+    expect(call.stream_options).toEqual({ include_usage: true });
+  });
+
+  it('stops the provider stream when onDelta returns false and resolves with the accumulated text', async () => {
+    createMock.mockResolvedValue(
+      streamingResponse([
+        { content: "I can't do that from here. " },
+        { content: 'But you could try…' },
+        { content: 'never reached' },
+      ]),
+    );
+    const deltas: string[] = [];
+    const result = await runDirectChatStream(
+      {
+        model: 'qwen/qwen3.7-plus',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: 'send an email',
+      },
+      (d) => {
+        deltas.push(d);
+        return false; // stop after the first delta
+      },
+    );
+    expect(deltas).toEqual(["I can't do that from here. "]);
+    expect(result.text).toBe("I can't do that from here. ");
+    expect(result.usage.promptTokens).toBe(0);
   });
 });

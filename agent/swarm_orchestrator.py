@@ -19,6 +19,7 @@ from config import settings
 from db import supabase as get_supabase
 from ledger import record_chat_usage
 from llm import (
+    CostTrackingClient,
     configure_agents_sdk,
     extract_usage_with_cache,
     get_llm_client,
@@ -175,10 +176,13 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
         )
 
         member_model = resolve_chat_model(settings.worker_model)
+        # Per-member cost tracker: opts each model call into OpenRouter usage
+        # accounting and sums the exact request cost across the run.
+        cost_tracker = CostTrackingClient(get_llm_client())
         agent = Agent(
             name=member["name"],
             instructions=system_prompt,
-            model=make_chat_model(member_model),
+            model=make_chat_model(member_model, openai_client=cost_tracker),
             model_settings=ModelSettings(max_tokens=2048),
         )
 
@@ -200,6 +204,7 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
             prompt_tokens=m_in,
             completion_tokens=m_out,
             cached_tokens=m_cached,
+            cost_usd=cost_tracker.cost_usd,
             route="agent",
         )
 

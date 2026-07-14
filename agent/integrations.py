@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any
 
 import httpx
@@ -141,6 +142,17 @@ def _safe_tool_name(slug: str, toolkit: str) -> str:
     return cleaned[:64]
 
 
+# Curated-schema cache: the schemas are static Composio definitions — only
+# WHICH slugs apply varies per realtor, and that's part of the key. Without
+# this, every agent turn paid a Vercel round-trip (a visible slice of the
+# "agent takes forever to start" latency) for bytes that never change.
+# 5-minute TTL bounds staleness after a connect/disconnect; a warm container
+# (min_containers=1) keeps the cache hot across turns.
+_SCHEMA_CACHE_TTL_SECONDS = 300.0
+_SCHEMA_CACHE_MAX_ENTRIES = 256
+_schema_cache: dict[tuple[str, str, tuple[str, ...]], tuple[float, list[dict[str, Any]]]] = {}
+
+
 async def _fetch_curated_schemas(
     *,
     space_id: str,
@@ -153,12 +165,22 @@ async def _fetch_curated_schemas(
     exact-slug filter path. Returns [] on any failure — the caller treats
     that as "fall back to dispatcher for these toolkits".
 
-    One HTTP round trip per agent build, regardless of how many slugs.
+    One HTTP round trip per agent build, regardless of how many slugs —
+    and zero when the (space, user, slugs) result is still warm in the
+    in-process cache. Failures are never cached.
     The endpoint enforces "slug's toolkit must be active for this user",
     so a stale curated entry for an unconnected toolkit returns nothing.
     """
     if not slugs:
         return []
+
+    cache_key = (space_id, user_id, tuple(slugs))
+    cached = _schema_cache.get(cache_key)
+    if cached is not None:
+        expires_at, tools = cached
+        if time.monotonic() < expires_at:
+            return tools
+        _schema_cache.pop(cache_key, None)
     try:
         async with httpx.AsyncClient(timeout=_SCHEMA_FETCH_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
@@ -191,7 +213,14 @@ async def _fetch_curated_schemas(
         data = resp.json()
     except Exception:
         return []
-    return data.get("tools") or []
+    tools = data.get("tools") or []
+    if tools:
+        if len(_schema_cache) >= _SCHEMA_CACHE_MAX_ENTRIES:
+            # Drop the stalest entry — bounded memory over LRU precision.
+            oldest = min(_schema_cache.items(), key=lambda kv: kv[1][0])[0]
+            _schema_cache.pop(oldest, None)
+        _schema_cache[cache_key] = (time.monotonic() + _SCHEMA_CACHE_TTL_SECONDS, tools)
+    return tools
 
 
 def _sanitize_enums_for_xai(node: Any) -> Any:

@@ -43,15 +43,14 @@
  *     - Treated as "no vision" — fall back to text. A non-vision model's
  *       image turn is upgraded to qwen by pickModelForAttachments.
  *
- * v1 cuts: video, audio, docx, image generation (input only — output
- * already exists via generate_studio_image).
+ * Documents/spreadsheets (csv, xlsx, docx, txt, json, md — and PDFs on
+ * providers without native PDF input) are served via `extractedText`,
+ * populated at upload by lib/extraction/extract.ts and injected inline as
+ * text blocks by the builders below. Only images depend on provider vision
+ * support.
  *
- * DEFERRED:
- *   - OpenAI PDF support via pdf-to-image conversion or OpenAI Files API
- *   - Gemini Files API native PDF
- *   - Provider auto-fallback when current model can't see (e.g. Grok →
- *     Claude for one turn) — router heuristic gets us most of the way
- *     today
+ * v1 cuts: video, audio, image generation (input only — output already
+ * exists via generate_studio_image).
  */
 
 import { detectProvider } from '@/lib/llm';
@@ -61,6 +60,29 @@ export interface MultimodalAttachment {
   filename: string;
   mimeType: string;
   url: string;
+  /**
+   * Server-extracted text for documents/spreadsheets (populated at upload
+   * by lib/extraction/extract.ts). When present, non-image attachments the
+   * provider can't consume natively are injected as inline text instead of
+   * being dropped as unsupported.
+   */
+  extractedText?: string | null;
+}
+
+/** Per-attachment ceiling for inline-injected extracted text. The stored
+ *  extraction caps at 50k chars; inline we keep it tighter so one giant
+ *  spreadsheet can't crowd out the conversation — the read_attachment tool
+ *  serves the full extraction on demand. */
+const INLINE_EXTRACT_CHARS = 20_000;
+
+function inlineExtractText(a: MultimodalAttachment): string | null {
+  const text = a.extractedText?.trim();
+  if (!text) return null;
+  const body =
+    text.length > INLINE_EXTRACT_CHARS
+      ? `${text.slice(0, INLINE_EXTRACT_CHARS)}\n[truncated — use read_attachment for the rest]`
+      : text;
+  return `Contents of attached file "${a.filename}" (${a.mimeType}):\n${body}`;
 }
 
 /** A content block in the shape the OpenAI-API-compatible chat.completions
@@ -202,16 +224,27 @@ export function buildMultimodalContent(
       continue;
     }
     if (isPdfMime(a.mimeType)) {
-      if (!supportsPdf) {
-        unsupported.push(a);
+      if (supportsPdf) {
+        blocks.push(...encodePdf(provider, a));
         continue;
       }
-      blocks.push(...encodePdf(provider, a));
+      // Non-Anthropic providers can't read PDFs natively — fall back to the
+      // text layer extracted at upload, if there is one.
+      const pdfText = inlineExtractText(a);
+      if (pdfText) {
+        blocks.push({ type: 'text', text: pdfText });
+        continue;
+      }
+      unsupported.push(a);
       continue;
     }
-    // Anything else — text, csv, docx, xlsx — is not handled by the
-    // multimodal path. The agent path's `read_attachment` tool covers
-    // those.
+    // Documents/spreadsheets (csv, xlsx, docx, txt, json, md) — inject the
+    // text extracted at upload so the model actually sees the contents.
+    const docText = inlineExtractText(a);
+    if (docText) {
+      blocks.push({ type: 'text', text: docText });
+      continue;
+    }
     unsupported.push(a);
   }
 
@@ -293,11 +326,22 @@ export function buildSdkUserContent(
       continue;
     }
     if (isPdfMime(a.mimeType)) {
-      if (!supportsPdf) {
-        unsupported.push(a);
+      if (supportsPdf) {
+        content.push({ type: 'input_file', file: { url: a.url }, filename: a.filename });
         continue;
       }
-      content.push({ type: 'input_file', file: { url: a.url }, filename: a.filename });
+      const pdfText = inlineExtractText(a);
+      if (pdfText) {
+        content.push({ type: 'input_text', text: pdfText });
+        continue;
+      }
+      unsupported.push(a);
+      continue;
+    }
+    // Documents/spreadsheets — inject the upload-time extraction as text.
+    const docText = inlineExtractText(a);
+    if (docText) {
+      content.push({ type: 'input_text', text: docText });
       continue;
     }
     unsupported.push(a);

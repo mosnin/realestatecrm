@@ -25,11 +25,24 @@ export type AgentEvent =
   | SubagentSpawnedEvent
   | TurnCompleteEvent
   | ErrorEvent
-  | SystemEvent;
+  | SystemEvent
+  | StatusEvent;
 
 interface BaseEvent {
   seq: number;
   ts: string;
+}
+
+/**
+ * A live status line for the thinking indicator ("Reading your workspace…",
+ * "Thinking…"). Purely presentational — the client shows the latest label
+ * while the turn has produced no visible text yet, and drops it on the first
+ * text_delta / terminal event. Emitted by both the direct and agent paths so
+ * the user sees signal within the first ~100ms instead of dead air.
+ */
+export interface StatusEvent extends BaseEvent {
+  type: 'status';
+  label: string;
 }
 
 /** A token of the assistant's reply text. Client appends to the current text block. */

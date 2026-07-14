@@ -17,6 +17,7 @@
  */
 
 import crypto from 'crypto';
+import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
@@ -269,6 +270,20 @@ function sumTurnUsage(result: SdkResultLike): {
 function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     async start(controller) {
+      // Hold the serverless function open until the turn (tools, model calls,
+      // persistence) finishes even if the browser disconnects mid-stream —
+      // cancel() below no longer aborts, and without this registration the
+      // platform may suspend the function once the response is cancelled.
+      let turnDone!: () => void;
+      const turnDonePromise = new Promise<void>((resolve) => {
+        turnDone = resolve;
+      });
+      try {
+        after(() => turnDonePromise);
+      } catch {
+        /* outside a request context (tests, workers) */
+      }
+
       const nextSeq = createSeqCounter();
       let textBuffer = '';
 
@@ -461,6 +476,12 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         pushEvent(ev);
       }
 
+      // Immediate signal for the thinking indicator — the agent path can
+      // spend seconds in context assembly + the first model call before any
+      // visible event fires. Superseded client-side by tool_call_start
+      // labels and the first text_delta.
+      pushEvent({ type: 'status', label: 'Thinking…' });
+
       let result: SdkResultLike;
       try {
         ({ result } = await input.start(resultSink));
@@ -633,11 +654,23 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             });
           }
         }
-        controller.close();
+        turnDone();
+        try {
+          controller.close();
+        } catch {
+          /* already closed by cancel() */
+        }
       }
     },
+    // Client disconnected (tab/app closed, navigation, Stop). Do NOT abort —
+    // the turn keeps running server-side to completion and the finally block
+    // above persists it, so the answer (and any tool side effects' record) is
+    // in history when the user returns. This matches the Modal proxy path's
+    // behaviour in app/api/ai/task. Bounded by the SDK maxTurns, the idle
+    // watchdog, and lib/ai-tools/loop-guard, so "keep running" can't become
+    // "run forever". pushEvent already swallows enqueue-after-close.
     cancel() {
-      input.abortController.abort();
+      /* intentionally no abort */
     },
   });
 }

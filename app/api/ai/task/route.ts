@@ -23,7 +23,7 @@
 
 import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -327,6 +327,21 @@ function proxyModalStream({
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Hold the serverless function open until the Modal drain + persist
+      // finish even after the client disconnects. The comments below promise
+      // "the turn keeps draining server-side" — without this registration the
+      // platform may suspend the function the moment the response stream is
+      // cancelled, and that promise silently breaks.
+      let drainDone!: () => void;
+      const drainDonePromise = new Promise<void>((resolve) => {
+        drainDone = resolve;
+      });
+      try {
+        after(() => drainDonePromise);
+      } catch {
+        /* outside a request context (tests) */
+      }
+
       const reader = modalBody.getReader();
       const decoder = new TextDecoder();
       let lineBuf = '';
@@ -526,6 +541,7 @@ function proxyModalStream({
         // closing a cancelled controller throws, so guard it.
         try { controller.close(); } catch { /* already closed by cancel() */ }
         reader.releaseLock();
+        drainDone();
       }
     },
     // Client disconnected (tab/app closed, navigation). Mark it so we stop
@@ -809,6 +825,7 @@ export async function POST(req: NextRequest) {
     filename: a.filename,
     mimeType: a.mime_type,
     url: a.public_url,
+    extractedText: a.extracted_text,
   }));
   const { model: turnModel, upgraded } = pickModelForAttachments(
     baseModel,

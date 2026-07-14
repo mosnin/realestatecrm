@@ -189,6 +189,105 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
   };
 }
 
+/**
+ * Streaming variant of runDirectChat. Emits each content delta through
+ * `onDelta` as it arrives and resolves with the same DirectChatResult shape
+ * (full text + usage) once the provider finishes.
+ *
+ * `onDelta` may return `false` to stop the stream early (the direct-stream
+ * escalation gate uses this once it has seen enough text to know the turn
+ * belongs on the agent path — no point paying for the rest of a reply that
+ * will be discarded). Early stop resolves with the text accumulated so far;
+ * usage is whatever the provider sent by then (usually nothing — OpenRouter
+ * reports usage on the final chunk only).
+ */
+export async function runDirectChatStream(
+  input: DirectChatInput,
+  onDelta: (delta: string) => boolean | void,
+): Promise<DirectChatResult> {
+  const client = getLLMClient();
+  const provider = detectProvider(input.model);
+
+  const userBlocks = buildContent(input);
+
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: 'system', content: input.systemMessage },
+    ...input.history.slice(-HISTORY_TURNS_DEFAULT * 2).map((h) => ({
+      role: h.role,
+      content: h.content,
+    })),
+    {
+      role: 'user',
+      content: userBlocks.blocks as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart[],
+    },
+  ];
+
+  // Local controller so an early stop aborts THIS provider call without
+  // touching the caller's signal (which is shared with the whole request).
+  const local = new AbortController();
+  const onCallerAbort = () => local.abort();
+  input.signal?.addEventListener('abort', onCallerAbort, { once: true });
+
+  let finalText = '';
+  let usage:
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        prompt_tokens_details?: { cached_tokens?: number };
+        cost?: number;
+      }
+    | undefined;
+
+  try {
+    const stream = await client.chat.completions.create(
+      {
+        model: input.model,
+        messages,
+        max_tokens: 800,
+        stream: true,
+        // Ask for usage on the final chunk — same fields the non-streaming
+        // path reads (OpenRouter also attaches `cost` here when the
+        // usage-accounting opt-in below is present).
+        stream_options: { include_usage: true },
+        ...(usageAccountingParams() as Record<string, never>),
+      },
+      { signal: local.signal },
+    );
+
+    for await (const chunk of stream) {
+      if (chunk.usage) usage = chunk.usage as typeof usage;
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === 'string' && delta.length > 0) {
+        finalText += delta;
+        if (onDelta(delta) === false) {
+          local.abort();
+          break;
+        }
+      }
+    }
+  } catch (err) {
+    // Early stop aborts the iterator mid-flight; everything else is real.
+    if (!local.signal.aborted || input.signal?.aborted) throw err;
+  } finally {
+    input.signal?.removeEventListener('abort', onCallerAbort);
+  }
+
+  const promptTokens = usage?.prompt_tokens ?? 0;
+  const completionTokens = usage?.completion_tokens ?? 0;
+  const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  const costUsd =
+    typeof usage?.cost === 'number' && Number.isFinite(usage.cost) && usage.cost >= 0
+      ? usage.cost
+      : undefined;
+
+  return {
+    text: finalText,
+    provider,
+    usage: { promptTokens, completionTokens, cachedTokens, costUsd },
+    fallbackNote: userBlocks.fallbackNote,
+  };
+}
+
 function buildContent(input: DirectChatInput): {
   blocks: ContentBlock[];
   fallbackNote: string;

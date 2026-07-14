@@ -1,13 +1,12 @@
 /**
- * `read_attachment` — return metadata for a chat attachment.
+ * `read_attachment` — return the extracted contents of a chat attachment.
  *
- * Read-only. **Does not stream blob content** through the model. The
- * full Python implementation in `agent/tools/attachments.py` does
- * lazy PDF/DOCX/XLSX extraction on demand; in the TS runtime we extract
- * at upload time (`/api/ai/attachments`) and inject `extractedText`
- * into the user message. This tool is the metadata-only readback path:
- * the realtor sees what was attached, the model sees enough to reference
- * the file by name.
+ * Read-only. Documents and spreadsheets are extracted at upload time
+ * (`/api/ai/attachments` → lib/extraction/extract.ts) into
+ * Attachment.extractedText; this tool serves that text back to the model
+ * on later turns (the upload turn already gets it injected inline by
+ * lib/chat/multimodal.ts). Supports offsets so the model can page through
+ * extractions bigger than one response.
  *
  * Schema: Attachment table from migration 20260430120000_attachments.sql.
  */
@@ -16,11 +15,20 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
 
+/** Max characters returned per call — page with `offset` for the rest. */
+const PAGE_CHARS = 20_000;
+
 const parameters = z
   .object({
-    attachmentId: z.string().min(1).describe('The Attachment.id to look up.'),
+    attachmentId: z.string().min(1).describe('The Attachment.id to read.'),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Character offset into the extracted text (for paging long documents). Default 0.'),
   })
-  .describe('Read metadata for a chat attachment.');
+  .describe('Read the extracted text contents of a chat attachment (PDF, DOCX, XLSX, CSV, TXT).');
 
 interface ReadAttachmentResult {
   attachmentId: string;
@@ -28,15 +36,17 @@ interface ReadAttachmentResult {
   mimeType: string;
   sizeBytes: number | null;
   extractionStatus: 'pending' | 'skipped' | 'done' | 'failed';
-  hasExtractedText: boolean;
-  description: string | null;
+  /** The extracted text page starting at `offset`. Null when unavailable. */
+  content: string | null;
+  /** Total extracted length; content continues past offset+content.length when smaller. */
+  totalChars: number;
 }
 
 export const readAttachmentTool = defineTool<typeof parameters, ReadAttachmentResult>({
   name: 'read_attachment',
   riskLevel: 'safe',
   description:
-    'Look up an attachment by id and return its filename, mime type, and extraction status. Does not return file contents.',
+    'Read the extracted text contents of an attachment (PDF, DOCX, XLSX, CSV, TXT) by id. Returns up to 20k characters per call; pass offset to page through longer documents. Images have no extracted text.',
   parameters,
   requiresApproval: false,
 
@@ -66,15 +76,25 @@ export const readAttachmentTool = defineTool<typeof parameters, ReadAttachmentRe
       extractedText: string | null;
     };
     const status = (r.extractionStatus ?? 'pending') as ReadAttachmentResult['extractionStatus'];
-    const hasText = typeof r.extractedText === 'string' && r.extractedText.length > 0;
-
-    // A short, safe description: first line of extracted text if any, capped.
-    const description = hasText
-      ? (r.extractedText as string).split(/\r?\n/, 1)[0].slice(0, 140) || null
-      : null;
+    const text = typeof r.extractedText === 'string' ? r.extractedText : '';
+    const offset = Math.min(args.offset ?? 0, text.length);
+    const content = text ? text.slice(offset, offset + PAGE_CHARS) : null;
 
     const sizeKb = r.sizeBytes != null ? `${Math.round(r.sizeBytes / 1024)} KB` : 'unknown size';
-    const summary = `${r.filename} (${r.mimeType}, ${sizeKb}).`;
+    let summary: string;
+    if (content) {
+      const remaining = text.length - (offset + content.length);
+      summary =
+        remaining > 0
+          ? `${r.filename} (${r.mimeType}, ${sizeKb}) — ${content.length} chars from offset ${offset}; ${remaining} more available.`
+          : `${r.filename} (${r.mimeType}, ${sizeKb}).`;
+    } else if (status === 'skipped') {
+      summary = `${r.filename} is an image — it has no extracted text (it is shown to vision models directly).`;
+    } else if (status === 'failed') {
+      summary = `${r.filename} (${r.mimeType}, ${sizeKb}) — text extraction failed for this file.`;
+    } else {
+      summary = `${r.filename} (${r.mimeType}, ${sizeKb}) — no extracted text available.`;
+    }
 
     return {
       summary,
@@ -84,8 +104,8 @@ export const readAttachmentTool = defineTool<typeof parameters, ReadAttachmentRe
         mimeType: r.mimeType,
         sizeBytes: r.sizeBytes ?? null,
         extractionStatus: status,
-        hasExtractedText: hasText,
-        description,
+        content,
+        totalChars: text.length,
       },
       display: 'plain',
     };

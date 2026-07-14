@@ -27,8 +27,9 @@
  *                   'pending'), so the due scan excludes it and the next tick will
  *                   NOT re-send. A row stuck in 'sending' (claimed, then crashed
  *                   pre-send) simply never sends — the SAFE failure: a missed
- *                   send, never a DUPLICATE real message to a client. (A future
- *                   stale-'sending' reclaim cron is a follow-up.)
+ *                   send, never a DUPLICATE real message to a client. Stale
+ *                   'sending' claims (>30 min) are reclaimed to 'failed' at
+ *                   the top of each dispatch tick so they surface for review.
  *                1. RATE LIMIT — AFTER a successful claim, count the ACTUAL
  *                   ScheduledMessage rows this space already SENT in the last
  *                   hour. At/over AUTO_SEND_MAX → RELEASE the claim ('sending'→
@@ -408,6 +409,31 @@ async function processRow(
  */
 export async function dispatchDueScheduledMessages(now: Date = new Date()): Promise<DispatchSummary> {
   const summary: DispatchSummary = { due: 0, drafted: 0, sent: 0, deferred: 0, failed: 0, skipped: 0 };
+
+  // Reclaim stale claims: a dispatcher that died between claiming
+  // ('pending'→'sending') and the terminal write leaves the row 'sending'
+  // forever, invisible to the due scan AND to the realtor. Because the crash
+  // window includes "send succeeded, status write lost", re-queueing could
+  // double-send a real client message — so stale claims land in 'failed'
+  // (surfaced for review) rather than back in 'pending'. 30 minutes is far
+  // beyond any legitimate single-row send.
+  const staleBefore = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+  const { data: reclaimed, error: reclaimErr } = await supabase
+    .from('ScheduledMessage')
+    .update({
+      status: 'failed',
+      detail: { error: 'stale sending claim reclaimed — delivery state unknown; review before rescheduling' },
+    })
+    .eq('status', 'sending')
+    .lt('updatedAt', staleBefore)
+    .select('id');
+  if (reclaimErr) {
+    logger.warn('[scheduled-dispatch] stale-claim reclaim failed', undefined, reclaimErr);
+  } else if (reclaimed && reclaimed.length > 0) {
+    logger.warn('[scheduled-dispatch] reclaimed stale sending claims', {
+      ids: reclaimed.map((r) => (r as { id: string }).id),
+    });
+  }
 
   const { data: rows, error } = await supabase
     .from('ScheduledMessage')
