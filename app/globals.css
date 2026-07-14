@@ -1453,3 +1453,60 @@
     opacity: 0.8;
   }
 }
+
+/* ── The Island (.chippi-island-*) ─────────────────────────────────────────
+   Ambient work-session pill (components/island/chippi-island.tsx). Only the
+   breathing-dot keyframes and the embed kill-switch live here — everything
+   else is Tailwind on the component. */
+
+/* Chrome-stripped iframe mode never shows the island (belt-and-braces with
+   the component's own ?embed=1 check). */
+[data-chippi-embed='true'] .chippi-island-root {
+  display: none;
+}
+
+.chippi-island-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+/* Working: Chippi-orange, breathing — alive without shouting. */
+.chippi-island-dot[data-tone='working'] {
+  background: #ff9f0a;
+  box-shadow: 0 0 6px rgba(255, 159, 10, 0.5);
+  animation: chippi-island-breathe 2.4s ease-in-out infinite;
+}
+/* Needs the realtor (approval / question): same orange, quicker breath. */
+.chippi-island-dot[data-tone='attention'] {
+  background: #ff9f0a;
+  box-shadow: 0 0 8px rgba(255, 159, 10, 0.6);
+  animation: chippi-island-breathe 1.3s ease-in-out infinite;
+}
+/* Outcomes hold steady — the state is settled, nothing is "happening". */
+.chippi-island-dot[data-tone='success'] {
+  background: #30d158;
+  box-shadow: 0 0 6px rgba(48, 209, 88, 0.45);
+}
+.chippi-island-dot[data-tone='failure'] {
+  background: #ff453a;
+  box-shadow: 0 0 6px rgba(255, 69, 58, 0.45);
+}
+@keyframes chippi-island-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the color signal; drop the breathing. */
+  .chippi-island-dot {
+    animation: none !important;
+    opacity: 1;
+  }
+}
