@@ -34,6 +34,13 @@ import { detectSlop, summarizeSlop } from '@/lib/voice/slop';
 // work; we still make only one compose call, so this does not amplify spend.
 const TIMEOUT_MS = 15_000;
 const MODEL = 'gpt-5-mini';
+// GPT-5 spends completion tokens on internal reasoning before it emits visible
+// JSON. With the old 220-token/default-reasoning request, OpenRouter could
+// return finish_reason=length with an empty content string, which the route
+// surfaced as a 502. Keep the model, but make this simple copy task explicitly
+// minimal-reasoning and give the short JSON response enough total headroom.
+const MAX_COMPLETION_TOKENS = 400;
+const REASONING_EFFORT = 'minimal' as const;
 
 export type Intent = 'check-in' | 'log-call' | 'welcome' | 'reach-out';
 export type Context = 'deal' | 'person';
@@ -79,7 +86,8 @@ async function reviseAwaySlop(
       {
         model: openaiModel(MODEL),
         temperature: 0.3,
-        max_tokens: 220,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        reasoning_effort: REASONING_EFFORT,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -195,17 +203,33 @@ export async function composeDraftWithOpenAI(args: {
       {
         model: openaiModel(MODEL),
         temperature: 0.4,
-        max_tokens: 220,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        reasoning_effort: REASONING_EFFORT,
         response_format: { type: 'json_object' },
         messages,
       },
       { signal: controller.signal },
     );
     const raw = response.choices?.[0]?.message?.content?.trim();
-    if (!raw) return null;
+    if (!raw) {
+      const choice = response.choices?.[0];
+      logger.warn('[quick-draft] compose returned empty content', {
+        model: MODEL,
+        finishReason: choice?.finish_reason ?? null,
+        completionTokens: response.usage?.completion_tokens ?? null,
+        reasoningTokens: response.usage?.completion_tokens_details?.reasoning_tokens ?? null,
+      });
+      return null;
+    }
     const parsed = JSON.parse(raw) as { subject?: unknown; body?: unknown };
     const body = typeof parsed.body === 'string' ? parsed.body.trim() : '';
-    if (!body) return null;
+    if (!body) {
+      logger.warn('[quick-draft] compose returned empty body', {
+        model: MODEL,
+        finishReason: response.choices?.[0]?.finish_reason ?? null,
+      });
+      return null;
+    }
     const subject =
       typeof parsed.subject === 'string' && parsed.subject.trim().length > 0
         ? parsed.subject.trim()
