@@ -9,7 +9,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Trophy, XCircle, ArrowUpRight, Activity, FileText } from 'lucide-react';
+import {
+  Trophy,
+  XCircle,
+  ArrowUpRight,
+  Activity,
+  FileText,
+  Sparkles,
+  RefreshCw,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, timeAgo } from '@/lib/formatting';
 import { AnimatedNumber } from '@/components/motion/animated-number';
@@ -24,6 +32,13 @@ import {
   GHOST_PILL,
 } from '@/lib/typography';
 import { DealInlineField } from './deal-inline-field';
+import {
+  NEXT_MOVE_KIND_META,
+  isNextMoveStale,
+  nextMoveHref,
+  normalizeNextMoveKind,
+  type NextMoveKind,
+} from './next-move-chip';
 import type { Deal, DealStage, Contact, DealContact, DealActivity } from '@/lib/types';
 import { toast } from 'sonner';
 
@@ -62,6 +77,27 @@ export function DealQuickPanel({
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [posting, setPosting] = useState(false);
+  // Next Move lives in local state so the on-demand refresh can swap the
+  // suggestion in place without waiting for the parent board to refetch.
+  const [nextMove, setNextMove] = useState<{
+    text: string;
+    kind: NextMoveKind;
+    computedAt: string | null;
+  } | null>(null);
+  const [refreshingMove, setRefreshingMove] = useState(false);
+
+  // Seed from the deal row whenever the panel shows a (new) deal.
+  useEffect(() => {
+    if (!deal?.nextMoveText) {
+      setNextMove(null);
+      return;
+    }
+    setNextMove({
+      text: deal.nextMoveText,
+      kind: normalizeNextMoveKind(deal.nextMoveKind),
+      computedAt: deal.nextMoveComputedAt ? String(deal.nextMoveComputedAt) : null,
+    });
+  }, [deal]);
 
   // Load activity timeline whenever the panel opens for a new deal.
   useEffect(() => {
@@ -95,6 +131,31 @@ export function DealQuickPanel({
     deal.value != null && deal.commissionRate != null
       ? (deal.value * deal.commissionRate) / 100
       : null;
+
+  async function refreshNextMove() {
+    if (!deal || refreshingMove) return;
+    setRefreshingMove(true);
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/next-move`, { method: 'POST' });
+      if (!res.ok) throw new Error('refresh failed');
+      const data = (await res.json()) as {
+        nextMove: { text: string; kind: string; computedAt: string } | null;
+      };
+      setNextMove(
+        data.nextMove
+          ? {
+              text: data.nextMove.text,
+              kind: normalizeNextMoveKind(data.nextMove.kind),
+              computedAt: data.nextMove.computedAt,
+            }
+          : null,
+      );
+    } catch {
+      toast.error("Couldn't refresh the next move.");
+    } finally {
+      setRefreshingMove(false);
+    }
+  }
 
   async function postNote() {
     if (!noteDraft.trim() || !deal) return;
@@ -235,6 +296,60 @@ export function DealQuickPanel({
                 {nextAction.label}
               </p>
             )}
+
+            {/* Agent-suggested next move — full text plus a one-tap "Do it"
+                deep link. Stale (>48h) renders dimmed with a refresh. */}
+            {isActive && nextMove && (() => {
+              const stale = isNextMoveStale(nextMove.computedAt);
+              const meta = NEXT_MOVE_KIND_META[nextMove.kind];
+              return (
+                <div
+                  className={cn(
+                    'mt-4 rounded-lg border border-border/70 p-3 transition-opacity',
+                    stale && 'opacity-60',
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    <Sparkles
+                      size={13}
+                      className={cn('mt-0.5 flex-shrink-0', meta.iconClass)}
+                    />
+                    <p className={cn(BODY, 'flex-1 min-w-0')}>{nextMove.text}</p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2.5 pl-[21px]">
+                    <Link
+                      href={nextMoveHref({
+                        kind: nextMove.kind,
+                        slug,
+                        dealId: deal.id,
+                        contactId: deal.dealContacts[0]?.contact.id ?? null,
+                      })}
+                      className={cn(PRIMARY_PILL, 'h-7 px-3 text-xs')}
+                    >
+                      Do it
+                    </Link>
+                    {stale && (
+                      <button
+                        type="button"
+                        onClick={refreshNextMove}
+                        disabled={refreshingMove}
+                        className={cn(
+                          GHOST_PILL,
+                          'h-7 px-3 text-xs disabled:opacity-50',
+                        )}
+                        title="This suggestion is over two days old — recompute it"
+                      >
+                        <RefreshCw
+                          size={11}
+                          className={refreshingMove ? 'animate-spin' : undefined}
+                        />
+                        {refreshingMove ? 'Refreshing…' : 'Refresh'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Inline-editable fields */}

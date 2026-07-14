@@ -443,6 +443,14 @@ export type Deal = {
   closeReasonDetail: string | null;
   /** Nullable FK to Property. Deals without a linked property still work. */
   propertyId: string | null;
+  /**
+   * Agent-computed "what now?" chip (lib/deals/next-move.ts). Optional so
+   * pre-migration rows and older fixtures keep compiling; null/absent means
+   * "no chip".
+   */
+  nextMoveText?: string | null;
+  nextMoveKind?: 'follow_up' | 'schedule' | 'document' | 'deadline' | 'other' | null;
+  nextMoveComputedAt?: Date | string | null;
   createdAt: Date;
   updatedAt: Date;
 };
