@@ -19,7 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireBrokerRoutineRun } from '@/lib/broker-routines';
 import { monitorCron } from '@/lib/cron-monitor';
-import { hasCurrentSubscription } from '@/lib/api-auth';
+import { isPremiumAccessBlocked } from '@/lib/api-auth';
 
 export const runtime = 'nodejs';
 // Match the space-routine cron's budget: broker dispatch shares fireRoutineRun's
@@ -84,19 +84,40 @@ async function handler(req: NextRequest) {
     console.error('[cron/broker-routines] Failed to load brokerages', brokerageErr);
     return NextResponse.json({ error: 'DB query failed' }, { status: 500 });
   }
+  // Gate on isPremiumAccessBlocked, not hasCurrentSubscription — see
+  // app/api/cron/routines: the fail-closed gate silently skipped every
+  // brokerage whose stripePeriodEnd was never backfilled.
   const activeBrokerages = new Set(
     (brokerageRows ?? [])
-      .filter((b) =>
-        hasCurrentSubscription(
-          b.stripeSubscriptionStatus as string,
-          b.stripePeriodEnd as string | null,
-        ),
+      .filter(
+        (b) =>
+          !isPremiumAccessBlocked(
+            b.stripeSubscriptionStatus as string,
+            b.stripePeriodEnd as string | null,
+          ),
       )
       .map((b) => b.id as string),
   );
 
   const runnable = due.filter((r) => activeBrokerages.has(r.brokerageId));
-  const skippedInactive = due.length - runnable.length;
+  const skippedRoutines = due.filter((r) => !activeBrokerages.has(r.brokerageId));
+  const skippedInactive = skippedRoutines.length;
+
+  // Stamp skipped routines so their stale nextRunAt can't starve the
+  // dispatch window; log which ones were gated. Mirrors cron/routines.
+  if (skippedRoutines.length > 0) {
+    console.warn('[cron/broker-routines] skipped (subscription gate)', {
+      routineIds: skippedRoutines.map((r) => r.id),
+    });
+    await Promise.all(
+      skippedRoutines.map((r) =>
+        supabase
+          .from('BrokerRoutine')
+          .update({ lastRunAt: new Date().toISOString(), lastRunStatus: 'skipped' })
+          .eq('id', r.id),
+      ),
+    );
+  }
 
   // ── 3. Fire with bounded concurrency ────────────────────────────────────
   let fired = 0;

@@ -133,13 +133,19 @@ function queueTick(opts: {
   ownersBySpace?: Record<string, string>;
   clerkIdByOwner?: Record<string, string>;
   periodEndsBySpace?: Record<string, string>;
+  statusBySpace?: Record<string, string>;
   runnableCount?: number;
 }) {
-  const stamps = opts.runnableCount ?? opts.due.length;
+  // Every due routine is stamped now — runnable ones by the worker,
+  // subscription-gated ones by the skip sweep (so they can't starve the
+  // dispatch window).
+  const stamps = opts.due.length;
   const spaceRows = opts.due.map((r) => ({
     id: r.spaceId,
     ownerId: opts.ownersBySpace?.[r.spaceId] ?? null,
-    stripeSubscriptionStatus: opts.activeSpaceIds.includes(r.spaceId) ? 'active' : 'cancelled',
+    stripeSubscriptionStatus:
+      opts.statusBySpace?.[r.spaceId] ??
+      (opts.activeSpaceIds.includes(r.spaceId) ? 'active' : 'canceled'),
     stripePeriodEnd: opts.activeSpaceIds.includes(r.spaceId)
       ? (opts.periodEndsBySpace?.[r.spaceId] ?? '2099-01-01T00:00:00.000Z')
       : null,
@@ -306,13 +312,13 @@ describe('GET /api/cron/routines', () => {
     });
   });
 
-  it('a due routine whose space has no live subscription is skipped — no Modal call', async () => {
+  it('a due routine whose space has a lapsed-paid subscription is skipped — no Modal call', async () => {
     queueTick({
       due: [
         { id: 'r_live', spaceId: 's_live', instruction: 'live space routine' },
         { id: 'r_churned', spaceId: 's_churned', instruction: 'churned space routine' },
       ],
-      activeSpaceIds: ['s_live'], // s_churned absent → inactive
+      activeSpaceIds: ['s_live'], // s_churned absent → status 'canceled' (lapsed paid)
       runnableCount: 1,
     });
 
@@ -322,6 +328,24 @@ describe('GET /api/cron/routines', () => {
     expect(body.fired).toBe(1);
     expect(body.skipped).toBe(1);
     expect(modalCalls.map((c) => (c.body as { space_id: string }).space_id)).toEqual(['s_live']);
+  });
+
+  it('a free space (no Stripe subscription) still runs its routines', async () => {
+    // Regression guard for the silent-skip bug: the old hasCurrentSubscription
+    // gate failed closed on spaces with no stripePeriodEnd, so free/inactive
+    // spaces scheduled routines that never fired (while "Run now" worked).
+    queueTick({
+      due: [{ id: 'r_free', spaceId: 's_free', instruction: 'free space routine' }],
+      activeSpaceIds: [],
+      statusBySpace: { s_free: 'inactive' },
+    });
+
+    const res = await invoke('Bearer test-secret');
+    const body = await res.json();
+    expect(body.due).toBe(1);
+    expect(body.fired).toBe(1);
+    expect(body.skipped).toBe(0);
+    expect(modalCalls.map((c) => (c.body as { space_id: string }).space_id)).toEqual(['s_free']);
   });
 
   it('a Modal HTTP 500 marks the routine errored but still stamps it', async () => {

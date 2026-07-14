@@ -59,7 +59,17 @@ vi.mock('@/lib/supabase', () => {
             filters.push([col, val]);
             return chain;
           },
-          select: () => Promise.resolve({ data: claimRows.value, error: null }),
+          // The stale-claim reclaim: update.eq('status','sending').lt('updatedAt', …).select('id').
+          lt: (col: string, val: unknown) => {
+            filters.push([col, val]);
+            return chain;
+          },
+          select: () => {
+            // The reclaim sweep returns no stale rows by default; the claim
+            // flip returns the test-controlled claimRows.
+            const isReclaim = filters.some(([col, val]) => col === 'status' && val === 'sending');
+            return Promise.resolve({ data: isReclaim ? [] : claimRows.value, error: null });
+          },
           then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
         };
         return chain;
@@ -165,7 +175,15 @@ function scheduledInsert() {
 
 function statusUpdates() {
   return calls
-    .filter((c) => c.table === 'ScheduledMessage' && c.op === 'update')
+    .filter(
+      (c) =>
+        c.table === 'ScheduledMessage' &&
+        c.op === 'update' &&
+        // Exclude the stale-claim reclaim sweep that opens every dispatch
+        // tick (update filtered on .eq('status','sending')) — these tests
+        // assert on per-row status transitions.
+        !c.filters?.some(([col, val]) => col === 'status' && val === 'sending'),
+    )
     .map((c) => c.payload as Record<string, unknown>);
 }
 
