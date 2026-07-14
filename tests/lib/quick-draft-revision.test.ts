@@ -61,6 +61,22 @@ describe('composeDraftWithOpenAI — voice self-critique', () => {
     expect(request.messages[0]?.content).toMatch(/do not fill gaps/i);
   });
 
+  it('rejects a previous follow-up invented from a scheduled CRM task', async () => {
+    createMock.mockResolvedValueOnce(
+      reply({
+        subject: 'Checking in',
+        body: "It’s been a while since our last follow-up. What would be helpful right now?",
+      }),
+    );
+
+    await expect(
+      composeDraftWithOpenAI({
+        ...baseArgs,
+        recentActivity: ['Follow-up scheduled: overdue since June'],
+      }),
+    ).resolves.toBeNull();
+  });
+
   it('keeps a guarded claim when the same fact exists in recent activity', async () => {
     createMock.mockResolvedValueOnce(
       reply({

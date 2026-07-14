@@ -51,6 +51,7 @@ interface PreviewBody {
 }
 interface SendBody {
   mode: 'send';
+  idempotencyKey: string;
   context: Context;
   id: string;
   intent: Intent;
@@ -209,6 +210,15 @@ export async function POST(req: NextRequest) {
     // local `mode` variable, which TS can't trace back to `body`. Cast once
     // here and let the validations below ensure the runtime shape.
     const sendBody = body as SendBody;
+    if (
+      typeof sendBody.idempotencyKey !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        sendBody.idempotencyKey,
+      ) ||
+      sendBody.idempotencyKey.length > 100
+    ) {
+      return NextResponse.json({ error: 'valid idempotencyKey required' }, { status: 400 });
+    }
     if (!ALLOWED_CHANNELS.includes(sendBody.channel)) {
       return NextResponse.json({ error: 'invalid channel' }, { status: 400 });
     }
@@ -231,6 +241,10 @@ export async function POST(req: NextRequest) {
     // from server code — and the logic is small. We replicate it inline:
     // insert pending → sendDraft → flip status. Same audit shape.
     const now = new Date().toISOString();
+    // A browser can lose the response after the provider accepted a message.
+    // Prefix the client request UUID with the tenant so the existing globally
+    // unique AgentDraft constraint becomes the authoritative double-send lock.
+    const idempotencyKey = `quick-draft:${space.id}:${sendBody.idempotencyKey}`;
     const { data: inserted, error: insertError } = await supabase
       .from('AgentDraft')
       .insert({
@@ -243,9 +257,32 @@ export async function POST(req: NextRequest) {
         reasoning: `Quick draft from /chippi home (${sendBody.intent}).`,
         priority: 0,
         status: 'pending',
+        idempotencyKey,
       })
       .select('id, channel, subject, content, contactId')
       .single();
+
+    if ((insertError as { code?: string } | null)?.code === '23505') {
+      const { data: existing } = await supabase
+        .from('AgentDraft')
+        .select('id, status')
+        .eq('idempotencyKey', idempotencyKey)
+        .eq('spaceId', space.id)
+        .maybeSingle();
+
+      if (existing) {
+        const prior = existing as { id: string; status: string };
+        return NextResponse.json(
+          {
+            error: 'already_processed',
+            id: prior.id,
+            status: prior.status,
+            deduplicated: true,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     if (insertError || !inserted) {
       logger.error('[quick-draft] insert failed', { err: insertError?.message });
@@ -300,12 +337,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    const responseBody = {
       id: draftId,
       status: finalStatus,
       contactName: contact.name,
       deliveryResult,
-    });
+    };
+
+    // "not_configured" is an intentional saved-draft outcome. Any other
+    // failed delivery is definitive and must not reach the client's success
+    // celebration. The saved AgentDraft remains available for inspection.
+    if (!deliveryResult.sent && deliveryResult.error !== 'not_configured') {
+      return NextResponse.json(
+        { ...responseBody, error: 'delivery_failed' },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json(responseBody);
   }
 
   return NextResponse.json({ error: 'unknown mode' }, { status: 400 });

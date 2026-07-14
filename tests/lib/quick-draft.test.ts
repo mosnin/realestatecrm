@@ -15,7 +15,7 @@ interface TableMock {
   single?: Record<string, unknown> | null;
   rows?: Array<Record<string, unknown>>;
   insertResult?: Record<string, unknown> | null;
-  insertError?: { message: string } | null;
+  insertError?: { message: string; code?: string } | null;
 }
 let mockByTable: Record<string, TableMock> = {};
 let lastInsertedDraft: Record<string, unknown> | null = null;
@@ -117,6 +117,8 @@ function makeReq(body: Record<string, unknown>): Request {
     body: JSON.stringify(body),
   });
 }
+
+const SEND_KEY = '123e4567-e89b-12d3-a456-426614174000';
 
 beforeEach(() => {
   mockByTable = {};
@@ -306,6 +308,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     const res = await POST(
       makeReq({
         mode: 'send',
+        idempotencyKey: SEND_KEY,
         context: 'deal',
         id: 'd_chen',
         intent: 'check-in',
@@ -327,6 +330,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
       channel: 'email',
       status: 'pending',
       subject: 'Quick check-in',
+      idempotencyKey: `quick-draft:s_1:${SEND_KEY}`,
     });
     expect(sendDraftMock).toHaveBeenCalledOnce();
     expect(lastDraftStatusUpdate).toMatchObject({ status: 'sent' });
@@ -341,6 +345,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     const res = await POST(
       makeReq({
         mode: 'send',
+        idempotencyKey: SEND_KEY,
         context: 'deal',
         id: 'd_chen',
         intent: 'check-in',
@@ -359,6 +364,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     const res = await POST(
       makeReq({
         mode: 'send',
+        idempotencyKey: SEND_KEY,
         context: 'deal',
         id: 'd_chen',
         intent: 'check-in',
@@ -375,6 +381,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     const res = await POST(
       makeReq({
         mode: 'send',
+        idempotencyKey: SEND_KEY,
         context: 'deal',
         id: 'd_chen',
         intent: 'check-in',
@@ -393,6 +400,7 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     const res = await POST(
       makeReq({
         mode: 'send',
+        idempotencyKey: SEND_KEY,
         context: 'deal',
         id: 'd_chen',
         intent: 'log-call',
@@ -402,5 +410,73 @@ describe('POST /api/agent/quick-draft — send mode', () => {
     );
     expect(res.status).toBe(200);
     expect(lastInsertedDraft).toMatchObject({ channel: 'note', subject: null });
+  });
+
+  it('rejects a send without an idempotency key', async () => {
+    mockByTable.Deal = { single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null } };
+    const res = await POST(
+      makeReq({
+        mode: 'send',
+        context: 'deal',
+        id: 'd_chen',
+        intent: 'check-in',
+        channel: 'email',
+        subject: 's',
+        body: 'b',
+      }) as never,
+    );
+    expect(res.status).toBe(400);
+    expect(sendDraftMock).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates a replay before calling the delivery provider', async () => {
+    mockByTable.Deal = { single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null } };
+    mockByTable.AgentDraft = {
+      single: { id: 'draft_existing', status: 'sent' },
+      insertResult: null,
+      insertError: { code: '23505', message: 'duplicate key value' },
+    };
+
+    const res = await POST(
+      makeReq({
+        mode: 'send',
+        idempotencyKey: SEND_KEY,
+        context: 'deal',
+        id: 'd_chen',
+        intent: 'check-in',
+        channel: 'email',
+        subject: 's',
+        body: 'b',
+      }) as never,
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      error: 'already_processed',
+      id: 'draft_existing',
+      deduplicated: true,
+    });
+    expect(sendDraftMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a failure status instead of celebrating a failed delivery', async () => {
+    sendDraftMock.mockResolvedValueOnce({ sent: false, error: 'provider_failed' } as never);
+    mockByTable.Deal = { single: { id: 'd_chen', title: 'Chen', contactId: 'c_chen', updatedAt: null } };
+    mockByTable.AgentDraft = { insertResult: { id: 'draft_failed' } };
+    mockByTable.Contact = { single: { name: 'David', email: 'david@example.com', phone: null } };
+
+    const res = await POST(
+      makeReq({
+        mode: 'send',
+        idempotencyKey: SEND_KEY,
+        context: 'deal',
+        id: 'd_chen',
+        intent: 'check-in',
+        channel: 'email',
+        subject: 's',
+        body: 'b',
+      }) as never,
+    );
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: 'delivery_failed' });
   });
 });
