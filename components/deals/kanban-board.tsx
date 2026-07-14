@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, horizontalListSortingStrategy, useSortable, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useReducedMotion } from 'framer-motion';
 import { KanbanColumn } from './kanban-column';
 import { Button } from '@/components/ui/button';
 import { DealQuickPanel } from './deal-quick-panel';
@@ -32,7 +33,8 @@ import {
   Palette,
   ArrowRight,
 } from 'lucide-react';
-import { TITLE_FONT } from '@/lib/typography';
+import { BODY_MUTED, PRIMARY_PILL, TITLE_FONT } from '@/lib/typography';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { Textarea } from '@/components/ui/textarea';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { cn } from '@/lib/utils';
@@ -62,17 +64,19 @@ import { dealHealth } from '@/lib/deals/health';
 import type { BoardStatus, BoardFocus } from './deals-page-client';
 
 /**
- * Drop snap config — 180ms with the Apple ease curve. No spring overshoot:
- * the card snaps to its slot like a piece of paper landing, not a ball
- * bouncing. Constant lives at module scope (not inside the component)
- * specifically so its identity is stable across renders — keeping it
- * stable matters here because the @dnd-kit DropAnimation prop is
- * referenced from inside `useDropAnimation` and a new object identity
- * each render would cancel and restart the animation.
+ * Drop settle — 200ms with a gently overdamped spring-out curve. The y2
+ * control point sits just past 1, so the card lands with one tiny (~4%)
+ * overshoot and settles — weight without bounce. Constant lives at module
+ * scope (not inside the component) specifically so its identity is stable
+ * across renders — keeping it stable matters here because the @dnd-kit
+ * DropAnimation prop is referenced from inside `useDropAnimation` and a
+ * new object identity each render would cancel and restart the animation.
+ * Under prefers-reduced-motion the overlay passes `null` instead, so the
+ * card simply appears in its slot.
  */
 const KANBAN_DROP_ANIMATION: DropAnimation = {
-  duration: 180,
-  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  duration: 200,
+  easing: 'cubic-bezier(0.32, 1.35, 0.45, 1)',
 };
 
 type DealWithRelations = Deal & {
@@ -409,7 +413,11 @@ export function KanbanBoard({
   onDataChanged,
 }: KanbanBoardProps) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [stages, setStages] = useState<StageWithDeals[]>([]);
+  // True once the first stages fetch has landed — gates the first-run empty
+  // state so it never flashes while the board is still loading.
+  const [loaded, setLoaded] = useState(false);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
   const [activeStageId, setActiveStageId] = useState<string | null>(null);
   // Slide-over panel state — clicking a card opens the deal here without nav.
@@ -501,7 +509,10 @@ export function KanbanBoard({
   }, [onDataChanged]);
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`);
-    if (res.ok) setStages(await res.json());
+    if (res.ok) {
+      setStages(await res.json());
+      setLoaded(true);
+    }
     if (hasFetchedRef.current) {
       onDataChangedRef.current?.();
     } else {
@@ -1087,15 +1098,45 @@ export function KanbanBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stages, searchLower, statusMatches, focus, monthBounds]);
 
+  // First-run empty board — the pipeline exists and has stages, but not a
+  // single deal in ANY status. Checked against the unfiltered stages so a
+  // search / focus / Closed tab that merely narrows to nothing keeps the
+  // columns (that emptiness is the filter's honest answer, not first-run).
+  const boardIsEmpty =
+    loaded && stages.length > 0 && stages.every((s) => s.deals.length === 0);
+
   return (
     <div className="space-y-4">
       {/* Toolbar (search + focus chip + status toggle) is now part of the
           page chrome above. The board renders just the board. */}
 
+      {/* First-run composition — surface-card language (borderless
+          rounded-3xl, whisper shadow), one headline, one line, one action. */}
+      {boardIsEmpty && (
+        <div className={cn(SURFACE_CARD, 'px-6 py-16 text-center')}>
+          <h2 className="text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+            No deals yet.
+          </h2>
+          <p className={cn(BODY_MUTED, 'mt-2 max-w-sm mx-auto')}>
+            Your pipeline is ready. Add the first deal and I&apos;ll track it
+            from lead to close.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(`/s/${slug}/deals/new`)}
+            className={cn(PRIMARY_PILL, 'mt-6')}
+          >
+            <Plus size={14} strokeWidth={2.25} />
+            Add your first deal
+          </button>
+        </div>
+      )}
+
       {/* Mobile view — one stage column at a time with horizontal snap.
           The stage-pill nav above doubles as the page indicator. Tap a pill
           to jump, swipe to scrub. No more 60px columns, no more endless
           vertical scroll across five stacked sections. */}
+      {!boardIsEmpty && (
         <div className="md:hidden">
           <MobileKanban
             stages={filteredStages}
@@ -1103,7 +1144,9 @@ export function KanbanBoard({
             formatCurrency={formatCurrency}
           />
         </div>
-        {/* Desktop kanban view */}
+      )}
+      {/* Desktop kanban view */}
+      {!boardIsEmpty && (
         <div className="hidden md:block overflow-x-auto pb-4">
           <DndContext
             sensors={sensors}
@@ -1200,16 +1243,19 @@ export function KanbanBoard({
                 </div>
               </StaggerList>
             </SortableContext>
-            <DragOverlay dropAnimation={KANBAN_DROP_ANIMATION}>
+            <DragOverlay dropAnimation={reduceMotion ? null : KANBAN_DROP_ANIMATION}>
               {activeDeal && (
                 // Lifted card during drag — gentle scale + 1deg rotate.
                 // `transform-gpu` keeps the lift on the compositor; the
                 // shadow bump reinforces the "this is in your hand" cue.
-                // No spring physics — when released, `dropAnimation` does
-                // a 180ms ease-out snap into the target slot.
+                // On release, `dropAnimation` settles the card into its
+                // slot with a 200ms whisper-of-spring curve. Under
+                // prefers-reduced-motion both the lift transform and the
+                // drop animation are dropped — the shadow alone carries
+                // the "in your hand" signal.
                 <div
                   className="relative w-72 overflow-hidden rounded-md border border-border bg-background px-3 py-3 shadow-[0_16px_40px_-12px_rgb(0_0_0/0.35)] opacity-95 transform-gpu"
-                  style={{ transform: 'scale(1.03) rotate(1deg)' }}
+                  style={reduceMotion ? undefined : { transform: 'scale(1.03) rotate(1deg)' }}
                 >
                   {activeDeal.stage?.color && (
                     <span
@@ -1253,6 +1299,7 @@ export function KanbanBoard({
             </DragOverlay>
           </DndContext>
         </div>
+      )}
       {ConfirmDialog}
 
       {/* Won / Lost reason dialog */}

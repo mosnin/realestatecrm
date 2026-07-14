@@ -176,6 +176,13 @@ const ESCALATION_PHRASES = [
   /\bi would need to actually\b/i,
   /\bi'll need to (?:actually )?(?:create|add|send|run|schedule|book|update|reach|contact|email|text|call|draft)\b/i,
   /\blet me (?:actually )?(?:create|add|send|run|schedule|book|update|reach|contact|email|text|draft) (?:that|this|it|him|her|them)\b/i,
+  // "Need a moment to look that up" — the EXACT phrasing the direct-path
+  // lite prompt instructs the model to use for action turns
+  // (CHIPPI_INSTRUCTIONS_LITE: "just say you'll need a moment to look that
+  // up and do it"). Previously unmatched, so a model obeying its own prompt
+  // promised action, escalated nothing, and the action never happened.
+  /\b(?:i(?:'ll| will)?|i'?d) (?:just )?need a moment to (?:look|pull|check|dig|get|grab)\b/i,
+  /\bgive me a (?:moment|minute|sec(?:ond)?) (?:to|while i) (?:look|pull|check|dig|get|grab)\b/i,
   // Hand-off language
   /\blet me (?:hand|pass) (?:this|that) (?:to|over to) (?:chippi'?s? tools|the agent|chippi)\b/i,
   /\bi(?:'ll| will) hand (?:this|that) (?:to|over to)\b/i,

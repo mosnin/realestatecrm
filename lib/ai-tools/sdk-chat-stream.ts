@@ -27,6 +27,7 @@ import type { ToolContext, ToolResult } from '@/lib/ai-tools/types';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { runChatTurn, resumeChatTurn } from '@/lib/ai-tools/sdk-chat';
+import { createStopPoller } from '@/lib/chat/stop-signal';
 import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-mapper';
 import {
   DELEGATE_TASK_TOOL_NAME,
@@ -499,10 +500,24 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         return;
       }
 
+      // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence
+      // between stream events. Distinct from disconnect (which must NOT
+      // stop the turn): Stop aborts generation and tool execution; the
+      // finally block persists whatever the user already saw.
+      const shouldStop = createStopPoller(input.conversationId);
+      let stopRequested = false;
+
       try {
         const stream = result.toStream() as { getReader(): ReadableStreamDefaultReader<unknown> };
         const reader = stream.getReader();
         while (true) {
+          void shouldStop().then((s) => {
+            if (s && !stopRequested) {
+              stopRequested = true;
+              input.abortController.abort();
+            }
+          });
+          if (stopRequested) break;
           // Each read is raced against the idle watchdog — a stalled stream
           // rejects with StreamStalledError instead of parking forever.
           const { done, value } = await withIdleTimeout(reader.read(), input.abortController);
@@ -510,6 +525,15 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           const mapped = mapSdkEvent(value as SdkStreamEventLike, ALL_TOOLS);
           if (mapped) pushEvent(mapped);
         }
+        // Stopped: skip the completed/usage/pause bookkeeping (the SDK run
+        // was aborted mid-flight; its usage aggregate is unreliable), tell
+        // the client honestly, and let the finally block persist what the
+        // user already saw.
+        if (stopRequested) {
+          pushEvent({ type: 'turn_complete', reason: 'aborted' });
+          return;
+        }
+
         // Block until the SDK declares the run complete so result.interruptions
         // and result.state are stable before we read them. Same watchdog — the
         // SDK can finish the stream yet never resolve `completed`.
@@ -591,6 +615,9 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             message: chippiErrorMessage('internal'),
             code: 'internal',
           });
+        } else if (stopRequested) {
+          // The abort raced into a pending read — still an explicit Stop.
+          pushEvent({ type: 'turn_complete', reason: 'aborted' });
         }
       } finally {
         // Persist the assistant text. Empty buffers are normal on a paused

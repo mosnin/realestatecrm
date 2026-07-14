@@ -176,7 +176,7 @@ export function KanbanColumn({
               type="button"
               title="Drag to reorder stage"
               aria-label={`Reorder stage ${stage.name}`}
-              className="hidden md:flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 hover:bg-foreground/[0.04] cursor-grab active:cursor-grabbing transition-opacity flex-shrink-0"
+              className="hidden md:flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 hover:bg-foreground/[0.04] cursor-grab active:cursor-grabbing transition-opacity flex-shrink-0"
               {...dragHandleProps}
             >
               <GripVertical size={13} className="rotate-90" />
@@ -205,7 +205,7 @@ export function KanbanColumn({
             onClick={() => onDeleteStage(stage)}
             title="Delete stage"
             aria-label={`Delete stage ${stage.name}`}
-            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 hover:bg-foreground/[0.06] hover:text-foreground transition-[opacity,colors]"
+            className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/60 opacity-0 group-hover/column:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 hover:bg-foreground/[0.06] hover:text-foreground transition-[opacity,colors]"
           >
             <Trash2 size={12} />
           </button>
@@ -253,9 +253,12 @@ export function KanbanColumn({
           {deals.length === 0 && (
             <div
               className={cn(
-                'flex flex-col items-center justify-center gap-1.5 py-8 text-center rounded-md transition-all duration-150',
+                // Drop target stays tint-only — the outer zone's wash deepens
+                // (no rings, no dashed borders); the label darkening is the
+                // only extra cue an empty column needs.
+                'flex flex-col items-center justify-center gap-1.5 py-8 text-center rounded-md transition-colors duration-150',
                 isCardDragging && isOver
-                  ? 'text-foreground ring-1 ring-inset ring-dashed ring-foreground/25'
+                  ? 'text-foreground bg-foreground/[0.03]'
                   : 'text-muted-foreground/50',
               )}
             >

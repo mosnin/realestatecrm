@@ -25,7 +25,7 @@ vi.mock('@/lib/supabase', () => {
     supabaseCalls.push({ table, chain: calls });
 
     const chain: Record<string, unknown> = {};
-    for (const method of ['select', 'eq', 'neq', 'in', 'order', 'limit']) {
+    for (const method of ['select', 'eq', 'neq', 'in', 'order', 'limit', 'update']) {
       chain[method] = vi.fn((...args: unknown[]) => {
         calls.push([method, args]);
         return chain;

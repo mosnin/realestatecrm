@@ -43,7 +43,8 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/sharkui/context-menu';
-import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
+import { BODY_MUTED, CHIPPI_PILL, H1, QUIET_LINK, TITLE_FONT } from '@/lib/typography';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -195,6 +196,39 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   const [savingView, setSavingView] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
   const { confirm, ConfirmDialog } = useConfirm();
+
+  // Staggered row entrance fires exactly once — the FIRST paint of a loaded
+  // list. Refetches (edits, deletes, searches) and view toggles re-render
+  // with the flag already true, so rows never re-choreograph. Same
+  // rAF-deferred pattern as the kanban columns: the flag flips one frame
+  // after the initial entrance commits.
+  const hasStaggeredRef = useRef(false);
+  useEffect(() => {
+    if (loading || error || contacts.length === 0 || hasStaggeredRef.current) return;
+    const id = requestAnimationFrame(() => {
+      hasStaggeredRef.current = true;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [loading, error, contacts.length]);
+
+  // Sticky select-all strip: a zero-height sentinel sits just above it; once
+  // the sentinel scrolls out of view the strip is pinned, and it gains a
+  // hairline shadow so content visibly slides beneath it.
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
+  const [headerStuck, setHeaderStuck] = useState(false);
+  useEffect(() => {
+    if (!selectMode || view !== 'list') {
+      setHeaderStuck(false);
+      return;
+    }
+    const el = stickySentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setHeaderStuck(!entry.isIntersecting),
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [selectMode, view]);
 
   // The global quick-create menu can open this form from any realtor route.
   // Keep the URL as the cross-route hand-off, then remove the flag when the
@@ -1137,28 +1171,38 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
         };
 
         if (isFreshWorkspace) {
+          // First-run composition — surface-card language (borderless
+          // rounded-3xl, whisper shadow): one headline, one line, one
+          // primary action, with the form offered as the quiet alternative.
           return (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-              <p className="text-base text-foreground">No relationships yet.</p>
-              <p className={cn(BODY_MUTED, 'mt-1.5')}>
+            <div className={cn(SURFACE_CARD, 'px-6 py-16 text-center')}>
+              <h2
+                className="text-2xl tracking-tight text-foreground"
+                style={TITLE_FONT}
+              >
+                No relationships yet.
+              </h2>
+              <p className={cn(BODY_MUTED, 'mt-2 max-w-sm mx-auto')}>
+                Every deal starts with a person — add your first and
+                I&apos;ll keep the details close.
+              </p>
+              <div className="mt-6 flex flex-col items-center gap-2">
                 <Link
                   href={`/s/${slug}/chippi?prefill=${encodeURIComponent(
                     "I'm adding a new person — ",
                   )}`}
-                  className="text-foreground underline underline-offset-2 hover:no-underline"
+                  className={CHIPPI_PILL}
                 >
                   Tell Chippi about someone
                 </Link>
-                {', or '}
                 <button
                   type="button"
                   onClick={() => setAddOpen(true)}
-                  className="text-foreground underline underline-offset-2 hover:no-underline"
+                  className={QUIET_LINK}
                 >
-                  fill out the form
+                  or fill out the form
                 </button>
-                .
-              </p>
+              </div>
             </div>
           );
         }
@@ -1296,22 +1340,35 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
               column labels on a single-data-line list are chrome that pays
               no rent. */}
           {selectMode && (
-            <div className="flex items-center gap-3 pb-2 border-b border-border/60 mb-1">
-              <input
-                type="checkbox"
-                checked={
-                  selectedIds.size === visibleContacts.length && visibleContacts.length > 0
-                }
-                onChange={toggleSelectAll}
-                aria-label="Select all"
-                className="rounded border-border cursor-pointer flex-shrink-0"
-              />
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                {selectedIds.size > 0
-                  ? `${selectedIds.size} selected`
-                  : `Select up to ${visibleContacts.length}`}
-              </span>
-            </div>
+            <>
+              {/* Zero-height sentinel — drives the stuck detection above. */}
+              <div ref={stickySentinelRef} aria-hidden />
+              <div
+                className={cn(
+                  // Sticky so select-all / the running count stay in reach on
+                  // a long list. bg-background because content scrolls under
+                  // it; the hairline shadow appears only once pinned.
+                  'sticky top-0 z-20 -mx-2 px-2 flex items-center gap-3 py-2 bg-background border-b border-border/60 mb-1',
+                  'transition-shadow duration-200 ease-out',
+                  headerStuck && 'shadow-[0_1px_2px_rgb(0_0_0/0.06)]',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedIds.size === visibleContacts.length && visibleContacts.length > 0
+                  }
+                  onChange={toggleSelectAll}
+                  aria-label="Select all"
+                  className="rounded border-border cursor-pointer flex-shrink-0"
+                />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {selectedIds.size > 0
+                    ? `${selectedIds.size} selected`
+                    : `Select up to ${visibleContacts.length}`}
+                </span>
+              </div>
+            </>
           )}
 
           <ul className="divide-y divide-border/60">
@@ -1320,7 +1377,8 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                 key={contact.id}
                 contact={contact}
                 slug={slug}
-                idx={idx}
+                // First loaded paint only — afterwards rows mount silently.
+                entranceIndex={hasStaggeredRef.current ? null : idx}
                 selectMode={selectMode}
                 selected={selectedIds.has(contact.id)}
                 onToggleSelect={() => toggleSelect(contact.id)}
@@ -1551,7 +1609,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
 function ContactRow({
   contact,
   slug,
-  idx,
+  entranceIndex,
   selectMode,
   selected,
   onToggleSelect,
@@ -1560,7 +1618,9 @@ function ContactRow({
 }: {
   contact: Client;
   slug: string;
-  idx: number;
+  /** Index for the first-load stagger. `null` = the list already made its
+   *  entrance (a refetch / view toggle) — mount silently, no re-choreography. */
+  entranceIndex: number | null;
   selectMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
@@ -1568,11 +1628,11 @@ function ContactRow({
   onDelete: () => void;
 }) {
   const stage = STAGES.find((s) => s.key === contact.type)!;
-  // Cap stagger to first 10 rows — past that, the row enters instantly.
-  // 30ms-per-row is the Apple list cadence (tight enough to read as one
-  // gesture, loose enough that each row reads its own arrival).
-  const shouldAnimate = idx < 10;
-  const delay = shouldAnimate ? idx * 0.03 : 0;
+  // First-load stagger, capped at 20 rows — past that, the row enters
+  // instantly. 15ms-per-row keeps the whole cascade under a third of a
+  // second: one composed gesture, not a parade.
+  const shouldAnimate = entranceIndex !== null && entranceIndex < 20;
+  const delay = shouldAnimate ? entranceIndex * 0.015 : 0;
   // Stage pill follows the row by 50ms — small enough to feel like a single
   // composed gesture; large enough that the eye registers the row first.
   const pillDelay = shouldAnimate ? delay + 0.05 : 0;
@@ -1639,13 +1699,15 @@ function ContactRow({
         )}
         {!selectMode && (
           <>
-            <div className="hidden lg:flex gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+            {/* Fade-in actions — opacity only, so the row never shifts.
+                focus-within keeps them visible for keyboard users. */}
+            <div className="hidden lg:flex gap-0.5 opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity duration-150">
               <Link
                 href={`/s/${slug}/chippi/log?personId=${contact.id}`}
                 aria-label={`Log a note for ${contact.name}`}
                 title="Log a note"
                 onClick={(e) => e.stopPropagation()}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
               >
                 <Mic size={13} />
               </Link>
@@ -1657,7 +1719,7 @@ function ContactRow({
                   onEdit();
                 }}
                 aria-label={`Edit ${contact.name}`}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
               >
                 <Pencil size={13} />
               </button>
@@ -1669,7 +1731,7 @@ function ContactRow({
                   onDelete();
                 }}
                 aria-label={`Delete ${contact.name}`}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
               >
                 <Trash2 size={13} />
               </button>
@@ -1686,15 +1748,17 @@ function ContactRow({
   );
 
   const rowClassName = cn(
-    'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors',
+    'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors duration-150 ease-out',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
     selected ? 'bg-muted/40' : 'hover:bg-muted/30',
   );
 
   return (
     <motion.li
-      // Apple list entrance — 200ms fade + 8px slide-up. Capped at 10 rows
-      // so a long contact list doesn't choreograph the whole page on load.
-      initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
+      // List entrance — 200ms fade + 4px rise, first load only (see
+      // entranceIndex). Small enough that the rows read as settling into
+      // place, not flying in.
+      initial={shouldAnimate ? { opacity: 0, y: 4 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
     >

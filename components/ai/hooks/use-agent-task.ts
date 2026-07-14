@@ -383,6 +383,20 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, []);
 
   const abort = useCallback(() => {
+    // Tell the SERVER to stop generating. Since the disconnect-survival
+    // work, dropping the fetch alone doesn't end the turn (a closed tab
+    // must not kill it) — without this signal, Stop only stopped the
+    // rendering while the turn kept generating, spending, and persisting.
+    // keepalive lets the request survive a quick navigation; best-effort.
+    const cid = conversationIdRef.current;
+    if (cid) {
+      void fetch('/api/ai/stop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId: cid }),
+        keepalive: true,
+      }).catch(() => {});
+    }
     abortRef.current?.abort();
     abortRef.current = null;
     setCurrentAction(null);

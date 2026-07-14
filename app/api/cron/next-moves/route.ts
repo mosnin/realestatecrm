@@ -103,7 +103,28 @@ async function handler(req: NextRequest) {
   );
 
   const runnable = due.filter((d) => activeSpaces.has(d.spaceId));
-  const skipped = due.length - runnable.length;
+  const skippedDeals = due.filter((d) => !activeSpaces.has(d.spaceId));
+  const skipped = skippedDeals.length;
+
+  // Stamp skipped deals too — without this, a billing-blocked space's deals
+  // keep nextMoveComputedAt NULL forever and permanently occupy the front of
+  // the order(nextMoveComputedAt).limit(N) window, starving every OTHER
+  // tenant's recomputes (the same starvation shape cron/routines fixed by
+  // stamping skipped rows). Stamping only touches the timestamp; the chip
+  // text is left as-is.
+  if (skippedDeals.length > 0) {
+    console.warn('[cron/next-moves] skipped (billing gate)', {
+      dealIds: skippedDeals.map((d) => d.id),
+    });
+    const nowIso = new Date().toISOString();
+    const { error: stampErr } = await supabase
+      .from('Deal')
+      .update({ nextMoveComputedAt: nowIso })
+      .in('id', skippedDeals.map((d) => d.id));
+    if (stampErr) {
+      console.error('[cron/next-moves] skip-stamp failed', stampErr);
+    }
+  }
 
   // ── 3. Compute with bounded concurrency ─────────────────────────────────
   let computed = 0;

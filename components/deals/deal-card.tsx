@@ -2,7 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   GripVertical,
@@ -66,6 +66,7 @@ export function DealCard({
   entranceIndex = null,
 }: DealCardProps) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: deal.id });
 
@@ -118,7 +119,8 @@ export function DealCard({
       // Entrance: 200ms fade + 8px slide-up, Apple ease. The stagger is the
       // index-driven delay — null entranceIndex => single add, no delay.
       // Exit: a quick fade so a deleted/moved card doesn't pop.
-      initial={{ opacity: 0, y: 8 }}
+      // prefers-reduced-motion skips the entrance entirely (initial=false).
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: isDragging ? 0.4 : 1, y: 0 }}
       exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_APPLE } }}
       transition={{ duration: 0.2, ease: EASE_APPLE, delay: staggerDelay }}
@@ -158,7 +160,7 @@ export function DealCard({
           <button
             {...attributes}
             {...listeners}
-            className="mt-0.5 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing flex-shrink-0 transition-colors"
+            className="mt-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 cursor-grab active:cursor-grabbing flex-shrink-0 transition-colors"
             onClick={(e) => e.stopPropagation()}
             aria-label="Reorder deal"
           >
@@ -314,6 +316,7 @@ export function DealCard({
                   'rounded-md text-[11px] font-medium py-1.5 px-2',
                   'border border-border/70 bg-background',
                   'hover:bg-foreground hover:text-background hover:border-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                   'transition-colors duration-150',
                 )}
                 title={`Move to ${nextStage.name}`}
@@ -324,14 +327,15 @@ export function DealCard({
             )}
           </div>
 
-          {/* Hover quick-actions — won / lost / delete */}
-          <div className="flex flex-col gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Hover quick-actions — won / lost / delete. focus-within keeps
+              them reachable (visible) for keyboard users tabbing into them. */}
+          <div className="flex flex-col gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
             {onStatusChange && deal.status === 'active' && (
               <>
                 <button
                   type="button"
                   title="Mark as Won"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     onStatusChange(deal, 'won');
@@ -342,7 +346,7 @@ export function DealCard({
                 <button
                   type="button"
                   title="Mark as Lost"
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
                     onStatusChange(deal, 'lost');
@@ -355,7 +359,7 @@ export function DealCard({
             <button
               type="button"
               title="Delete deal"
-              className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(deal.id);
