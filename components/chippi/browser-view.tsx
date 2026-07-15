@@ -44,8 +44,33 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [showEmbedHint, setShowEmbedHint] = useState(false);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Server-side pre-flight verdict for the CURRENT url. The iframe only
+  // navigates on 'ok' — a site that blocks framing (X-Frame-Options / CSP
+  // frame-ancestors, i.e. google.com and most of the big web) gets an honest
+  // "open in new tab" card INSTEAD of Chrome's sad-face error page, which the
+  // client can't detect after the fact (cross-origin frames fire `load` even
+  // on the error page). See app/api/browser/frame-check.
+  const [verdict, setVerdict] = useState<'checking' | 'ok' | 'blocked'>('checking');
 
   const currentUrl = nav.index >= 0 ? nav.stack[nav.index] : null;
+
+  useEffect(() => {
+    if (!currentUrl) return;
+    let cancelled = false;
+    setVerdict('checking');
+    fetch(`/api/browser/frame-check?url=${encodeURIComponent(currentUrl)}`)
+      .then((res) => (res.ok ? res.json() : { embeddable: true }))
+      .then((data: { embeddable?: boolean }) => {
+        if (!cancelled) setVerdict(data.embeddable === false ? 'blocked' : 'ok');
+      })
+      .catch(() => {
+        // Check unavailable → let the iframe try; the slow-load hint remains.
+        if (!cancelled) setVerdict('ok');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUrl, frameNonce]);
 
   // Restore the last browsed URL after hydration (sidebar MORE_STORAGE_KEY idiom).
   useEffect(() => {
@@ -227,7 +252,7 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
         </a>
       </div>
 
-      {(showEmbedHint || invalid) && (
+      {((showEmbedHint && verdict === 'ok') || invalid) && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/60 text-[11px] text-muted-foreground" aria-live="polite">
           {invalid ? (
             <span>That doesn&rsquo;t look like a web address.</span>
@@ -250,19 +275,53 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
       )}
 
       <div className="flex-1 relative min-h-0">
-        {!frameLoaded && (
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground/15 animate-pulse" aria-hidden />
+        {verdict === 'blocked' ? (
+          // The site refuses to be embedded — say so plainly and hand the
+          // user a real tab, instead of letting Chrome paint its sad page.
+          <div className="h-full flex flex-col items-center justify-center px-8 text-center">
+            <Globe size={22} strokeWidth={1.5} className="text-muted-foreground/40" aria-hidden />
+            <p className="mt-3 text-[13px] font-medium text-foreground">
+              {(() => {
+                try {
+                  return new URL(currentUrl).hostname;
+                } catch {
+                  return currentUrl;
+                }
+              })()}{' '}
+              doesn&rsquo;t allow embedding
+            </p>
+            <p className="mt-1 max-w-xs text-[12px] text-muted-foreground">
+              Many sites block being shown inside another app. It opens normally in its own tab.
+            </p>
+            <a
+              href={currentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 h-8 rounded-full bg-foreground text-background px-4 text-[12px] font-medium hover:opacity-90 transition-opacity"
+            >
+              <ExternalLink size={12} />
+              Open in new tab
+            </a>
+          </div>
+        ) : (
+          <>
+            {(!frameLoaded || verdict === 'checking') && (
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground/15 animate-pulse" aria-hidden />
+            )}
+            {verdict === 'ok' && (
+              <iframe
+                key={`${currentUrl}#${frameNonce}`}
+                src={currentUrl}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                referrerPolicy="no-referrer"
+                title="In-panel browser"
+                className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
+                onLoad={handleFrameLoad}
+                onError={handleFrameError}
+              />
+            )}
+          </>
         )}
-        <iframe
-          key={`${currentUrl}#${frameNonce}`}
-          src={currentUrl}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          referrerPolicy="no-referrer"
-          title="In-panel browser"
-          className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
-          onLoad={handleFrameLoad}
-          onError={handleFrameError}
-        />
       </div>
     </div>
   );

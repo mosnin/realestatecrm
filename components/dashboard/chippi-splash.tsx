@@ -8,18 +8,11 @@
  * they were away, signs off with the small Chippi mark, then the whole thing
  * swipes up to reveal the dashboard beneath it.
  *
- * It plays on every real "open", not just the very first mount — which is the
- * bug that made it feel gone on an installed PWA. An installed PWA usually
- * RESUMES (the page stays alive in memory) instead of reloading, so a
- * mount-only splash only ever played on the very first cold launch. This
- * version triggers on the browser's open/resume lifecycle:
- *   - initial load / hard refresh / cold PWA launch  → the server paints the
- *     greeting and the client runs the timeline;
- *   - bfcache restore (back/forward, some PWA resumes) → `pageshow.persisted`;
- *   - the app is brought back to the foreground after being away a while
- *     (re-opening the PWA for the day) → `visibilitychange`.
- * In-app navigation does NOT replay it (the dashboard layout persists, so the
- * component never remounts and nothing re-fires).
+ * It plays exactly ONCE per login session — the first open after signing in.
+ * In-app navigation, tab re-focus, and PWA resume never replay it
+ * (sessionStorage gate), and it never plays inside an iframe: the RightPanel
+ * side-panel embeds load these dashboard pages with ?embed=1, and a
+ * full-screen greeting inside a side-panel tab reads as a broken preloader.
  *
  * Theme-driven (bg-background / text-foreground + the BrandLogo's own
  * light/dark swap). Honors prefers-reduced-motion. A safety timeout guarantees
@@ -50,10 +43,6 @@ const T_TO_SNAPSHOT = 1700;
 const T_TO_GONE = 4100;
 const T_SAFETY = 7000;
 
-// Coming back to the app after this long away counts as a fresh "open" and
-// replays the splash (the "open the PWA for the day → here's your brief"
-// moment). Short tab-switches stay under it, so it never nags mid-task.
-const REOPEN_AFTER_MS = 30 * 60 * 1000;
 const LAST_PLAYED_KEY = "chippi:splash:lastPlayed";
 
 function buildItems(s: ChippiSnapshot): { n: number; label: string }[] {
@@ -106,40 +95,32 @@ export function ChippiSplash({
     }
   }, [clearTimers]);
 
-  // Restart the whole splash (used when the app is re-opened / resumed).
-  const replay = useCallback(() => {
-    setStage("greeting");
-    runTimeline();
-  }, [runTimeline]);
-
   useEffect(() => {
-    // Initial open: the greeting is already on screen (SSR) — run the timeline.
+    // The splash belongs to ONE moment: the first open after signing in.
+    //   - Inside any iframe (the RightPanel embeds load dashboard pages with
+    //     ?embed=1) it must never play — a 4s full-screen greeting inside a
+    //     side-panel tab reads as a broken preloader, not a welcome.
+    //   - Once per login session (sessionStorage): in-app navigation, tab
+    //     re-focus, and PWA resume do NOT replay it.
+    const inIframe = typeof window !== "undefined" && window.self !== window.top;
+    let alreadyPlayed = false;
+    try {
+      alreadyPlayed = sessionStorage.getItem(LAST_PLAYED_KEY) != null;
+    } catch {
+      /* sessionStorage unavailable → treat as first open */
+    }
+    if (inIframe || alreadyPlayed) {
+      setStage("gone");
+      return () => clearTimers();
+    }
+
+    // First open of this session: the greeting is already on screen (SSR) —
+    // run the timeline and stamp it played.
     runTimeline();
-
-    // Restored from bfcache (back/forward, some PWA resumes) → a real re-open.
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) replay();
-    };
-    // App brought back to the foreground after being away → re-open for the day.
-    const onVisibility = () => {
-      if (document.visibilityState !== "visible") return;
-      let last = 0;
-      try {
-        last = Number(sessionStorage.getItem(LAST_PLAYED_KEY)) || 0;
-      } catch {
-        /* ignore */
-      }
-      if (Date.now() - last >= REOPEN_AFTER_MS) replay();
-    };
-
-    window.addEventListener("pageshow", onPageShow);
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      window.removeEventListener("pageshow", onPageShow);
-      document.removeEventListener("visibilitychange", onVisibility);
       clearTimers();
     };
-  }, [runTimeline, replay, clearTimers]);
+  }, [runTimeline, clearTimers]);
 
   // Lock body scroll while the overlay is up.
   useEffect(() => {
