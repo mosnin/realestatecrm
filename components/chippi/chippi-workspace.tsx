@@ -409,6 +409,15 @@ export function ChippiWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-boot the Modal chat container the moment the surface mounts. The
+  // realtor spends a few seconds reading/typing before the first send — this
+  // ping spends those seconds booting the sandbox so the first message never
+  // pays the cold start. Fire-and-forget; the server no-ops without Modal
+  // configured and rate-limits per user. See app/api/ai/warmup/route.ts.
+  useEffect(() => {
+    fetch('/api/ai/warmup', { method: 'POST' }).catch(() => {});
+  }, []);
+
   // Broker history comes from the broker-gated `/api/ai/broker-messages`
   // (reads "BrokerMessage"); realtor history from `/api/ai/messages` (reads
   // "Message"). Choosing by variant, mirroring taskEndpoint / conversations-
