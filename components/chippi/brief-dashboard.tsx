@@ -54,6 +54,7 @@ import {
   Check,
   ChevronDown,
   Star,
+  HeartHandshake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -125,7 +126,8 @@ function daysSince(iso: string | null): number | null {
 // ── Shell ───────────────────────────────────────────────────────────────────
 
 export function BriefDashboard({ slug, data }: Props) {
-  const { brief, needsYou, pipeline, overnight, hotLeads, tours, reputation } = data;
+  const { brief, needsYou, pipeline, overnight, hotLeads, tours, reputation, reactivations, topReferrers } =
+    data;
 
   const hasOnDeck = brief.cards.length > 0 || brief.tip != null;
   const hasTours = tours.length > 0;
@@ -133,6 +135,7 @@ export function BriefDashboard({ slug, data }: Props) {
   const hasHotLeads = hotLeads.length > 0;
   const hasOvernight = overnight != null && overnight.buckets.length > 0;
   const hasReputation = reputation != null && reputation.requested > 0;
+  const hasReactivations = reactivations.length > 0 || topReferrers.length > 0;
 
   let i = 0;
   const delay = () => 0.04 + i++ * CHAT_STAGGER_DELAY;
@@ -181,6 +184,13 @@ export function BriefDashboard({ slug, data }: Props) {
       {hasReputation && reputation && (
         <BriefCell span="md:col-span-2" delay={delay()}>
           <ReputationCell reputation={reputation} />
+        </BriefCell>
+      )}
+
+      {/* REACTIVATE — dormant past clients worth a touch + top referrers */}
+      {hasReactivations && (
+        <BriefCell span="md:col-span-2" delay={delay()}>
+          <ReactivateCell slug={slug} reactivations={reactivations} topReferrers={topReferrers} />
         </BriefCell>
       )}
 
@@ -644,6 +654,86 @@ function HotLeadsCell({ slug, hotLeads }: { slug: string; hotLeads: DashboardDat
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+// ── REACTIVATE (past clients + referrers) ─────────────────────────────────────
+
+function ReactivateCell({
+  slug,
+  reactivations,
+  topReferrers,
+}: {
+  slug: string;
+  reactivations: DashboardData['reactivations'];
+  topReferrers: DashboardData['topReferrers'];
+}) {
+  return (
+    <div className="p-6 sm:p-7">
+      <CellHeader
+        label="Past clients"
+        icon={HeartHandshake}
+        href={`/s/${slug}/contacts`}
+        cta="People"
+      />
+      {reactivations.length > 0 ? (
+        <ul className="mt-2 divide-y divide-border/60">
+          {reactivations.map((r) => {
+            const name = r.name?.trim() || 'Past client';
+            return (
+              <li key={r.id}>
+                <Link
+                  href={`/s/${slug}/contacts/${r.id}`}
+                  className="group/row flex items-center gap-3 py-2.5 -mx-1.5 px-1.5 rounded-lg hover:bg-foreground/[0.035] active:bg-foreground/[0.06] transition-colors"
+                >
+                  <span className="flex-1 min-w-0">
+                    <span className="text-sm text-foreground truncate block group-hover/row:underline underline-offset-2 decoration-foreground/30">
+                      {name}
+                    </span>
+                    <span className={cn(BODY_MUTED, 'text-xs')}>{r.reason}</span>
+                  </span>
+                  {typeof r.dealValue === 'number' && r.dealValue > 0 && (
+                    <span className="text-xs tabular-nums text-muted-foreground shrink-0 transition-colors group-hover/row:text-foreground">
+                      {formatCompact(r.dealValue)}
+                    </span>
+                  )}
+                  <ArrowUpRight
+                    size={15}
+                    className="text-muted-foreground/40 group-hover/row:text-foreground group-hover/row:translate-x-0.5 group-hover/row:-translate-y-0.5 transition-all duration-200 shrink-0"
+                  />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className={cn(BODY_MUTED, 'text-xs mt-3')}>
+          No past clients are due for a check-in right now.
+        </p>
+      )}
+
+      {/* Top referrers — only shown when referrals have actually been recorded. */}
+      {topReferrers.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/60">
+          <AccentBarLabel>Top referrers</AccentBarLabel>
+          <ul className="mt-1.5 space-y-1">
+            {topReferrers.map((ref) => (
+              <li key={ref.id} className="flex items-baseline justify-between gap-3">
+                <Link
+                  href={`/s/${slug}/contacts/${ref.id}`}
+                  className="text-sm text-foreground truncate hover:underline underline-offset-2 decoration-foreground/30"
+                >
+                  {ref.name?.trim() || 'A client'}
+                </Link>
+                <span className={cn(BODY_MUTED, 'text-xs tabular-nums shrink-0')}>
+                  {ref.referralCount} {pluralize(ref.referralCount, 'referral')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,12 @@ import {
   composeOvernight,
   type OvernightSummary,
 } from './sections';
+import {
+  computeReactivations,
+  topReferrers,
+  type Reactivation,
+  type Referrer,
+} from '@/lib/reactivation';
 import type { Brief } from './types';
 
 /** Pipeline snapshot — active deal counts plus total open value. The
@@ -96,6 +102,12 @@ export interface BriefDashboard {
   hotLeads: HotLead[];
   tours: TourToday[];
   reputation: ReputationStat | null;
+  /** Dormant past clients (closed-won long ago, gone quiet) worth reaching
+   *  out to. Empty when none qualify — the bento omits the cell. */
+  reactivations: Reactivation[];
+  /** The realtor's best advocates, ranked by referrals sent. Empty until the
+   *  referral_tracking migration is live and referrals are recorded. */
+  topReferrers: Referrer[];
 }
 
 const HOT_LEADS_SHOWN = 4;
@@ -330,6 +342,8 @@ export async function composeBriefDashboard(
     hotLeads,
     tours,
     reputation,
+    reactivations,
+    referrers,
     ownerName,
   ] = await Promise.all([
     composeBrief(spaceId).catch(() => null),
@@ -342,6 +356,8 @@ export async function composeBriefDashboard(
     fetchHotLeads(spaceId).catch(() => []),
     fetchToursToday(spaceId).catch(() => []),
     composeReputationStat(spaceId).catch(() => null),
+    computeReactivations(spaceId).catch(() => []),
+    topReferrers(spaceId).catch(() => []),
     fetchOwnerName(ownerId).catch(() => null),
   ]);
 
@@ -368,5 +384,7 @@ export async function composeBriefDashboard(
     hotLeads,
     tours,
     reputation,
+    reactivations,
+    topReferrers: referrers,
   };
 }
