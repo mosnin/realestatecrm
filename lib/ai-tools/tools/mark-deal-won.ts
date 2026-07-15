@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
+import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import { defineTool } from '../types';
 
 const parameters = z
@@ -125,6 +126,14 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
       syncDeal(refreshed).catch((err) =>
         logger.warn('[tools.mark_deal_won] vector sync failed', { dealId: args.dealId }, err),
       );
+    }
+
+    // Post-Close Reputation Engine: draft a grounded review ask off the win.
+    // Fire-and-forget — never throws, dedupes per deal, skips spaces with no
+    // reviewUrl configured. Only fires when the deal has a primary contact.
+    const wonContactId = (refreshed as { contactId?: string | null } | null)?.contactId ?? null;
+    if (wonContactId) {
+      void fireReviewAsk({ spaceId: ctx.space.id, dealId: args.dealId, contactId: wonContactId });
     }
 
     return {

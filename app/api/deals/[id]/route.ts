@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { dealHasOpenSignatureRequests } from '@/lib/esign';
 import { normalizeCloseReason } from '@/lib/close-reason';
+import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import type { Deal, DealStage } from '@/lib/types';
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
@@ -619,6 +620,16 @@ export async function PATCH(
           logger.error('[deals/PATCH] deal_stage_changed workflow dispatch failed', { dealId: id }, e);
         }
       });
+    }
+
+    // Post-Close Reputation Engine: on the transition INTO 'won', kick off the
+    // review ask (draft a grounded review request + a tracked link, log a
+    // ReviewCampaign). Fire-and-forget — fireReviewAsk registers its own
+    // after() keep-alive, never throws, and dedupes per deal, so this adds zero
+    // latency and can't fail the close. Only fires when the deal has a primary
+    // contact to reach; the engine itself skips spaces with no reviewUrl set.
+    if (closingWon && dealRow.contactId) {
+      void fireReviewAsk({ spaceId: space.id, dealId: id, contactId: dealRow.contactId as string });
     }
 
     // Attach the non-blocking advisory ONLY when it's true, so the success

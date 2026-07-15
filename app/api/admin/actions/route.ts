@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClerkClient, auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
+import { requireAdminCapability, type AdminCapability } from '@/lib/permissions';
+import { requireStepUp } from '@/lib/admin-stepup';
 import { shouldBackfillOnboardFromSpace } from '@/lib/onboarding';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
@@ -79,6 +81,50 @@ export async function POST(req: NextRequest) {
   const ALLOWED_ACTIONS = ['send_password_reset', 'repair_onboarding', 'update_subscription', 'change_plan', 'cancel_subscription', 'list_invoices', 'suspend_user', 'unsuspend_user', 'comp_free_month', 'issue_refund', 'impersonate_user', 'force_password_reset', 'revoke_session', 'revoke_all_sessions', 'send_mfa_prompt'];
   if (!ALLOWED_ACTIONS.includes(action as string)) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  }
+
+  // ── Least-privilege: map each mutating sub-action to a capability. requireAdmin
+  //    above is the coarse gate (any admin role); this enforces the graded role.
+  //    list_invoices is read-only → coarse admin gate is enough. ────────────────
+  const ACTION_CAPABILITY: Record<string, AdminCapability> = {
+    send_password_reset: 'support:write',
+    repair_onboarding: 'support:write',
+    update_subscription: 'billing:credit',
+    change_plan: 'billing:credit',
+    cancel_subscription: 'billing:credit',
+    suspend_user: 'support:write',
+    unsuspend_user: 'support:write',
+    comp_free_month: 'billing:credit',
+    issue_refund: 'billing:refund',
+    impersonate_user: 'users:impersonate',
+    force_password_reset: 'support:write',
+    revoke_session: 'support:write',
+    revoke_all_sessions: 'support:write',
+    send_mfa_prompt: 'support:write',
+  };
+  const requiredCap = ACTION_CAPABILITY[action as string];
+  if (requiredCap) {
+    try {
+      await requireAdminCapability(requiredCap);
+    } catch {
+      return NextResponse.json({ error: 'Forbidden: insufficient admin capability' }, { status: 403 });
+    }
+  }
+
+  // ── Step-up: destructive actions require a reason + a typed confirmation token
+  //    that lands in the audit trail (reason/confirmationText). ─────────────────
+  const STEP_UP_CONFIRM: Record<string, string> = {
+    impersonate_user: 'IMPERSONATE',
+    suspend_user: 'SUSPEND',
+    issue_refund: 'REFUND',
+    cancel_subscription: 'CANCEL',
+  };
+  let stepUp: { reason: string; confirm: string } | null = null;
+  const expectedConfirm = STEP_UP_CONFIRM[action as string];
+  if (expectedConfirm) {
+    const step = requireStepUp(body, { expectedConfirmation: expectedConfirm });
+    if (step instanceof NextResponse) return step;
+    stepUp = step;
   }
 
   try {
@@ -504,6 +550,8 @@ export async function POST(req: NextRequest) {
         actor: admin.userId,
         action: 'cancel_subscription',
         target: `${accountType}:${accountId}`,
+        reason: stepUp?.reason,
+        confirmationText: stepUp?.confirm,
         details: { mode: cancelMode, subId },
       });
 
@@ -593,6 +641,8 @@ export async function POST(req: NextRequest) {
         actor: admin.userId,
         action: 'suspend_user',
         target: userId,
+        reason: stepUp?.reason,
+        confirmationText: stepUp?.confirm,
         details: { clerkId: target.clerkId, email: target.email },
       });
 
@@ -831,7 +881,7 @@ export async function POST(req: NextRequest) {
         ...(partialAmount !== undefined ? { amount: partialAmount } : {}),
       });
       const refundTarget = accountId ? `${accountType}:${accountId}` : targetUserId;
-      await logAdminAction({ actor: admin.userId, action: 'issue_refund', target: refundTarget, details: { invoiceId: invoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount, partial: partialAmount !== undefined, customerId } });
+      await logAdminAction({ actor: admin.userId, action: 'issue_refund', target: refundTarget, reason: stepUp?.reason, confirmationText: stepUp?.confirm, details: { invoiceId: invoice.id, paymentIntent: paymentIntentId, refundId: refund.id, amount: refund.amount, partial: partialAmount !== undefined, customerId } });
       return NextResponse.json({ success: true, refundId: refund.id, amount: refund.amount });
     }
 
@@ -853,6 +903,8 @@ export async function POST(req: NextRequest) {
           actor: admin.userId,
           action: 'impersonate_user',
           target: clerkId,
+          reason: stepUp?.reason,
+          confirmationText: stepUp?.confirm,
           details: { tokenId: token.id, expiresInSeconds: 600 },
         });
 
@@ -869,6 +921,8 @@ export async function POST(req: NextRequest) {
           actor: admin.userId,
           action: 'impersonate_user_failed',
           target: clerkId,
+          reason: stepUp?.reason,
+          confirmationText: stepUp?.confirm,
           details: { error: err instanceof Error ? err.message : String(err) },
         });
         return NextResponse.json(

@@ -3,11 +3,11 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import { Search, X, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL } from '@/lib/typography';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 
 type SpaceRow = {
   id: string;
@@ -171,11 +171,11 @@ export function SpaceListClient({
           }
         />
       ) : (
-        <Card>
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left">
+                <tr className="border-b border-border/60 text-left">
                   <th className={cn('px-4 py-3', SECTION_LABEL)}>Name / slug</th>
                   <th className={cn('px-4 py-3', SECTION_LABEL)}>Owner</th>
                   <th className={cn('px-4 py-3', SECTION_LABEL)}>Subscription</th>
@@ -183,7 +183,7 @@ export function SpaceListClient({
                   <th className={cn('px-4 py-3', SECTION_LABEL)}>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/60">
                 {filtered.map((space) => {
                   const owner = ownerMap[space.ownerId];
                   const createdAt = new Date(
@@ -264,7 +264,7 @@ export function SpaceListClient({
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

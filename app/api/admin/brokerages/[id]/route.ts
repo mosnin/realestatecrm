@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { requirePlatformAdmin } from '@/lib/permissions';
+import { requirePlatformAdmin, requireAdminCapability } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
+import { requireStepUp } from '@/lib/admin-stepup';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -11,10 +12,10 @@ type Params = { params: Promise<{ id: string }> };
  * DELETE /api/admin/brokerages/[id]
  * Removes all memberships, unlinks spaces, then deletes the brokerage.
  */
-export async function DELETE(_req: Request, { params }: Params) {
-  let admin: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+export async function DELETE(req: Request, { params }: Params) {
+  let admin: Awaited<ReturnType<typeof requireAdminCapability>>;
   try {
-    admin = await requirePlatformAdmin();
+    admin = await requireAdminCapability('brokerages:delete');
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -27,6 +28,16 @@ export async function DELETE(_req: Request, { params }: Params) {
   if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
   }
+
+  // Step-up: reason + the operator typing 'DELETE'.
+  let body: unknown = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const step = requireStepUp(body, { expectedConfirmation: 'DELETE' });
+  if (step instanceof NextResponse) return step;
 
   // Unlink all member spaces from the brokerage first
   const { error: spaceError } = await supabase
@@ -59,7 +70,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
   }
 
-  await logAdminAction({ actor: admin.clerkUserId, action: 'delete_brokerage', target: id, details: {} });
+  await logAdminAction({ actor: admin.clerkUserId, action: 'delete_brokerage', target: id, reason: step.reason, confirmationText: step.confirm, details: {} });
 
   return NextResponse.json({ message: 'Brokerage deleted' });
 }

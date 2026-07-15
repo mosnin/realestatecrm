@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import {
   DollarSign,
   CreditCard,
@@ -272,8 +272,7 @@ export default async function AdminBillingPage() {
       />
 
       {/* ── Subscription Breakdown ──────────────────────────────── */}
-      <Card>
-        <CardContent className="px-5 py-4">
+      <div className={cn(SURFACE_CARD, 'px-5 py-4')}>
           <p className={`${H3} mb-4`}>Subscription breakdown</p>
 
           {/* Visual bar */}
@@ -320,8 +319,7 @@ export default async function AdminBillingPage() {
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* ── Credit management (grant / reverse) ──────────────────── */}
       <div>
@@ -331,8 +329,7 @@ export default async function AdminBillingPage() {
 
       {/* ── Trial Expiring Soon ─────────────────────────────────── */}
       {trialExpiringSoon.length > 0 && (
-        <Card className="border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5">
-          <CardContent className="px-5 py-4">
+        <div className={cn(SURFACE_CARD, 'bg-amber-50/40 dark:bg-amber-500/[0.06] px-5 py-4')}>
             <div className="flex items-center gap-2 mb-3">
               <Clock size={15} className="text-amber-500" />
               <p className="text-sm font-semibold">Trial expiring soon</p>
@@ -361,8 +358,7 @@ export default async function AdminBillingPage() {
                 </Link>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       {/* ── Recent Subscriptions ────────────────────────────────── */}
@@ -376,11 +372,11 @@ export default async function AdminBillingPage() {
             size="sm"
           />
         ) : (
-          <Card>
+          <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border/60">
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Space name</th>
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Owner email</th>
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Status</th>
@@ -448,7 +444,7 @@ export default async function AdminBillingPage() {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         )}
       </div>
 
@@ -466,11 +462,11 @@ export default async function AdminBillingPage() {
             size="sm"
           />
         ) : (
-          <Card>
+          <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border/60">
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Brokerage</th>
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Plan</th>
                     <th className={cn('text-left py-3 px-4', SECTION_LABEL)}>Status</th>
@@ -531,7 +527,7 @@ export default async function AdminBillingPage() {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         )}
       </div>
     </div>

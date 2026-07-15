@@ -49,6 +49,10 @@ export interface AuditParams {
   req?: NextRequest;
   /** Free-form JSON — before/after snapshots, tags, etc. */
   metadata?: Record<string, unknown>;
+  /** Step-up justification for a destructive admin action (first-class column). */
+  reason?: string;
+  /** Typed confirmation captured on a destructive admin action (first-class column). */
+  confirmationText?: string;
 }
 
 async function persistAudit(params: AuditParams): Promise<void> {
@@ -60,21 +64,57 @@ async function persistAudit(params: AuditParams): Promise<void> {
     spaceId,
     req,
     metadata,
+    reason,
+    confirmationText,
   } = params;
 
   const ipAddress = req ? getClientIp(req) : null;
 
+  // Resolve the internal User.id so the actorId column stops being dead —
+  // SOC2 access investigations join audit rows to the internal user, not
+  // just the Clerk id. Best-effort: a lookup miss leaves actorId null.
+  let actorId: string | null = null;
+  if (actorClerkId) {
+    try {
+      const { data } = await supabase
+        .from('User')
+        .select('id')
+        .eq('clerkId', actorClerkId)
+        .maybeSingle();
+      actorId = (data as { id?: string } | null)?.id ?? null;
+    } catch {
+      /* leave null — never block the audit write on the lookup */
+    }
+  }
+
+  const baseRow = {
+    id: crypto.randomUUID(),
+    actorId,
+    clerkId: actorClerkId,
+    ipAddress,
+    action,
+    resource,
+    resourceId: resourceId ?? null,
+    spaceId: spaceId ?? null,
+    metadata: metadata ?? null,
+  };
+  // reason/confirmationText are first-class columns (migration 20260821000000)
+  // but also live in metadata (via logAdminAction), so a deploy where the
+  // columns aren't live yet still preserves the data — see the retry below.
+  const stepUpCols: Record<string, unknown> = {};
+  if (reason !== undefined) stepUpCols.reason = reason;
+  if (confirmationText !== undefined) stepUpCols.confirmationText = confirmationText;
+  const hasStepUp = Object.keys(stepUpCols).length > 0;
+
   try {
-    const { error } = await supabase.from('AuditLog').insert({
-      id: crypto.randomUUID(),
-      clerkId: actorClerkId,
-      ipAddress,
-      action,
-      resource,
-      resourceId: resourceId ?? null,
-      spaceId: spaceId ?? null,
-      metadata: metadata ?? null,
-    });
+    let { error } = await supabase.from('AuditLog').insert({ ...baseRow, ...stepUpCols });
+    // If the reason/confirmationText columns aren't live yet the insert fails on
+    // an unknown column. The data is still in metadata, so retry WITHOUT the new
+    // columns rather than lose the audit row entirely.
+    if (error && hasStepUp) {
+      const retry = await supabase.from('AuditLog').insert(baseRow);
+      error = retry.error;
+    }
     if (error) {
       logger.error('[audit] failed to persist audit event', { action, resource, resourceId }, error);
     }

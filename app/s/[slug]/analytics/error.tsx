@@ -1,21 +1,35 @@
 'use client';
 
+import { motion, useReducedMotion } from 'framer-motion';
+import { RotateCcw, CloudOff } from 'lucide-react';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { H3, BODY_MUTED } from '@/lib/typography';
+import { cn } from '@/lib/utils';
+
 export default function AnalyticsError({ reset }: { error: Error; reset: () => void }) {
+  const reduce = useReducedMotion();
   return (
-    <div className="rounded-xl border border-border/70 bg-background px-6 py-12 text-center space-y-3">
-      <p
-        className="text-3xl tracking-tight text-foreground"
-        style={{ fontFamily: 'var(--font-title)' }}
+    <div className="flex min-h-[50vh] items-center justify-center px-6">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
+        className="text-center max-w-sm"
       >
-        Couldn&apos;t load analytics
-      </p>
-      <p className="text-sm text-muted-foreground">Usually temporary.</p>
-      <button
-        onClick={reset}
-        className="bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] rounded-full px-4 h-9 gap-1.5 inline-flex items-center transition-all duration-150 text-sm"
-      >
-        Retry
-      </button>
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
+          <CloudOff size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
+        </div>
+        <h2 className={H3}>Couldn&apos;t load analytics</h2>
+        <p className={cn(BODY_MUTED, 'mt-1.5')}>Usually temporary.</p>
+        <button
+          type="button"
+          onClick={reset}
+          className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <RotateCcw size={14} />
+          Try again
+        </button>
+      </motion.div>
     </div>
   );
 }

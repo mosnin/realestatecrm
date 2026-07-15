@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { SurfaceCard, StatCard, SURFACE_CARD } from '@/components/ui/surface-card';
 import { Input } from '@/components/ui/input';
 import {
   FileText,
@@ -201,28 +201,14 @@ export function FormAnalyticsClient({
 
       {/* Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {metrics.map(({ label, value, sub, icon: Icon, color }) => (
-          <Card key={label} className="rounded-xl border bg-card h-full">
-            <CardContent className="p-6 h-full flex flex-col justify-between">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                  <p className="text-[25px] leading-tight tracking-tight mt-0.5 tabular-nums">{value}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-muted">
-                  <Icon size={15} className={color} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {metrics.map(({ label, value, sub }) => (
+          <StatCard key={label} label={label} value={value} sub={sub} />
         ))}
       </div>
 
       {/* Score distribution + Source funnel */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
+        <SurfaceCard>
             <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Score distribution
             </h2>
@@ -255,11 +241,9 @@ export function FormAnalyticsClient({
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </SurfaceCard>
 
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
+        <SurfaceCard>
             <h2 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-4">
               Submissions by source
             </h2>
@@ -287,13 +271,11 @@ export function FormAnalyticsClient({
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </SurfaceCard>
       </div>
 
       {/* Trend */}
-      <Card className="rounded-xl border bg-card">
-        <CardContent className="p-6">
+      <SurfaceCard>
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-semibold">Submission trend</p>
@@ -355,8 +337,7 @@ export function FormAnalyticsClient({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+      </SurfaceCard>
 
       {/* Top tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -365,11 +346,11 @@ export function FormAnalyticsClient({
             Top brokerages
           </h2>
           {filteredBrokerages.length === 0 ? (
-            <Card className="rounded-xl border bg-card">
+            <SurfaceCard>
               <EmptyState icon={Building2} title="No brokerage submissions yet." size="sm" />
-            </Card>
+            </SurfaceCard>
           ) : (
-            <Card className="rounded-xl border bg-card">
+            <div className={`${SURFACE_CARD} overflow-hidden`}>
               <div className="divide-y divide-border">
                 {filteredBrokerages.map((b) => (
                   <Link
@@ -389,7 +370,7 @@ export function FormAnalyticsClient({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </div>
           )}
         </div>
 
@@ -398,13 +379,11 @@ export function FormAnalyticsClient({
             Top spaces
           </h2>
           {filteredSpaces.length === 0 ? (
-            <Card className="rounded-xl border bg-card">
-              <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground">No space submissions yet.</p>
-              </CardContent>
-            </Card>
+            <div className="rounded-3xl bg-muted/40 px-6 py-10 text-center">
+              <p className="text-sm text-muted-foreground">No space submissions yet.</p>
+            </div>
           ) : (
-            <Card className="rounded-xl border bg-card">
+            <div className={`${SURFACE_CARD} overflow-hidden`}>
               <div className="divide-y divide-border">
                 {filteredSpaces.map((s) => (
                   <Link
@@ -427,7 +406,7 @@ export function FormAnalyticsClient({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </div>
           )}
         </div>
       </div>

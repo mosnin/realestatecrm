@@ -14,13 +14,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const { requireMock } = vi.hoisted(() => ({
-  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk' })),
+  // Route gates on the 'users:role' capability (super_admin only).
+  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' })),
 }));
 const { getCurrentDbUserMock } = vi.hoisted(() => ({
   getCurrentDbUserMock: vi.fn(async () => ({ id: 'admin_db', clerkId: 'admin_clerk' })),
 }));
 vi.mock('@/lib/permissions', () => ({
-  requirePlatformAdmin: requireMock,
+  requireAdminCapability: requireMock,
   getCurrentDbUser: getCurrentDbUserMock,
 }));
 vi.mock('@clerk/nextjs/server', () => ({
@@ -84,7 +85,7 @@ beforeEach(() => {
   dbState.rows = {};
   dbState.adminCount = 2;
   dbState.writes = [];
-  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk' } as any);
+  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' } as any);
   getCurrentDbUserMock.mockResolvedValue({ id: 'admin_db', clerkId: 'admin_clerk' } as any);
 });
 

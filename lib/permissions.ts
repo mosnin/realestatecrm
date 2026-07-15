@@ -51,6 +51,107 @@ export async function requirePlatformAdmin(): Promise<{ clerkUserId: string }> {
   return { clerkUserId: session.userId };
 }
 
+// ── Graded admin roles (least-privilege / SOC2 CC6.1, CC6.3) ───────────────────
+//
+// platformRole='admin' stays the COARSE gate (requirePlatformAdmin). adminRole
+// is a SECOND, finer axis that only differentiates users who are already
+// admins. Reads stay behind requirePlatformAdmin; mutations gate on a
+// capability via requireAdminCapability(). See migration 20260820000000.
+
+export type AdminRole = 'admin_readonly' | 'admin_support' | 'admin_billing' | 'super_admin';
+
+const ADMIN_ROLES: readonly AdminRole[] = [
+  'admin_readonly',
+  'admin_support',
+  'admin_billing',
+  'super_admin',
+];
+
+/**
+ * Declarative capability → allowed-roles map. The single source of truth for
+ * "who may do what" among admins. A capability absent from a role's set is
+ * denied. Reads are NOT listed here — they gate on requirePlatformAdmin, which
+ * every admin role satisfies.
+ */
+export const ADMIN_CAPABILITIES = {
+  // Super-admin-only, irreversible / identity-critical.
+  'users:delete': ['super_admin'],
+  'users:impersonate': ['super_admin'],
+  'users:role': ['super_admin'],
+  'broadcast:send': ['super_admin'],
+  'brokerages:delete': ['super_admin'],
+  // Money movement — billing admins and above.
+  'billing:refund': ['admin_billing', 'super_admin'],
+  'billing:credit': ['admin_billing', 'super_admin'],
+  // General support mutations — support, billing, and super admins.
+  'support:write': ['admin_support', 'admin_billing', 'super_admin'],
+} as const satisfies Record<string, readonly AdminRole[]>;
+
+export type AdminCapability = keyof typeof ADMIN_CAPABILITIES;
+
+/**
+ * Resolve the current admin's graded role.
+ *   - null if not authenticated, offboarded, or not a platform admin.
+ *   - the stored User.adminRole when set to a valid tier.
+ *   - 'super_admin' as the SAFE DEFAULT for a legacy admin whose adminRole is
+ *     NULL (or when the column isn't live yet) — so graded RBAC never LOCKS OUT
+ *     an existing admin. Least-privilege is opt-in per user via adminRole.
+ */
+export async function getAdminRole(): Promise<AdminRole | null> {
+  const session = await auth();
+  if (!session.userId) return null;
+
+  const { data, error } = await supabase
+    .from('User')
+    .select('platformRole, adminRole, status')
+    .eq('clerkId', session.userId)
+    .maybeSingle();
+
+  // adminRole column may not be live yet (migrations are human-gated) — fall
+  // back to the coarse gate and treat any admin as super_admin.
+  if (error) {
+    return (await isPlatformAdmin()) ? 'super_admin' : null;
+  }
+
+  const row = data as
+    | { platformRole?: string; adminRole?: string | null; status?: string }
+    | null;
+  if (!row) return null;
+  if (row.status === 'offboarded') return null;
+  if (row.platformRole !== 'admin') return null;
+
+  const role = row.adminRole;
+  if (role && (ADMIN_ROLES as readonly string[]).includes(role)) {
+    return role as AdminRole;
+  }
+  // Legacy admin with NULL/unknown adminRole → full access (never lock out).
+  return 'super_admin';
+}
+
+/**
+ * Require a specific admin capability. Throws (like requirePlatformAdmin) when
+ * the caller isn't authenticated, isn't a platform admin, or holds an admin
+ * role that lacks the capability. Route handlers catch and map to 403.
+ */
+export async function requireAdminCapability(
+  cap: AdminCapability,
+): Promise<{ clerkUserId: string; adminRole: AdminRole }> {
+  const session = await auth();
+  if (!session.userId) throw new Error('Forbidden: not authenticated');
+
+  const role = await getAdminRole();
+  if (!role) throw new Error('Forbidden: platform admin access required');
+
+  const allowed = ADMIN_CAPABILITIES[cap] as readonly AdminRole[];
+  if (!allowed.includes(role)) {
+    throw new Error(
+      `Forbidden: capability '${cap}' requires one of [${allowed.join(', ')}]; you are '${role}'`,
+    );
+  }
+
+  return { clerkUserId: session.userId, adminRole: role };
+}
+
 // ── Broker ────────────────────────────────────────────────────────────────────
 
 type BrokerContext = {

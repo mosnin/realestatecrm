@@ -47,7 +47,9 @@ export type AppNotificationType =
   /** A workflow/automation outcome (notify_agent action, failed run). */
   | 'automation'
   /** The scheduled-message dispatcher drafted or auto-sent a message. */
-  | 'agent_send';
+  | 'agent_send'
+  /** Post-close reputation engine: a review request (or nudge) draft is ready. */
+  | 'review_request';
 
 export type AppNotificationPriority = 'high' | 'medium' | 'low';
 

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { BrokerageListClient } from './brokerage-list-client';
+import { StatCard } from '@/components/ui/surface-card';
 
 export const metadata = { title: 'Brokerages — Admin — Chippi' };
 
@@ -88,6 +89,12 @@ export default async function AdminBrokeragesPage({
           {totalCount} total · {active} active · {suspended} suspended.
         </p>
       </header>
+
+      <div className="grid gap-3 sm:gap-4 grid-cols-3">
+        <StatCard label="Total" value={totalCount} />
+        <StatCard label="Active" value={active} />
+        <StatCard label="Suspended" value={suspended} />
+      </div>
 
       <BrokerageListClient
         brokerages={rows}

@@ -2,7 +2,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BrokerPeopleLoading() {
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-pulse">
+    <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-pulse" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       {/* Header + search bar row */}
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-32" />

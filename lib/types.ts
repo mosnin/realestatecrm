@@ -1,6 +1,8 @@
 // Database model types — replaces Prisma generated types
 
 export type PlatformRole = 'user' | 'admin';
+/** Graded admin capability tier (only meaningful when platformRole==='admin'). */
+export type AdminRole = 'admin_readonly' | 'admin_support' | 'admin_billing' | 'super_admin';
 export type AccountType = 'realtor' | 'broker_only' | 'both';
 export type MembershipRole = 'broker_owner' | 'broker_admin' | 'realtor_member';
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
@@ -18,6 +20,8 @@ export type User = {
   onboardingCompletedAt: Date | null;
   onboard: boolean;
   platformRole: PlatformRole;
+  /** Graded admin tier; null for non-admins and legacy admins (treated as super_admin). */
+  adminRole?: AdminRole | null;
   accountType: AccountType;
   /** Last time the user was active anywhere in the app (messaging presence). */
   lastSeenAt?: Date | null;

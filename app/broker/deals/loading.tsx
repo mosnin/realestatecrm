@@ -8,7 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export default function BrokerDealsLoading() {
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-12 animate-pulse">
+    <div className="space-y-6 max-w-[1500px] mx-auto pb-12 animate-pulse" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       {/* Status-sentence header — eyebrow, serif title, status line. */}
       <header className="space-y-1.5">
         <Skeleton className="h-4 w-20" />

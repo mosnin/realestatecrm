@@ -31,6 +31,7 @@ import {
 import { Plus, Copy, Check, Ticket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import { PLANS, type PlanId } from '@/lib/plans';
 import type { InviteCodeRow } from '@/lib/billing/invite-codes';
@@ -158,11 +159,11 @@ export function InviteCodesClient({ initialCodes }: { initialCodes: InviteCodeRo
           description="Create one to give a workspace free access at a chosen plan, no payment required."
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Code</th>
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Plan</th>
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Uses</th>
@@ -173,7 +174,7 @@ export function InviteCodesClient({ initialCodes }: { initialCodes: InviteCodeRo
                   <th className="text-right px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/60">
                 {rows.map((r) => {
                   const exhausted = r.maxUses != null && r.usesCount >= r.maxUses;
                   return (

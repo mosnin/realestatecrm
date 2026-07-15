@@ -12,9 +12,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const { requireMock } = vi.hoisted(() => ({
-  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk' })),
+  // Route gates on the 'support:write' capability (support/billing/super_admin).
+  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' })),
 }));
-vi.mock('@/lib/permissions', () => ({ requirePlatformAdmin: requireMock }));
+vi.mock('@/lib/permissions', () => ({ requireAdminCapability: requireMock }));
 
 const { updateUserMock, createEmailMock } = vi.hoisted(() => ({
   updateUserMock: vi.fn(async () => ({ id: 'c1' })),
@@ -78,7 +79,7 @@ beforeEach(() => {
   dbState.user = { id: UID, clerkId: 'c1', email: 'old@b.com', name: 'Old Name' };
   dbState.clash = null;
   dbState.writes = [];
-  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk' } as any);
+  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' } as any);
 });
 
 it('403s when not admin', async () => {

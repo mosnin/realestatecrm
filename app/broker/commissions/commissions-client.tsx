@@ -30,10 +30,11 @@ import {
   Download,
   MoreHorizontal,
   Loader2,
+  Receipt,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { STAT_NUMBER, CAPTION, SECTION_LABEL } from '@/lib/typography';
+import { StatCard, StatusPill, SurfaceCard, SurfaceCardHeader } from '@/components/ui/surface-card';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -583,44 +584,42 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
         </Button>
       </div>
 
-      {/* Summary — hairline stat grid (printed-paper vocabulary). */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
-        <div className="bg-background px-4 py-4">
-          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.totalCommissions)}</p>
-          <p className={cn(CAPTION, 'mt-1')}>Total commissions</p>
-        </div>
-        <div className="bg-background px-4 py-4">
-          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.pendingPayouts)}</p>
-          <p className={cn(CAPTION, 'mt-1')}>Pending (broker)</p>
-        </div>
-        <div className="bg-background px-4 py-4">
-          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.paidThisMonth)}</p>
-          <p className={cn(CAPTION, 'mt-1')}>Paid (broker)</p>
-        </div>
-        <div className="bg-background px-4 py-4">
-          <p className={cn(STAT_NUMBER)}>{formatCurrency(summary.totalValue)}</p>
-          <p className={cn(CAPTION, 'mt-1')}>Total deal value</p>
-        </div>
+      {/* Summary — surface-card stat row. */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Total commissions" value={formatCurrency(summary.totalCommissions)} />
+        <StatCard
+          label="Pending (broker)"
+          value={formatCurrency(summary.pendingPayouts)}
+          dim={summary.pendingPayouts === 0}
+        />
+        <StatCard
+          label="Paid (broker)"
+          value={formatCurrency(summary.paidThisMonth)}
+          dim={summary.paidThisMonth === 0}
+        />
+        <StatCard label="Total deal value" value={formatCurrency(summary.totalValue)} />
       </section>
 
       {/* Per-agent summary */}
-      <div className="space-y-3">
-        <p className={cn(SECTION_LABEL)}>Per-agent commissions</p>
-        <div className="overflow-x-auto rounded-xl border border-border/60">
+      <SurfaceCard className="p-0 sm:p-0 overflow-hidden">
+        <div className="px-6 pt-6 sm:px-7 sm:pt-7">
+          <SurfaceCardHeader title="Per-agent commissions" />
+        </div>
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Agent</th>
+              <tr className="border-b border-border/60">
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground sm:px-7">Agent</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Deals</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Total value</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Agent owed</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Broker earned</th>
+                <th className="text-right px-6 py-3 text-xs font-medium text-muted-foreground sm:px-7">Broker earned</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60 bg-card">
+            <tbody className="divide-y divide-border/60">
               {byAgent.map((a) => (
                 <tr key={a.agentUserId} className="hover:bg-foreground/[0.04] transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-3 sm:px-7">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
                         {initials(a.name, a.email)}
@@ -634,31 +633,35 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                   <td className="px-3 py-3 text-right tabular-nums text-xs font-medium">{a.dealsClosed}</td>
                   <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.totalValue)}</td>
                   <td className="px-3 py-3 text-right tabular-nums text-xs">{formatCurrency(a.agentCommission)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-xs font-medium">
+                  <td className="px-6 py-3 text-right tabular-nums text-xs font-medium sm:px-7">
                     {formatCurrency(a.brokerCommission)}
                   </td>
                 </tr>
               ))}
               {byAgent.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No ledger rows for the selected month and status.
+                  <td colSpan={5} className="px-6 pb-8 pt-2 sm:px-7">
+                    <TableEmpty icon={<Users size={20} strokeWidth={1.5} />}>
+                      No ledger rows for the selected month and status.
+                    </TableEmpty>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </SurfaceCard>
 
       {/* Ledger detail table */}
-      <div className="space-y-3">
-        <p className={cn(SECTION_LABEL)}>Ledger</p>
-        <div className="overflow-x-auto rounded-xl border border-border/60">
+      <SurfaceCard className="p-0 sm:p-0 overflow-hidden">
+        <div className="px-6 pt-6 sm:px-7 sm:pt-7">
+          <SurfaceCardHeader title="Ledger" />
+        </div>
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Deal</th>
+              <tr className="border-b border-border/60">
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted-foreground sm:px-7">Deal</th>
                 <th className="text-left px-3 py-3 text-xs font-medium text-muted-foreground">Agent</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Closed</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Value</th>
@@ -666,10 +669,10 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Broker %</th>
                 <th className="text-right px-3 py-3 text-xs font-medium text-muted-foreground">Broker $</th>
                 <th className="text-center px-3 py-3 text-xs font-medium text-muted-foreground">Status</th>
-                <th className="w-10 px-2 py-3" />
+                <th className="w-10 px-2 py-3 sm:pr-7" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60 bg-card">
+            <tbody className="divide-y divide-border/60">
               {filtered.map((row) => (
                   <tr
                     key={row.id}
@@ -681,7 +684,7 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                       setEditing(row);
                     }}
                   >
-                    <td className="px-4 py-3 text-xs">
+                    <td className="px-6 py-3 text-xs sm:px-7">
                       <p className="font-medium truncate max-w-[16rem]">{row.dealTitle ?? row.dealId}</p>
                     </td>
                     <td className="px-3 py-3 text-xs">
@@ -698,9 +701,11 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                       {formatCurrency(row.brokerAmount)}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <StatusPill status={row.status} />
+                      <StatusPill className={STATUS_PILL[row.status].className}>
+                        {STATUS_PILL[row.status].label}
+                      </StatusPill>
                     </td>
-                    <td className="px-2 py-3 text-right" data-row-action>
+                    <td className="px-2 py-3 text-right sm:pr-7" data-row-action>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -746,15 +751,17 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
                 ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                    No ledger rows for the selected filters.
+                  <td colSpan={9} className="px-6 pb-8 pt-2 sm:px-7">
+                    <TableEmpty icon={<Receipt size={20} strokeWidth={1.5} />}>
+                      No ledger rows for the selected filters.
+                    </TableEmpty>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      </div>
+      </SurfaceCard>
 
       <p className="text-xs text-muted-foreground">
         Ledger rows are snapshotted when a deal is won. Row rates reflect the rates
@@ -769,20 +776,35 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
 
 // ── Small UI bits ────────────────────────────────────────────────────────────
 
-function StatusPill({ status }: { status: LedgerStatus }) {
-  const styles: Record<LedgerStatus, string> = {
-    pending: 'text-muted-foreground bg-muted',
-    paid: 'text-foreground bg-muted',
-    void: 'text-muted-foreground bg-muted',
-  };
-  const label: Record<LedgerStatus, string> = {
-    pending: 'Pending',
-    paid: 'Paid',
-    void: 'Void',
-  };
+/**
+ * Money-surface status tones for the shared StatusPill. On a ledger a broker
+ * must tell paid / pending / void apart at a glance, so each state gets a
+ * visually distinct tone rather than the identical bg-muted the old local pill
+ * used:
+ *   - paid    → filled positive (emerald) — money is out the door.
+ *   - pending → the shared muted default — still owed.
+ *   - void    → dim + struck through — cancelled, don't count it.
+ */
+const STATUS_PILL: Record<LedgerStatus, { label: string; className: string }> = {
+  paid: { label: 'Paid', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  pending: { label: 'Pending', className: 'text-muted-foreground' },
+  void: { label: 'Void', className: 'bg-muted/50 text-muted-foreground/50 line-through' },
+};
+
+/**
+ * Designed calm empty state for a table body — a soft-circle icon over the
+ * section's existing copy. Sits inside a full-width `<td>`.
+ */
+function TableEmpty({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
-      {label[status]}
-    </span>
+    <div className="flex flex-col items-center py-8 text-center">
+      <span
+        aria-hidden
+        className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.04] text-muted-foreground/60"
+      >
+        {icon}
+      </span>
+      <p className="max-w-xs text-sm text-muted-foreground">{children}</p>
+    </div>
   );
 }

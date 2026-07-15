@@ -2,7 +2,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BrokerMembersLoading() {
   return (
-    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
+    <div className="space-y-6 max-w-3xl pb-56 md:pb-24" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       <header className="space-y-1.5">
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-8 w-64" />

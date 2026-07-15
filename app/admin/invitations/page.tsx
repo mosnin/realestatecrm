@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { RevokeInvitation } from './revoke-invitation';
 import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
+import { cn } from '@/lib/utils';
 
 const statusStyle = (status: string) => {
   switch (status) {
@@ -65,12 +67,12 @@ export default async function AdminInvitationsPage() {
           description="Invitations sent from any brokerage will show up here."
         />
       ) : (
-        <div className="space-y-2">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden divide-y divide-border/60')}>
           {invs.map((inv) => {
             const sentAt = new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const expiresAt = new Date(inv.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             return (
-              <div key={inv.id} className="rounded-xl border border-border bg-card px-4 py-3">
+              <div key={inv.id} className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">{inv.email}</p>

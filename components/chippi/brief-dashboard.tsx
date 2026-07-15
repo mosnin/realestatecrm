@@ -52,6 +52,7 @@ import {
   Sparkles,
   Check,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -123,13 +124,14 @@ function daysSince(iso: string | null): number | null {
 // ── Shell ───────────────────────────────────────────────────────────────────
 
 export function BriefDashboard({ slug, data }: Props) {
-  const { brief, needsYou, pipeline, overnight, hotLeads, tours } = data;
+  const { brief, needsYou, pipeline, overnight, hotLeads, tours, reputation } = data;
 
   const hasOnDeck = brief.cards.length > 0 || brief.tip != null;
   const hasTours = tours.length > 0;
   const hasPipeline = pipeline != null && pipeline.active > 0;
   const hasHotLeads = hotLeads.length > 0;
   const hasOvernight = overnight != null && overnight.buckets.length > 0;
+  const hasReputation = reputation != null && reputation.requested > 0;
 
   let i = 0;
   const delay = () => 0.04 + i++ * CHAT_STAGGER_DELAY;
@@ -174,12 +176,47 @@ export function BriefDashboard({ slug, data }: Props) {
         </BriefCell>
       )}
 
+      {/* REPUTATION — post-close review campaigns (requested / clicked) */}
+      {hasReputation && reputation && (
+        <BriefCell span="md:col-span-2" delay={delay()}>
+          <ReputationCell reputation={reputation} />
+        </BriefCell>
+      )}
+
       {/* OVERNIGHT — what Chippi did in the last 12h, full width */}
       {hasOvernight && overnight && (
         <BriefCell span="md:col-span-4" delay={delay()}>
           <OvernightCell slug={slug} overnight={overnight} />
         </BriefCell>
       )}
+    </div>
+  );
+}
+
+// ── REPUTATION ────────────────────────────────────────────────────────────────
+
+function ReputationCell({
+  reputation,
+}: {
+  reputation: NonNullable<DashboardData['reputation']>;
+}) {
+  const { requested, clicked } = reputation;
+  return (
+    <div className="p-6 sm:p-7">
+      <CellHeader label="Reputation" icon={Star} />
+      <div className="mt-3 grid grid-cols-2 gap-x-3">
+        <Stat value={<AnimatedNumber value={requested} />} label="requested" />
+        <Stat
+          value={<AnimatedNumber value={clicked} />}
+          label="clicked through"
+          dim={clicked === 0}
+        />
+      </div>
+      <p className={cn(BODY_MUTED, 'text-xs mt-3')}>
+        {clicked > 0
+          ? `${clicked} of ${requested} ${pluralize(requested, 'review request')} opened in the last 90 days.`
+          : `${requested} ${pluralize(requested, 'review request')} sent in the last 90 days — none opened yet.`}
+      </p>
     </div>
   );
 }
