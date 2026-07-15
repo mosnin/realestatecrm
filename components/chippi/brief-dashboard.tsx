@@ -46,6 +46,7 @@ import {
   Users,
   CalendarClock,
   FileText,
+  MessagesSquare,
   Flame,
   TrendingUp,
   ArrowUpRight,
@@ -324,6 +325,18 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
       icon: FileText,
     },
   ];
+
+  // Clients waiting on a reply only appears when someone actually is — an empty
+  // inbox shouldn't add a permanently-zero row to the "what needs you" list.
+  if (needsYou.clientsWaiting > 0) {
+    tiles.push({
+      n: needsYou.clientsWaiting,
+      label: pluralize(needsYou.clientsWaiting, 'Client waiting', 'Clients waiting'),
+      sub: 'unread reply on your desk',
+      href: `/s/${slug}/inbox`,
+      icon: MessagesSquare,
+    });
+  }
 
   const allClear = tiles.every((t) => t.n === 0);
 

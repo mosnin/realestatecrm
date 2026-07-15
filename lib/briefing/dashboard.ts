@@ -68,6 +68,9 @@ export interface NeedsYou {
   followUpsDue: number;
   /** AgentDraft rows awaiting the realtor's approve/edit. */
   pendingDrafts: number;
+  /** Inbox threads with at least one unread inbound message — clients whose
+   *  last word is still sitting unanswered on the realtor's desk. */
+  clientsWaiting: number;
 }
 
 /**
@@ -149,6 +152,22 @@ async function countPendingDrafts(spaceId: string): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('spaceId', spaceId)
     .eq('status', 'pending');
+  return count ?? 0;
+}
+
+/**
+ * Threaded-inbox rows carrying unread inbound — one per contact still waiting
+ * on a reply. Powers the Brief's "N clients waiting on you" signal and the
+ * unread badge on the unified inbox. Scoped by spaceId (the security boundary)
+ * and by unreadCount > 0. Exported so its behavior is unit-testable in
+ * isolation without standing up the whole dashboard compose.
+ */
+export async function countClientsWaiting(spaceId: string): Promise<number> {
+  const { count } = await supabase
+    .from('InboxThread')
+    .select('id', { count: 'exact', head: true })
+    .eq('spaceId', spaceId)
+    .gt('unreadCount', 0);
   return count ?? 0;
 }
 
@@ -305,6 +324,7 @@ export async function composeBriefDashboard(
     newLeads,
     followUpsDue,
     pendingDrafts,
+    clientsWaiting,
     pipeline,
     overnight,
     hotLeads,
@@ -316,6 +336,7 @@ export async function composeBriefDashboard(
     countNewLeads(spaceId).catch(() => 0),
     countFollowUpsDue(spaceId).catch(() => 0),
     countPendingDrafts(spaceId).catch(() => 0),
+    countClientsWaiting(spaceId).catch(() => 0),
     composePipelineStat(spaceId).catch(() => null),
     composeOvernight(spaceId).catch(() => null),
     fetchHotLeads(spaceId).catch(() => []),
@@ -341,7 +362,7 @@ export async function composeBriefDashboard(
   return {
     ownerName,
     brief,
-    needsYou: { newLeads, followUpsDue, pendingDrafts },
+    needsYou: { newLeads, followUpsDue, pendingDrafts, clientsWaiting },
     pipeline,
     overnight,
     hotLeads,
