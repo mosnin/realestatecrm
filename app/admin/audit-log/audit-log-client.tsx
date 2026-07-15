@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, ChevronDown, ChevronRight, ScrollText } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { SECTION_LABEL, CAPTION } from '@/lib/typography';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -182,11 +183,11 @@ export function AuditLogClient({ logs, userMap }: AuditLogClientProps) {
           }
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className={cn('text-left px-4 py-2.5 whitespace-nowrap', SECTION_LABEL)}>
                     Timestamp
                   </th>
@@ -208,7 +209,7 @@ export function AuditLogClient({ logs, userMap }: AuditLogClientProps) {
                   <th className="w-8" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/60">
                 {filtered.map((log) => {
                   const user = log.clerkId ? userMap[log.clerkId] : null;
                   const isExpanded = expandedRow === log.id;

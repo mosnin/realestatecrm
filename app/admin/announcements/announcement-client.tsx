@@ -23,6 +23,7 @@ import {
 import { Plus, Pencil, Trash2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 
 export type Announcement = {
   id: string;
@@ -248,11 +249,11 @@ export function AnnouncementClient({
           description="Create one to show a banner to users."
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Message</th>
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Severity</th>
                   <th className="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground hidden md:table-cell">Segment</th>
@@ -263,7 +264,7 @@ export function AnnouncementClient({
                   <th className="text-right px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/60">
                 {rows.map((a) => (
                   <tr key={a.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3">

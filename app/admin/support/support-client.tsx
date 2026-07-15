@@ -31,6 +31,7 @@ import {
 import { LifeBuoy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { SECTION_LABEL } from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -207,11 +208,11 @@ export function SupportClient({
           description="Help requests from realtors will land here for triage."
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Submitter</th>
                   <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>Space</th>
                   <th className={cn('text-left px-4 py-3 hidden md:table-cell', SECTION_LABEL)}>Category</th>
@@ -221,7 +222,7 @@ export function SupportClient({
                   <th className={cn('text-left px-4 py-3 hidden lg:table-cell', SECTION_LABEL)}>Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/60">
                 {visible.map((t) => {
                   const space = t.spaceId ? spaceMap[t.spaceId] : undefined;
                   return (
