@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import { Pencil, ShieldCheck, ShieldOff, Trash2, UserCog, Building2 } from 'lucide-react';
 
 export interface MembershipSummary {
@@ -66,10 +67,8 @@ export function AccountManagement({
   const [memberResult, setMemberResult] = useState<string | null>(null);
 
   // ── Delete ───────────────────────────────────────────────────────────────────
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState('');
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteResult, setDeleteResult] = useState<string | null>(null);
+  // Deletion is a SOC2 step-up action: the ConfirmDialog collects a reason +
+  // the typed target email and hands them to handleDelete for the request body.
 
   async function handleSaveProfile() {
     setEditLoading(true);
@@ -150,29 +149,26 @@ export function AccountManagement({
     }
   }
 
-  async function handleDelete() {
-    setDeleteLoading(true);
-    setDeleteResult(null);
+  async function handleDelete(stepUp?: { reason: string; confirm: string }) {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/delete`, { method: 'POST' });
+      const res = await fetch(`/api/admin/users/${userId}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: stepUp?.reason, confirm: stepUp?.confirm }),
+      });
       const data = await res.json();
       if (res.ok) {
-        setDeleteResult(data.message || 'Account deleted.');
-        setDeleteOpen(false);
         router.push('/admin/users');
         router.refresh();
-      } else {
-        setDeleteResult(data.error || 'Delete failed.');
+        return;
       }
+      return data.error || 'Delete failed.';
     } catch {
-      setDeleteResult('Network error. Try again.');
-    } finally {
-      setDeleteLoading(false);
+      return 'Network error. Try again.';
     }
   }
 
   const isAdmin = platformRole === 'admin';
-  const confirmMatches = deleteConfirm.trim().toLowerCase() === email.trim().toLowerCase();
 
   return (
     <div>
@@ -339,8 +335,8 @@ export function AccountManagement({
                 the entire workspace. This is not suspension — it cannot be undone.
               </p>
             </div>
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-              <DialogTrigger asChild>
+            <ConfirmDialog
+              trigger={
                 <Button
                   variant="outline"
                   size="sm"
@@ -357,41 +353,24 @@ export function AccountManagement({
                   <Trash2 size={13} />
                   Delete account
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Delete account</DialogTitle>
-                  <DialogDescription>
-                    This permanently deletes <strong>{email}</strong> — the Clerk
-                    login and, when hard-delete is enabled, all of their workspace
-                    data. This cannot be undone. Type the email to confirm.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-2">
-                  <Input
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    placeholder={email}
-                    autoComplete="off"
-                  />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteLoading}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={deleteLoading || !confirmMatches}
-                  >
-                    <Trash2 size={14} />
-                    {deleteLoading ? 'Deleting...' : 'Permanently delete'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              }
+              title="Delete account"
+              description={
+                <>
+                  This permanently deletes <strong>{email}</strong> — the Clerk
+                  login and, when hard-delete is enabled, all of their workspace
+                  data. This cannot be undone.
+                </>
+              }
+              confirmLabel="Permanently delete"
+              tone="danger"
+              stepUp={{
+                confirmationPhrase: email,
+                confirmationLabel: 'Type the email to confirm deletion',
+              }}
+              onConfirm={handleDelete}
+            />
           </div>
-          {deleteResult && <p className="text-xs text-muted-foreground">{deleteResult}</p>}
         </CardContent>
       </Card>
     </div>

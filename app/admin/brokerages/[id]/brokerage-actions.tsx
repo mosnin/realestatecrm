@@ -373,8 +373,12 @@ function RevokeInvite({
 function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
   const router = useRouter();
 
-  async function deleteBrokerage() {
-    const res = await fetch(`/api/admin/brokerages/${brokerageId}`, { method: 'DELETE' });
+  async function deleteBrokerage(stepUp?: { reason: string; confirm: string }) {
+    const res = await fetch(`/api/admin/brokerages/${brokerageId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: stepUp?.reason, confirm: stepUp?.confirm }),
+    });
     if (res.ok) {
       router.push('/admin/brokerages');
       router.refresh();
@@ -405,6 +409,7 @@ function DeleteBrokerage({ brokerageId, brokerageName }: DeleteProps) {
       }
       confirmLabel="Delete brokerage"
       tone="danger"
+      stepUp={{ confirmationPhrase: 'DELETE' }}
       onConfirm={deleteBrokerage}
     />
   );
