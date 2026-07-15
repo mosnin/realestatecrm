@@ -51,7 +51,10 @@ export function RightPanelTabs({ activeTab, onTabChange, className, variant = 'r
       className={cn(
         // Five tabs can outgrow a narrow split panel — allow a quiet horizontal
         // scroll rather than wrapping or clipping the underline.
-        'flex items-center gap-0.5 px-3 py-2 border-b border-border/60 overflow-x-auto',
+        // pr-14 keeps the last tab clear of anything floating in the panel's
+        // top-right corner (preview-deploy toolbars, future panel controls) —
+        // without it the Browser tab renders underneath them.
+        'flex items-center gap-0.5 pl-3 pr-14 py-2 border-b border-border/60 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
     >

@@ -1,30 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChainOfThought, ThinkingBar } from '@/components/ai/prompt-kit';
-
-/**
- * A small breathing orb in Chippi's brand orange. Constant, gentle motion is
- * the second half of "still alive" (the live seconds counter is the first) —
- * even when the status word holds steady for a beat, the orb keeps moving so
- * the row never reads as frozen. Honors prefers-reduced-motion: it holds a
- * calm static dot for that audience rather than pulsing.
- */
-function ThinkingOrb() {
-  const reduce = useReducedMotion();
-  return (
-    <motion.span
-      aria-hidden
-      className="inline-block h-2 w-2 shrink-0 rounded-full"
-      style={{ background: 'radial-gradient(circle at 30% 30%, #FF9A52, #F25A00)' }}
-      animate={reduce ? { opacity: 0.8 } : { scale: [1, 1.35, 1], opacity: [0.55, 1, 0.55] }}
-      transition={reduce ? undefined : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-    />
-  );
-}
 
 /**
  * Thinking indicator shown while Chippi is mid-turn.
@@ -70,9 +50,8 @@ export function ThinkingIndicator({
 
   return (
     <div className={cn('flex flex-col gap-1.5 justify-center min-h-7', className)}>
-      {/* Row 1: breathing orb + shimmering action line + live timer + chevron */}
+      {/* Row 1: shimmering action line + live timer + optional reasoning chevron */}
       <div className="flex items-center gap-1.5">
-        {action && <ThinkingOrb />}
         <AnimatePresence mode="wait" initial={false}>
           {action && (
             <motion.div
