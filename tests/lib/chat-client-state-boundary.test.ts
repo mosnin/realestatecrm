@@ -82,10 +82,17 @@ describe('chat client-side boundary state', () => {
     expect(workspaceSource).toContain('{!isBroker && <ApprovalsPill />}');
   });
 
-  it('does not call realtor mention-search endpoints from the broker surface', () => {
+  // Broker @-mentions now resolve through the brokerage-scoped endpoint
+  // (/api/broker/mentions — behaviorally covered in tests/api/broker-mentions.test.ts),
+  // and the broker branch returns BEFORE the realtor space-scoped fetches, so the
+  // broker surface never probes /api/contacts?slug= or /api/deals?slug=.
+  it('routes broker @-mentions through the brokerage-scoped endpoint, not realtor space endpoints', () => {
     expect(workspaceSource).toContain('if (isBroker) {');
-    expect(workspaceSource).toContain('broker-specific mentions should use dedicated');
-    expect(workspaceSource).toContain('return results;');
-    expect(workspaceSource).toContain('[isBroker, slug, mentionApps]');
+    expect(workspaceSource).toContain('/api/broker/mentions?search=${encodeURIComponent(query)}');
+    // The realtor-only endpoints still exist, but only past the broker branch's return.
+    const brokerIdx = workspaceSource.indexOf('/api/broker/mentions?search=');
+    const realtorContactsIdx = workspaceSource.indexOf('/api/contacts?slug=');
+    expect(brokerIdx).toBeGreaterThan(-1);
+    expect(realtorContactsIdx).toBeGreaterThan(brokerIdx);
   });
 });

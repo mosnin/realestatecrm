@@ -664,10 +664,25 @@ export function ChippiWorkspace({
     async (query: string): Promise<MentionItem[]> => {
       const results: MentionItem[] = [];
       if (isBroker) {
-        // The @ mention search endpoints are realtor/space-scoped. The broker
-        // surface must not probe them with an empty slug (or accidentally query
-        // a realtor workspace); broker-specific mentions should use dedicated
-        // brokerage-scoped endpoints when added.
+        // Broker mentions are brokerage-scoped: one endpoint searches contacts
+        // + deals across ALL member spaces (never a single realtor workspace).
+        // Falls through to the shared apps/plugins loop below.
+        try {
+          const res = await fetch(`/api/broker/mentions?search=${encodeURIComponent(query)}`);
+          if (res.ok) {
+            const items = (await res.json()) as MentionItem[];
+            for (const item of items.slice(0, 20)) results.push(item);
+          }
+        } catch (err) {
+          console.error('[Chat] Broker mention search failed:', err);
+          toast.error("Couldn't search contacts or deals.", { id: 'mention-search-error' });
+        }
+        const bq = query.toLowerCase();
+        for (const app of mentionApps) {
+          if (!bq || app.label.toLowerCase().includes(bq) || app.slug.toLowerCase().includes(bq)) {
+            results.push({ id: `app-${app.slug}`, type: 'app', label: app.label, subtitle: 'App / plugin' });
+          }
+        }
         return results;
       }
       try {
