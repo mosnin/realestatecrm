@@ -4,6 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { audit } from '@/lib/audit';
+import { exportSpaceData } from '@/lib/data-export';
 
 /**
  * GDPR / CCPA data portability — export everything in the caller's workspace.
@@ -13,7 +14,8 @@ import { audit } from '@/lib/audit';
  *
  * Tenant scope is the whole point: the spaceId is derived from the session
  * (getSpaceForUser → owner's single Space) and never read from the request.
- * Every table read is filtered on that one spaceId. A body-supplied id would
+ * The per-table reads live in lib/data-export.ts (exportSpaceData), shared with
+ * the admin DSAR export so the two can never drift. A body-supplied id would
  * be a cross-tenant leak; there is no body. Owner-only by design — an export
  * is the full book of business, so we don't extend it to brokerage admins
  * here (they have their own brokerage tooling).
@@ -21,50 +23,6 @@ import { audit } from '@/lib/audit';
  * Heavy query — one read per table. Rate-limited to a handful per hour per
  * user so it can't be used to hammer the DB.
  */
-
-// Every Space-scoped table that holds the user's own data. Each is read with
-// .eq('spaceId', space.id). Keep this list in sync with docs/DATA-DELETION.md —
-// what we export is what we delete.
-const SPACE_SCOPED_TABLES = [
-  'SpaceSetting',
-  'Contact',
-  'ContactActivity',
-  'ContactDocument',
-  'DealStage',
-  'Pipeline',
-  'Deal',
-  'DealActivity',
-  'DealChecklistItem',
-  'DealDocument',
-  'Property',
-  'PropertyPacket',
-  'Conversation',
-  'Message',
-  'Attachment',
-  'Note',
-  'Tour',
-  'TourFeedback',
-  'TourWaitlist',
-  'TourPropertyProfile',
-  'TourAvailabilityOverride',
-  'CalendarEvent',
-  'MessageTemplate',
-  'FormDraft',
-  'FormAnalyticsEvent',
-  'ApplicationMessage',
-  'ApplicationStatusUpdate',
-  'CommissionSplit',
-  'AuditLog',
-  'AgentSettings',
-  'AgentActivityLog',
-  'AgentMemory',
-  'AgentGoal',
-  'AgentTask',
-  'McpApiKey',
-  'CmaReport',
-  'StudioPost',
-  'File',
-] as const;
 
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
@@ -91,6 +49,8 @@ export async function GET(req: NextRequest) {
     .eq('id', space.ownerId)
     .maybeSingle();
 
+  // The per-table, spaceId-scoped reads live in lib/data-export.ts — shared
+  // with the admin DSAR export so the two surfaces can never drift.
   const data: Record<string, unknown> = {
     space: {
       id: space.id,
@@ -101,38 +61,8 @@ export async function GET(req: NextRequest) {
       brokerageId: space.brokerageId,
     },
     account: ownerRow ?? null,
+    ...(await exportSpaceData(space.id)),
   };
-
-  // One read per table, every one scoped to this space. Sequential keeps the
-  // DB pressure predictable; an export is not latency-sensitive. A missing
-  // table (pre-migration) is logged and skipped so the whole export never
-  // fails on one absent relation.
-  for (const table of SPACE_SCOPED_TABLES) {
-    const { data: rows, error } = await supabase
-      .from(table)
-      .select('*')
-      .eq('spaceId', space.id);
-    if (error) {
-      console.error(`[account/export] ${table} read failed`, error.message);
-      data[table] = { error: 'unavailable' };
-      continue;
-    }
-    data[table] = rows ?? [];
-  }
-
-  // DealContact is a junction with no spaceId — scope it through the deals we
-  // just exported. Same tenant boundary, reached via the deal ids.
-  const dealRows = Array.isArray(data['Deal']) ? (data['Deal'] as Array<{ id: string }>) : [];
-  const dealIds = dealRows.map((d) => d.id);
-  if (dealIds.length > 0) {
-    const { data: dealContacts, error } = await supabase
-      .from('DealContact')
-      .select('*')
-      .in('dealId', dealIds);
-    data['DealContact'] = error ? { error: 'unavailable' } : (dealContacts ?? []);
-  } else {
-    data['DealContact'] = [];
-  }
 
   const payload = {
     exportedAt: new Date().toISOString(),

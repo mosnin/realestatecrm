@@ -85,6 +85,10 @@ export const ADMIN_CAPABILITIES = {
   'billing:credit': ['admin_billing', 'super_admin'],
   // General support mutations — support, billing, and super admins.
   'support:write': ['admin_support', 'admin_billing', 'super_admin'],
+  // DSAR data export — a privileged full-workspace read to fulfil a
+  // data-subject access request. Super admins and support admins (who field
+  // the requests). Read-only/billing admins are excluded.
+  'users:export': ['admin_support', 'super_admin'],
 } as const satisfies Record<string, readonly AdminRole[]>;
 
 export type AdminCapability = keyof typeof ADMIN_CAPABILITIES;

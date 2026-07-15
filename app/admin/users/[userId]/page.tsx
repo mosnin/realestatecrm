@@ -22,6 +22,7 @@ import {
 import Link from 'next/link';
 import { UserActions } from './user-actions';
 import { AccountManagement, type MembershipSummary } from './account-management';
+import { DsarExportButton } from './dsar-export-button';
 import { getCurrentDbUser } from '@/lib/permissions';
 import type { User, Space, SpaceSetting } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -551,6 +552,9 @@ export default async function AdminUserDetailPage({
         isSelf={isSelf}
         memberships={memberships}
       />
+
+      {/* DSAR data export — privileged, audited, capability-gated */}
+      <DsarExportButton userId={fullUser.id} email={fullUser.email} />
     </div>
   );
 }
