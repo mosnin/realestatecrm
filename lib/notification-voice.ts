@@ -277,7 +277,7 @@ export function notificationForMemberJoined(
   role: 'broker_admin' | 'realtor_member',
   via: 'join_code' | 'email_invitation',
 ): NotificationCopy {
-  const roleWord = role === 'broker_admin' ? 'Admin' : 'Realtor';
+  const roleWord = role === 'broker_admin' ? 'Admin' : 'Real estate agent';
   const verb = via === 'join_code' ? 'joined the brokerage' : 'accepted the invitation';
   return {
     title: `${identifier} ${verb}.`,

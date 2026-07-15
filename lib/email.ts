@@ -578,7 +578,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
 
   const { toEmail, brokerageName, inviterName, roleToAssign, token } = params;
   const acceptUrl = `${appUrl}/invite/${token}`;
-  const roleLabel = roleToAssign === 'broker_admin' ? 'Brokerage Admin' : 'Realtor';
+  const roleLabel = roleToAssign === 'broker_admin' ? 'Brokerage Admin' : 'Real estate agent';
   const safeEmail = toEmail.replace(/[\r\n\t]/g, ' ').slice(0, 200);
 
   const html = `

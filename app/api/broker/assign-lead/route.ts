@@ -6,7 +6,7 @@ import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 
 const assignLeadSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
-  realtorUserId: z.string().uuid('Invalid realtor user ID'),
+  realtorUserId: z.string().uuid('Invalid real estate agent user ID'),
 });
 
 /**

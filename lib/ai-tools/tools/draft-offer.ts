@@ -141,7 +141,7 @@ export const draftOfferTool = defineTool<typeof parameters, DraftOfferResult>({
       channel: 'note',
       subject: `Offer presentation — ${dealRow.title}`,
       content,
-      reasoning: 'Drafted an offer presentation for realtor review (not sent, not binding).',
+      reasoning: 'Drafted an offer presentation for real estate agent review (not sent, not binding).',
       priority: 0,
       status: 'pending',
       expiresAt,

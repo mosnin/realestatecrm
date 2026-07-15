@@ -367,6 +367,13 @@ async def chat_turn(item: dict):
         from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
+    # Warmup ping (POST /api/ai/warmup on the web app, fired when the chat
+    # surface mounts). The container boot this request triggered IS the work —
+    # return before building an agent so the ping is free. By the time the
+    # realtor sends their first real message, this container is already hot.
+    if item.get("warmup"):
+        return {"ok": True, "warm": True}
+
     space_id = (item.get("space_id") or "").strip()
     # Clerk userId of the realtor sending this message. Required for
     # Composio integration loading — connections are scoped per entity

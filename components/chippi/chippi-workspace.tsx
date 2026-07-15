@@ -103,6 +103,30 @@ interface ChippiWorkspaceProps {
 const MESSAGE_LIMIT = 50;
 
 /**
+ * The warmup status line, chosen by how long the turn has been waiting with no
+ * concrete output yet. Time-based (not a blind rotating list) so the wording
+ * escalates HONESTLY as the wait grows — a fresh turn reads "Thinking…", a
+ * genuinely slow one admits "Still working on it…" — and, paired with the live
+ * seconds counter the indicator renders, the wait never looks frozen.
+ *
+ * `coldStart` = the first Agent turn of a conversation, the one that actually
+ * pays the Modal sandbox warmup; only there do we name the honest warmup steps.
+ * Every other turn reuses the warm sandbox, so it gets the calm thinking copy —
+ * the sandbox wording would be a lie there (honest-UI non-negotiable).
+ */
+export function warmupPhraseFor(coldStart: boolean, elapsedMs: number): string {
+  if (coldStart) {
+    if (elapsedMs < 2500) return 'Getting things ready…';
+    if (elapsedMs < 6000) return 'Warming up…';
+    if (elapsedMs < 11000) return 'Lining up the work…';
+    return 'Still working on it…';
+  }
+  if (elapsedMs < 3000) return 'Thinking…';
+  if (elapsedMs < 8000) return 'Working it through…';
+  return 'Still working on it…';
+}
+
+/**
  * Opt-in soft "tap" tone on message send. Generated via Web Audio API so
  * we don't ship any asset, fires once at a quiet -28dB-ish gain, and
  * gates on:
@@ -237,7 +261,12 @@ export function ChippiWorkspace({
   }, [activeConversationId]);
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
-  const effectiveIsSplit = !isBroker && isSplit;
+  // Split / live-work side panel is available on BOTH variants. For broker the
+  // RightPanel embeds the brokerage-scoped /broker/* routes (people/deals/
+  // properties) plus the universal live-work activity feed and in-panel
+  // browser; see RightPanel's `variant` prop. (Previously forced off for
+  // broker because the tabs were realtor-scoped.)
+  const effectiveIsSplit = isSplit;
   // True only while the divider is being dragged. The right panel is an iframe,
   // which would otherwise swallow the mousemove events the drag listeners need —
   // so during a drag we shield it with pointer-events:none and the handle keeps
@@ -378,6 +407,15 @@ export function ChippiWorkspace({
       router.replace(`${endpoints.routeBase}${qs ? `?${qs}` : ''}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pre-boot the Modal chat container the moment the surface mounts. The
+  // realtor spends a few seconds reading/typing before the first send — this
+  // ping spends those seconds booting the sandbox so the first message never
+  // pays the cold start. Fire-and-forget; the server no-ops without Modal
+  // configured and rate-limits per user. See app/api/ai/warmup/route.ts.
+  useEffect(() => {
+    fetch('/api/ai/warmup', { method: 'POST' }).catch(() => {});
   }, []);
 
   // Broker history comes from the broker-gated `/api/ai/broker-messages`
@@ -659,10 +697,25 @@ export function ChippiWorkspace({
     async (query: string): Promise<MentionItem[]> => {
       const results: MentionItem[] = [];
       if (isBroker) {
-        // The @ mention search endpoints are realtor/space-scoped. The broker
-        // surface must not probe them with an empty slug (or accidentally query
-        // a realtor workspace); broker-specific mentions should use dedicated
-        // brokerage-scoped endpoints when added.
+        // Broker mentions are brokerage-scoped: one endpoint searches contacts
+        // + deals across ALL member spaces (never a single realtor workspace).
+        // Falls through to the shared apps/plugins loop below.
+        try {
+          const res = await fetch(`/api/broker/mentions?search=${encodeURIComponent(query)}`);
+          if (res.ok) {
+            const items = (await res.json()) as MentionItem[];
+            for (const item of items.slice(0, 20)) results.push(item);
+          }
+        } catch (err) {
+          console.error('[Chat] Broker mention search failed:', err);
+          toast.error("Couldn't search contacts or deals.", { id: 'mention-search-error' });
+        }
+        const bq = query.toLowerCase();
+        for (const app of mentionApps) {
+          if (!bq || app.label.toLowerCase().includes(bq) || app.slug.toLowerCase().includes(bq)) {
+            results.push({ id: `app-${app.slug}`, type: 'app', label: app.label, subtitle: 'App / plugin' });
+          }
+        }
         return results;
       }
       try {
@@ -986,22 +1039,6 @@ export function ChippiWorkspace({
   // like "sandbox" (the realtor must not see our plumbing). Every later turn
   // (and every Chat turn) reuses the warm path and cycles the calm "Thinking…"
   // set below instead.
-  const AGENT_WARMUP_PHRASES = useMemo(
-    () => [
-      'Getting things ready…',
-      'Warming up…',
-      'Lining up the work…',
-      'Almost there…',
-    ],
-    [],
-  );
-  // The alive "thinking" cycle for every in-progress turn after the cold
-  // start. Understated, honest, never mentions infrastructure.
-  const THINKING_PHRASES = useMemo(
-    () => ['Thinking…', 'Pondering…', 'Working it through…'],
-    [],
-  );
-
   // First Agent turn of a fresh conversation? True when no assistant turn has
   // landed any blocks yet — i.e. the streaming tail is the only assistant
   // bubble. That's the one turn that pays the cold Modal warmup; later turns
@@ -1015,7 +1052,12 @@ export function ChippiWorkspace({
   );
   // The runtime the in-flight turn is running on. Set on each send.
   const [activeTurnMode, setActiveTurnMode] = useState<ChatMode>('chat');
-  const [warmupIndex, setWarmupIndex] = useState(0);
+  // Milliseconds the current turn has spent warming up (streaming open, nothing
+  // concrete yet). Drives BOTH the escalating status phrase and the live
+  // seconds counter — a steadily-climbing clock is the strongest "still alive"
+  // signal during a cold start or a slow first token.
+  const [warmupElapsedMs, setWarmupElapsedMs] = useState(0);
+  const warmupStartRef = useRef<number | null>(null);
 
   // Warming up = streaming, assistant bubble open, nothing concrete yet (no
   // streamed text, no live tool call, no reasoning tokens).
@@ -1028,21 +1070,23 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
 
-  // Cycle the status label while warming up — the cold-start sandbox steps
-  // move a touch faster (1.7s) so the longer wait reads as progress; the
-  // calm "Thinking…" cycle breathes slower (2.4s) so it never feels anxious.
+  // Tick a live elapsed clock while warming up. One interval at 1s: it both
+  // advances the honest phrase (warmupPhraseFor) and updates the seconds
+  // counter the indicator renders, so a slow turn visibly counts up instead of
+  // sitting on a frozen word. Resets the instant real output starts flowing.
   useEffect(() => {
     if (!isWarmingUp) {
-      setWarmupIndex(0);
+      warmupStartRef.current = null;
+      setWarmupElapsedMs(0);
       return;
     }
-    const isColdStart = activeTurnMode === 'agent' && isFirstAgentTurn;
-    const id = setInterval(
-      () => setWarmupIndex((i) => i + 1),
-      isColdStart ? 1700 : 2400,
-    );
+    if (warmupStartRef.current === null) warmupStartRef.current = Date.now();
+    const update = () =>
+      setWarmupElapsedMs(Date.now() - (warmupStartRef.current ?? Date.now()));
+    update();
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [isWarmingUp, activeTurnMode, isFirstAgentTurn]);
+  }, [isWarmingUp]);
 
   const currentAction = useMemo<string | null>(() => {
     if (!isStreaming || !tailMessage) return null;
@@ -1085,15 +1129,11 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
     if (!hasText) {
-      // First Agent turn of a fresh conversation pays the cold Modal warmup —
-      // name the honest sandbox steps that one time. Every later turn (and
-      // every Chat turn) reuses the warm sandbox, so cycle the calm
-      // "Thinking…" set instead — the sandbox copy would be a lie there.
-      const phrases =
-        activeTurnMode === 'agent' && isFirstAgentTurn
-          ? AGENT_WARMUP_PHRASES
-          : THINKING_PHRASES;
-      return phrases[warmupIndex % phrases.length];
+      // Time-based, honest escalation (see warmupPhraseFor). The cold Modal
+      // warmup is only paid on the first Agent turn; later turns reuse the warm
+      // sandbox and get the calm thinking copy.
+      const coldStart = activeTurnMode === 'agent' && isFirstAgentTurn;
+      return warmupPhraseFor(coldStart, warmupElapsedMs);
     }
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1104,9 +1144,7 @@ export function ChippiWorkspace({
     serverAction,
     activeTurnMode,
     isFirstAgentTurn,
-    warmupIndex,
-    AGENT_WARMUP_PHRASES,
-    THINKING_PHRASES,
+    warmupElapsedMs,
   ]);
 
   // Final visibility gate for the indicator block — we want the avatar +
@@ -1306,9 +1344,10 @@ export function ChippiWorkspace({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Split panel disabled on broker variant — RightPanel tabs
-            (contacts/deals/etc.) are realtor-scoped in Phase 1. */}
-        {!isBroker && <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />}
+        {/* Split / live-work side panel — enabled on both variants. Broker's
+            RightPanel embeds the brokerage-scoped /broker/* routes plus the
+            universal activity + browser tabs (see RightPanel variant). */}
+        <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -1607,6 +1646,7 @@ export function ChippiWorkspace({
                           <ThinkingIndicator
                             currentAction={currentAction}
                             streamingReasoning={streamingReasoning}
+                            elapsedMs={isWarmingUp ? warmupElapsedMs : 0}
                           />
                         </div>
                       </motion.div>
@@ -1722,6 +1762,7 @@ export function ChippiWorkspace({
             <RightPanel
               key="chippi-right-panel"
               slug={slug}
+              variant={variant}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"

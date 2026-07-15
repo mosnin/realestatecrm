@@ -63,13 +63,13 @@ export default async function DashboardPage() {
         <PortalFadeIn delay={0.05}>
           <PortalEmptyState
             headline="Nothing in motion yet."
-            whatsNext="The moment you apply or book a tour with a realtor using this email, it lands right here — applications, tours, and messages, all in one place."
+            whatsNext="The moment you apply or book a tour with a real estate agent using this email, it lands right here — applications, tours, and messages, all in one place."
             action={
               <a
                 href="https://usechippi.com"
                 className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-sm text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
               >
-                Find a realtor on Chippi
+                Find a real estate agent on Chippi
               </a>
             }
           />

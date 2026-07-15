@@ -25,7 +25,7 @@ export default function TermsPage() {
         <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-2 leading-6">
           <li><strong className="text-foreground">&quot;Service&quot;</strong> means the Chippi platform, including the web application at www.usechippi.com, all related APIs, integrations, AI features (including lead scoring, voice AI assistant, and MCP server integration), deal pipelines, tour scheduling, and documentation.</li>
           <li><strong className="text-foreground">&quot;User&quot;</strong> means any individual or entity that accesses or uses the Service, including Subscribers and Applicants.</li>
-          <li><strong className="text-foreground">&quot;Subscriber&quot;</strong> means a realtor, brokerage, or other entity that creates an account and subscribes to the Service to manage real estate operations, including intake forms, lead management, deal pipelines, and brokerage team management.</li>
+          <li><strong className="text-foreground">&quot;Subscriber&quot;</strong> means a real estate agent, brokerage, or other entity that creates an account and subscribes to the Service to manage real estate operations, including intake forms, lead management, deal pipelines, and brokerage team management.</li>
           <li><strong className="text-foreground">&quot;Applicant&quot;</strong> means any individual who submits information through a Subscriber&apos;s intake forms or interacts with the Service on behalf of or at the direction of a Subscriber.</li>
           <li><strong className="text-foreground">&quot;Content&quot;</strong> means all data, text, files, images, and other materials uploaded, submitted, or generated through the Service.</li>
           <li><strong className="text-foreground">&quot;Subscriber Data&quot;</strong> means all Content that a Subscriber or their Applicants submit, upload, or generate through the Service, including lead information, deal data, tour schedules, and AI scoring results.</li>
@@ -80,10 +80,10 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">5. Data Controller and Processor Relationship</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>5.1. With respect to Subscriber Data (including Applicant data collected through intake forms), the Subscriber is the <strong className="text-foreground">Data Controller</strong> and Chippi is the <strong className="text-foreground">Data Processor</strong>. Realtors and brokerages are responsible for how they use their own data.</p>
+          <p>5.1. With respect to Subscriber Data (including Applicant data collected through intake forms), the Subscriber is the <strong className="text-foreground">Data Controller</strong> and Chippi is the <strong className="text-foreground">Data Processor</strong>. Real estate agents and brokerages are responsible for how they use their own data.</p>
           <p>5.2. Chippi processes Subscriber Data solely on the Subscriber&apos;s behalf and in accordance with the Subscriber&apos;s instructions as set forth in these Terms and our <a href="/legal/dpa" className="underline hover:text-foreground">Data Processing Agreement</a>.</p>
           <p>5.3. Subscribers are responsible for ensuring that their collection and use of data through the Service complies with all applicable data protection laws, including obtaining any necessary consents from Applicants.</p>
-          <p>5.4. Applicants who submit data through intake forms agree to both Chippi&apos;s <a href="/legal/privacy" className="underline hover:text-foreground">Privacy Policy</a> and the applicable Subscriber&apos;s (realtor/brokerage) privacy policy.</p>
+          <p>5.4. Applicants who submit data through intake forms agree to both Chippi&apos;s <a href="/legal/privacy" className="underline hover:text-foreground">Privacy Policy</a> and the applicable Subscriber&apos;s (real estate agent/brokerage) privacy policy.</p>
           <p>5.5. Chippi does not sell Subscriber Data or Applicant data. Chippi does not use Subscriber Data or Applicant data to train artificial intelligence models.</p>
         </div>
       </section>

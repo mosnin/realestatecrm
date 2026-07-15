@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!membership) {
     return NextResponse.json(
-      { error: 'This realtor is not part of a brokerage — there is no team to message.' },
+      { error: 'This real estate agent is not part of a brokerage — there is no team to message.' },
       { status: 404 },
     );
   }

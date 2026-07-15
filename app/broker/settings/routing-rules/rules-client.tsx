@@ -652,7 +652,7 @@ function RuleEditorDialog({
                     Mini round-robin / score pick
                   </p>
                   <p className={CAPTION}>
-                    Distributes matching leads across the realtor pool.
+                    Distributes matching leads across the real estate agent pool.
                   </p>
                 </div>
               </label>
@@ -740,7 +740,7 @@ function RuleEditorDialog({
 function roleLabel(role: string): string {
   if (role === 'broker_owner') return 'Owner';
   if (role === 'broker_admin') return 'Admin';
-  if (role === 'realtor_member') return 'Realtor';
+  if (role === 'realtor_member') return 'Real estate agent';
   return role;
 }
 

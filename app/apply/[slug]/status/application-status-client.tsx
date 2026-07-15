@@ -970,7 +970,7 @@ function TourRequestPanel({
         <CalendarCheck size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0 text-sm">
           <p className="font-medium text-foreground">Tour request sent.</p>
-          <p className="text-muted-foreground">Your realtor will respond shortly.</p>
+          <p className="text-muted-foreground">Your real estate agent will respond shortly.</p>
         </div>
         <button
           type="button"
@@ -998,7 +998,7 @@ function TourRequestPanel({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground">Request a tour</p>
-          <p className="text-xs text-muted-foreground">Tell your realtor when you&apos;re free; they&apos;ll set it up.</p>
+          <p className="text-xs text-muted-foreground">Tell your real estate agent when you&apos;re free; they&apos;ll set it up.</p>
         </div>
       </button>
     );

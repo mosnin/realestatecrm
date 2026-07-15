@@ -430,7 +430,7 @@ export default async function DealDetailPage({
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground truncate">{ownerName}</p>
-                  <p className="text-[11px] text-muted-foreground">Realtor</p>
+                  <p className="text-[11px] text-muted-foreground">Real estate agent</p>
                 </div>
               </div>
 

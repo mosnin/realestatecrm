@@ -129,7 +129,7 @@ export default async function BrokerProfitabilityPage() {
             ? 'Owner'
             : m.role === 'broker_admin'
               ? 'Admin'
-              : 'Realtor',
+              : 'Real estate agent',
         leads: leadsBySpace.get(sid) ?? 0,
       };
     });

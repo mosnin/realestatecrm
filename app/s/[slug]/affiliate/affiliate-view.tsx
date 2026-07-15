@@ -183,7 +183,7 @@ export function AffiliateView({ slug }: { slug: string }) {
     if (status.state === 'unconfigured')
       return 'Affiliate program is not active on this server.';
     if (status.state === 'unenrolled')
-      return 'Refer realtors and brokerages. Earn on every subscription.';
+      return 'Refer real estate agents and brokerages. Earn on every subscription.';
     const s = status.stats;
     if (!s) return 'Your referral link is active.';
     if (s.referrals === 0) return 'Your link is live. Share it.';
@@ -240,7 +240,7 @@ export function AffiliateView({ slug }: { slug: string }) {
               <p className={cn(SECTION_LABEL)}>How it works</p>
             </div>
             <p className={cn(BODY)}>
-              You get a personal referral link. Share it with other realtors or
+              You get a personal referral link. Share it with other real estate agents or
               brokerages. When they subscribe to Chippi through your link, you
               earn a commission on their subscription — recurring, for as long
               as they stay active.
@@ -282,7 +282,7 @@ export function AffiliateView({ slug }: { slug: string }) {
               </button>
             </div>
             <p className={cn(CAPTION)}>
-              Works for individual realtors and entire brokerages — share freely.
+              Works for individual real estate agents and entire brokerages — share freely.
             </p>
           </div>
 

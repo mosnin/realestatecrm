@@ -23,7 +23,7 @@ import {
   CHIPPI_PILL,
 } from '@/lib/typography';
 
-export const metadata: Metadata = { title: 'Realtor Detail — Teams' };
+export const metadata: Metadata = { title: 'Real estate agent Detail — Teams' };
 
 type Params = { params: Promise<{ userId: string }> };
 
@@ -140,8 +140,8 @@ export default async function RealtorDrilldownPage({ params }: Params) {
   // shown here so a realtor's page carries one quality number, not just volume.
   const conversionPct = totalContacts > 0 ? Math.round((wonDeals / totalContacts) * 100) : null;
 
-  const displayName = user.name ?? user.email ?? 'this realtor';
-  const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_admin' ? 'Admin' : 'Realtor';
+  const displayName = user.name ?? user.email ?? 'this real estate agent';
+  const roleLabel = membership.role === 'broker_owner' ? 'Owner' : membership.role === 'broker_admin' ? 'Admin' : 'Real estate agent';
   const joinedAt = new Date(membership.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = (user.name ?? user.email ?? '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 
@@ -187,7 +187,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
         href="/broker/realtors"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
-        <ArrowLeft size={14} /> Back to realtors
+        <ArrowLeft size={14} /> Back to real estate agents
       </Link>
 
       {/* Profile header — identity on the left, the two real actions on the
@@ -303,7 +303,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-foreground">No workspace yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            This realtor hasn&apos;t set up their workspace.
+            This real estate agent hasn&apos;t set up their workspace.
           </p>
         </div>
       ) : (

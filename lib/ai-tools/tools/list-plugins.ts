@@ -31,7 +31,7 @@ export const listPluginsTool = defineTool<typeof parameters, ListPluginsResult>(
 
     const plugins = (data ?? []) as ListPluginsResult['plugins'];
     if (plugins.length === 0) {
-      return { summary: 'No custom plugins registered. The realtor can add one on the Plugins page.', data: { plugins } };
+      return { summary: 'No custom plugins registered. The real estate agent can add one on the Plugins page.', data: { plugins } };
     }
     const lines = plugins
       .map((p) => `${p.name}${p.enabled ? '' : ' (disabled)'} — ${p.description}`)

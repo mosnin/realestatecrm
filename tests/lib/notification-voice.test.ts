@@ -179,7 +179,7 @@ describe('notification-voice — brokerage events', () => {
   it('uses "joined" for join-code, "accepted the invitation" for email', () => {
     expect(notificationForMemberJoined('alice@x.com', 'realtor_member', 'join_code')).toEqual({
       title: 'alice@x.com joined the brokerage.',
-      description: 'Realtor',
+      description: 'Real estate agent',
     });
     expect(
       notificationForMemberJoined('alice@x.com', 'broker_admin', 'email_invitation'),

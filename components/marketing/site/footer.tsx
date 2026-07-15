@@ -11,7 +11,7 @@ import { ArrowRight } from 'lucide-react';
 
 const columns = {
   Product: [
-    { label: 'For realtors', href: '/realtors' },
+    { label: 'For real estate agents', href: '/realtors' },
     { label: 'For brokerages', href: '/brokerages' },
     { label: 'Plugins', href: '/integrations' },
     { label: 'Pricing', href: '/pricing' },
@@ -59,7 +59,7 @@ export function SiteFooter() {
             <div className="col-span-2 md:col-span-1">
               <p className="max-w-xs text-sm leading-relaxed text-neutral-600">
                 The agentic OS for real-estate agents and brokerages, every
-                realtor with Chippi doing real work for them.
+                real estate agent with Chippi doing real work for them.
               </p>
             </div>
             {Object.entries(columns).map(([heading, items]) => (

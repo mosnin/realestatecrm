@@ -25,7 +25,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
     short_name: 'Chippi',
     description:
-      'An AI agent that runs your realtor workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current.',
+      'An AI agent that runs your real estate agent workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current.',
     start_url: '/',
     display: 'standalone',
     orientation: 'portrait',

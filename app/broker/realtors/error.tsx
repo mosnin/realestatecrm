@@ -19,7 +19,7 @@ export default function BrokerRealtorsError({ reset }: { error: Error; reset: ()
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
           <CloudOff size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
         </div>
-        <h2 className={H3}>Couldn&apos;t load realtors</h2>
+        <h2 className={H3}>Couldn&apos;t load real estate agents</h2>
         <p className={cn(BODY_MUTED, 'mt-1.5')}>Usually temporary.</p>
         <button
           type="button"

@@ -34,7 +34,7 @@ import {
 import { FeatureList } from '@/components/marketing/site/home/feature-list';
 
 export const metadata = {
-  title: 'For realtors · Chippi',
+  title: 'For real estate agents · Chippi',
   description:
     'Chippi works your book while you close, reading the inbox, sending replies in your voice, and booking tour times against your real calendar.',
 };
@@ -283,7 +283,7 @@ export default function RealtorsPage() {
   return (
     <div>
       <PageHero
-        eyebrow="For solo realtors"
+        eyebrow="For solo real estate agents"
         title="Your book, worked while you close"
         sub="Chippi reads your inbox, sends every reply in your voice, and books tour times against your real calendar."
         primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}

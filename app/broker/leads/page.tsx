@@ -212,7 +212,7 @@ export default async function BrokerLeadsPage() {
       // Legacy: parse from notes
       const realtorIdMatch = c.notes?.match(/Assigned to realtor \(([^)]+)\)/);
       assignedName = realtorIdMatch?.[1]
-        ? realtorNameMap.get(realtorIdMatch[1]) ?? 'Realtor'
+        ? realtorNameMap.get(realtorIdMatch[1]) ?? 'Real estate agent'
         : null;
       const dateMatch = c.notes?.match(/Assigned to realtor .+ on (\S+)/);
       assignedAt = dateMatch?.[1] ?? (c.tags.includes('assigned') ? c.createdAt : null);
@@ -254,7 +254,7 @@ export default async function BrokerLeadsPage() {
       (l) => l.scoreLabel?.toLowerCase() === 'hot',
     ).length;
     if (hotAssigned > 0) {
-      return `${hotAssigned} hot ${hotAssigned === 1 ? 'lead' : 'leads'} on a realtor's plate. Check in.`;
+      return `${hotAssigned} hot ${hotAssigned === 1 ? 'lead' : 'leads'} on a real estate agent's plate. Check in.`;
     }
     const total = unassignedCount + assignedLeads.length;
     if (total === 0) {

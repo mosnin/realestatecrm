@@ -212,7 +212,7 @@ export default function BrokerFormBuilderPage() {
 
   const memberLabel = memberCount != null
     ? `${memberCount} member${memberCount === 1 ? '' : 's'}`
-    : 'all member realtors';
+    : 'all member real estate agents';
 
   const handlePushToMembers = useCallback(async () => {
     setPushing(true);
@@ -345,7 +345,7 @@ export default function BrokerFormBuilderPage() {
               Apply both rental and buyer forms to {memberCount != null ? (
                 <span className="font-medium text-foreground">{memberCount} member{memberCount === 1 ? '' : 's'}</span>
               ) : (
-                'all member realtors'
+                'all member real estate agents'
               )}. Their individual form settings will be overridden.
             </p>
           </div>

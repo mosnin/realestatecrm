@@ -113,7 +113,7 @@ export function InviteForm({ isOwner = true, seatUsage }: InviteFormProps) {
                   : 'bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
               } disabled:opacity-50`}
             >
-              Realtor
+              Real estate agent
             </button>
             <button
               type="button"

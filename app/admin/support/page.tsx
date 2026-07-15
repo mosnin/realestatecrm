@@ -44,7 +44,7 @@ export default async function AdminSupportPage() {
       <AdminPageHeader
         eyebrow="System."
         title="Support"
-        subtitle={`Help requests from realtors. ${tickets.length} total.`}
+        subtitle={`Help requests from real estate agents. ${tickets.length} total.`}
       />
       <SupportClient initialTickets={tickets} spaceMap={spaceMap} />
     </div>

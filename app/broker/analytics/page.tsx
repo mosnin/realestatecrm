@@ -164,7 +164,7 @@ export default async function BrokerAnalyticsPage() {
             ? 'Owner'
             : m.role === 'broker_admin'
               ? 'Admin'
-              : 'Realtor',
+              : 'Real estate agent',
         totalLeads: s.totalLeads,
         qualification: s.qualification,
         tours: s.tour,
@@ -229,7 +229,7 @@ export default async function BrokerAnalyticsPage() {
         <div className={cn(SURFACE_CARD, 'px-5 py-10 text-center')}>
           <p className="text-sm text-foreground">No activity yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Lead and deal data across your member realtors will appear here.
+            Lead and deal data across your member real estate agents will appear here.
           </p>
         </div>
       ) : (

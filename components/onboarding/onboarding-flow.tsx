@@ -40,8 +40,8 @@ const BROKER_READY_WORDS = ['Building.', 'Wiring.', 'Done.'] as const;
 type Role = 'realtor' | 'broker' | 'broker_only';
 
 const ROLE_OPTIONS: TileOption<Role>[] = [
-  { value: 'realtor',     label: 'Realtor',           description: 'Solo agent with a pipeline.',      icon: Home },
-  { value: 'broker',      label: 'Broker + realtor',  description: 'Run a team and sell.',             icon: Briefcase },
+  { value: 'realtor',     label: 'Real estate agent', description: 'Solo agent with a pipeline.',      icon: Home },
+  { value: 'broker',      label: 'Broker + real estate agent',  description: 'Run a team and sell.',             icon: Briefcase },
   { value: 'broker_only', label: 'Broker only',       description: 'Team lead - no personal pipeline.', icon: Building2 },
 ];
 

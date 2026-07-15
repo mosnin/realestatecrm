@@ -56,7 +56,7 @@ export async function PATCH(
       .maybeSingle();
     const s = space as { brokerageId?: string; ownerId?: string } | null;
     if (!s?.ownerId) {
-      return NextResponse.json({ error: 'That realtor is not in your brokerage.' }, { status: 400 });
+      return NextResponse.json({ error: 'That real estate agent is not in your brokerage.' }, { status: 400 });
     }
 
     let inBrokerage = s.ownerId === ctx.brokerage.ownerId;
@@ -71,7 +71,7 @@ export async function PATCH(
     }
 
     if (!inBrokerage) {
-      return NextResponse.json({ error: 'That realtor is not in your brokerage.' }, { status: 400 });
+      return NextResponse.json({ error: 'That real estate agent is not in your brokerage.' }, { status: 400 });
     }
   }
 

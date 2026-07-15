@@ -43,7 +43,7 @@ export default async function LeaderboardPage() {
           <h1 className={cn(H1)} style={TITLE_FONT}>
             Leaderboard
           </h1>
-          <p className={cn(BODY_MUTED)}>No realtors to rank yet.</p>
+          <p className={cn(BODY_MUTED)}>No real estate agents to rank yet.</p>
         </header>
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
           <p className={cn(BODY_MUTED, 'text-[13px]')}>
@@ -168,9 +168,9 @@ export default async function LeaderboardPage() {
   const ranked = stats.length;
   const closed = stats.reduce((sum, s) => sum + s.dealsClosed, 0);
   const statusSentence = (() => {
-    if (ranked === 0) return 'No realtors to rank yet.';
-    if (closed === 0) return `Ranking ${ranked} ${ranked === 1 ? 'realtor' : 'realtors'} — no deals closed yet.`;
-    return `Ranking ${ranked} ${ranked === 1 ? 'realtor' : 'realtors'} · ${closed} ${closed === 1 ? 'deal' : 'deals'} closed.`;
+    if (ranked === 0) return 'No real estate agents to rank yet.';
+    if (closed === 0) return `Ranking ${ranked} ${ranked === 1 ? 'real estate agent' : 'real estate agents'} — no deals closed yet.`;
+    return `Ranking ${ranked} ${ranked === 1 ? 'real estate agent' : 'real estate agents'} · ${closed} ${closed === 1 ? 'deal' : 'deals'} closed.`;
   })();
 
   return (

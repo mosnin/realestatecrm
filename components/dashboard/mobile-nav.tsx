@@ -20,7 +20,7 @@ import {
 const brokerSideItems = [
   { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: true },
   { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
-  { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false },
+  { href: '/broker/realtors', label: 'Real estate agents', icon: UserCircle, exact: false },
   { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false },
 ];
 

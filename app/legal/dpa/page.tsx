@@ -26,7 +26,7 @@ export default function DataProcessingAgreementPage() {
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
           <p>1.1. In this DPA, the following terms have the meanings set out below:</p>
           <ul className="list-disc pl-5 space-y-2">
-            <li><strong className="text-foreground">&quot;Controller&quot;</strong> means the Subscriber (realtor, brokerage, or other entity) that determines the purposes and means of the processing of personal data through the Service. The Controller is the Data Controller with respect to all Applicant data and Subscriber Data processed through the Service.</li>
+            <li><strong className="text-foreground">&quot;Controller&quot;</strong> means the Subscriber (real estate agent, brokerage, or other entity) that determines the purposes and means of the processing of personal data through the Service. The Controller is the Data Controller with respect to all Applicant data and Subscriber Data processed through the Service.</li>
             <li><strong className="text-foreground">&quot;Processor&quot;</strong> means Chippi Inc., which processes personal data on behalf of the Controller in connection with the provision of the Service.</li>
             <li><strong className="text-foreground">&quot;Personal Data&quot;</strong> means any information relating to an identified or identifiable natural person that is processed by the Processor on behalf of the Controller through the Service.</li>
             <li><strong className="text-foreground">&quot;Data Subject&quot;</strong> means the identified or identifiable natural person to whom Personal Data relates, including Applicants who submit data through intake forms.</li>

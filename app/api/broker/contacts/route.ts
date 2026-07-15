@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   for (const m of allMembers) {
     const sid = m.Space?.id;
     if (!sid) continue;
-    spaceToRealtor.set(sid, m.User?.name ?? m.User?.email ?? 'Unknown realtor');
+    spaceToRealtor.set(sid, m.User?.name ?? m.User?.email ?? 'Unknown real estate agent');
   }
 
   // ── Parse query params ────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
   // Annotate each row with realtorName
   const annotated = (data ?? []).map((c: any) => ({
     ...c,
-    realtorName: spaceToRealtor.get(c.spaceId) ?? 'Unknown realtor',
+    realtorName: spaceToRealtor.get(c.spaceId) ?? 'Unknown real estate agent',
   }));
 
   return NextResponse.json(annotated);

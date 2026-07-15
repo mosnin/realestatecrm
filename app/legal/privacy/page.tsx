@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
         <h2 className="text-xl font-semibold">1. Who We Are</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
           <p>1.1. Chippi Inc. operates a B2B SaaS agentic OS for real estate agents and brokerages. The platform combines an autonomous AI agent with intake forms, AI lead scoring, deal pipelines, tour scheduling, voice AI, MCP server integration, and brokerage team management.</p>
-          <p>1.2. With respect to Subscriber Data (including Applicant data), Chippi acts as a <strong className="text-foreground">Data Processor</strong>. We process data on behalf of our Subscribers (realtors and brokerages), who are the <strong className="text-foreground">Data Controllers</strong>.</p>
+          <p>1.2. With respect to Subscriber Data (including Applicant data), Chippi acts as a <strong className="text-foreground">Data Processor</strong>. We process data on behalf of our Subscribers (real estate agents and brokerages), who are the <strong className="text-foreground">Data Controllers</strong>.</p>
           <p>1.3. For data we collect directly about Subscribers for account and billing purposes, Chippi acts as the Data Controller.</p>
         </div>
       </section>
@@ -32,9 +32,9 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">2. Data Controller Clarification</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>2.1. Realtors and brokerages who use the Service are the Data Controllers of the data they collect through intake forms, deal pipelines, and other Service features. They are responsible for how they use their own data.</p>
+          <p>2.1. Real estate agents and brokerages who use the Service are the Data Controllers of the data they collect through intake forms, deal pipelines, and other Service features. They are responsible for how they use their own data.</p>
           <p>2.2. Subscribers are responsible for obtaining all necessary consents from Applicants and complying with applicable data protection laws.</p>
-          <p>2.3. Applicants who submit data through intake forms agree to both Chippi&apos;s Privacy Policy and the applicable Subscriber&apos;s (realtor/brokerage) privacy policy.</p>
+          <p>2.3. Applicants who submit data through intake forms agree to both Chippi&apos;s Privacy Policy and the applicable Subscriber&apos;s (real estate agent/brokerage) privacy policy.</p>
           <p>2.4. For details on how we process data on behalf of Subscribers, please refer to our <a href="/legal/dpa" className="underline hover:text-foreground">Data Processing Agreement</a>.</p>
         </div>
       </section>
@@ -62,7 +62,7 @@ export default function PrivacyPolicyPage() {
             <li>Any other information the Subscriber&apos;s intake form requests.</li>
           </ul>
           <p>4.2. Applicant data is processed solely for the purpose of providing the Service to the Subscriber. The Subscriber determines what data is collected through their intake forms.</p>
-          <p>4.3. Applicants with questions about how their data is used should contact the Subscriber (realtor/brokerage) who collected their information.</p>
+          <p>4.3. Applicants with questions about how their data is used should contact the Subscriber (real estate agent/brokerage) who collected their information.</p>
         </div>
       </section>
 
@@ -165,7 +165,7 @@ export default function PrivacyPolicyPage() {
             <li><strong className="text-foreground">Opt-Out.</strong> Opt out of non-essential communications at any time.</li>
           </ul>
           <p>11.2. <strong className="text-foreground">For Subscribers:</strong> You can exercise these rights by contacting us at <a href="mailto:help@usechippi.com" className="underline hover:text-foreground">help@usechippi.com</a> or through your account settings.</p>
-          <p>11.3. <strong className="text-foreground">For Applicants:</strong> Because Subscribers are the Data Controllers of Applicant data, Applicants should first contact the realtor or brokerage that collected their information. If you are unable to reach the Subscriber, you may contact us at <a href="mailto:help@usechippi.com" className="underline hover:text-foreground">help@usechippi.com</a> and we will assist in forwarding your request.</p>
+          <p>11.3. <strong className="text-foreground">For Applicants:</strong> Because Subscribers are the Data Controllers of Applicant data, Applicants should first contact the real estate agent or brokerage that collected their information. If you are unable to reach the Subscriber, you may contact us at <a href="mailto:help@usechippi.com" className="underline hover:text-foreground">help@usechippi.com</a> and we will assist in forwarding your request.</p>
           <p>11.4. We will respond to data rights requests within 30 days.</p>
         </div>
       </section>
@@ -203,7 +203,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">14A. Subscriber Tracking Technologies</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>14A.1. Subscribers (realtors and brokerages) may configure third-party tracking pixels on their public-facing intake forms and tour booking pages. These tracking technologies may include pixels and scripts from platforms such as Meta/Facebook, Google Analytics, Google Ads, TikTok, Twitter/X, LinkedIn, and Snapchat.</p>
+          <p>14A.1. Subscribers (real estate agents and brokerages) may configure third-party tracking pixels on their public-facing intake forms and tour booking pages. These tracking technologies may include pixels and scripts from platforms such as Meta/Facebook, Google Analytics, Google Ads, TikTok, Twitter/X, LinkedIn, and Snapchat.</p>
           <p>14A.2. These technologies may collect information such as IP addresses, browser type, device information, pages visited, and actions taken (such as form submissions). This data is sent directly from the Applicant&apos;s browser to the respective third-party platform.</p>
           <p>14A.3. <strong className="text-foreground">Chippi acts as a Data Processor</strong> with respect to Subscriber-configured tracking pixels. The Subscriber (Data Controller) is responsible for disclosing the use of these technologies in their own privacy policy and obtaining any required consents.</p>
           <p>14A.4. Applicants may opt out of third-party tracking by adjusting their browser settings, using browser extensions that block tracking scripts, or visiting the <a href="https://optout.aboutads.info/" className="underline hover:text-foreground" target="_blank" rel="noopener noreferrer">Digital Advertising Alliance&apos;s opt-out page</a>.</p>

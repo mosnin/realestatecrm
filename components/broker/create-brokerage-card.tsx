@@ -81,7 +81,7 @@ export function CreateBrokerageCard({ existingBrokerageName }: CreateBrokerageCa
           </div>
           <div>
             <p className="text-sm font-semibold">Create a brokerage</p>
-            <p className="text-xs text-muted-foreground">Invite realtors and get team visibility</p>
+            <p className="text-xs text-muted-foreground">Invite real estate agents and get team visibility</p>
           </div>
         </div>
         <form onSubmit={handleCreate} className="flex gap-2">

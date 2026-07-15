@@ -44,7 +44,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
     .eq('id', dbUserId)
     .maybeSingle();
 
-  const userName = userRow?.name ?? userRow?.email ?? 'Realtor';
+  const userName = userRow?.name ?? userRow?.email ?? 'Real estate agent';
   const firstName = userName.split(' ')[0] ?? userName;
 
   if (!space) {

@@ -46,7 +46,7 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
   requiresApproval: true,
   rateLimit: { max: 60, windowSeconds: 3600 },
   summariseCall(args) {
-    return `Reassign contact ${args.personId.slice(0, 8)} → realtor ${args.realtorUserId.slice(0, 8)}: ${args.why}`;
+    return `Reassign contact ${args.personId.slice(0, 8)} → real estate agent ${args.realtorUserId.slice(0, 8)}: ${args.why}`;
   },
 
   async handler(args, ctx) {
@@ -81,7 +81,7 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
       !realtorMembership ||
       !callerBrokerageIds.has((realtorMembership as { brokerageId: string }).brokerageId)
     ) {
-      return { summary: 'That realtor is not in your brokerage.', display: 'error' };
+      return { summary: 'That real estate agent is not in your brokerage.', display: 'error' };
     }
 
     // ── Contact must exist (in this space OR linked to the brokerage) ──────

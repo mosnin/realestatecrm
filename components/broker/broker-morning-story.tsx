@@ -170,7 +170,7 @@ function StatsRow({
 }) {
   return (
     <div className="flex items-center gap-4 text-[11px] tabular-nums text-muted-foreground">
-      <Stat label="realtors" value={stats.realtors} loading={loading} />
+      <Stat label="real estate agents" value={stats.realtors} loading={loading} />
       <Divider />
       <Stat label="active deals" value={stats.activeDeals} loading={loading} />
       <Divider />

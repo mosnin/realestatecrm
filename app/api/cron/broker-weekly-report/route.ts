@@ -174,7 +174,7 @@ async function handler(req: NextRequest) {
           const row: AgentRow = {
             name: user?.name ?? user?.email ?? 'Unknown',
             email: user?.email ?? '',
-            role: m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_admin' ? 'Admin' : 'Realtor',
+            role: m.role === 'broker_owner' ? 'Owner' : m.role === 'broker_admin' ? 'Admin' : 'Real estate agent',
             newLeads: newLeadsBySpace[sid] ?? 0,
             contacted: contactedBySpace[sid] ?? 0,
             dealsCreated: newDealsBySpace[sid] ?? 0,

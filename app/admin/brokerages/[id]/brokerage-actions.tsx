@@ -230,7 +230,7 @@ function ChangeMemberRole({
         className="text-[11px] rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <option value="broker_admin">Admin</option>
-        <option value="realtor_member">Realtor</option>
+        <option value="realtor_member">Real estate agent</option>
       </select>
       {error && <p className="text-[11px] text-destructive mt-0.5">{error}</p>}
     </div>
@@ -307,7 +307,7 @@ function InviteMember({
                 onChange={(e) => setRole(e.target.value)}
                 className="mt-1 w-full text-sm rounded-md border border-border bg-card px-2 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="realtor_member">Realtor</option>
+                <option value="realtor_member">Real estate agent</option>
                 <option value="broker_admin">Admin</option>
               </select>
             </div>

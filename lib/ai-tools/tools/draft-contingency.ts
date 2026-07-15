@@ -142,7 +142,7 @@ export const draftContingencyTool = defineTool<typeof parameters, DraftContingen
       channel: 'note',
       subject: `${typeLabel} contingency — ${dealRow.title}`,
       content,
-      reasoning: `Drafted a ${typeLabel.toLowerCase()} contingency summary for realtor review (not sent, not binding).`,
+      reasoning: `Drafted a ${typeLabel.toLowerCase()} contingency summary for real estate agent review (not sent, not binding).`,
       priority: 0,
       status: 'pending',
       expiresAt,

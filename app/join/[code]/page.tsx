@@ -60,7 +60,7 @@ export default async function JoinWithCodePage({ params }: Params) {
                   <p className="text-sm text-foreground leading-relaxed">
                     You&apos;ve been invited to join{' '}
                     <span className="font-semibold">{brokerage.name}</span> as a{' '}
-                    <span className="font-semibold">Realtor Member</span>.
+                    <span className="font-semibold">Real estate agent member</span>.
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
                     You&apos;ll keep your own workspace, leads, and pipeline — this just adds you to the brokerage network.

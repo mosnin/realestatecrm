@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   if (typeof body.assignedSpaceId === 'string' && body.assignedSpaceId) {
     const members = await loadMemberSpaces(ctx.brokerage.id, ctx.brokerage.ownerId);
     if (!members.some((m) => m.id === body.assignedSpaceId)) {
-      return NextResponse.json({ error: 'That realtor is not in your brokerage.' }, { status: 400 });
+      return NextResponse.json({ error: 'That real estate agent is not in your brokerage.' }, { status: 400 });
     }
     assignedSpaceId = body.assignedSpaceId;
   }

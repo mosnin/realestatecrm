@@ -641,7 +641,7 @@ export default async function BrokerForecastPage() {
           {/* Per-realtor performance context */}
           <section>
             <div className="flex items-center gap-3 pb-3 border-b border-border/60">
-              <h2 className={SECTION_LABEL}>By realtor</h2>
+              <h2 className={SECTION_LABEL}>By real estate agent</h2>
               {realtorRollups.length > 0 && (
                 <span className="text-[11px] text-muted-foreground tabular-nums">
                   {realtorRollups.length}
@@ -651,9 +651,9 @@ export default async function BrokerForecastPage() {
 
             {realtorRollups.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center mt-4">
-                <p className="text-sm text-foreground">No realtor activity yet.</p>
+                <p className="text-sm text-foreground">No real estate agent activity yet.</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Each realtor&rsquo;s forecast and pace will appear here as deals move.
+                  Each real estate agent&rsquo;s forecast and pace will appear here as deals move.
                 </p>
               </div>
             ) : (
@@ -800,7 +800,7 @@ function EmptyPage({
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
         <p className="text-sm text-foreground">Nothing in the pipeline yet.</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Invite your first realtor and their deals will appear here.
+          Invite your first real estate agent and their deals will appear here.
         </p>
       </div>
     </div>

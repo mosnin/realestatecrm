@@ -4,6 +4,7 @@ import { Sparkles, Users, Briefcase, Building2, FileText, Globe } from 'lucide-r
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { isTabAvailable, type RightPanelVariant } from './right-panel-embeds';
 
 /**
  * Canonical union of RightPanel tabs. hooks/use-split-panel.ts re-exports this
@@ -27,6 +28,9 @@ interface RightPanelTabsProps {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
   className?: string;
+  /** `broker` omits the Documents tab — there is no brokerage-scoped
+   *  Documents surface to embed. Defaults to the realtor tab set. */
+  variant?: RightPanelVariant;
 }
 
 const TABS: ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users }> = [
@@ -38,7 +42,10 @@ const TABS: ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users
   { id: 'browser', label: 'Browser', icon: Globe },
 ];
 
-export function RightPanelTabs({ activeTab, onTabChange, className }: RightPanelTabsProps) {
+export function RightPanelTabs({ activeTab, onTabChange, className, variant = 'realtor' }: RightPanelTabsProps) {
+  // Broker has no Documents surface — drop tabs the variant omits so they
+  // can't be selected (single source of truth in right-panel-embeds).
+  const tabs = TABS.filter((t) => isTabAvailable(variant, t.id));
   return (
     <div
       className={cn(
@@ -48,7 +55,7 @@ export function RightPanelTabs({ activeTab, onTabChange, className }: RightPanel
         className,
       )}
     >
-      {TABS.map(({ id, label, icon: Icon }) => {
+      {tabs.map(({ id, label, icon: Icon }) => {
         const isActive = activeTab === id;
         return (
           <button

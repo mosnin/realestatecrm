@@ -189,7 +189,7 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/integrations', label: 'Plugins', icon: Plug, exact: false, adminOnly: false },
       { href: '/broker/routines', label: 'Routines', icon: CalendarClock, exact: false, adminOnly: true },
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
-      { href: '/broker/realtors', label: 'Realtors', icon: UserCircle, exact: false, adminOnly: false },
+      { href: '/broker/realtors', label: 'Real estate agents', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
@@ -1859,7 +1859,7 @@ function RealtorSidebarShell({
             because the row is the workspace identity at that width. */}
         <WorkspaceSwitcher
           currentName={spaceName}
-          currentSubtitle="Solo realtor"
+          currentSubtitle="Solo real estate agent"
           currentIcon={Briefcase}
           slug={slug}
           spaceName={spaceName}

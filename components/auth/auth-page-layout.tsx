@@ -100,7 +100,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
                   )}
                 >
                   <User size={16} className="shrink-0 sm:size-[14px]" />
-                  Realtor
+                  Real estate agent
                 </Link>
                 <Link
                   href="/login/broker"

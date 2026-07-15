@@ -166,7 +166,7 @@ function AssignControl({ property, members, onAssigned }: AssignControlProps) {
         onChange={handleChange}
         disabled={saving}
         className={selectClasses}
-        aria-label="Assign to realtor"
+        aria-label="Assign to real estate agent"
       >
         <option value="">Unassigned</option>
         {members.map((m) => (
@@ -478,7 +478,7 @@ function AddPropertyForm({ members, onCreated, onCancel }: AddPropertyFormProps)
 
         {/* Assign on create — broker-only field not in PropertyForm */}
         {members.length > 0 && (
-          <FormField label="Assign to realtor">
+          <FormField label="Assign to real estate agent">
             <select
               value={v.assignedSpaceId}
               onChange={(e) => set('assignedSpaceId', e.target.value)}
@@ -679,7 +679,7 @@ export function BrokerPropertiesClient() {
             Quiet — no properties in the pool yet.
           </p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
-            Add the first listing to start assigning to your realtors.
+            Add the first listing to start assigning to your real estate agents.
           </p>
           <button
             type="button"

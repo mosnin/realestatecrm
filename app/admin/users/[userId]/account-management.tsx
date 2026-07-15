@@ -37,7 +37,7 @@ interface AccountManagementProps {
 const ROLE_LABEL: Record<string, string> = {
   broker_owner: 'Owner',
   broker_admin: 'Admin',
-  realtor_member: 'Realtor',
+  realtor_member: 'Real estate agent',
 };
 
 export function AccountManagement({
@@ -309,7 +309,7 @@ export function AccountManagement({
                             className="text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
                           >
                             <option value="broker_admin">Admin</option>
-                            <option value="realtor_member">Realtor</option>
+                            <option value="realtor_member">Real estate agent</option>
                           </select>
                         )}
                       </div>

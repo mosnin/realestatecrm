@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 import { RightPanelTabs, type RightPanelTab } from './right-panel-tabs';
 import { BrowserView } from './browser-view';
+import { embedSrcFor, type EmbedTab, type RightPanelVariant } from './right-panel-embeds';
 
 interface RightPanelProps {
   slug: string;
@@ -19,26 +20,15 @@ interface RightPanelProps {
   /** True while the divider is being dragged — the iframes are made
    *  pointer-events:none so they stop swallowing the drag's mousemove events. */
   isResizing?: boolean;
+  /**
+   * Which Chippi surface owns this panel. `realtor` (default) embeds the
+   * space-scoped `/s/<slug>/…` dashboard routes; `broker` embeds the
+   * brokerage-scoped `/broker/…` routes instead. The `activity` (live work)
+   * and `browser` tabs are universal. Broker has no Documents surface, so that
+   * tab is omitted for the broker variant (see RightPanelTabs).
+   */
+  variant?: RightPanelVariant;
 }
-
-// Every tab except 'browser' embeds an internal dashboard page.
-type EmbedTab = Exclude<RightPanelTab, 'browser'>;
-
-// `?embed=1` flips the dashboard layout into chrome-stripped mode so the
-// iframe shows ONLY the page content (the People list, Deals kanban,
-// Properties grid, Documents editor) — no nested sidebar, no nested header,
-// no nested chat bar. The outer Chippi already owns all of those. See
-// `EmbedDetector` in app/s/[slug]/layout.tsx and the
-// `[data-chippi-embed='true']` rules in app/globals.css.
-const TAB_PATHS: Record<EmbedTab, (slug: string) => string> = {
-  // The default: Chippi's live work — the realtime activity feed of what it's
-  // doing, drafting, and touching right now (not static CRM navigation).
-  activity: (slug) => `/s/${slug}/chippi/activity?embed=1`,
-  people: (slug) => `/s/${slug}/contacts?embed=1`,
-  deals: (slug) => `/s/${slug}/deals?embed=1`,
-  properties: (slug) => `/s/${slug}/properties?embed=1`,
-  documents: (slug) => `/s/${slug}/documents?embed=1`,
-};
 
 const TAB_LABELS: Record<EmbedTab, string> = {
   activity: "Chippi's live activity panel",
@@ -48,7 +38,14 @@ const TAB_LABELS: Record<EmbedTab, string> = {
   documents: 'Documents dashboard panel',
 };
 
-export function RightPanel({ slug, activeTab, onTabChange, className, isResizing }: RightPanelProps) {
+export function RightPanel({
+  slug,
+  activeTab,
+  onTabChange,
+  className,
+  isResizing,
+  variant = 'realtor',
+}: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
   // via CSS) so the visited page, its scroll position, and back/forward
@@ -56,11 +53,23 @@ export function RightPanel({ slug, activeTab, onTabChange, className, isResizing
   // remount-per-switch behavior.
   const [browserMounted, setBrowserMounted] = useState(false);
   const isBrowser = activeTab === 'browser';
+  // Broker has no surface for some realtor tabs (Documents). If a stale
+  // persisted tab (the split-panel state is shared across variants) lands on
+  // one, self-correct to the always-present live-work activity feed rather
+  // than render a broken iframe.
+  const embedTab = isBrowser ? 'activity' : (activeTab as EmbedTab);
+  const embedSrc = embedSrcFor(variant, embedTab, slug);
 
   useEffect(() => {
     setIsLoading(true);
     if (activeTab === 'browser') setBrowserMounted(true);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (variant === 'broker' && !isBrowser && embedSrc === null) {
+      onTabChange('activity');
+    }
+  }, [variant, isBrowser, embedSrc, onTabChange]);
 
   return (
     <motion.div
@@ -77,7 +86,7 @@ export function RightPanel({ slug, activeTab, onTabChange, className, isResizing
       exit={{ x: 24, opacity: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_IN_OUT }}
     >
-      <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} />
+      <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} variant={variant} />
 
       <div className="flex-1 relative min-h-0">
         {!isBrowser && (
@@ -96,11 +105,13 @@ export function RightPanel({ slug, activeTab, onTabChange, className, isResizing
               </div>
             )}
             <iframe
-              key={activeTab}
-              src={TAB_PATHS[activeTab as EmbedTab](slug)}
+              // Re-key on the resolved src so a variant fallback (broker +
+              // documents → activity) actually remounts the frame.
+              key={embedSrc ?? embedTab}
+              src={embedSrc ?? embedSrcFor(variant, 'activity', slug) ?? ''}
               className={cn('w-full h-full border-0', isResizing && 'pointer-events-none')}
-              title={TAB_LABELS[activeTab as EmbedTab]}
-              aria-label={TAB_LABELS[activeTab as EmbedTab]}
+              title={TAB_LABELS[embedTab]}
+              aria-label={TAB_LABELS[embedTab]}
               onLoad={() => setIsLoading(false)}
             />
           </>
