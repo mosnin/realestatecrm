@@ -221,6 +221,9 @@ export function AccountBillingPanel({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelResult, setCancelResult] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // SOC2 step-up: reason (>= 10 chars) + the operator typing 'CANCEL'.
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelConfirm, setCancelConfirm] = useState('');
 
   async function handleCancel() {
     setCancelLoading(true);
@@ -229,12 +232,21 @@ export function AccountBillingPanel({
       const res = await fetch('/api/admin/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel_subscription', accountType, accountId, mode: cancelMode }),
+        body: JSON.stringify({
+          action: 'cancel_subscription',
+          accountType,
+          accountId,
+          mode: cancelMode,
+          reason: cancelReason.trim(),
+          confirm: cancelConfirm,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setCancelResult(data.message || 'Subscription canceled.');
         setCancelOpen(false);
+        setCancelReason('');
+        setCancelConfirm('');
         router.refresh();
       } else {
         setCancelResult(data.error || 'Cancel failed.');
@@ -341,6 +353,9 @@ export function AccountBillingPanel({
   const [refundLoading, setRefundLoading] = useState(false);
   const [refundResult, setRefundResult] = useState<string | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
+  // SOC2 step-up: reason (>= 10 chars) + the operator typing 'REFUND'.
+  const [refundReason, setRefundReason] = useState('');
+  const [refundConfirm, setRefundConfirm] = useState('');
 
   const loadInvoices = useCallback(async () => {
     setInvoicesLoading(true);
@@ -390,12 +405,16 @@ export function AccountBillingPanel({
           ...(ownerUserId ? { userId: ownerUserId } : {}),
           ...(selectedInvoice ? { invoiceId: selectedInvoice } : {}),
           ...(amountCents !== undefined ? { amount: amountCents } : {}),
+          reason: refundReason.trim(),
+          confirm: refundConfirm,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setRefundResult(`Refund issued. ID ${data.refundId}, amount ${fmtMoney(data.amount)}.`);
         setRefundOpen(false);
+        setRefundReason('');
+        setRefundConfirm('');
         router.refresh();
       } else {
         setRefundResult(data.error || 'Refund failed.');
@@ -592,9 +611,46 @@ export function AccountBillingPanel({
                       )}
                     </DialogDescription>
                   </DialogHeader>
+                  <div className="flex flex-col gap-3 py-1">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-foreground/80">
+                        Reason (recorded in the audit log)
+                      </span>
+                      <textarea
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        rows={2}
+                        placeholder="Why is this subscription being canceled?"
+                        className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      />
+                      {cancelReason.length > 0 && cancelReason.trim().length < 10 && (
+                        <span className="text-[11px] text-muted-foreground">At least 10 characters.</span>
+                      )}
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-foreground/80">
+                        Type &quot;CANCEL&quot; to confirm
+                      </span>
+                      <input
+                        value={cancelConfirm}
+                        onChange={(e) => setCancelConfirm(e.target.value)}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      />
+                    </label>
+                  </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setCancelOpen(false)}>Back</Button>
-                    <Button variant="destructive" onClick={handleCancel} disabled={cancelLoading}>
+                    <Button
+                      variant="destructive"
+                      onClick={handleCancel}
+                      disabled={
+                        cancelLoading ||
+                        cancelReason.trim().length < 10 ||
+                        cancelConfirm !== 'CANCEL'
+                      }
+                    >
                       <Ban size={14} />
                       {cancelLoading ? 'Canceling…' : 'Confirm cancel'}
                     </Button>
@@ -750,10 +806,41 @@ export function AccountBillingPanel({
                           className="w-40 text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-muted-foreground">Reason (recorded in the audit log)</label>
+                        <textarea
+                          value={refundReason}
+                          onChange={(e) => setRefundReason(e.target.value)}
+                          rows={2}
+                          placeholder="Why is this refund being issued?"
+                          className="w-full resize-none text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        {refundReason.length > 0 && refundReason.trim().length < 10 && (
+                          <span className="text-[11px] text-muted-foreground">At least 10 characters.</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-muted-foreground">Type &quot;REFUND&quot; to confirm</label>
+                        <input
+                          value={refundConfirm}
+                          onChange={(e) => setRefundConfirm(e.target.value)}
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-40 text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setRefundOpen(false)}>Cancel</Button>
-                      <Button variant="destructive" onClick={handleRefund} disabled={refundLoading}>
+                      <Button
+                        variant="destructive"
+                        onClick={handleRefund}
+                        disabled={
+                          refundLoading ||
+                          refundReason.trim().length < 10 ||
+                          refundConfirm !== 'REFUND'
+                        }
+                      >
                         <DollarSign size={14} />
                         {refundLoading ? 'Refunding…' : 'Confirm refund'}
                       </Button>

@@ -7,6 +7,7 @@ import { toastCopied } from '@/lib/toast-helpers';
 import { pluralize } from '@/lib/formatting';
 import { Card, CardContent } from '@/components/ui/card';
 import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
+import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -151,13 +152,16 @@ export function UserActions({
   const [suspendLoading, setSuspendLoading] = useState(false);
   const [suspendResult, setSuspendResult] = useState<string | null>(null);
   const [suspendOpen, setSuspendOpen] = useState(false);
+  // SOC2 step-up applies to SUSPENDING only (unsuspend is a restore, not
+  // destructive): a reason (>= 10 chars) + the operator typing 'SUSPEND'.
+  const [suspendReason, setSuspendReason] = useState('');
+  const [suspendConfirm, setSuspendConfirm] = useState('');
   const [compLoading, setCompLoading] = useState(false);
   const [compResult, setCompResult] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>(activeSessions);
   const [sessionBusy, setSessionBusy] = useState<string | null>(null);
   const [sessionResult, setSessionResult] = useState<string | null>(null);
   const [revokeAllLoading, setRevokeAllLoading] = useState(false);
-  const [impersonateLoading, setImpersonateLoading] = useState(false);
   const [impersonateResult, setImpersonateResult] = useState<string | null>(null);
   const [forceResetOpen, setForceResetOpen] = useState(false);
   const [forceResetLoading, setForceResetLoading] = useState(false);
@@ -278,27 +282,29 @@ export function UserActions({
     }
   }
 
-  async function handleImpersonate() {
-    setImpersonateLoading(true);
+  async function handleImpersonate(stepUp?: { reason: string; confirm: string }) {
     setImpersonateResult(null);
     try {
       const res = await fetch('/api/admin/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'impersonate_user', clerkId }),
+        body: JSON.stringify({
+          action: 'impersonate_user',
+          clerkId,
+          reason: stepUp?.reason,
+          confirm: stepUp?.confirm,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.url) {
         try { await navigator.clipboard.writeText(data.url); } catch { /* clipboard may be blocked */ }
         window.open(data.url, '_blank', 'noopener,noreferrer');
         setImpersonateResult('Sign-in link copied to clipboard and opened in a new tab.');
-      } else {
-        setImpersonateResult(data.error || 'Failed to create sign-in link.');
+        return;
       }
+      return data.error || 'Failed to create sign-in link.';
     } catch {
-      setImpersonateResult('Network error. Try again.');
-    } finally {
-      setImpersonateLoading(false);
+      return 'Network error. Try again.';
     }
   }
 
@@ -398,18 +404,27 @@ export function UserActions({
   async function handleSuspendToggle() {
     setSuspendLoading(true);
     setSuspendResult(null);
+    const isSuspending = !suspended;
     const action = suspended ? 'unsuspend_user' : 'suspend_user';
     try {
       const res = await fetch('/api/admin/actions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, userId }),
+        body: JSON.stringify({
+          action,
+          userId,
+          // Step-up fields only on the suspend branch (the route requires them
+          // for suspend_user, not unsuspend_user).
+          ...(isSuspending ? { reason: suspendReason.trim(), confirm: suspendConfirm } : {}),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setSuspendResult(data.message || (suspended ? 'User unsuspended.' : 'User suspended.'));
         setSuspended(!suspended);
         setSuspendOpen(false);
+        setSuspendReason('');
+        setSuspendConfirm('');
         router.refresh();
       } else {
         setSuspendResult(data.error || 'Action failed.');
@@ -723,6 +738,37 @@ export function UserActions({
                     )}
                   </DialogDescription>
                 </DialogHeader>
+                {!suspended && (
+                  <div className="flex flex-col gap-3 py-1">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-foreground/80">
+                        Reason (recorded in the audit log)
+                      </span>
+                      <textarea
+                        value={suspendReason}
+                        onChange={(e) => setSuspendReason(e.target.value)}
+                        rows={2}
+                        placeholder="Why is this account being suspended?"
+                        className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      />
+                      {suspendReason.length > 0 && suspendReason.trim().length < 10 && (
+                        <span className="text-[11px] text-muted-foreground">At least 10 characters.</span>
+                      )}
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-foreground/80">
+                        Type &quot;SUSPEND&quot; to confirm
+                      </span>
+                      <input
+                        value={suspendConfirm}
+                        onChange={(e) => setSuspendConfirm(e.target.value)}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      />
+                    </label>
+                  </div>
+                )}
                 <DialogFooter>
                   <Button
                     variant="outline"
@@ -733,7 +779,11 @@ export function UserActions({
                   <Button
                     variant={suspended ? 'default' : 'destructive'}
                     onClick={handleSuspendToggle}
-                    disabled={suspendLoading}
+                    disabled={
+                      suspendLoading ||
+                      (!suspended &&
+                        (suspendReason.trim().length < 10 || suspendConfirm !== 'SUSPEND'))
+                    }
                   >
                     {suspended ? (
                       <>
@@ -911,16 +961,29 @@ export function UserActions({
                 </DialogContent>
               </Dialog>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleImpersonate}
-                disabled={impersonateLoading}
-                className="text-xs gap-1.5"
-              >
-                <LogIn size={13} />
-                {impersonateLoading ? 'Creating link...' : 'Sign in as user'}
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                  >
+                    <LogIn size={13} />
+                    Sign in as user
+                  </Button>
+                }
+                title="Sign in as user"
+                description={
+                  <>
+                    Create a one-time sign-in link to impersonate{' '}
+                    <strong>{email}</strong>? It opens their account in a new tab.
+                  </>
+                }
+                confirmLabel="Create sign-in link"
+                tone="danger"
+                stepUp={{ confirmationPhrase: 'IMPERSONATE' }}
+                onConfirm={handleImpersonate}
+              />
             </div>
 
             {mfaResult && (

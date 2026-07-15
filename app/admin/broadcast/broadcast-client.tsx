@@ -86,6 +86,10 @@ export function BroadcastClient({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // SOC2 step-up on the actual send: a reason (>= 10 chars) + the operator
+  // typing 'SEND'. Collected in the confirm dialog, sent in the request body.
+  const [sendReason, setSendReason] = useState('');
+  const [sendConfirm, setSendConfirm] = useState('');
   const [isSending, startSending] = useTransition();
   const [pastBroadcasts, setPastBroadcasts] = useState<PastBroadcast[]>(initialPast);
 
@@ -94,6 +98,8 @@ export function BroadcastClient({
 
   const canSubmit =
     segment !== null && subject.trim().length > 0 && body.trim().length > 0 && !isSending;
+
+  const sendStepUpOk = sendReason.trim().length >= 10 && sendConfirm === 'SEND';
 
   async function loadPreview() {
     if (!segment || subject.trim().length === 0 || body.trim().length === 0) return;
@@ -134,7 +140,13 @@ export function BroadcastClient({
         const res = await fetch('/api/admin/broadcast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subject, body, segment }),
+          body: JSON.stringify({
+            subject,
+            body,
+            segment,
+            reason: sendReason.trim(),
+            confirm: sendConfirm,
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -163,6 +175,8 @@ export function BroadcastClient({
         setBody('');
         setSegment(null);
         setPreview(null);
+        setSendReason('');
+        setSendConfirm('');
         setConfirmOpen(false);
       } catch {
         toast.error('Network error while sending');
@@ -403,11 +417,39 @@ export function BroadcastClient({
               ? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex flex-col gap-3 py-1">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground/80">
+                Reason (recorded in the audit log)
+              </span>
+              <Textarea
+                value={sendReason}
+                onChange={(e) => setSendReason(e.target.value)}
+                rows={2}
+                placeholder="Why is this broadcast being sent?"
+                className="resize-none text-sm"
+              />
+              {sendReason.length > 0 && sendReason.trim().length < 10 && (
+                <span className="text-[11px] text-muted-foreground">At least 10 characters.</span>
+              )}
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground/80">
+                Type &quot;SEND&quot; to confirm
+              </span>
+              <Input
+                value={sendConfirm}
+                onChange={(e) => setSendConfirm(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={isSending}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmSend} disabled={isSending}>
+            <Button onClick={handleConfirmSend} disabled={isSending || !sendStepUpOk}>
               {isSending ? (
                 <>
                   <Loader2 size={14} className="mr-1.5 animate-spin" />
