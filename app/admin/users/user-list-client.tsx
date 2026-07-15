@@ -59,8 +59,14 @@ function SuspendButton({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // SOC2 step-up: suspending (not unsuspending) requires a reason + typing
+  // 'SUSPEND'; the 'suspend_user' action 400s without them (lib/admin-stepup).
+  const [reason, setReason] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const suspendReady = isSuspended || (reason.trim().length >= 10 && confirmText === 'SUSPEND');
 
   async function handleConfirm() {
+    if (!suspendReady) return;
     setLoading(true);
     setErr(null);
     try {
@@ -70,6 +76,7 @@ function SuspendButton({
         body: JSON.stringify({
           action: isSuspended ? 'unsuspend_user' : 'suspend_user',
           userId,
+          ...(isSuspended ? {} : { reason: reason.trim(), confirm: confirmText }),
         }),
       });
       const data = await res.json();
@@ -125,6 +132,32 @@ function SuspendButton({
               )}
             </DialogDescription>
           </DialogHeader>
+          {!isSuspended && (
+            <div className="flex flex-col gap-3 py-1">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-foreground/80">
+                  Reason (recorded in the audit log)
+                </span>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={2}
+                  placeholder="Why is this suspension necessary?"
+                  className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-foreground/80">Type &quot;SUSPEND&quot; to confirm</span>
+                <input
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                />
+              </label>
+            </div>
+          )}
           {err && <p className="text-xs text-destructive px-1">{err}</p>}
           <DialogFooter>
             <Button
@@ -137,7 +170,7 @@ function SuspendButton({
             <Button
               variant={isSuspended ? 'default' : 'destructive'}
               onClick={handleConfirm}
-              disabled={loading}
+              disabled={loading || !suspendReady}
             >
               {loading
                 ? 'Processing…'
