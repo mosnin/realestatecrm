@@ -1263,7 +1263,19 @@ export function ChippiWorkspace({
           Pre-fix this cluster carried eight competing icons plus a
           message-limit counter; the DOET audit (PR #101) called it a
           score-2 Discoverability failure. */}
-      <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5">
+      <div
+        className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5"
+        // When the split panel is open this cluster must hug the CHAT pane's
+        // right edge, not the workspace's — otherwise it floats on top of the
+        // right panel's tab strip and covers the Documents/Browser tabs
+        // (screenshot-verified bug). The inline `right` tracks the live pane
+        // split (and the resize drag); when not split, the class values apply.
+        style={
+          effectiveIsSplit
+            ? { right: `calc(${100 - leftWidthPercent}% + 0.75rem)` }
+            : undefined
+        }
+      >
         {!isBroker && <ApprovalsPill />}
         {/* One three-dots menu — folds New chat, History, Brief/Drafts, and
             (realtor) Run now / Memory / Chippi settings into a single animated

@@ -274,53 +274,57 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
         </div>
       )}
 
+      {verdict === 'blocked' && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/60 text-[11px] text-muted-foreground" aria-live="polite">
+          <span className="truncate">
+            Read-only view — this site blocks live embedding.
+          </span>
+          <a
+            href={currentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 font-medium text-foreground/80 hover:text-foreground underline underline-offset-2"
+          >
+            Open full site
+          </a>
+        </div>
+      )}
+
       <div className="flex-1 relative min-h-0">
+        {(!frameLoaded || verdict === 'checking') && (
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground/15 animate-pulse" aria-hidden />
+        )}
         {verdict === 'blocked' ? (
-          // The site refuses to be embedded — say so plainly and hand the
-          // user a real tab, instead of letting Chrome paint its sad page.
-          <div className="h-full flex flex-col items-center justify-center px-8 text-center">
-            <Globe size={22} strokeWidth={1.5} className="text-muted-foreground/40" aria-hidden />
-            <p className="mt-3 text-[13px] font-medium text-foreground">
-              {(() => {
-                try {
-                  return new URL(currentUrl).hostname;
-                } catch {
-                  return currentUrl;
-                }
-              })()}{' '}
-              doesn&rsquo;t allow embedding
-            </p>
-            <p className="mt-1 max-w-xs text-[12px] text-muted-foreground">
-              Many sites block being shown inside another app. It opens normally in its own tab.
-            </p>
-            <a
-              href={currentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-1.5 h-8 rounded-full bg-foreground text-background px-4 text-[12px] font-medium hover:opacity-90 transition-opacity"
-            >
-              <ExternalLink size={12} />
-              Open in new tab
-            </a>
-          </div>
+          // The site refuses live embedding (X-Frame-Options / CSP — the
+          // browser enforces it, nothing client-side can override it). So the
+          // page loads THROUGH our read-only server proxy instead: fetched
+          // server-side, scripts stripped, links/search rewritten to stay in
+          // the proxy, served from our origin — always renders. The sandbox
+          // here deliberately has NO allow-scripts and NO allow-same-origin:
+          // the proxied document is inert third-party content.
+          <iframe
+            key={`proxy:${currentUrl}#${frameNonce}`}
+            src={`/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`}
+            sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
+            referrerPolicy="no-referrer"
+            title="In-panel browser (read-only view)"
+            className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
+            onLoad={handleFrameLoad}
+            onError={handleFrameError}
+          />
         ) : (
-          <>
-            {(!frameLoaded || verdict === 'checking') && (
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground/15 animate-pulse" aria-hidden />
-            )}
-            {verdict === 'ok' && (
-              <iframe
-                key={`${currentUrl}#${frameNonce}`}
-                src={currentUrl}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                referrerPolicy="no-referrer"
-                title="In-panel browser"
-                className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
-                onLoad={handleFrameLoad}
-                onError={handleFrameError}
-              />
-            )}
-          </>
+          verdict === 'ok' && (
+            <iframe
+              key={`${currentUrl}#${frameNonce}`}
+              src={currentUrl}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              referrerPolicy="no-referrer"
+              title="In-panel browser"
+              className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
+              onLoad={handleFrameLoad}
+              onError={handleFrameError}
+            />
+          )
         )}
       </div>
     </div>
