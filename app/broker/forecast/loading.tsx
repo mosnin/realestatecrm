@@ -2,7 +2,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BrokerForecastLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-pulse">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-pulse" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       {/* Status-sentence header */}
       <header className="space-y-1.5">
         <Skeleton className="h-4 w-24" />

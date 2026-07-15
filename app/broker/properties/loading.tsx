@@ -2,7 +2,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BrokerPropertiesLoading() {
   return (
-    <div className="space-y-6 max-w-4xl pb-12 animate-pulse">
+    <div className="space-y-6 max-w-4xl pb-12 animate-pulse" aria-busy="true">
+      <span className="sr-only">Loading…</span>
       {/* Header + add button */}
       <div className="flex items-center justify-between">
         <div className="space-y-1.5">
