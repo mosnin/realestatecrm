@@ -1,10 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChainOfThought, ThinkingBar } from '@/components/ai/prompt-kit';
+
+/**
+ * A small breathing orb in Chippi's brand orange. Constant, gentle motion is
+ * the second half of "still alive" (the live seconds counter is the first) —
+ * even when the status word holds steady for a beat, the orb keeps moving so
+ * the row never reads as frozen. Honors prefers-reduced-motion: it holds a
+ * calm static dot for that audience rather than pulsing.
+ */
+function ThinkingOrb() {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      aria-hidden
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={{ background: 'radial-gradient(circle at 30% 30%, #FF9A52, #F25A00)' }}
+      animate={reduce ? { opacity: 0.8 } : { scale: [1, 1.35, 1], opacity: [0.55, 1, 0.55] }}
+      transition={reduce ? undefined : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  );
+}
 
 /**
  * Thinking indicator shown while Chippi is mid-turn.
@@ -24,15 +44,25 @@ import { ChainOfThought, ThinkingBar } from '@/components/ai/prompt-kit';
 export function ThinkingIndicator({
   currentAction,
   streamingReasoning,
+  elapsedMs = 0,
   className,
 }: {
   currentAction?: string | null;
   streamingReasoning?: string;
+  /**
+   * How long the current turn has been thinking with no concrete output yet.
+   * Once it crosses ~2.5s a live "· 4s" counter appears next to the action so a
+   * slow turn (cold start, slow first token) visibly climbs instead of sitting
+   * on a frozen word. 0 (the default) hides the counter.
+   */
+  elapsedMs?: number;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const action = currentAction?.trim() || null;
   const hasReasoning = Boolean(streamingReasoning?.trim());
+  const showElapsed = action != null && elapsedMs >= 2500;
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
   // If there's literally nothing to say, render nothing — let the avatar
   // sit alone rather than show a hollow indicator.
@@ -40,8 +70,9 @@ export function ThinkingIndicator({
 
   return (
     <div className={cn('flex flex-col gap-1.5 justify-center min-h-7', className)}>
-      {/* Row 1: shimmering action line + optional reasoning chevron */}
+      {/* Row 1: breathing orb + shimmering action line + live timer + chevron */}
       <div className="flex items-center gap-1.5">
+        {action && <ThinkingOrb />}
         <AnimatePresence mode="wait" initial={false}>
           {action && (
             <motion.div
@@ -55,6 +86,12 @@ export function ThinkingIndicator({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {showElapsed && (
+          <span className="text-[11px] tabular-nums text-muted-foreground/45 select-none" aria-hidden>
+            {elapsedSeconds}s
+          </span>
+        )}
 
         {hasReasoning && (
           <button

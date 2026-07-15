@@ -103,6 +103,30 @@ interface ChippiWorkspaceProps {
 const MESSAGE_LIMIT = 50;
 
 /**
+ * The warmup status line, chosen by how long the turn has been waiting with no
+ * concrete output yet. Time-based (not a blind rotating list) so the wording
+ * escalates HONESTLY as the wait grows — a fresh turn reads "Thinking…", a
+ * genuinely slow one admits "Still working on it…" — and, paired with the live
+ * seconds counter the indicator renders, the wait never looks frozen.
+ *
+ * `coldStart` = the first Agent turn of a conversation, the one that actually
+ * pays the Modal sandbox warmup; only there do we name the honest warmup steps.
+ * Every other turn reuses the warm sandbox, so it gets the calm thinking copy —
+ * the sandbox wording would be a lie there (honest-UI non-negotiable).
+ */
+export function warmupPhraseFor(coldStart: boolean, elapsedMs: number): string {
+  if (coldStart) {
+    if (elapsedMs < 2500) return 'Getting things ready…';
+    if (elapsedMs < 6000) return 'Warming up…';
+    if (elapsedMs < 11000) return 'Lining up the work…';
+    return 'Still working on it…';
+  }
+  if (elapsedMs < 3000) return 'Thinking…';
+  if (elapsedMs < 8000) return 'Working it through…';
+  return 'Still working on it…';
+}
+
+/**
  * Opt-in soft "tap" tone on message send. Generated via Web Audio API so
  * we don't ship any asset, fires once at a quiet -28dB-ish gain, and
  * gates on:
@@ -1006,22 +1030,6 @@ export function ChippiWorkspace({
   // like "sandbox" (the realtor must not see our plumbing). Every later turn
   // (and every Chat turn) reuses the warm path and cycles the calm "Thinking…"
   // set below instead.
-  const AGENT_WARMUP_PHRASES = useMemo(
-    () => [
-      'Getting things ready…',
-      'Warming up…',
-      'Lining up the work…',
-      'Almost there…',
-    ],
-    [],
-  );
-  // The alive "thinking" cycle for every in-progress turn after the cold
-  // start. Understated, honest, never mentions infrastructure.
-  const THINKING_PHRASES = useMemo(
-    () => ['Thinking…', 'Pondering…', 'Working it through…'],
-    [],
-  );
-
   // First Agent turn of a fresh conversation? True when no assistant turn has
   // landed any blocks yet — i.e. the streaming tail is the only assistant
   // bubble. That's the one turn that pays the cold Modal warmup; later turns
@@ -1035,7 +1043,12 @@ export function ChippiWorkspace({
   );
   // The runtime the in-flight turn is running on. Set on each send.
   const [activeTurnMode, setActiveTurnMode] = useState<ChatMode>('chat');
-  const [warmupIndex, setWarmupIndex] = useState(0);
+  // Milliseconds the current turn has spent warming up (streaming open, nothing
+  // concrete yet). Drives BOTH the escalating status phrase and the live
+  // seconds counter — a steadily-climbing clock is the strongest "still alive"
+  // signal during a cold start or a slow first token.
+  const [warmupElapsedMs, setWarmupElapsedMs] = useState(0);
+  const warmupStartRef = useRef<number | null>(null);
 
   // Warming up = streaming, assistant bubble open, nothing concrete yet (no
   // streamed text, no live tool call, no reasoning tokens).
@@ -1048,21 +1061,23 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
 
-  // Cycle the status label while warming up — the cold-start sandbox steps
-  // move a touch faster (1.7s) so the longer wait reads as progress; the
-  // calm "Thinking…" cycle breathes slower (2.4s) so it never feels anxious.
+  // Tick a live elapsed clock while warming up. One interval at 1s: it both
+  // advances the honest phrase (warmupPhraseFor) and updates the seconds
+  // counter the indicator renders, so a slow turn visibly counts up instead of
+  // sitting on a frozen word. Resets the instant real output starts flowing.
   useEffect(() => {
     if (!isWarmingUp) {
-      setWarmupIndex(0);
+      warmupStartRef.current = null;
+      setWarmupElapsedMs(0);
       return;
     }
-    const isColdStart = activeTurnMode === 'agent' && isFirstAgentTurn;
-    const id = setInterval(
-      () => setWarmupIndex((i) => i + 1),
-      isColdStart ? 1700 : 2400,
-    );
+    if (warmupStartRef.current === null) warmupStartRef.current = Date.now();
+    const update = () =>
+      setWarmupElapsedMs(Date.now() - (warmupStartRef.current ?? Date.now()));
+    update();
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [isWarmingUp, activeTurnMode, isFirstAgentTurn]);
+  }, [isWarmingUp]);
 
   const currentAction = useMemo<string | null>(() => {
     if (!isStreaming || !tailMessage) return null;
@@ -1105,15 +1120,11 @@ export function ChippiWorkspace({
       (b) => b.type === 'text' && b.content.trim().length > 0,
     );
     if (!hasText) {
-      // First Agent turn of a fresh conversation pays the cold Modal warmup —
-      // name the honest sandbox steps that one time. Every later turn (and
-      // every Chat turn) reuses the warm sandbox, so cycle the calm
-      // "Thinking…" set instead — the sandbox copy would be a lie there.
-      const phrases =
-        activeTurnMode === 'agent' && isFirstAgentTurn
-          ? AGENT_WARMUP_PHRASES
-          : THINKING_PHRASES;
-      return phrases[warmupIndex % phrases.length];
+      // Time-based, honest escalation (see warmupPhraseFor). The cold Modal
+      // warmup is only paid on the first Agent turn; later turns reuse the warm
+      // sandbox and get the calm thinking copy.
+      const coldStart = activeTurnMode === 'agent' && isFirstAgentTurn;
+      return warmupPhraseFor(coldStart, warmupElapsedMs);
     }
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1124,9 +1135,7 @@ export function ChippiWorkspace({
     serverAction,
     activeTurnMode,
     isFirstAgentTurn,
-    warmupIndex,
-    AGENT_WARMUP_PHRASES,
-    THINKING_PHRASES,
+    warmupElapsedMs,
   ]);
 
   // Final visibility gate for the indicator block — we want the avatar +
@@ -1628,6 +1637,7 @@ export function ChippiWorkspace({
                           <ThinkingIndicator
                             currentAction={currentAction}
                             streamingReasoning={streamingReasoning}
+                            elapsedMs={isWarmingUp ? warmupElapsedMs : 0}
                           />
                         </div>
                       </motion.div>
