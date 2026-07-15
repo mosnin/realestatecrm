@@ -64,9 +64,27 @@ async function persistAudit(params: AuditParams): Promise<void> {
 
   const ipAddress = req ? getClientIp(req) : null;
 
+  // Resolve the internal User.id so the actorId column stops being dead —
+  // SOC2 access investigations join audit rows to the internal user, not
+  // just the Clerk id. Best-effort: a lookup miss leaves actorId null.
+  let actorId: string | null = null;
+  if (actorClerkId) {
+    try {
+      const { data } = await supabase
+        .from('User')
+        .select('id')
+        .eq('clerkId', actorClerkId)
+        .maybeSingle();
+      actorId = (data as { id?: string } | null)?.id ?? null;
+    } catch {
+      /* leave null — never block the audit write on the lookup */
+    }
+  }
+
   try {
     const { error } = await supabase.from('AuditLog').insert({
       id: crypto.randomUUID(),
+      actorId,
       clerkId: actorClerkId,
       ipAddress,
       action,

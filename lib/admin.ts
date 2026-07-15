@@ -15,6 +15,7 @@
 
 import { requirePlatformAdmin, isPlatformAdmin } from '@/lib/permissions';
 import { audit } from '@/lib/audit';
+import type { NextRequest } from 'next/server';
 
 export { isPlatformAdmin as checkAdmin };
 
@@ -32,14 +33,23 @@ export async function logAdminAction(params: {
   action: string;
   target?: string;
   details?: Record<string, unknown>;
+  /** Pass the request so the audit row captures the admin's IP — SOC2
+   *  access investigations depend on it (previously always null). */
+  req?: NextRequest;
+  /** Reason + typed confirmation captured on destructive actions (step-up). */
+  reason?: string;
+  confirmationText?: string;
 }) {
   await audit({
     actorClerkId: params.actor,
     action: 'ADMIN_ACTION',
     resource: 'AdminAction',
     resourceId: params.target,
+    req: params.req,
     metadata: {
       adminAction: params.action,
+      ...(params.reason ? { reason: params.reason } : {}),
+      ...(params.confirmationText ? { confirmationText: params.confirmationText } : {}),
       ...params.details,
     },
   });

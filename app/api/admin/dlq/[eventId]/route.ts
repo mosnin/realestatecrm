@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { inngest } from '@/lib/inngest/client';
+import { logAdminAction } from '@/lib/admin';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RETRY_THRESHOLD = 3;
@@ -136,6 +137,16 @@ export async function PATCH(req: Request, { params }: Params) {
     console.error('[admin/dlq] update failed', updateError);
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
   }
+
+  // SOC2: every privileged admin mutation is audited. Replaying a DLQ event
+  // re-enqueues a background job on a tenant's behalf — a privileged action.
+  void logAdminAction({
+    actor: admin.clerkUserId,
+    action: action === 'retry' ? 'dlq_replay' : 'dlq_resolve',
+    target: eventId,
+    req: req as NextRequest,
+    details: { eventType: existing.eventType, spaceId: existing.spaceId, newStatus: updatePayload.status },
+  });
 
   return NextResponse.json({ event });
 }

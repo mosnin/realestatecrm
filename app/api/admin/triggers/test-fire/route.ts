@@ -32,6 +32,8 @@ import { getById } from '@/lib/integrations/connections';
 import { listTriggersForConnection } from '@/lib/integrations/triggers';
 import { logger } from '@/lib/logger';
 import { isPlatformAdmin } from '@/lib/permissions';
+import { logAdminAction } from '@/lib/admin';
+import { auth } from '@clerk/nextjs/server';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -198,6 +200,18 @@ export async function POST(req: NextRequest) {
     triggerSlug,
     deliveryId,
     receiverStatus,
+  });
+
+  // SOC2: audit the privileged action (synthetic trigger delivery on a
+  // connection). Best-effort; the actor may be a CRON_SECRET caller (no
+  // Clerk session), in which case actor is 'cron'.
+  const actorSession = await auth().catch(() => null);
+  void logAdminAction({
+    actor: actorSession?.userId ?? 'cron',
+    action: 'trigger_test_fire',
+    target: connectionId,
+    req,
+    details: { triggerSlug, deliveryId, receiverStatus, composioTriggerId: triggerRow.composioTriggerId },
   });
 
   return NextResponse.json({
