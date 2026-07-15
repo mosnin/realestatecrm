@@ -49,7 +49,7 @@ export default function ScrollFAQAccordion({
     },
     {
       id: 5,
-      question: "Is this built for solo realtors?",
+      question: "Is this built for solo real estate agents?",
       answer:
         "Absolutely. Chippi is designed for solo operators and small teams who want cleaner intake and faster day-to-day leasing execution."
     }

@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import { BODY_MUTED, QUIET_LINK } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = { title: 'Realtor Sign In — Chippi' };
+export const metadata: Metadata = { title: 'Real estate agent Sign In — Chippi' };
 
 export default async function RealtorSignInPage({
   searchParams,
@@ -34,7 +34,7 @@ export default async function RealtorSignInPage({
   return (
     <AuthPageLayout
       variant="realtor"
-      heading="Welcome back, realtor."
+      heading="Welcome back, real estate agent."
     >
       {/* Stash any ?plan= from the marketing CTA before Clerk's redirects drop it. */}
       <Suspense fallback={null}>

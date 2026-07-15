@@ -139,7 +139,7 @@ export const draftCounterOfferTool = defineTool<typeof parameters, DraftCounterO
       channel: 'note',
       subject: `Counter-offer — ${dealRow.title}`,
       content,
-      reasoning: 'Drafted a counter-offer summary for realtor review (not sent, not binding).',
+      reasoning: 'Drafted a counter-offer summary for real estate agent review (not sent, not binding).',
       priority: 0,
       status: 'pending',
       expiresAt,

@@ -543,7 +543,7 @@ export function AnalyticsClient({ agents }: Props) {
           <div className={cn(SURFACE_CARD, 'px-5 py-10 text-center')}>
             <p className="text-sm text-foreground">No agents with data yet.</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Lead activity will appear here once realtors are active.
+              Lead activity will appear here once real estate agents are active.
             </p>
           </div>
         )

@@ -260,7 +260,7 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
         <Inbox size={26} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
         <p className="text-sm text-foreground">No active deals across your brokerage.</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Deals created by your member realtors will appear here.
+          Deals created by your member real estate agents will appear here.
         </p>
       </motion.div>
     );
@@ -274,11 +274,11 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
       {realtorNames.length > 1 && (
         <div className="flex items-center gap-2">
           <Select value={realtor} onValueChange={setRealtor}>
-            <SelectTrigger className="w-[200px]" aria-label="Filter by realtor">
+            <SelectTrigger className="w-[200px]" aria-label="Filter by real estate agent">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All realtors</SelectItem>
+              <SelectItem value="all">All real estate agents</SelectItem>
               {realtorNames.map((name) => (
                 <SelectItem key={name} value={name}>
                   {name}
@@ -299,7 +299,7 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
           <Inbox size={26} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-sm text-foreground">No active deals for {realtor}.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Switch back to all realtors to see the full pipeline.
+            Switch back to all real estate agents to see the full pipeline.
           </p>
         </motion.div>
       ) : (

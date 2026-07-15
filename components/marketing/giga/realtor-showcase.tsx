@@ -145,7 +145,7 @@ const STEPS: ShowcaseStep[] = [
               Alex Rivera
               <BadgeCheck className="h-3.5 w-3.5 text-[#ff9a6e]" />
             </span>
-            <span className="block text-[11px] text-white/45">Realtor® · Downtown</span>
+            <span className="block text-[11px] text-white/45">Real estate agent · Downtown</span>
           </span>
           <span className="flex items-center gap-1 text-[12px] text-white/80">
             <Star className="h-3.5 w-3.5 fill-current text-amber-300" /> 4.9
@@ -180,7 +180,7 @@ export function RealtorShowcase() {
         </>
       }
       product={{
-        name: 'Realtor Dashboard',
+        name: 'Real estate agent Dashboard',
         icon: Home,
         desc: 'The home base for your whole business. Qualify leads, move deals, manage every contact, book tours, and put a public profile out front that wins you listings.',
         cta: { label: 'Explore the dashboard', href: '/agents' },

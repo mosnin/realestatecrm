@@ -94,7 +94,7 @@ export function LeaderboardClient({ initialStats }: { initialStats: RealtorStats
       {sorted.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
           <p className={cn(BODY_MUTED, 'text-[13px]')}>
-            Nothing to rank yet — once realtors close a deal I&apos;ll start the leaderboard.
+            Nothing to rank yet — once real estate agents close a deal I&apos;ll start the leaderboard.
           </p>
         </div>
       ) : (

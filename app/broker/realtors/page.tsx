@@ -8,7 +8,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
 
-export const metadata: Metadata = { title: 'Realtors — Teams' };
+export const metadata: Metadata = { title: 'Real estate agents — Teams' };
 
 export default async function BrokerRealtorsPage() {
   const ctx = await getBrokerContext();
@@ -280,7 +280,7 @@ export default async function BrokerRealtorsPage() {
   // ── Status-sentence header: accountability-first framing ──────────────────
   const subtitle = (() => {
     if (realtors.length === 0) {
-      return 'No realtors yet. Send the first invite.';
+      return 'No real estate agents yet. Send the first invite.';
     }
     const active = realtors.filter((r) => r.onboard);
     if (active.length === 0) {
@@ -304,7 +304,7 @@ export default async function BrokerRealtorsPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Realtors.</p>
+        <p className={cn(BODY_MUTED)}>Real estate agents.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
           Your team in flight
         </h1>
@@ -313,7 +313,7 @@ export default async function BrokerRealtorsPage() {
 
       {members.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-          <p className="text-sm text-foreground">No realtors yet.</p>
+          <p className="text-sm text-foreground">No real estate agents yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
             <Link
               href="/broker/invitations"

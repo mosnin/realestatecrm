@@ -188,7 +188,7 @@ export function BrokerageSettingsForm({
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-0.5">
             <Label>Privacy policy</Label>
-            <p className={CAPTION}>Shown on intake pages for realtors under your brokerage.</p>
+            <p className={CAPTION}>Shown on intake pages for real estate agents under your brokerage.</p>
           </div>
           {isOwner && (
             <button

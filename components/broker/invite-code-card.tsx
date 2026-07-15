@@ -51,7 +51,7 @@ export function InviteCodeCard({ isOwner = true }: { isOwner?: boolean }) {
           </div>
           <div>
             <p className="text-sm font-semibold">Invite code</p>
-            <p className="text-xs text-muted-foreground">Share this code — anyone can use it to join as a Realtor</p>
+            <p className="text-xs text-muted-foreground">Share this code — anyone can use it to join as a real estate agent</p>
           </div>
         </div>
 

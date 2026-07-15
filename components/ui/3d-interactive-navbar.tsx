@@ -55,7 +55,7 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   {
-    label: 'Realtors',
+    label: 'Real estate agents',
     href: '/realtors',
     sections: [
       {
@@ -96,7 +96,7 @@ const NAV_LINKS: NavLink[] = [
       },
       {
         label: 'Lead distribution',
-        desc: 'every lead routed to the right realtor.',
+        desc: 'every lead routed to the right real estate agent.',
         to: 'lead-distribution',
       },
       {

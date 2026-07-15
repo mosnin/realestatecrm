@@ -470,7 +470,7 @@ export function BrokerPeopleTable() {
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
               <p className="text-base text-foreground">No contacts across the brokerage yet.</p>
               <p className={cn(BODY_MUTED, 'mt-1.5')}>
-                Contacts will appear here as your realtors add them.
+                Contacts will appear here as your real estate agents add them.
               </p>
             </div>
           );

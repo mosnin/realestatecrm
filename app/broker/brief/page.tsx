@@ -249,7 +249,7 @@ export default async function BrokerBriefPage() {
   }
   if (topSpaceId) {
     const owner = members.find((m) => m.Space?.id === topSpaceId);
-    const name = owner?.User?.name?.split(' ')[0] ?? owner?.User?.name ?? 'Realtor';
+    const name = owner?.User?.name?.split(' ')[0] ?? owner?.User?.name ?? 'Real estate agent';
     topRealtorMtd = { name, amount: topAmount };
   }
 
@@ -582,7 +582,7 @@ export default async function BrokerBriefPage() {
           <BriefKpiTile label="MTD commission" display={formatCompact(mtdCommission)} />
           <BriefKpiTile label="YTD commission" display={formatCompact(ytdCommission)} />
           <BriefKpiTile
-            label="Top realtor (MTD)"
+            label="Top real estate agent (MTD)"
             display={
               topRealtorMtd ? (
                 <span className="block truncate">{topRealtorMtd.name}</span>
@@ -738,7 +738,7 @@ export default async function BrokerBriefPage() {
                   ? 'Owner'
                   : inv.roleToAssign === 'broker_admin'
                     ? 'Admin'
-                    : 'Realtor';
+                    : 'Real estate agent';
               return (
                 <li key={inv.id} className="py-3 flex items-center gap-3 text-sm">
                   <Mail size={13} className="text-muted-foreground flex-shrink-0" />
@@ -778,13 +778,13 @@ export default async function BrokerBriefPage() {
             <Building2 size={26} className="mx-auto mb-3 text-muted-foreground/55" aria-hidden />
             <p className="text-sm text-foreground">Your team, in here.</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Invite your first realtor and their work will land in this view.
+              Invite your first real estate agent and their work will land in this view.
             </p>
           </div>
         ) : (
           <ul className="divide-y divide-border/60">
             {memberRows.map(({ member, leads, deals, drafts, apps }) => {
-              const name = member.User?.name ?? 'Unnamed realtor';
+              const name = member.User?.name ?? 'Unnamed real estate agent';
               const initial = name.charAt(0).toUpperCase();
               // A teammate row opens the broker-scoped realtor detail page.
               // /s/<slug>/* requires owning that space, so a broker can't open a
@@ -797,7 +797,7 @@ export default async function BrokerBriefPage() {
                   ? 'Owner'
                   : member.role === 'broker_admin'
                     ? 'Admin'
-                    : 'Realtor';
+                    : 'Real estate agent';
               const onboard = !!member.User?.onboard;
               return (
                 <li key={member.id}>
@@ -857,7 +857,7 @@ export default async function BrokerBriefPage() {
             {/* Ghost add-row — the list card's quiet last action. */}
             <li>
               <AddRow href="/broker/members" className="-mx-2">
-                Invite a realtor
+                Invite a real estate agent
               </AddRow>
             </li>
           </ul>

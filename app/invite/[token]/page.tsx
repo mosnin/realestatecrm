@@ -17,7 +17,7 @@ interface InvitationDetail {
 }
 
 const roleLabel = (role: string) =>
-  role === 'broker_admin' ? 'Brokerage Admin' : 'Realtor';
+  role === 'broker_admin' ? 'Brokerage Admin' : 'Real estate agent';
 
 export default async function AcceptInvitationPage({ params }: Params) {
   const { token } = await params;

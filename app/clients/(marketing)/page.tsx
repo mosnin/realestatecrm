@@ -29,7 +29,7 @@ export default async function ClientPortalLanding() {
           Track your application. Book tours. Message your agent.
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          One calm place for everything you have in motion with a realtor —
+          One calm place for everything you have in motion with a real estate agent —
           wherever you applied, whatever you&apos;re touring. Sign in with the
           email you used and it&apos;s all here.
         </p>

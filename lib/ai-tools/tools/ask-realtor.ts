@@ -108,12 +108,12 @@ export const askRealtorTool = defineTool<typeof parameters, AskRealtorData>({
       const options = args.options ?? [];
       if (options.length < 2) {
         return {
-          summary: 'Need at least two options to ask the realtor to choose.',
+          summary: 'Need at least two options to ask the real estate agent to choose.',
           display: 'error',
         };
       }
       return {
-        summary: `Asked the realtor to choose from ${options.length} options.`,
+        summary: `Asked the real estate agent to choose from ${options.length} options.`,
         data: {
           id: 'ask-options',
           options,
@@ -130,12 +130,12 @@ export const askRealtorTool = defineTool<typeof parameters, AskRealtorData>({
     const steps = args.steps ?? [];
     if (steps.length < 1) {
       return {
-        summary: 'Need at least one step to ask the realtor.',
+        summary: 'Need at least one step to ask the real estate agent.',
         display: 'error',
       };
     }
     return {
-      summary: `Asked the realtor a ${steps.length}-step clarification.`,
+      summary: `Asked the real estate agent a ${steps.length}-step clarification.`,
       data: { id: 'ask-questions', steps },
       display: 'question-flow',
     };

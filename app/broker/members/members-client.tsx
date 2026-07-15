@@ -22,7 +22,7 @@ interface Member {
 }
 
 const roleLabel = (role: string) =>
-  role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
+  role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Real estate agent';
 
 // Role pill — small caps, muted background. Matches the contacts page's
 // stage pill vocabulary so the team feels like one product. Role is a

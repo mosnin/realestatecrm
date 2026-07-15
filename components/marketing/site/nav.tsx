@@ -55,13 +55,13 @@ interface NavGroup {
 // and is reachable — from inside the story it belongs to.
 const GROUPS: NavGroup[] = [
   {
-    label: 'For realtors',
+    label: 'For real estate agents',
     href: '/realtors',
     featured: {
-      eyebrow: 'For solo realtors',
+      eyebrow: 'For solo real estate agents',
       title: 'Your extra teammate in the field.',
       body: 'Drafts in your voice, leads scored, tours booked, from your phone, between showings.',
-      cta: 'See the realtor story',
+      cta: 'See the real estate agent story',
       href: '/realtors',
     },
     items: [

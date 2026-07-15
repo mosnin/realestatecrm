@@ -195,7 +195,7 @@ export default async function BrokerUsagePage() {
   const statusSentence = (() => {
     if (rows.length === 0) return `No Chippi usage recorded for ${monthName} yet.`;
     const parts: string[] = [];
-    parts.push(`${fmtCost(totalCost)} spent across ${realtors.length} ${realtors.length === 1 ? 'realtor' : 'realtors'}`);
+    parts.push(`${fmtCost(totalCost)} spent across ${realtors.length} ${realtors.length === 1 ? 'real estate agent' : 'real estate agents'}`);
     parts.push(`${totalTurns.toLocaleString()} ${totalTurns === 1 ? 'turn' : 'turns'} this month`);
     return parts.join(' · ') + '.';
   })();
@@ -224,7 +224,7 @@ export default async function BrokerUsagePage() {
           </div>
           <p className="text-sm text-foreground">No usage yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Chippi activity across your member realtors will appear here.
+            Chippi activity across your member real estate agents will appear here.
           </p>
         </div>
       ) : (
@@ -257,11 +257,11 @@ export default async function BrokerUsagePage() {
 
           {/* ── Per-realtor breakdown ───────────────────────────────────────── */}
           <section className="space-y-3">
-            <p className={SECTION_LABEL}>By realtor</p>
+            <p className={SECTION_LABEL}>By real estate agent</p>
 
             {/* Column header */}
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 items-center px-1 pb-1">
-              <p className={SECTION_LABEL}>Realtor</p>
+              <p className={SECTION_LABEL}>Real estate agent</p>
               <p className={cn(SECTION_LABEL, 'w-20 text-right')}>Tokens</p>
               <p className={cn(SECTION_LABEL, 'w-16 text-right')}>Cost</p>
               <p className={cn(SECTION_LABEL, 'w-14 text-right')}>Turns</p>
@@ -297,7 +297,7 @@ export default async function BrokerUsagePage() {
             </StaggerList>
 
             <p className={cn(META, 'text-right pt-1')}>
-              {realtors.length} {realtors.length === 1 ? 'realtor' : 'realtors'} · {monthName}
+              {realtors.length} {realtors.length === 1 ? 'real estate agent' : 'real estate agents'} · {monthName}
             </p>
           </section>
 

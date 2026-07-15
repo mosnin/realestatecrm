@@ -238,7 +238,7 @@ export function BrokerageSetupClient({
               Set up your brokerage
             </h1>
             <p className={cn(BODY_MUTED, 'max-w-xl')}>
-              Create your own brokerage to manage a team of realtors, or join one
+              Create your own brokerage to manage a team of real estate agents, or join one
               with a code from your broker.
             </p>
           </header>
@@ -253,13 +253,13 @@ export function BrokerageSetupClient({
                 <IconSquare icon={Building2} />
                 <h2 className={cn(H3, 'mt-5 mb-2')}>Create a brokerage</h2>
                 <p className={cn(BODY_MUTED, 'leading-relaxed mb-5')}>
-                  Start your own brokerage. Invite realtors to join, manage their
+                  Start your own brokerage. Invite real estate agents to join, manage their
                   leads, and get team-wide visibility from a central broker
                   dashboard.
                 </p>
                 <div className="space-y-2 mb-6">
                   {[
-                    { icon: Users, label: 'Invite realtors via email or share code' },
+                    { icon: Users, label: 'Invite real estate agents via email or share code' },
                     { icon: BarChart3, label: 'Team-wide lead and pipeline analytics' },
                     { icon: Mail, label: 'Manage brokerage invitations' },
                   ].map((f) => (
@@ -325,7 +325,7 @@ export function BrokerageSetupClient({
                 <IconSquare icon={Building2} />
                 <h2 className={cn(H2, 'mt-5 mb-1')}>Create a brokerage</h2>
                 <p className={cn(BODY_MUTED, 'mb-6')}>
-                  Give your brokerage a name. You can invite realtors after it&apos;s
+                  Give your brokerage a name. You can invite real estate agents after it&apos;s
                   created.
                 </p>
                 <CreateForm />

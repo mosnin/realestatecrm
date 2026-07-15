@@ -109,7 +109,7 @@ export const analyzeRealtorTool = defineTool<typeof parameters, AnalyzeRealtorRe
       return { summary: 'That user is not a brokerage member.', display: 'error' };
     }
     if (!callerBrokerageIds.has((realtorMembership as { brokerageId: string }).brokerageId)) {
-      return { summary: 'Broker access required for that realtor.', display: 'error' };
+      return { summary: 'Broker access required for that real estate agent.', display: 'error' };
     }
 
     // ── Fetch realtor profile + their space ────────────────────────────────
@@ -126,11 +126,11 @@ export const analyzeRealtorTool = defineTool<typeof parameters, AnalyzeRealtorRe
         .maybeSingle(),
     ]);
     if (!realtor) {
-      return { summary: 'Realtor not found.', display: 'error' };
+      return { summary: 'Real estate agent not found.', display: 'error' };
     }
     if (!space) {
       return {
-        summary: `${(realtor as { name: string | null }).name ?? 'Realtor'} has no workspace yet.`,
+        summary: `${(realtor as { name: string | null }).name ?? 'Real estate agent'} has no workspace yet.`,
         display: 'error',
       };
     }

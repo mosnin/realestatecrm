@@ -165,7 +165,7 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
     const sid = m.Space?.id;
     if (!sid) continue;
     spaceIds.push(sid);
-    spaceToRealtor.set(sid, m.User?.name ?? m.User?.email ?? 'a realtor');
+    spaceToRealtor.set(sid, m.User?.name ?? m.User?.email ?? 'a real estate agent');
   }
   if (spaceIds.length === 0) return result;
 
@@ -197,7 +197,7 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
   for (const c of rows) {
     const tags = c.tags ?? [];
     const waited = minutesSince(c.createdAt);
-    const realtor = spaceToRealtor.get(c.spaceId) ?? 'a realtor';
+    const realtor = spaceToRealtor.get(c.spaceId) ?? 'a real estate agent';
     result.breached += 1;
 
     const level: 'nudge' | 'escalation' =

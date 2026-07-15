@@ -50,7 +50,7 @@ export default async function AdminInvitationsPage() {
     Brokerage: { name: string } | null;
   }>;
 
-  const roleLabel = (r: string) => r === 'broker_admin' ? 'Admin' : 'Realtor';
+  const roleLabel = (r: string) => r === 'broker_admin' ? 'Admin' : 'Real estate agent';
 
   return (
     <div className="space-y-8 pb-12 max-w-5xl mx-auto">

@@ -18,7 +18,7 @@ interface ChangeRoleButtonProps {
 
 const ROLES = [
   { value: 'broker_admin', label: 'Admin' },
-  { value: 'realtor_member', label: 'Realtor' },
+  { value: 'realtor_member', label: 'Real estate agent' },
 ];
 
 /**

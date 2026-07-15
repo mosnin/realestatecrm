@@ -211,7 +211,7 @@ function RealtorPicker({
             <Search size={13} className="text-muted-foreground flex-shrink-0" />
             <input
               type="text"
-              placeholder="Find a realtor…"
+              placeholder="Find a real estate agent…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
@@ -222,7 +222,7 @@ function RealtorPicker({
         <div className="max-h-60 overflow-y-auto py-1">
           {filtered.length === 0 ? (
             <p className="px-4 py-3 text-xs text-muted-foreground text-center">
-              No realtors match.
+              No real estate agents match.
             </p>
           ) : (
             filtered.map((r) => (
@@ -541,7 +541,7 @@ function AssignedRow({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
 
-  const realtorName = progress?.realtorName ?? lead.assignedTo ?? 'this realtor';
+  const realtorName = progress?.realtorName ?? lead.assignedTo ?? 'this real estate agent';
 
   async function handleUnassign() {
     setUnassigning(true);
@@ -710,7 +710,7 @@ function AssignedRow({
           <div className="rounded-lg bg-muted/30 border border-border/60 p-3 space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
-                <p className={SECTION_LABEL}>Realtor</p>
+                <p className={SECTION_LABEL}>Real estate agent</p>
                 <p className="mt-0.5 font-medium text-foreground">{progress.realtorName}</p>
               </div>
               <div>
@@ -921,12 +921,12 @@ export function BrokerLeadsClient({
             <Select value={realtorFilter} onValueChange={setRealtorFilter}>
               <SelectTrigger
                 className="w-full sm:w-[200px]"
-                aria-label="Filter by realtor"
+                aria-label="Filter by real estate agent"
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All realtors</SelectItem>
+                <SelectItem value="all">All real estate agents</SelectItem>
                 {realtorNames.map((name) => (
                   <SelectItem key={name} value={name}>
                     {name}
@@ -964,7 +964,7 @@ export function BrokerLeadsClient({
           <SectionHeader
             label="Unassigned"
             count={filteredUnassigned.length}
-            hint={filteredUnassigned.length > 0 ? 'Route to a realtor' : undefined}
+            hint={filteredUnassigned.length > 0 ? 'Route to a real estate agent' : undefined}
           />
           {filteredUnassigned.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
@@ -1004,7 +1004,7 @@ export function BrokerLeadsClient({
                   ? 'No matches in the routed list.'
                   : realtorFilter !== 'all'
                     ? `Nothing on ${realtorFilter}’s plate yet.`
-                    : "Nothing on a realtor's plate yet."}
+                    : "Nothing on a real estate agent's plate yet."}
               </p>
             </div>
           ) : (

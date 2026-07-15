@@ -118,7 +118,7 @@ export async function POST(
   }
   if (tour.status === 'cancelled' && action === 'confirm') {
     return NextResponse.json(
-      { error: 'This tour was cancelled. Ask your realtor to reschedule.' },
+      { error: 'This tour was cancelled. Ask your real estate agent to reschedule.' },
       { status: 409 },
     );
   }

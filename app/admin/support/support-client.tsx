@@ -205,7 +205,7 @@ export function SupportClient({
         <EmptyState
           icon={LifeBuoy}
           title="Nothing here. Quiet day."
-          description="Help requests from realtors will land here for triage."
+          description="Help requests from real estate agents will land here for triage."
         />
       ) : (
         <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
@@ -347,7 +347,7 @@ export function SupportClient({
                     value={draftNote}
                     maxLength={ADMIN_NOTE_MAX}
                     onChange={(e) => setDraftNote(e.target.value)}
-                    placeholder="Triage notes — not shown to the realtor."
+                    placeholder="Triage notes — not shown to the real estate agent."
                     rows={3}
                   />
                 </div>

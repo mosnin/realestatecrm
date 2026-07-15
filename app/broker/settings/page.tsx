@@ -61,7 +61,7 @@ export default async function BrokerSettingsPage() {
         <p className={SECTION_LABEL}>Compliance &amp; trust signals</p>
         <p className={BODY_MUTED}>
           License number, Fair Housing notice, and Equal Housing mark — shown
-          in the brokerage intake-form footer for every realtor on your team.
+          in the brokerage intake-form footer for every real estate agent on your team.
         </p>
         <BrokerageIntakeTrustSignalsForm
           licenseNumber={brokerage.brokerageLicenseNumber ?? ''}

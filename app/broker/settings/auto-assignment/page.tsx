@@ -52,12 +52,12 @@ const METHOD_OPTIONS: Array<{
   {
     value: 'round_robin',
     label: 'Round-robin',
-    helper: 'Distribute leads evenly across active realtors in rotation.',
+    helper: 'Distribute leads evenly across active real estate agents in rotation.',
   },
   {
     value: 'score_based',
     label: 'Score-based',
-    helper: 'Send each lead to the realtor with the highest score and availability.',
+    helper: 'Send each lead to the real estate agent with the highest score and availability.',
   },
   {
     value: 'manual',
@@ -184,7 +184,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium text-foreground">Enable auto-assignment</Label>
                 <p className={CAPTION}>
-                  Send new leads to a realtor automatically. Off means they sit in the inbox.
+                  Send new leads to a real estate agent automatically. Off means they sit in the inbox.
                 </p>
               </div>
               <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -229,7 +229,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
                 <div className="space-y-0.5">
                   <Label className="text-sm font-medium text-foreground">Enforce response times</Label>
                   <p className={CAPTION}>
-                    Hold realtors to a first-response time. Chippi nudges them, then escalates to you if a lead stays cold.
+                    Hold real estate agents to a first-response time. Chippi nudges them, then escalates to you if a lead stays cold.
                   </p>
                 </div>
                 <Switch checked={slaEnabled} onCheckedChange={setSlaEnabled} />
@@ -239,7 +239,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
                 <div className="space-y-4 pt-1">
                   <div className="space-y-1.5">
                     <Label htmlFor="sla-first" className="text-sm font-medium text-foreground">
-                      Nudge the realtor after
+                      Nudge the real estate agent after
                     </Label>
                     <div className="flex items-center gap-2">
                       <Input
@@ -330,7 +330,7 @@ function RoutingActivitySection({ settings }: { settings: SettingsResponse }) {
     ['Current method', METHOD_LABEL[settings.assignmentMethod]],
     ['Last assigned', settings.lastAssignedUserName ?? 'Nobody yet'],
     [
-      'Active realtors',
+      'Active real estate agents',
       <span key="count" className="tabular-nums">
         {settings.realtorMemberCount}
       </span>,

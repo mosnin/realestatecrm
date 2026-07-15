@@ -176,7 +176,7 @@ export function AgentActivityClient({ initial, brokerageName }: Props) {
             <p className="text-sm text-muted-foreground mt-2">
               {headlineNumber === 0
                 ? <>Nothing yet {periodCopy(windowDays)}. Chippi takes a few days to warm up on a new team.</>
-                : <>actions {periodCopy(windowDays)} across {realtorCount} {realtorCount === 1 ? 'realtor' : 'realtors'}.</>
+                : <>actions {periodCopy(windowDays)} across {realtorCount} {realtorCount === 1 ? 'real estate agent' : 'real estate agents'}.</>
               }
             </p>
           </div>
@@ -203,7 +203,7 @@ export function AgentActivityClient({ initial, brokerageName }: Props) {
       <section className="space-y-3">
         <div className="flex items-center gap-3 pb-3 border-b border-border/60">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">
-            By realtor
+            By real estate agent
           </h2>
           {realtorCount > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">{realtorCount}</span>
@@ -217,7 +217,7 @@ export function AgentActivityClient({ initial, brokerageName }: Props) {
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
             <p className="text-sm text-foreground">No team members yet.</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Invite a realtor and Chippi&apos;s work will start landing here.
+              Invite a real estate agent and Chippi&apos;s work will start landing here.
             </p>
           </div>
         ) : (

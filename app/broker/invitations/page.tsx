@@ -40,7 +40,7 @@ function statusPill(status: string): { label: string; class: string } | null {
 }
 
 const roleLabel = (role: string) =>
-  role === 'broker_admin' ? 'Admin' : 'Realtor';
+  role === 'broker_admin' ? 'Admin' : 'Real estate agent';
 
 // Role pill — small caps, muted bg. Matches the Members + Realtors rows so
 // the three pages read as one product.

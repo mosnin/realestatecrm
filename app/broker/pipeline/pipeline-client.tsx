@@ -369,7 +369,7 @@ export function PipelineClient({ deals, stages, realtors, summary }: Props) {
         </div>
 
         {agentGroups.length === 0 ? (
-          <DashedEmpty>No realtors yet.</DashedEmpty>
+          <DashedEmpty>No real estate agents yet.</DashedEmpty>
         ) : (
           <ul className="divide-y divide-border/60">
             {agentGroups.map((agent) => {

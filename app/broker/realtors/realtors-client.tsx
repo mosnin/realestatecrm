@@ -62,7 +62,7 @@ const HEALTH_ORDER: Record<RealtorRow['health'], number> = {
 };
 
 const roleLabel = (role: string) =>
-  role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Realtor';
+  role === 'broker_owner' ? 'Owner' : role === 'broker_admin' ? 'Admin' : 'Real estate agent';
 
 // Role pill — small caps, muted bg.
 const rolePillClass =
@@ -280,7 +280,7 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search realtors..."
+            placeholder="Search real estate agents..."
             className="h-9 w-full sm:w-64 rounded-md border border-border/70 bg-background pl-8 pr-7 text-sm outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 transition-colors"
           />
           {searchQuery && (

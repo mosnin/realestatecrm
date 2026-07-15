@@ -156,7 +156,7 @@ export async function GET() {
   const memberRows: MemberRow[] = members
     .map((m) => ({
       userId: m.userId,
-      name: m.User?.name ?? m.User?.email ?? 'Realtor',
+      name: m.User?.name ?? m.User?.email ?? 'Real estate agent',
       spaceId: m.Space?.id ?? '',
     }))
     .filter((m): m is MemberRow => Boolean(m.spaceId));
