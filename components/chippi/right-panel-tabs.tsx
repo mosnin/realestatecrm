@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, Briefcase, Building2, FileText, Globe } from 'lucide-react';
+import { Sparkles, Users, Briefcase, Building2, FileText, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
@@ -9,8 +9,19 @@ import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
  * Canonical union of RightPanel tabs. hooks/use-split-panel.ts re-exports this
  * so the persisted split-panel state and the workspace stay in sync with the
  * tab bar — add tabs here (and in TABS below) and everything widens together.
+ *
+ * 'activity' is the DEFAULT: the panel opens to Chippi's live work (what it's
+ * doing right now — the pages, documents and tools it's touching), not a
+ * static CRM navigation view. People/Deals/Properties are still available as
+ * tabs but no longer the landing surface.
  */
-export type RightPanelTab = 'people' | 'deals' | 'properties' | 'documents' | 'browser';
+export type RightPanelTab =
+  | 'activity'
+  | 'people'
+  | 'deals'
+  | 'properties'
+  | 'documents'
+  | 'browser';
 
 interface RightPanelTabsProps {
   activeTab: RightPanelTab;
@@ -19,6 +30,7 @@ interface RightPanelTabsProps {
 }
 
 const TABS: ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users }> = [
+  { id: 'activity', label: 'Activity', icon: Sparkles },
   { id: 'people', label: 'People', icon: Users },
   { id: 'deals', label: 'Deals', icon: Briefcase },
   { id: 'properties', label: 'Properties', icon: Building2 },

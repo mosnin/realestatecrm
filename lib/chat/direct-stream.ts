@@ -65,15 +65,19 @@ interface SseEvent {
 }
 
 /**
- * How much reply text we hold back before committing to the direct route.
- * Escalation phrases are opening-sentence admissions ("I can't do that",
- * "I'll need to actually send…") — the lite prompt tells the model to LEAD
- * with them — so a window this size catches them before anything is shown,
- * and everything after it streams token-by-token. A phrase that only
- * appears deeper than this commits the direct answer (same outcome as the
- * pre-streaming fall-through when the handoff failed).
+ * How much reply text we hold back before letting tokens stream to the user.
+ * Escalation phrases are opening admissions ("I can't do that", "I don't have
+ * access to your CRM", "I'll need to actually send…") — the lite prompt makes
+ * the model LEAD with them — and every one resolves within the first ~50
+ * chars, so a small window catches them before anything is shown while every
+ * normal answer starts streaming almost immediately.
+ *
+ * This was 240, which meant any reply SHORTER than 240 chars (i.e. most Q&A
+ * answers) was buffered whole and flushed at once — no streaming, the exact
+ * "doesn't feel alive" symptom. 64 keeps the escalation net (all known
+ * phrases are shorter) while letting short answers stream after a brief hold.
  */
-const ESCALATION_HOLDBACK_CHARS = 240;
+const ESCALATION_HOLDBACK_CHARS = 64;
 
 /**
  * Build a Response streaming the direct-path turn.
