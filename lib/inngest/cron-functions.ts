@@ -175,6 +175,12 @@ export const CRON_MANIFEST: readonly CronManifestEntry[] = [
     cron: '15 * * * *',
     load: () => import('@/app/api/cron/extraction-backfill/route'),
   },
+  {
+    id: 'cron-review-nudge',
+    path: '/api/cron/review-nudge',
+    cron: '30 16 * * *',
+    load: () => import('@/app/api/cron/review-nudge/route'),
+  },
 ];
 
 /**

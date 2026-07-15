@@ -70,6 +70,18 @@ export interface NeedsYou {
   pendingDrafts: number;
 }
 
+/**
+ * Post-close reputation snapshot — how many review requests went out recently
+ * and how many the client clicked. Both are real counts over the same trailing
+ * window; the Brief cell renders nothing when none were requested.
+ */
+export interface ReputationStat {
+  /** Review requests sent in the trailing window (status past 'drafted'). */
+  requested: number;
+  /** Of those, how many the client clicked the tracked link on. */
+  clicked: number;
+}
+
 export interface BriefDashboard {
   /** The realtor's first name for the greeting, or null. */
   ownerName: string | null;
@@ -80,6 +92,7 @@ export interface BriefDashboard {
   overnight: OvernightSummary | null;
   hotLeads: HotLead[];
   tours: TourToday[];
+  reputation: ReputationStat | null;
 }
 
 const HOT_LEADS_SHOWN = 4;
@@ -231,6 +244,36 @@ async function fetchToursToday(spaceId: string): Promise<TourToday[]> {
   }));
 }
 
+/**
+ * Post-close review campaigns over the trailing 90 days: how many asks went
+ * out (any status past 'drafted') and how many the client clicked. Returns
+ * null when the realtor has requested no reviews in the window — the Brief
+ * omits the reputation cell rather than showing a hollow "0 of 0".
+ */
+const REPUTATION_WINDOW_DAYS = 90;
+
+async function composeReputationStat(spaceId: string): Promise<ReputationStat | null> {
+  const since = new Date(Date.now() - REPUTATION_WINDOW_DAYS * 86_400_000).toISOString();
+  const [requestedRes, clickedRes] = await Promise.all([
+    supabase
+      .from('ReviewCampaign')
+      .select('id', { count: 'exact', head: true })
+      .eq('spaceId', spaceId)
+      .in('status', ['sent', 'clicked', 'completed'])
+      .gte('createdAt', since),
+    supabase
+      .from('ReviewCampaign')
+      .select('id', { count: 'exact', head: true })
+      .eq('spaceId', spaceId)
+      .not('clickedAt', 'is', null)
+      .gte('createdAt', since),
+  ]);
+
+  const requested = requestedRes.count ?? 0;
+  if (requested === 0) return null;
+  return { requested, clicked: clickedRes.count ?? 0 };
+}
+
 /** The realtor's first name for the greeting. */
 async function fetchOwnerName(ownerId: string): Promise<string | null> {
   const { data } = await supabase
@@ -266,6 +309,7 @@ export async function composeBriefDashboard(
     overnight,
     hotLeads,
     tours,
+    reputation,
     ownerName,
   ] = await Promise.all([
     composeBrief(spaceId).catch(() => null),
@@ -276,6 +320,7 @@ export async function composeBriefDashboard(
     composeOvernight(spaceId).catch(() => null),
     fetchHotLeads(spaceId).catch(() => []),
     fetchToursToday(spaceId).catch(() => []),
+    composeReputationStat(spaceId).catch(() => null),
     fetchOwnerName(ownerId).catch(() => null),
   ]);
 
@@ -301,5 +346,6 @@ export async function composeBriefDashboard(
     overnight,
     hotLeads,
     tours,
+    reputation,
   };
 }

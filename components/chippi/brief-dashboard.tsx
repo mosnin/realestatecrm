@@ -52,6 +52,7 @@ import {
   Sparkles,
   Check,
   ChevronDown,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -123,13 +124,14 @@ function daysSince(iso: string | null): number | null {
 // ── Shell ───────────────────────────────────────────────────────────────────
 
 export function BriefDashboard({ slug, data }: Props) {
-  const { brief, needsYou, pipeline, overnight, hotLeads, tours } = data;
+  const { brief, needsYou, pipeline, overnight, hotLeads, tours, reputation } = data;
 
   const hasOnDeck = brief.cards.length > 0 || brief.tip != null;
   const hasTours = tours.length > 0;
   const hasPipeline = pipeline != null && pipeline.active > 0;
   const hasHotLeads = hotLeads.length > 0;
   const hasOvernight = overnight != null && overnight.buckets.length > 0;
+  const hasReputation = reputation != null && reputation.requested > 0;
 
   let i = 0;
   const delay = () => 0.04 + i++ * CHAT_STAGGER_DELAY;
