@@ -747,6 +747,11 @@ async def chat_turn(item: dict):
                     run_config=run_config,
                     max_turns=CHAT_MAX_TURNS,
                 )
+                # Immediate live signal so the thinking indicator shows real
+                # motion the moment the turn starts — not the client's generic
+                # rotating filler. The proxy relays `status` verbatim to the UI
+                # as the action line; it's cleared by the first output token.
+                yield f'data: {json.dumps({"type": "status", "label": "Thinking…"})}\n\n'
                 async for event in result.stream_events():
                     try:
                         out = translate(event)
@@ -755,6 +760,15 @@ async def chat_turn(item: dict):
                     if out:
                         streamed = True
                         yield f"data: {json.dumps(out, default=str)}\n\n"
+                        # After a tool returns, the model reads the result before
+                        # its next token/tool — keep the line alive instead of
+                        # falling back to filler during that gap.
+                        if out.get("type") == "tool_call_result":
+                            yield (
+                                'data: '
+                                + json.dumps({"type": "status", "label": "Working through what I found…"})
+                                + "\n\n"
+                            )
 
                 final = getattr(result, "final_output", None)
                 final_text = (

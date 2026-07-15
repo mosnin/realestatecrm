@@ -410,6 +410,12 @@ function proxyModalStream({
             } else if (type === 'reasoning_delta') {
               push(controller, { type: 'reasoning_delta', delta: String(evt.delta ?? '') });
 
+            } else if (type === 'status') {
+              // Live thinking-line from the Modal agent ("Thinking…",
+              // "Working through what I found…"). Relayed verbatim; the
+              // client renders it as the thinking indicator's action line.
+              push(controller, { type: 'status', label: String(evt.label ?? '') });
+
             } else if (type === 'tool_call_start') {
               const toolName = String(evt.tool ?? 'tool');
               const toolArgs = (evt.args ?? {}) as Record<string, unknown>;

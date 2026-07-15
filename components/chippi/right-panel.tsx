@@ -31,6 +31,9 @@ type EmbedTab = Exclude<RightPanelTab, 'browser'>;
 // `EmbedDetector` in app/s/[slug]/layout.tsx and the
 // `[data-chippi-embed='true']` rules in app/globals.css.
 const TAB_PATHS: Record<EmbedTab, (slug: string) => string> = {
+  // The default: Chippi's live work — the realtime activity feed of what it's
+  // doing, drafting, and touching right now (not static CRM navigation).
+  activity: (slug) => `/s/${slug}/chippi/activity?embed=1`,
   people: (slug) => `/s/${slug}/contacts?embed=1`,
   deals: (slug) => `/s/${slug}/deals?embed=1`,
   properties: (slug) => `/s/${slug}/properties?embed=1`,
@@ -38,6 +41,7 @@ const TAB_PATHS: Record<EmbedTab, (slug: string) => string> = {
 };
 
 const TAB_LABELS: Record<EmbedTab, string> = {
+  activity: "Chippi's live activity panel",
   people: 'People dashboard panel',
   deals: 'Deals dashboard panel',
   properties: 'Properties dashboard panel',

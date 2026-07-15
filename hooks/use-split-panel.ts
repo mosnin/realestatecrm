@@ -13,10 +13,13 @@ interface SplitPanelState {
   leftWidthPercent: number; // 0-100, default 58
 }
 
-const STORAGE_KEY = 'chippi-split-panel-v1';
+// v2: the default tab changed from the 'people' CRM iframe to 'activity'
+// (Chippi's live work). Bumping the key drops stale persisted state so
+// existing users land on the new default once instead of keeping 'people'.
+const STORAGE_KEY = 'chippi-split-panel-v2';
 const DEFAULTS: SplitPanelState = {
   isSplit: false,
-  rightTab: 'people',
+  rightTab: 'activity',
   leftWidthPercent: 58,
 };
 
