@@ -8,6 +8,7 @@ import { MobileNav } from '@/components/dashboard/mobile-nav';
 import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { BrokerMain } from '@/components/broker/broker-main';
+import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { supabase } from '@/lib/supabase';
 import { isAccountComped } from '@/lib/billing/comp';
 import { hasCurrentSubscription } from '@/lib/api-auth';
@@ -230,6 +231,11 @@ export default async function BrokerLayout({ children }: { children: React.React
         }}
       />
       <AccountSwitchSwipe />
+      {/* Detects ?embed=1 from the Chippi RightPanel iframe and strips the
+          brokerage sidebar/header/mobile-nav via CSS so the embedded
+          /broker/* page renders only its content inside the split panel —
+          mirrors the realtor layout (app/s/[slug]/layout.tsx). */}
+      <EmbedDetector />
       <SidebarCollapseProvider>
         <Sidebar
           slug={slug}

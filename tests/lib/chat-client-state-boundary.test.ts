@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import {
+  embedSrcFor,
+  isTabAvailable,
+} from '@/components/chippi/right-panel-embeds';
 
 const ROOT = process.cwd();
 const hookSource = readFileSync(
@@ -37,10 +41,36 @@ describe('chat client-side boundary state', () => {
     expect(workspaceSource).toContain('`${conversationItemBase}/${encodeURIComponent(id)}`');
   });
 
-  it('prevents persisted realtor split-panel state from rendering on broker chat', () => {
-    expect(workspaceSource).toContain('const effectiveIsSplit = !isBroker && isSplit;');
-    expect(workspaceSource).toContain("style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}");
-    expect(workspaceSource).toContain('{effectiveIsSplit && (');
+  // The broker split panel is now enabled (feature parity with realtor), but
+  // it must embed the BROKERAGE-scoped /broker/* routes — never the realtor
+  // space-scoped /s/<slug>/* routes — even when the split-panel state (shared
+  // across variants via localStorage) carries a stale realtor tab.
+  it('embeds brokerage-scoped routes for the broker split panel, never realtor space routes', () => {
+    expect(embedSrcFor('broker', 'people', 'acme')).toBe('/broker/people?embed=1');
+    expect(embedSrcFor('broker', 'deals', 'acme')).toBe('/broker/deals?embed=1');
+    expect(embedSrcFor('broker', 'properties', 'acme')).toBe('/broker/properties?embed=1');
+    // Universal live-work feed → the brokerage-wide activity surface.
+    expect(embedSrcFor('broker', 'activity', 'acme')).toBe('/broker/activity?embed=1');
+    // No broker URL ever leaks the realtor space slug.
+    for (const tab of ['people', 'deals', 'properties', 'activity'] as const) {
+      expect(embedSrcFor('broker', tab, 'acme')).not.toContain('/s/');
+    }
+  });
+
+  it('has no brokerage Documents surface, so the broker panel omits it and falls back to activity', () => {
+    // The Documents tab is not offered on the broker variant…
+    expect(isTabAvailable('broker', 'documents')).toBe(false);
+    expect(isTabAvailable('realtor', 'documents')).toBe(true);
+    // …and a stale persisted 'documents' tab has no broker embed URL (null),
+    // which the panel treats as a fall-back to the live-work activity feed.
+    expect(embedSrcFor('broker', 'documents', 'acme')).toBeNull();
+  });
+
+  it('keeps the realtor split panel pointed at space-scoped routes', () => {
+    expect(embedSrcFor('realtor', 'people', 'acme')).toBe('/s/acme/contacts?embed=1');
+    expect(embedSrcFor('realtor', 'deals', 'acme')).toBe('/s/acme/deals?embed=1');
+    expect(embedSrcFor('realtor', 'documents', 'acme')).toBe('/s/acme/documents?embed=1');
+    expect(embedSrcFor('realtor', 'activity', 'acme')).toBe('/s/acme/chippi/activity?embed=1');
   });
 
   it('labels the broker reviews link without realtor draft copy', () => {

@@ -237,7 +237,12 @@ export function ChippiWorkspace({
   }, [activeConversationId]);
 
   const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
-  const effectiveIsSplit = !isBroker && isSplit;
+  // Split / live-work side panel is available on BOTH variants. For broker the
+  // RightPanel embeds the brokerage-scoped /broker/* routes (people/deals/
+  // properties) plus the universal live-work activity feed and in-panel
+  // browser; see RightPanel's `variant` prop. (Previously forced off for
+  // broker because the tabs were realtor-scoped.)
+  const effectiveIsSplit = isSplit;
   // True only while the divider is being dragged. The right panel is an iframe,
   // which would otherwise swallow the mousemove events the drag listeners need —
   // so during a drag we shield it with pointer-events:none and the handle keeps
@@ -1306,9 +1311,10 @@ export function ChippiWorkspace({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Split panel disabled on broker variant — RightPanel tabs
-            (contacts/deals/etc.) are realtor-scoped in Phase 1. */}
-        {!isBroker && <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />}
+        {/* Split / live-work side panel — enabled on both variants. Broker's
+            RightPanel embeds the brokerage-scoped /broker/* routes plus the
+            universal activity + browser tabs (see RightPanel variant). */}
+        <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />
       </div>
 
       {/* Conversation history drawer — softened overlay */}
@@ -1722,6 +1728,7 @@ export function ChippiWorkspace({
             <RightPanel
               key="chippi-right-panel"
               slug={slug}
+              variant={variant}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
