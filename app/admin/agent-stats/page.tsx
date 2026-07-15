@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
+import { SurfaceCard } from '@/components/ui/surface-card';
 import { Zap, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
@@ -197,8 +197,7 @@ export default async function AgentStatsPage({
       {/* Status breakdown + Top tools (side by side) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Status breakdown */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
+        <SurfaceCard>
             <h2 className={cn(SECTION_LABEL, 'mb-4')}>Tasks by status</h2>
             {stats.totalTasks === 0 ? (
               <EmptyState icon={Bot} title="No tasks in this period." size="sm" variant="flush" />
@@ -241,12 +240,10 @@ export default async function AgentStatsPage({
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </SurfaceCard>
 
         {/* Top 10 Tools */}
-        <Card className="rounded-xl border bg-card">
-          <CardContent className="p-6">
+        <SurfaceCard>
             <div className="flex items-center gap-2 mb-4">
               <Zap size={14} className="text-muted-foreground" />
               <h2 className={SECTION_LABEL}>Top tools</h2>
@@ -283,13 +280,11 @@ export default async function AgentStatsPage({
                 })}
               </ol>
             )}
-          </CardContent>
-        </Card>
+        </SurfaceCard>
       </div>
 
       {/* Tasks by Space */}
-      <Card className="rounded-xl border bg-card">
-        <CardContent className="p-6">
+      <SurfaceCard>
           <div className="flex items-center justify-between mb-4">
             <h2 className={SECTION_LABEL}>Tasks by space</h2>
             <span className={CAPTION}>Top 20 by task count</span>
@@ -347,8 +342,7 @@ export default async function AgentStatsPage({
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </SurfaceCard>
 
       {/* Footer */}
       <p className={cn(META, 'text-center border-t border-border/60 pt-4')}>

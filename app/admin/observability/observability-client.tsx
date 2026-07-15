@@ -18,13 +18,12 @@ import { useState, useCallback } from 'react';
 import { RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  SECTION_LABEL,
-  STAT_NUMBER_COMPACT,
   META,
   CAPTION,
   H3,
   BODY_MUTED,
 } from '@/lib/typography';
+import { SurfaceCard, StatCard, SURFACE_CARD } from '@/components/ui/surface-card';
 import type { SentryIssue, SentryEventStats } from '@/lib/sentry-api';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -163,7 +162,7 @@ export function ObservabilityClient({
   // ── Not-configured empty state ─────────────────────────────────────────
   if (!configured) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
+      <div className="rounded-3xl bg-muted/40 px-5 py-12 text-center">
         <AlertTriangle
           size={20}
           strokeWidth={1.5}
@@ -206,7 +205,7 @@ export function ObservabilityClient({
       )}
       {/* ── Stat cells ─────────────────────────────────────────────────── */}
       <section
-        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
         aria-label="Sentry summary"
       >
         {[
@@ -235,23 +234,23 @@ export function ObservabilityClient({
             alert: false,
           },
         ].map(({ label, value, sub, alert }) => (
-          <div key={label} className="bg-background px-4 py-4 sm:px-5 sm:py-5">
-            <p className={cn(SECTION_LABEL, 'mb-2')}>{label}</p>
-            <p
-              className={cn(
-                STAT_NUMBER_COMPACT,
-                alert && 'text-amber-600 dark:text-amber-400',
-              )}
-            >
-              {value}
-            </p>
-            <p className={cn(META, 'mt-1')}>{sub}</p>
-          </div>
+          <StatCard
+            key={label}
+            label={label}
+            value={
+              alert ? (
+                <span className="text-amber-600 dark:text-amber-400">{value}</span>
+              ) : (
+                value
+              )
+            }
+            sub={sub}
+          />
         ))}
       </section>
 
       {/* ── Event volume chart ──────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+      <SurfaceCard>
         <div className="flex items-start justify-between mb-1">
           <div>
             <p className={H3}>Event volume</p>
@@ -276,7 +275,7 @@ export function ObservabilityClient({
             </span>
           </div>
         )}
-      </div>
+      </SurfaceCard>
 
       {/* ── Issues list ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
@@ -303,19 +302,19 @@ export function ObservabilityClient({
         </div>
 
         {!issuesAvailable ? (
-          <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 px-5 py-10 text-center">
+          <div className="rounded-3xl bg-amber-500/5 px-5 py-10 text-center">
             <p className="text-sm text-foreground">Open issues could not be loaded.</p>
             <p className="mt-1 text-xs text-muted-foreground">Restore Sentry API access, then refresh this page.</p>
           </div>
         ) : issues.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="rounded-3xl bg-muted/40 px-5 py-10 text-center">
             <p className="text-sm text-foreground">No open issues.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Quiet — nothing in flight.
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+          <ul className={cn(SURFACE_CARD, 'divide-y divide-border/60 overflow-hidden')}>
             {issues.map((issue) => (
               <li key={issue.id}>
                 <a

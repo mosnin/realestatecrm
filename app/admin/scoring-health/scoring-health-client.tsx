@@ -15,6 +15,7 @@ import type { SpaceFailureRow, FailedLeadRow } from './page';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 import { StatGrid } from '@/app/admin/components/stat-grid';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL, CAPTION, META } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
@@ -159,7 +160,7 @@ export function ScoringHealthClient({
             size="sm"
           />
         ) : (
-          <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+          <ul className={cn(SURFACE_CARD, 'divide-y divide-border/60 overflow-hidden')}>
             {perSpace.map((row) => (
               <li key={row.spaceId} className="flex items-center gap-3 px-4 py-3">
                 <div className="w-8 h-8 rounded-lg bg-foreground/[0.05] flex items-center justify-center flex-shrink-0">
@@ -205,7 +206,7 @@ export function ScoringHealthClient({
             size="sm"
           />
         ) : (
-          <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+          <ul className={cn(SURFACE_CARD, 'divide-y divide-border/60 overflow-hidden')}>
             <AnimatePresence initial={false}>
               {visibleFailed.map((lead) => {
                 const state = rowState[lead.id] ?? 'idle';

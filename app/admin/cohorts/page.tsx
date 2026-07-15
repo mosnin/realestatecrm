@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { SurfaceCard, SURFACE_CARD } from '@/components/ui/surface-card';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -212,8 +212,7 @@ export default async function AdminCohortsPage() {
         subtitle="Weekly signup cohorts and their retention through the funnel."
       />
 
-      <Card className="rounded-xl border bg-card">
-        <CardContent className="px-5 py-4">
+      <SurfaceCard>
           <p className={cn(CAPTION, 'leading-relaxed')}>
             Each row represents users who signed up during a particular ISO week
             (Monday start, UTC). Percentages are calculated against the signup
@@ -223,8 +222,7 @@ export default async function AdminCohortsPage() {
             show lower conversion rates as users haven&apos;t had time to
             progress through the funnel yet.
           </p>
-        </CardContent>
-      </Card>
+      </SurfaceCard>
 
       {fetchError && (
         <div className="rounded-xl border border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-500/5 px-5 py-4">
@@ -235,7 +233,7 @@ export default async function AdminCohortsPage() {
       )}
 
       {/* ── Cohort retention table ───────────────────────────────────── */}
-      <Card className="rounded-xl border bg-card overflow-hidden">
+      <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 border-b border-border">
@@ -270,7 +268,7 @@ export default async function AdminCohortsPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {/* ── Top-level stats ──────────────────────────────────────────── */}
       <div className="space-y-3">
