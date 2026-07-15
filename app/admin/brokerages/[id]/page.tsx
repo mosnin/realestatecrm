@@ -1,7 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { SURFACE_CARD, StatCard, StatusPill } from '@/components/ui/surface-card';
 import {
   ArrowLeft,
   Building2,
@@ -16,7 +17,7 @@ import Link from 'next/link';
 import { formatCompact } from '@/lib/formatting';
 import { BrokerageActions } from './brokerage-actions';
 import { AccountBillingPanel } from '@/app/admin/components/account-billing-panel';
-import { H1, TITLE_FONT, SECTION_LABEL, STAT_NUMBER_COMPACT } from '@/lib/typography';
+import { H1, TITLE_FONT, SECTION_LABEL } from '@/lib/typography';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -159,18 +160,15 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
         </div>
       </div>
 
-      {/* Stat cards — hairline-divider snapshot grid, neutral throughout */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+      {/* Stat cards — surface-card snapshot grid, neutral throughout */}
+      <section className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
         {[
           { label: 'Members',         value: members.length },
           { label: 'Pending invites', value: pendingInviteCount.count ?? 0 },
           { label: 'Active deals',    value: totalDeals },
           { label: 'Pipeline value',  value: formatCompact(totalPipeline) },
         ].map(({ label, value }) => (
-          <div key={label} className="bg-background px-4 py-4">
-            <p className={SECTION_LABEL}>{label}</p>
-            <p className={`${STAT_NUMBER_COMPACT} mt-1`} style={TITLE_FONT}>{value}</p>
-          </div>
+          <StatCard key={label} label={label} value={value} />
         ))}
       </section>
 
@@ -187,14 +185,14 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
             <BrokerageActions action="invite-member" brokerageId={brokerage.id} />
           </div>
           {members.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <div className="rounded-3xl bg-muted/40 px-5 py-10 text-center">
               <p className="text-sm text-foreground">Nobody here yet.</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Members show up once invitations are accepted.
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60 border-y border-border/60">
+            <ul className={cn(SURFACE_CARD, 'overflow-hidden divide-y divide-border/60')}>
               {members.map((m) => {
                 const user = m.User;
                 const initials = (user?.name ?? user?.email ?? '?')
@@ -203,7 +201,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                   month: 'short', day: 'numeric', year: 'numeric',
                 });
                 return (
-                  <li key={m.id} className="flex items-center gap-3 py-3">
+                  <li key={m.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-[11px] font-semibold text-foreground/70 flex-shrink-0">
                       {initials}
                     </div>
@@ -215,9 +213,9 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                         >
                           {user?.name ?? 'No name'}
                         </Link>
-                        <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 flex-shrink-0">
+                        <StatusPill className="flex-shrink-0 text-[11px]">
                           {roleLabel(m.role)}
-                        </span>
+                        </StatusPill>
                         {user?.onboard ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/15">
                             <CheckCircle2 size={10} /> Active
@@ -260,8 +258,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
           {/* Info card */}
           <div className="space-y-2">
             <p className={SECTION_LABEL}>Details</p>
-            <Card>
-              <CardContent className="px-4 py-3 space-y-3">
+            <div className={cn(SURFACE_CARD, 'px-4 py-3 space-y-3')}>
                 <div className="flex items-start gap-2.5">
                   <Hash size={13} className="text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
@@ -310,8 +307,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                     <p className="text-xs">{createdAt}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           </div>
 
           {/* Admin actions — recoverable action up top; the irreversible
@@ -319,8 +315,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
               never be mistaken for the safe suspend toggle. */}
           <div className="space-y-2">
             <p className={SECTION_LABEL}>Admin actions</p>
-            <Card>
-              <CardContent className="px-4 py-4 space-y-3">
+            <div className={cn(SURFACE_CARD, 'px-4 py-4 space-y-3')}>
                 <BrokerageActions
                   action="toggle-status"
                   brokerageId={brokerage.id}
@@ -336,8 +331,7 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                     brokerageName={brokerage.name}
                   />
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
@@ -370,14 +364,14 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
           </span>
         </p>
         {invitations.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="rounded-3xl bg-muted/40 px-5 py-10 text-center">
             <p className="text-sm text-foreground">No invitations sent.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Invitations this brokerage sends will show up here.
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/60 border-y border-border/60">
+          <ul className={cn(SURFACE_CARD, 'overflow-hidden divide-y divide-border/60')}>
             {invitations.map((inv) => {
               const sent = new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
               const expires = new Date(inv.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -388,13 +382,13 @@ export default async function AdminBrokerageDetailPage({ params }: Params) {
                     ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
                     : 'text-muted-foreground bg-muted';
               return (
-                <li key={inv.id} className="flex items-center gap-3 py-3">
+                <li key={inv.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <span className="text-sm font-medium text-foreground truncate">{inv.email}</span>
-                      <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-2 py-0.5 flex-shrink-0">
+                      <StatusPill className="flex-shrink-0 text-[11px]">
                         {inv.roleToAssign === 'broker_admin' ? 'Admin' : 'Realtor'}
-                      </span>
+                      </StatusPill>
                       <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 flex-shrink-0 ${statusPill}`}>
                         {statusLabel(inv.status)}
                       </span>

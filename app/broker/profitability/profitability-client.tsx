@@ -22,7 +22,7 @@
 
 import { useMemo, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowDown, ArrowUp, Info } from 'lucide-react';
+import { ArrowDown, ArrowUp, Info, PieChart } from 'lucide-react';
 import {
   SECTION_LABEL,
   TITLE_FONT,
@@ -34,6 +34,11 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, formatCompact, getInitials } from '@/lib/formatting';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { AnimatedNumber } from '@/components/motion/animated-number';
+import {
+  SurfaceCard,
+  AccentBarLabel,
+  InsightStrip,
+} from '@/components/ui/surface-card';
 import { EASE_OUT } from '@/lib/motion';
 import type {
   AgentProfitability,
@@ -80,8 +85,8 @@ function SplitBar({ agent }: { agent: AgentProfitability }) {
 
 function AgentSplitCard({ agent }: { agent: AgentProfitability }) {
   return (
-    <section className="rounded-xl border border-border/70 bg-background px-4 py-4 space-y-3">
-      {/* Header: identity + focal net to brokerage */}
+    <SurfaceCard className="p-4 sm:p-5 space-y-3">
+      {/* Header: identity + focal net to brokerage (StatCard-style label) */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-foreground/[0.06] flex items-center justify-center text-xs font-medium text-foreground flex-shrink-0">
           {getInitials(agent.name)}
@@ -92,14 +97,14 @@ function AgentSplitCard({ agent }: { agent: AgentProfitability }) {
           </p>
           <p className={cn(CAPTION, 'truncate')}>{agent.role}</p>
         </div>
-        <div className="text-right flex-shrink-0">
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <AccentBarLabel>Net to brokerage</AccentBarLabel>
           <p
             className="text-[21px] leading-tight tracking-tight tabular-nums text-foreground"
             style={TITLE_FONT}
           >
             <AnimatedNumber value={agent.brokerageNet} format={formatCompact} />
           </p>
-          <p className={CAPTION}>net to brokerage</p>
         </div>
       </div>
 
@@ -140,7 +145,7 @@ function AgentSplitCard({ agent }: { agent: AgentProfitability }) {
             : 'no leads yet'}
         </span>
       </div>
-    </section>
+    </SurfaceCard>
   );
 }
 
@@ -298,12 +303,18 @@ export function ProfitabilityClient({ agents, totals }: Props) {
             ))}
           </StaggerList>
         ) : (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <SurfaceCard className="px-6 py-10 flex flex-col items-center text-center">
+            <span
+              aria-hidden
+              className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.04] text-muted-foreground/60"
+            >
+              <PieChart size={20} strokeWidth={1.5} />
+            </span>
             <p className="text-sm text-foreground">No agents with data yet.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Commission activity will appear here once deals close.
             </p>
-          </div>
+          </SurfaceCard>
         ))}
 
       {/* ── Table view ──────────────────────────────────────────────────────── */}
@@ -472,22 +483,15 @@ export function ProfitabilityClient({ agents, totals }: Props) {
           shown is lead -> deal conversion and that cost-per-lead needs a spend
           input. Neutral info affordance, no alarming color. */}
       {!totals.costDataAvailable && (
-        <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5 flex items-start gap-2.5">
-          <Info
-            size={15}
-            className="text-muted-foreground mt-0.5 flex-shrink-0"
-            aria-hidden
-          />
-          <div className="space-y-0.5">
-            <p className="text-sm text-foreground">
-              Efficiency shown is lead → deal conversion.
-            </p>
-            <p className={CAPTION}>
-              Cost-per-lead needs a marketing-spend input, which isn&rsquo;t
-              tracked yet — so it&rsquo;s left out rather than estimated. Add
-              per-agent or per-channel ad spend and it&rsquo;ll appear here.
-            </p>
-          </div>
+        <div className="space-y-1.5">
+          <InsightStrip icon={<Info size={15} aria-hidden />} className="mt-0">
+            Efficiency shown is lead → deal conversion.
+          </InsightStrip>
+          <p className={cn(CAPTION, 'px-4')}>
+            Cost-per-lead needs a marketing-spend input, which isn&rsquo;t
+            tracked yet — so it&rsquo;s left out rather than estimated. Add
+            per-agent or per-channel ad spend and it&rsquo;ll appear here.
+          </p>
         </div>
       )}
 

@@ -22,7 +22,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import {
   Dialog,
   DialogContent,
@@ -411,8 +411,7 @@ export function AccountBillingPanel({
     'text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring';
 
   return (
-    <Card>
-      <CardContent className="px-5 py-4 space-y-5">
+    <div className={`${SURFACE_CARD} px-5 py-4 space-y-5`}>
         {/* ── Complimentary (free) access ──────────────────────────────── */}
         <div className="space-y-2">
           <p className="text-sm font-medium flex items-center gap-1.5">
@@ -766,7 +765,6 @@ export function AccountBillingPanel({
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

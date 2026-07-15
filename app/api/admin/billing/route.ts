@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requirePlatformAdmin } from '@/lib/permissions';
+import { requirePlatformAdmin, requireAdminCapability } from '@/lib/permissions';
 import { logAdminAction } from '@/lib/admin';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
@@ -102,6 +102,15 @@ export async function POST(req: Request) {
   }
 
   const action = body.action;
+
+  // Least-privilege: credit ops (grant / comp) need billing:credit; refunding a
+  // debit needs billing:refund. requirePlatformAdmin above is the coarse gate.
+  const cap = action === 'refund' ? 'billing:refund' : 'billing:credit';
+  try {
+    await requireAdminCapability(cap);
+  } catch {
+    return NextResponse.json({ error: 'Forbidden: insufficient admin capability' }, { status: 403 });
+  }
 
   if (action === 'grant') {
     const account = parseAccount(body.accountType, body.accountId);

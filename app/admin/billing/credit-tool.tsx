@@ -12,7 +12,8 @@
 
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import { ConfirmDialog } from '@/app/admin/components/confirm-dialog';
 import { Coins, Plus, RefreshCw, Search, Undo2 } from 'lucide-react';
 
@@ -122,8 +123,7 @@ export function BillingCreditTool() {
     'text-xs rounded-md border border-border bg-card px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-ring';
 
   return (
-    <Card>
-      <CardContent className="px-5 py-4 space-y-4">
+    <div className={cn(SURFACE_CARD, 'px-5 py-4 space-y-4')}>
         <div>
           <p className="text-sm font-medium flex items-center gap-1.5">
             <Coins size={14} />
@@ -232,7 +232,6 @@ export function BillingCreditTool() {
         )}
 
         {result && <p className="text-xs text-muted-foreground">{result}</p>}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

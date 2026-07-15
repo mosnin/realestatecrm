@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { requirePlatformAdmin, getCurrentDbUser } from '@/lib/permissions';
+import { requireAdminCapability, getCurrentDbUser } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
@@ -33,9 +33,9 @@ const SETTABLE_MEMBERSHIP_ROLES = ['broker_admin', 'realtor_member'] as const;
  *   - membershipId must belong to the target user; broker_owner rows are refused.
  */
 export async function POST(req: Request, { params }: Params) {
-  let admin: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+  let admin: Awaited<ReturnType<typeof requireAdminCapability>>;
   try {
-    admin = await requirePlatformAdmin();
+    admin = await requireAdminCapability('users:role');
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

@@ -14,6 +14,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Auth / audit / rate-limit.
 vi.mock('@/lib/permissions', () => ({
   requirePlatformAdmin: vi.fn(async () => ({ clerkUserId: 'admin_clerk' })),
+  // POST now also gates on a billing capability; a super_admin passes all.
+  requireAdminCapability: vi.fn(async () => ({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' })),
 }));
 const { logAdminActionMock } = vi.hoisted(() => ({ logAdminActionMock: vi.fn(async (..._args: any[]) => undefined) }));
 vi.mock('@/lib/admin', () => ({ logAdminAction: logAdminActionMock }));

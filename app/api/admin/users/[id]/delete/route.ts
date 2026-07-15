@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { requirePlatformAdmin, getCurrentDbUser } from '@/lib/permissions';
+import { requireAdminCapability, getCurrentDbUser } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
+import { requireStepUp } from '@/lib/admin-stepup';
 import { hardDeleteEnabled, performAccountDeletion } from '@/lib/account-deletion';
 
 type Params = { params: Promise<{ id: string }> };
@@ -27,10 +28,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  *     panel is almost always a mistake and would also strip admin access.
  *   - Structural blockers (owning a brokerage) surface as 409 via the engine.
  */
-export async function POST(_req: Request, { params }: Params) {
-  let admin: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+export async function POST(req: Request, { params }: Params) {
+  let admin: Awaited<ReturnType<typeof requireAdminCapability>>;
   try {
-    admin = await requirePlatformAdmin();
+    admin = await requireAdminCapability('users:delete');
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -43,6 +44,15 @@ export async function POST(_req: Request, { params }: Params) {
   const { id } = await params;
   if (!id || !UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+  }
+
+  // Body carries the step-up fields (reason + typed confirmation). Tolerate an
+  // empty/absent body so a malformed request still yields a clear 400 below.
+  let body: unknown = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
   }
 
   // Resolve the target user.
@@ -73,6 +83,10 @@ export async function POST(_req: Request, { params }: Params) {
     );
   }
 
+  // Step-up: require a reason + the target's exact email typed as confirmation.
+  const step = requireStepUp(body, { expectedConfirmation: target.email });
+  if (step instanceof NextResponse) return step;
+
   // Resolve the workspace (if any) for the cascade root.
   const { data: spaceRow } = await supabase
     .from('Space')
@@ -86,6 +100,8 @@ export async function POST(_req: Request, { params }: Params) {
     actor: admin.clerkUserId,
     action: 'delete_user',
     target: target.id,
+    reason: step.reason,
+    confirmationText: step.confirm,
     details: {
       clerkId: target.clerkId,
       email: target.email,

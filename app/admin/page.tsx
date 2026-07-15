@@ -37,6 +37,13 @@ import {
   META,
   CAPTION,
 } from '@/lib/typography';
+import {
+  SurfaceCard,
+  SurfaceCardHeader,
+  StatCard,
+  StatusPill,
+  SURFACE_CARD,
+} from '@/components/ui/surface-card';
 import { hasCurrentSubscription } from '@/lib/api-auth';
 
 export default async function AdminOverviewPage() {
@@ -477,7 +484,7 @@ export default async function AdminOverviewPage() {
     console.error('[admin] DB queries failed', { error: err });
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-8 py-12 text-center">
+        <div className={cn(SURFACE_CARD, 'px-8 py-12 text-center')}>
           <p className="text-sm text-foreground font-medium">Couldn&apos;t load admin dashboard.</p>
           <p className="text-xs text-muted-foreground mt-1">This is usually temporary.</p>
           <a
@@ -520,10 +527,7 @@ export default async function AdminOverviewPage() {
         Jobs lens: cut the 30-card wall. Keep the numbers that answer
         "is the business healthy?" at a glance.
       */}
-      <section
-        className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
-        aria-label="Key metrics"
-      >
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" aria-label="Key metrics">
         {[
           {
             label: 'Total users',
@@ -539,6 +543,7 @@ export default async function AdminOverviewPage() {
             label: 'MRR',
             value: `$${mrr.toLocaleString()}`,
             sub: `${activeSubscriptions} active`,
+            accent: true,
           },
           {
             label: 'Brokerages',
@@ -566,19 +571,22 @@ export default async function AdminOverviewPage() {
             sub: pastDueUsers > 0 ? 'needs attention' : 'all clear',
             alert: pastDueUsers > 0,
           },
-        ].map(({ label, value, sub, alert }) => (
-          <div key={label} className="bg-background px-4 py-4 sm:px-5 sm:py-5">
-            <p className={cn(SECTION_LABEL, 'mb-2')}>{label}</p>
-            <p
-              className={cn(
-                STAT_NUMBER_COMPACT,
-                alert && 'text-amber-600 dark:text-amber-400',
-              )}
-            >
-              {value}
-            </p>
-            <p className={cn(META, 'mt-1')}>{sub}</p>
-          </div>
+        ].map(({ label, value, sub, alert, accent }) => (
+          <StatCard
+            key={label}
+            label={label}
+            accent={accent}
+            value={
+              alert ? (
+                <span className="text-amber-600 dark:text-amber-400">{value}</span>
+              ) : (
+                value
+              )
+            }
+            sub={
+              <span className={cn(alert && 'text-amber-600 dark:text-amber-400')}>{sub}</span>
+            }
+          />
         ))}
       </section>
 
@@ -654,16 +662,16 @@ export default async function AdminOverviewPage() {
         <p className={SECTION_LABEL}>Growth</p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Signup chart — spans 2 columns */}
-          <div className="lg:col-span-2 rounded-xl border border-border/70 bg-card px-5 py-5">
+          <SurfaceCard className="lg:col-span-2">
             <p className={H3}>User growth</p>
             <p className={cn(CAPTION, 'mt-0.5 mb-4')}>
               Signups over the last 30 days · {signupsLast30} total
             </p>
             <SignupChart data={signupsByDay} />
-          </div>
+          </SurfaceCard>
 
           {/* Conversion funnel */}
-          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+          <SurfaceCard>
             <p className={H3}>Conversion funnel</p>
             <p className={cn(CAPTION, 'mt-0.5 mb-5')}>User journey breakdown</p>
             <div className="space-y-4">
@@ -701,7 +709,7 @@ export default async function AdminOverviewPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </SurfaceCard>
         </div>
       </section>
 
@@ -710,7 +718,7 @@ export default async function AdminOverviewPage() {
         <p className={SECTION_LABEL}>Adoption</p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Feature adoption */}
-          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+          <SurfaceCard>
             <p className={H3}>Feature adoption</p>
             <p className={cn(CAPTION, 'mt-0.5 mb-5')}>Spaces using each feature</p>
             <div className="space-y-4">
@@ -745,16 +753,13 @@ export default async function AdminOverviewPage() {
                 );
               })}
             </div>
-          </div>
+          </SurfaceCard>
 
           {/* Lead quality */}
-          <div className="rounded-xl border border-border/70 bg-card px-5 py-5">
+          <SurfaceCard>
             <p className={H3}>Lead quality</p>
             <p className={cn(CAPTION, 'mt-0.5 mb-5')}>Scored lead distribution</p>
-            <div
-              className="grid grid-cols-2 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
-              aria-label="Lead quality breakdown"
-            >
+            <div className="grid grid-cols-2 gap-3" aria-label="Lead quality breakdown">
               {[
                 {
                   label: 'Hot',
@@ -777,7 +782,7 @@ export default async function AdminOverviewPage() {
                   pill: 'text-muted-foreground bg-muted',
                 },
               ].map(({ label, value, pill }) => (
-                <div key={label} className="bg-background px-4 py-4">
+                <div key={label} className="rounded-2xl bg-muted/40 px-4 py-4">
                   <p className={SECTION_LABEL}>{label}</p>
                   <p className={cn(STAT_NUMBER_COMPACT, 'mt-1.5')}>{value}</p>
                   <span
@@ -791,7 +796,7 @@ export default async function AdminOverviewPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </SurfaceCard>
         </div>
       </section>
 
@@ -811,11 +816,11 @@ export default async function AdminOverviewPage() {
               </Link>
             </div>
             {recentUsers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+              <div className="rounded-3xl bg-muted/40 px-5 py-10 text-center">
                 <p className="text-sm text-foreground">No users yet.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+              <ul className={cn(SURFACE_CARD, 'divide-y divide-border/60 overflow-hidden')}>
                 {recentUsers.map((user) => (
                   <li key={user.id}>
                     <Link
@@ -864,11 +869,11 @@ export default async function AdminOverviewPage() {
           <div className="space-y-3">
             <p className={H3}>Recent activity</p>
             {recentActivity.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+              <div className="rounded-3xl bg-muted/40 px-5 py-10 text-center">
                 <p className="text-sm text-foreground">No activity yet.</p>
               </div>
             ) : (
-              <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+              <ul className={cn(SURFACE_CARD, 'divide-y divide-border/60 overflow-hidden')}>
                 {recentActivity.map((item, i) => {
                   const Icon = activityIcon[item.type];
                   const ago = timeAgo(item.time);
@@ -923,15 +928,15 @@ function AtRiskCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-card px-5 py-5 flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <p className={H3}>{title}</p>
-        <span className={cn(META, 'tabular-nums text-foreground')}>{count}</span>
-      </div>
+    <SurfaceCard className="flex flex-col">
+      <SurfaceCardHeader
+        title={title}
+        action={<StatusPill className="tabular-nums">{count}</StatusPill>}
+      />
       {count === 0 ? (
-        <p className={cn(CAPTION, 'flex-1')}>{empty}</p>
+        <p className={cn(CAPTION, 'flex-1 mt-4')}>{empty}</p>
       ) : (
-        <ul className="flex-1 -mx-2 divide-y divide-border/40">
+        <ul className="flex-1 -mx-2 mt-3 divide-y divide-border/40">
           {children}
         </ul>
       )}
@@ -941,7 +946,7 @@ function AtRiskCard({
       >
         View all →
       </Link>
-    </div>
+    </SurfaceCard>
   );
 }
 

@@ -46,6 +46,10 @@ export async function logAdminAction(params: {
     resource: 'AdminAction',
     resourceId: params.target,
     req: params.req,
+    // Promote step-up fields to first-class AuditLog columns AND keep them in
+    // metadata (belt-and-suspenders: queryable columns + self-contained JSON).
+    ...(params.reason ? { reason: params.reason } : {}),
+    ...(params.confirmationText ? { confirmationText: params.confirmationText } : {}),
     metadata: {
       adminAction: params.action,
       ...(params.reason ? { reason: params.reason } : {}),

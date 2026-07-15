@@ -19,6 +19,7 @@ import { timeAgo, pluralize } from '@/lib/formatting';
 import { SUBSCRIPTION_STATUS_COLORS } from '@/lib/constants/colors';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL } from '@/lib/typography';
+import { SURFACE_CARD, StatusPill } from '@/components/ui/surface-card';
 
 type UserRow = {
   id: string;
@@ -272,11 +273,11 @@ export function UserListClient({
           description={query ? 'Try a different search term.' : 'No users match the current filter.'}
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>User</th>
                   <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Status</th>
                   <th className={cn('text-left px-4 py-3 hidden sm:table-cell', SECTION_LABEL)}>
@@ -291,7 +292,7 @@ export function UserListClient({
                   <th className={cn('text-right px-4 py-3', SECTION_LABEL)}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/60">
                 {initialUsers.map((user) => {
                   const isSuspended = suspendedIds.has(user.id);
                   const subStatus = user.space?.subscriptionStatus ?? null;
@@ -348,9 +349,9 @@ export function UserListClient({
                       {/* Workspace */}
                       <td className="px-4 py-3 hidden sm:table-cell">
                         {user.space ? (
-                          <span className="text-xs font-medium text-muted-foreground bg-foreground/[0.05] rounded-full px-2 py-0.5 truncate max-w-[120px] inline-block">
+                          <StatusPill className="max-w-[120px] truncate">
                             {user.space.slug}
-                          </span>
+                          </StatusPill>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}

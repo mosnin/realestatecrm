@@ -44,6 +44,13 @@ vi.mock('@/lib/admin', () => ({
 }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
 vi.mock('@/lib/onboarding', () => ({ shouldBackfillOnboardFromSpace: () => false }));
+// The route now enforces a per-action capability via requireAdminCapability.
+// A super_admin (the backfill default) satisfies every capability, so all of
+// these existing billing paths behave exactly as before.
+const { requireCapMock } = vi.hoisted(() => ({
+  requireCapMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' })),
+}));
+vi.mock('@/lib/permissions', () => ({ requireAdminCapability: requireCapMock }));
 
 // ── Supabase double — table-aware reads + recorded writes ───────────────────
 const { dbState } = vi.hoisted(() => ({
@@ -215,9 +222,12 @@ describe('change_plan (Fix #2) — moves the Stripe item price, mirrors the DB',
 });
 
 describe('cancel_subscription (Fix #3)', () => {
+  // cancel_subscription is now a step-up action: reason (>=10 chars) + confirm 'CANCEL'.
+  const stepUp = { reason: 'customer requested cancellation', confirm: 'CANCEL' };
+
   it('immediate: cancels in Stripe + downgrades plan now', async () => {
     dbState.rows['Space'] = { id: 'sp1', stripeSubscriptionId: 'sub_1' };
-    const res = await POST(req({ action: 'cancel_subscription', accountType: 'space', accountId: 'sp1', mode: 'immediate' }));
+    const res = await POST(req({ action: 'cancel_subscription', accountType: 'space', accountId: 'sp1', mode: 'immediate', ...stepUp }));
     expect(res.status).toBe(200);
     expect(subCancelMock).toHaveBeenCalledWith('sub_1');
     const w = dbState.writes.find((x) => x.table === 'Space');
@@ -227,7 +237,7 @@ describe('cancel_subscription (Fix #3)', () => {
 
   it('end_of_period: sets cancel_at_period_end + does NOT downgrade plan yet', async () => {
     dbState.rows['Space'] = { id: 'sp1', stripeSubscriptionId: 'sub_1' };
-    const res = await POST(req({ action: 'cancel_subscription', accountType: 'space', accountId: 'sp1', mode: 'end_of_period' }));
+    const res = await POST(req({ action: 'cancel_subscription', accountType: 'space', accountId: 'sp1', mode: 'end_of_period', ...stepUp }));
     expect(res.status).toBe(200);
     expect(subUpdateMock).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: true });
     // No plan downgrade write for end-of-period.
@@ -236,10 +246,17 @@ describe('cancel_subscription (Fix #3)', () => {
 
   it('brokerage immediate downgrades to starter (not free)', async () => {
     dbState.rows['Brokerage'] = { id: 'br1', stripeSubscriptionId: 'sub_b' };
-    const res = await POST(req({ action: 'cancel_subscription', accountType: 'brokerage', accountId: 'br1', mode: 'immediate' }));
+    const res = await POST(req({ action: 'cancel_subscription', accountType: 'brokerage', accountId: 'br1', mode: 'immediate', ...stepUp }));
     expect(res.status).toBe(200);
     const w = dbState.writes.find((x) => x.table === 'Brokerage');
     expect(w!.payload.plan).toBe('starter');
+  });
+
+  it('400s (no Stripe call) when step-up reason/confirm is missing', async () => {
+    dbState.rows['Space'] = { id: 'sp1', stripeSubscriptionId: 'sub_1' };
+    const res = await POST(req({ action: 'cancel_subscription', accountType: 'space', accountId: 'sp1', mode: 'immediate' }));
+    expect(res.status).toBe(400);
+    expect(subCancelMock).not.toHaveBeenCalled();
   });
 });
 

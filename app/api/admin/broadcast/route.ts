@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
+import { requireAdminCapability } from '@/lib/permissions';
+import { requireStepUp } from '@/lib/admin-stepup';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -135,6 +137,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Blasting every user (and even previewing the recipient list) is super-admin
+  // only — the highest-blast-radius admin surface.
+  try {
+    await requireAdminCapability('broadcast:send');
+  } catch {
+    return NextResponse.json({ error: 'Forbidden: insufficient admin capability' }, { status: 403 });
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -161,6 +171,16 @@ export async function POST(req: NextRequest) {
   }
   if (!SEGMENTS.includes(segment)) {
     return NextResponse.json({ error: 'Invalid segment' }, { status: 400 });
+  }
+
+  // Step-up on the actual send (previews don't send email): a reason + the
+  // operator typing 'SEND'. Enforced before the rate-limit so a malformed send
+  // is rejected without consuming the hourly budget.
+  let stepUp: { reason: string; confirm: string } | null = null;
+  if (!preview) {
+    const step = requireStepUp(body, { expectedConfirmation: 'SEND' });
+    if (step instanceof NextResponse) return step;
+    stepUp = step;
   }
 
   // Only rate-limit actual sends; previews are cheap and used interactively.
@@ -249,6 +269,8 @@ export async function POST(req: NextRequest) {
     actor: admin.userId,
     action: 'broadcast_email',
     target: broadcastId,
+    reason: stepUp?.reason,
+    confirmationText: stepUp?.confirm,
     details: { subject, segment, recipientCount, sentCount, failedCount },
   });
 

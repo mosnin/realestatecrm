@@ -1,24 +1,27 @@
 'use client';
 
 /**
- * StatGrid — the hairline "pulse stats" grid, codified for the admin console.
+ * StatGrid — the admin console's KPI row, on the surface-card language.
  *
- * The Overview and Billing pages already use this exact figure: cells joined
- * by 1px hairlines (`gap-px` over a `bg-border/60` slab, each cell painted
- * `bg-background`) inside one rounded, clipped frame. Scoring-health,
- * agent-stats and cohorts hand-rolled four separate `Card`s with colored icon
- * chips and ad-hoc `text-[25px]` numerals instead — louder, heavier, and off
- * the type ladder. This component makes the dense, scannable figure the
- * default everywhere.
+ * Rebuilt (2026 restyle) on the shared {@link StatCard} primitive so the admin
+ * dashboards speak the same borderless rounded-3xl vocabulary as the realtor /
+ * brokerage dashboards. The old joined-hairline figure (gap-px slab of
+ * `bg-border` cells) is gone; cells are now individual flat surface cards in a
+ * gapped grid, each with the reference's short vertical accent bar beside its
+ * label.
  *
- * Numeric values count up once on entry via the shared AnimatedNumber (honors
- * reduced-motion); string values (already-formatted money, "—") render as-is.
- * An `alert` cell tints the numeral amber to flag something that needs eyes.
+ * The public API is unchanged — every existing consumer (overview, billing,
+ * agent-stats, cohorts, scoring-health) keeps passing the same `StatCell[]`.
+ *
+ * Numeric values still count up once on entry via the shared AnimatedNumber
+ * (honors reduced-motion); string values (already-formatted money, "—") render
+ * as-is. An `alert` cell tints the numeral + sub amber to flag something that
+ * needs eyes.
  */
 
 import { cn } from '@/lib/utils';
 import { AnimatedNumber } from '@/components/motion/animated-number';
-import { SECTION_LABEL, STAT_NUMBER_COMPACT, META } from '@/lib/typography';
+import { StatCard } from '@/components/ui/surface-card';
 
 export interface StatCell {
   label: string;
@@ -52,42 +55,33 @@ export function StatGrid({
         : 'grid-cols-2');
 
   return (
-    <section
-      aria-label={ariaLabel}
-      className={cn(
-        'grid gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60',
-        cols,
-        className,
-      )}
-    >
-      {cells.map(({ label, value, sub, alert, format }) => (
-        <div key={label} className="bg-background px-4 py-4 sm:px-5 sm:py-5">
-          <p className={cn(SECTION_LABEL, 'mb-2')}>{label}</p>
-          <p
-            className={cn(
-              STAT_NUMBER_COMPACT,
-              alert && 'text-amber-600 dark:text-amber-400',
-            )}
-          >
-            {typeof value === 'number' ? (
-              <AnimatedNumber value={value} format={format} />
-            ) : (
-              value
-            )}
-          </p>
-          {sub && (
-            <p
-              className={cn(
-                META,
-                'mt-1',
-                alert && 'text-amber-600/80 dark:text-amber-400/80',
-              )}
-            >
-              {sub}
-            </p>
-          )}
-        </div>
-      ))}
+    <section aria-label={ariaLabel} className={cn('grid gap-3 sm:gap-4', cols, className)}>
+      {cells.map(({ label, value, sub, alert, format }) => {
+        const inner =
+          typeof value === 'number' ? (
+            <AnimatedNumber value={value} format={format} />
+          ) : (
+            value
+          );
+        return (
+          <StatCard
+            key={label}
+            label={label}
+            value={
+              alert ? (
+                <span className="text-amber-600 dark:text-amber-400">{inner}</span>
+              ) : (
+                inner
+              )
+            }
+            sub={
+              sub ? (
+                <span className={cn(alert && 'text-amber-600 dark:text-amber-400')}>{sub}</span>
+              ) : undefined
+            }
+          />
+        );
+      })}
     </section>
   );
 }

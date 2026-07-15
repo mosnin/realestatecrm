@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth, createClerkClient } from '@clerk/nextjs/server';
-import { requirePlatformAdmin } from '@/lib/permissions';
+import { requireAdminCapability } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
@@ -29,9 +29,9 @@ const clerkAdmin = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! 
  * only updated after Clerk succeeds, so the two never diverge.
  */
 export async function PATCH(req: Request, { params }: Params) {
-  let admin: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+  let admin: Awaited<ReturnType<typeof requireAdminCapability>>;
   try {
-    admin = await requirePlatformAdmin();
+    admin = await requireAdminCapability('support:write');
   } catch {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

@@ -3,7 +3,7 @@ import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { buildIntakeUrl } from '@/lib/intake';
 import { getOnboardingStatus } from '@/lib/onboarding';
-import { Card, CardContent } from '@/components/ui/card';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 import {
   ArrowLeft,
   CheckCircle2,
@@ -288,7 +288,7 @@ export default async function AdminUserDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="rounded-xl border border-border bg-card px-5 py-4">
+      <div className={cn(SURFACE_CARD, 'px-5 py-4')}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-foreground/[0.06] flex items-center justify-center text-base font-semibold text-foreground/70 flex-shrink-0">
@@ -345,8 +345,7 @@ export default async function AdminUserDetailPage({
         {/* Account details */}
         <div>
           <p className={cn(SECTION_LABEL, 'mb-2')}>Account</p>
-          <Card>
-            <CardContent className="px-5 py-1 divide-y divide-border">
+          <div className={cn(SURFACE_CARD, 'px-5 py-1 divide-y divide-border/60')}>
               <InfoRow icon={Mail} label="Email" value={fullUser.email} />
               <InfoRow icon={Hash} label="User ID" value={fullUser.id} mono />
               <InfoRow icon={Hash} label="Clerk ID" value={fullUser.clerkId} mono />
@@ -374,16 +373,14 @@ export default async function AdminUserDetailPage({
                 label="Onboarding completed"
                 value={formatDate(fullUser.onboardingCompletedAt)}
               />
-            </CardContent>
-          </Card>
+          </div>
         </div>
 
         {/* Workspace */}
         <div>
           <p className={cn(SECTION_LABEL, 'mb-2')}>Workspace</p>
           {fullUser.space ? (
-            <Card>
-              <CardContent className="px-5 py-1 divide-y divide-border">
+            <div className={cn(SURFACE_CARD, 'px-5 py-1 divide-y divide-border/60')}>
                 <InfoRow icon={Building2} label="Name" value={fullUser.space.name} />
                 <InfoRow icon={Hash} label="Slug" value={fullUser.space.slug} mono />
                 {intakeUrl && (
@@ -435,11 +432,9 @@ export default async function AdminUserDetailPage({
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           ) : (
-            <Card>
-              <CardContent className="px-5 py-8 text-center">
+            <div className="rounded-3xl bg-muted/40 px-5 py-8 text-center">
                 <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
                   <XCircle size={18} className="text-muted-foreground" />
                 </div>
@@ -447,8 +442,7 @@ export default async function AdminUserDetailPage({
                 <p className="text-xs text-muted-foreground mt-1">
                   This user has not created a workspace yet.
                 </p>
-              </CardContent>
-            </Card>
+            </div>
           )}
         </div>
       </div>
@@ -458,19 +452,17 @@ export default async function AdminUserDetailPage({
         <div>
           <p className={cn(SECTION_LABEL, 'mb-2')}>Recent leads</p>
           {recentLeads.length === 0 ? (
-            <Card>
-              <CardContent className="px-5 py-8 text-center">
+            <div className="rounded-3xl bg-muted/40 px-5 py-8 text-center">
                 <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
                   <PhoneIncoming size={18} className="text-muted-foreground" />
                 </div>
                 <p className="text-sm text-muted-foreground">No leads yet.</p>
-              </CardContent>
-            </Card>
+            </div>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
+            <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
+                  <tr className="border-b border-border/60 bg-muted/40">
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                       Name
                     </th>
@@ -485,7 +477,7 @@ export default async function AdminUserDetailPage({
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border bg-card">
+                <tbody className="divide-y divide-border/60">
                   {recentLeads.map((lead) => (
                     <tr key={lead.id}>
                       <td className="px-4 py-3 font-medium">{lead.name}</td>

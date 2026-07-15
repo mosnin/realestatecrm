@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL } from '@/lib/typography';
 import { pluralize } from '@/lib/formatting';
+import { SURFACE_CARD } from '@/components/ui/surface-card';
 
 type BrokerageRow = {
   id: string;
@@ -126,11 +127,11 @@ export function BrokerageListClient({
           description={query ? 'Try a different search term.' : 'No brokerages match the current filter.'}
         />
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border/60 bg-muted/40">
                   <th className={cn('text-left px-4 py-3', SECTION_LABEL)}>Brokerage</th>
                   <th className={cn('text-left px-4 py-3 hidden sm:table-cell', SECTION_LABEL)}>
                     Owner
@@ -145,7 +146,7 @@ export function BrokerageListClient({
                   <th className={cn('text-right px-4 py-3', SECTION_LABEL)}>&nbsp;</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border bg-card">
+              <tbody className="divide-y divide-border/60">
                 {brokerages.map((b) => {
                   const isActive = b.status === 'active';
                   return (

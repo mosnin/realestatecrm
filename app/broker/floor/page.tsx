@@ -1,11 +1,22 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Inbox, MessageSquareHeart, TrendingUp } from 'lucide-react';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { rosterForBrokerage } from '@/lib/messaging';
 import { FloorRoster, type FloorMember } from '@/components/broker/floor-roster';
+import {
+  SurfaceCard,
+  SurfaceCardHeader,
+  AccentBarLabel,
+  InsightStrip,
+  SURFACE_CARD,
+  ACCENT_CARD_PILL,
+} from '@/components/ui/surface-card';
 import { H1, TITLE_FONT } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
+import { cn } from '@/lib/utils';
 
 /**
  * /broker/floor — The Floor: the brokerage's single command view.
@@ -116,6 +127,20 @@ export default async function BrokerFloorPage() {
     { label: 'Drafts pending', value: counts.drafts, href: '/broker/reviews', tone: 'calm' },
   ];
 
+  // The coaching queue is the floor's most "alive" surface — people explicitly
+  // asking for judgement. It becomes the view's ONE solid accent card whenever
+  // someone is actually waiting; empty, it recedes to a calm surface card.
+  const coachingAlive = openReviews.length > 0;
+
+  // Honest one-line reads for the insight strips, computed from the same rows
+  // rendered above them. Each hides when its list is empty.
+  const oldestReviewAgo = openReviews.length ? timeAgo(openReviews[0].createdAt) : null; // asc → oldest first
+  const longestStalledAgo = stalledDeals.length ? timeAgo(stalledDeals[0].updatedAt) : null; // asc updatedAt → most stalled first
+  const oldestLeadAgo = untouchedLeads.length
+    ? timeAgo(untouchedLeads[untouchedLeads.length - 1].createdAt) // desc createdAt → oldest last
+    : null;
+  const moreSuffix = (total: number, shown: number) => (total > shown ? ` · ${total - shown} more` : '');
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-12">
       <header className="space-y-1">
@@ -131,19 +156,21 @@ export default async function BrokerFloorPage() {
           <Link
             key={k.label}
             href={k.href}
-            className="group rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-accent/40"
+            className={cn(
+              SURFACE_CARD,
+              'group block p-5 transition-shadow duration-150 hover:shadow-[0_1px_2px_rgb(17_17_19/0.04),0_16px_36px_-20px_rgb(17_17_19/0.18)]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+            )}
           >
+            <AccentBarLabel>{k.label}</AccentBarLabel>
             <p
-              className={
-                k.value > 0 && k.tone === 'loud'
-                  ? 'text-2xl font-semibold tabular-nums text-foreground'
-                  : 'text-2xl font-semibold tabular-nums text-muted-foreground'
-              }
+              className={cn(
+                'mt-2 text-[25px] leading-tight tracking-tight tabular-nums',
+                k.value > 0 && k.tone === 'loud' ? 'text-foreground' : 'text-muted-foreground/70',
+              )}
+              style={TITLE_FONT}
             >
               {k.value}
-            </p>
-            <p className="mt-0.5 text-[12px] text-muted-foreground group-hover:text-foreground">
-              {k.label}
             </p>
           </Link>
         ))}
@@ -158,94 +185,168 @@ export default async function BrokerFloorPage() {
         />
 
         <div className="space-y-4">
-          {/* 4. The coaching queue. */}
-          <section className="rounded-xl border border-border bg-card">
-            <div className="flex items-baseline justify-between border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-foreground">Coaching queue</h2>
-              <Link href="/broker/reviews" className="text-xs text-muted-foreground hover:text-foreground">
-                All reviews →
-              </Link>
-            </div>
-            {openReviews.length === 0 ? (
-              <p className="px-5 py-4 text-[13px] text-muted-foreground">
-                No open reviews — nobody is waiting on your judgement.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {openReviews.map((r) => (
-                  <li key={r.id}>
-                    <Link href={`/broker/reviews/${r.id}`} className="block px-5 py-3 transition-colors hover:bg-accent/40">
-                      <p className="truncate text-[13px] text-foreground">{r.reason}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {agentName(r.requestingUserId)} · waiting {timeAgo(r.createdAt)}
-                      </p>
+          {/* 4. The coaching queue — the floor's most alive surface. */}
+          <SurfaceCard accent={coachingAlive} className="p-0 sm:p-0 overflow-hidden">
+            <div className="p-6 sm:p-7">
+              <SurfaceCardHeader
+                title="Coaching queue"
+                onAccent={coachingAlive}
+                action={
+                  <Link
+                    href="/broker/reviews"
+                    className={
+                      coachingAlive
+                        ? ACCENT_CARD_PILL
+                        : 'text-xs text-muted-foreground transition-colors hover:text-foreground'
+                    }
+                  >
+                    All reviews →
+                  </Link>
+                }
+              />
+              {openReviews.length === 0 ? (
+                <CalmEmpty icon={<MessageSquareHeart size={20} strokeWidth={1.5} />}>
+                  No open reviews — nobody is waiting on your judgement.
+                </CalmEmpty>
+              ) : (
+                <>
+                  <ul className="mt-4 space-y-1.5">
+                    {openReviews.map((r) => (
+                      <li key={r.id}>
+                        <Link
+                          href={`/broker/reviews/${r.id}`}
+                          className="block rounded-2xl bg-white/10 px-4 py-3 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                        >
+                          <p className="truncate text-[13px] text-white">{r.reason}</p>
+                          <p className="mt-0.5 text-[11px] text-white/75">
+                            {agentName(r.requestingUserId)} · waiting {timeAgo(r.createdAt)}
+                          </p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  {oldestReviewAgo && (
+                    <Link
+                      href="/broker/reviews"
+                      className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white/20 px-4 py-3 text-sm text-white transition-colors hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                    >
+                      <span className="flex-1 min-w-0 truncate">
+                        Oldest waiting {oldestReviewAgo}
+                        {moreSuffix(counts.reviews, openReviews.length)}
+                      </span>
+                      <span aria-hidden className="shrink-0">→</span>
                     </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+                  )}
+                </>
+              )}
+            </div>
+          </SurfaceCard>
 
           {/* 3. What's stalled. */}
-          <section className="rounded-xl border border-border bg-card">
-            <div className="flex items-baseline justify-between border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-foreground">Stalled deals</h2>
-              <Link href="/broker/deals" className="text-xs text-muted-foreground hover:text-foreground">
-                All deals →
-              </Link>
-            </div>
+          <SurfaceCard>
+            <SurfaceCardHeader
+              title="Stalled deals"
+              action={
+                <Link
+                  href="/broker/deals"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  All deals →
+                </Link>
+              }
+            />
             {stalledDeals.length === 0 ? (
-              <p className="px-5 py-4 text-[13px] text-muted-foreground">
+              <CalmEmpty icon={<TrendingUp size={20} strokeWidth={1.5} />}>
                 Nothing stalled — every active deal moved in the last {STALLED_AFTER_DAYS} days.
-              </p>
+              </CalmEmpty>
             ) : (
-              <ul className="divide-y divide-border/60">
-                {stalledDeals.map((d) => (
-                  <li key={d.id} className="px-5 py-3">
-                    <p className="truncate text-[13px] text-foreground">
-                      {d.title || 'Untitled deal'}
-                      {d.value != null && (
-                        <span className="ml-2 text-[12px] tabular-nums text-muted-foreground">
-                          ${Math.round(d.value).toLocaleString()}
-                        </span>
-                      )}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {agentBySpace.get(d.spaceId) ?? 'Unknown agent'} · no movement since {timeAgo(d.updatedAt)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="mt-4 divide-y divide-border/50">
+                  {stalledDeals.map((d) => (
+                    <li key={d.id} className="py-3 first:pt-0">
+                      <p className="truncate text-[13px] text-foreground">
+                        {d.title || 'Untitled deal'}
+                        {d.value != null && (
+                          <span className="ml-2 text-[12px] tabular-nums text-muted-foreground">
+                            ${Math.round(d.value).toLocaleString()}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {agentBySpace.get(d.spaceId) ?? 'Unknown agent'} · no movement since {timeAgo(d.updatedAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {longestStalledAgo && (
+                  <InsightStrip href="/broker/deals">
+                    Longest idle {longestStalledAgo}
+                    {moreSuffix(counts.stalled, stalledDeals.length)}
+                  </InsightStrip>
+                )}
+              </>
             )}
-          </section>
+          </SurfaceCard>
 
           {/* 2. Leads nobody touched. */}
-          <section className="rounded-xl border border-border bg-card">
-            <div className="flex items-baseline justify-between border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-foreground">Untouched leads</h2>
-              <Link href="/broker/leads" className="text-xs text-muted-foreground hover:text-foreground">
-                All leads →
-              </Link>
-            </div>
+          <SurfaceCard>
+            <SurfaceCardHeader
+              title="Untouched leads"
+              action={
+                <Link
+                  href="/broker/leads"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  All leads →
+                </Link>
+              }
+            />
             {untouchedLeads.length === 0 ? (
-              <p className="px-5 py-4 text-[13px] text-muted-foreground">
+              <CalmEmpty icon={<Inbox size={20} strokeWidth={1.5} />}>
                 Every new lead has been contacted. That&rsquo;s the whole job.
-              </p>
+              </CalmEmpty>
             ) : (
-              <ul className="divide-y divide-border/60">
-                {untouchedLeads.map((l) => (
-                  <li key={l.id} className="px-5 py-3">
-                    <p className="truncate text-[13px] text-foreground">{l.name}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {agentBySpace.get(l.spaceId) ?? 'Unrouted'} · arrived {timeAgo(l.createdAt)}, never contacted
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="mt-4 divide-y divide-border/50">
+                  {untouchedLeads.map((l) => (
+                    <li key={l.id} className="py-3 first:pt-0">
+                      <p className="truncate text-[13px] text-foreground">{l.name}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {agentBySpace.get(l.spaceId) ?? 'Unrouted'} · arrived {timeAgo(l.createdAt)}, never contacted
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {oldestLeadAgo && (
+                  <InsightStrip href="/broker/leads">
+                    Oldest arrived {oldestLeadAgo}
+                    {moreSuffix(counts.leads, untouchedLeads.length)}
+                  </InsightStrip>
+                )}
+              </>
             )}
-          </section>
+          </SurfaceCard>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Designed calm empty state — a soft-circle icon over the section's existing
+ * copy. Used when a list card has nothing waiting (all of which are good news
+ * on the Floor), so the surface reads settled rather than broken.
+ */
+function CalmEmpty({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="mt-4 flex flex-col items-center py-6 text-center">
+      <span
+        aria-hidden
+        className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.04] text-muted-foreground/60"
+      >
+        {icon}
+      </span>
+      <p className="max-w-xs text-[13px] text-muted-foreground">{children}</p>
     </div>
   );
 }

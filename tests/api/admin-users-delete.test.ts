@@ -15,11 +15,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const { requireMock, getCurrentDbUserMock } = vi.hoisted(() => ({
-  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk' })),
+  // The route now gates on the graded capability, not the coarse platform-admin
+  // check. A super_admin (the backfill default) satisfies 'users:delete'.
+  requireMock: vi.fn(async () => ({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' })),
   getCurrentDbUserMock: vi.fn(async () => ({ id: 'admin_db', clerkId: 'admin_clerk' })),
 }));
 vi.mock('@/lib/permissions', () => ({
-  requirePlatformAdmin: requireMock,
+  requireAdminCapability: requireMock,
   getCurrentDbUser: getCurrentDbUserMock,
 }));
 vi.mock('@clerk/nextjs/server', () => ({
@@ -57,15 +59,21 @@ vi.mock('@/lib/supabase', () => {
 import { POST } from '@/app/api/admin/users/[id]/delete/route';
 
 const UID = '11111111-1111-1111-1111-111111111111';
-function call() {
-  const req = new Request(`http://localhost/api/admin/users/${UID}/delete`, { method: 'POST' });
+// Step-up defaults: a valid reason (>=10 chars) + the target's email as the
+// typed confirmation. Individual tests override to exercise the 400 paths.
+function call(body: Record<string, unknown> | undefined = { reason: 'offboarding a churned account', confirm: 'r@b.com' }) {
+  const req = new Request(`http://localhost/api/admin/users/${UID}/delete`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
   return POST(req, { params: Promise.resolve({ id: UID }) });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   dbState.rows = {};
-  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk' } as any);
+  requireMock.mockResolvedValue({ clerkUserId: 'admin_clerk', adminRole: 'super_admin' } as any);
   getCurrentDbUserMock.mockResolvedValue({ id: 'admin_db', clerkId: 'admin_clerk' } as any);
   performAccountDeletionMock.mockResolvedValue({ ok: true, hardDeleted: true, pendingDataDeletion: false } as any);
   hardDeleteEnabledMock.mockReturnValue(true);
@@ -77,6 +85,51 @@ describe('authz', () => {
     const res = await call();
     expect(res.status).toBe(403);
     expect(performAccountDeletionMock).not.toHaveBeenCalled();
+  });
+
+  it('403s when the admin role lacks the users:delete capability', async () => {
+    // A non-super_admin (e.g. admin_readonly) → requireAdminCapability throws.
+    requireMock.mockRejectedValueOnce(new Error("Forbidden: capability 'users:delete'"));
+    dbState.rows['User'] = { id: UID, clerkId: 'u_clerk', email: 'r@b.com', platformRole: 'user' };
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(performAccountDeletionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('step-up (reason + typed confirmation)', () => {
+  beforeEach(() => {
+    dbState.rows['User'] = { id: UID, clerkId: 'u_clerk', email: 'r@b.com', platformRole: 'user' };
+    dbState.rows['Space'] = { id: 'sp1', slug: 'acme', name: 'Acme' };
+  });
+
+  it('400s with no reason/confirm and does NOT delete', async () => {
+    const res = await call({});
+    expect(res.status).toBe(400);
+    expect(performAccountDeletionMock).not.toHaveBeenCalled();
+  });
+
+  it('400s on a too-short reason', async () => {
+    const res = await call({ reason: 'too short', confirm: 'r@b.com' });
+    expect(res.status).toBe(400);
+    expect(performAccountDeletionMock).not.toHaveBeenCalled();
+  });
+
+  it('400s when the typed confirmation is not the target email', async () => {
+    const res = await call({ reason: 'offboarding a churned account', confirm: 'wrong@b.com' });
+    expect(res.status).toBe(400);
+    expect(performAccountDeletionMock).not.toHaveBeenCalled();
+  });
+
+  it('succeeds with a valid reason + email and writes both to the audit row', async () => {
+    const res = await call({ reason: 'offboarding a churned account', confirm: 'r@b.com' });
+    expect(res.status).toBe(200);
+    expect(performAccountDeletionMock).toHaveBeenCalledTimes(1);
+    expect(logAdminActionMock.mock.calls[0][0]).toMatchObject({
+      action: 'delete_user',
+      reason: 'offboarding a churned account',
+      confirmationText: 'r@b.com',
+    });
   });
 });
 
