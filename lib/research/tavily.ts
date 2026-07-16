@@ -71,6 +71,23 @@ export interface SearchResult {
   score?: number;
 }
 
+/**
+ * General web search for the in-panel browser's URL bar. Unlike the property
+ * pipeline above, this is a single free-text query with no domain boosting —
+ * it powers "type a question, get real results" in the side panel's Browser
+ * tab. Uses Tavily (a search API, so it isn't bot-walled the way scraping
+ * Google/DuckDuckGo server-side is). Returns [] on any failure; throws only if
+ * the key is missing (callers gate on `tavilyConfigured()`).
+ */
+export async function searchWeb(
+  query: string,
+  signal?: AbortSignal,
+): Promise<SearchResult[]> {
+  const apiKey = process.env.TAVILY_API_KEY;
+  if (!apiKey) throw new Error('TAVILY_API_KEY not configured');
+  return runQuery(apiKey, query, signal);
+}
+
 /** One-line address used verbatim inside queries. */
 function fullAddress(subject: TavilySubject): string {
   const unit = subject.unitNumber ? ` #${subject.unitNumber}` : '';
