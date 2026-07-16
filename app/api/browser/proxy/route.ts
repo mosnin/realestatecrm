@@ -101,7 +101,15 @@ export async function GET(req: NextRequest) {
     const body = Buffer.concat(chunks);
 
     if (contentType.includes('text/html')) {
-      const html = rewriteHtml(body.toString('utf8'), target.href, PROXY_PATH);
+      // Rewrite links/forms to an ABSOLUTE proxy URL (our own origin). This is
+      // load-bearing: the rewriter also injects <base href="<site>"> so the
+      // page's own relative images/CSS resolve against the origin site — and a
+      // RELATIVE proxy path ("/api/browser/proxy") would resolve against that
+      // base too, sending every click and search to "<site>/api/browser/proxy"
+      // (the "unsearchable" bug). Absolute URLs ignore <base>, so navigation
+      // stays on us while subresources stay on the site.
+      const proxyBase = `${req.nextUrl.origin}${PROXY_PATH}`;
+      const html = rewriteHtml(body.toString('utf8'), target.href, proxyBase);
       return new NextResponse(html, {
         status: res.status,
         headers: htmlHeaders(),

@@ -54,8 +54,30 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
 
   const currentUrl = nav.index >= 0 ? nav.stack[nav.index] : null;
 
+  // A search query navigates to our own /api/browser/search page (Tavily-
+  // backed real results) rather than an external URL — it's same-origin and
+  // always embeddable, so it skips the frame-check and renders in the same
+  // strict, script-free sandbox as the proxy.
+  const isInternal = currentUrl?.startsWith('/api/browser/') ?? false;
+  const useProxy = !isInternal && verdict === 'blocked';
+  const frameSrc = !currentUrl
+    ? null
+    : isInternal
+      ? currentUrl
+      : useProxy
+        ? `/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`
+        : currentUrl;
+  // Strict sandbox for anything that isn't a live embeddable site: no scripts,
+  // no same-origin — the proxied/search HTML is inert third-party content.
+  const strictFrame = isInternal || useProxy;
+
   useEffect(() => {
     if (!currentUrl) return;
+    // Our own pages (search results) are always embeddable — skip the check.
+    if (currentUrl.startsWith('/api/browser/')) {
+      setVerdict('ok');
+      return;
+    }
     let cancelled = false;
     setVerdict('checking');
     fetch(`/api/browser/frame-check?url=${encodeURIComponent(currentUrl)}`)
@@ -110,37 +132,56 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
 
   const navigate = useCallback(
     (raw: string) => {
-      const normalized = normalizeBrowserUrl(raw);
-      if (!normalized) {
+      const trimmed = raw.trim();
+      if (!trimmed) {
         setInvalid(true);
         return;
       }
+      const normalized = normalizeBrowserUrl(trimmed);
+      // Not a web address (has spaces, no dot, a bare word) → treat it as a
+      // search. A lightweight proxy can't scrape Google/DuckDuckGo (they
+      // bot-wall datacenter IPs), so search runs through our Tavily-backed
+      // /api/browser/search and renders real results in-panel.
+      const target = normalized ?? `/api/browser/search?q=${encodeURIComponent(trimmed)}`;
       setInvalid(false);
-      setInput(normalized);
-      if (normalized === currentUrl) {
-        // Re-submitting the current address acts as a reload.
-        setFrameNonce((n) => n + 1);
+      // Keep the human-readable text in the bar (the raw query, or the URL).
+      setInput(normalized ?? trimmed);
+      if (target === currentUrl) {
+        setFrameNonce((n) => n + 1); // re-submitting acts as a reload
         return;
       }
-      const stack = [...nav.stack.slice(0, nav.index + 1), normalized];
+      const stack = [...nav.stack.slice(0, nav.index + 1), target];
       setNav({ stack, index: stack.length - 1 });
     },
     [nav, currentUrl],
   );
 
+  // A stack entry can be a search URL (/api/browser/search?q=…) — show the
+  // human query in the address bar, not the endpoint path.
+  const displayFor = useCallback((entry: string) => {
+    if (entry.startsWith('/api/browser/search')) {
+      try {
+        return new URLSearchParams(entry.split('?')[1] ?? '').get('q') ?? entry;
+      } catch {
+        return entry;
+      }
+    }
+    return entry;
+  }, []);
+
   const goBack = useCallback(() => {
     if (nav.index <= 0) return;
     const index = nav.index - 1;
     setNav({ stack: nav.stack, index });
-    setInput(nav.stack[index]);
-  }, [nav]);
+    setInput(displayFor(nav.stack[index]));
+  }, [nav, displayFor]);
 
   const goForward = useCallback(() => {
     if (nav.index >= nav.stack.length - 1) return;
     const index = nav.index + 1;
     setNav({ stack: nav.stack, index });
-    setInput(nav.stack[index]);
-  }, [nav]);
+    setInput(displayFor(nav.stack[index]));
+  }, [nav, displayFor]);
 
   const reload = useCallback(() => setFrameNonce((n) => n + 1), []);
 
@@ -187,7 +228,7 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
           setInput(e.target.value);
           setInvalid(false);
         }}
-        placeholder="Enter URL"
+        placeholder="Search or enter URL"
         aria-label="Web address"
         aria-invalid={invalid || undefined}
         className={cn(
@@ -207,7 +248,7 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
         <div className="flex-1 flex flex-col items-center justify-center px-8">
           <Globe size={22} strokeWidth={1.5} className="text-muted-foreground/40" aria-hidden />
           <p className="mt-3 text-[13px] text-muted-foreground">
-            Enter a URL to browse alongside Chippi
+            Search the web or enter a URL to browse alongside Chippi
           </p>
           <div className="mt-4 w-full max-w-sm flex">{addressField(true)}</div>
           <p
@@ -274,13 +315,13 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
         </div>
       )}
 
-      {verdict === 'blocked' && (
+      {useProxy && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/60 text-[11px] text-muted-foreground" aria-live="polite">
           <span className="truncate">
             Read-only view — this site blocks live embedding.
           </span>
           <a
-            href={currentUrl}
+            href={currentUrl ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="shrink-0 font-medium text-foreground/80 hover:text-foreground underline underline-offset-2"
@@ -291,40 +332,33 @@ export function BrowserView({ slug, isResizing, className }: BrowserViewProps) {
       )}
 
       <div className="flex-1 relative min-h-0">
-        {(!frameLoaded || verdict === 'checking') && (
+        {(!frameLoaded || (verdict === 'checking' && !isInternal)) && (
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-foreground/15 animate-pulse" aria-hidden />
         )}
-        {verdict === 'blocked' ? (
-          // The site refuses live embedding (X-Frame-Options / CSP — the
-          // browser enforces it, nothing client-side can override it). So the
-          // page loads THROUGH our read-only server proxy instead: fetched
-          // server-side, scripts stripped, links/search rewritten to stay in
-          // the proxy, served from our origin — always renders. The sandbox
-          // here deliberately has NO allow-scripts and NO allow-same-origin:
-          // the proxied document is inert third-party content.
+        {/* One frame, three modes:
+            - live embeddable site  → its own URL, scripts allowed (real site)
+            - blocked site          → /api/browser/proxy (server-fetched,
+                                       script-stripped, inert — strict sandbox)
+            - a search query        → /api/browser/search (our Tavily results,
+                                       same-origin, script-free — strict sandbox)
+            X-Frame-Options / CSP framing refusal is browser-enforced and can't
+            be overridden client-side, which is why blocked sites go through
+            the proxy and search never touches Google/DuckDuckGo directly. */}
+        {frameSrc && (isInternal || verdict === 'ok' || verdict === 'blocked') && (
           <iframe
-            key={`proxy:${currentUrl}#${frameNonce}`}
-            src={`/api/browser/proxy?url=${encodeURIComponent(currentUrl)}`}
-            sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox"
+            key={`${strictFrame ? 'strict' : 'live'}:${frameSrc}#${frameNonce}`}
+            src={frameSrc}
+            sandbox={
+              strictFrame
+                ? 'allow-forms allow-popups allow-popups-to-escape-sandbox'
+                : 'allow-scripts allow-same-origin allow-forms allow-popups'
+            }
             referrerPolicy="no-referrer"
-            title="In-panel browser (read-only view)"
+            title={isInternal ? 'In-panel search' : useProxy ? 'In-panel browser (read-only view)' : 'In-panel browser'}
             className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
             onLoad={handleFrameLoad}
             onError={handleFrameError}
           />
-        ) : (
-          verdict === 'ok' && (
-            <iframe
-              key={`${currentUrl}#${frameNonce}`}
-              src={currentUrl}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              referrerPolicy="no-referrer"
-              title="In-panel browser"
-              className={cn('w-full h-full border-0 bg-background', isResizing && 'pointer-events-none')}
-              onLoad={handleFrameLoad}
-              onError={handleFrameError}
-            />
-          )
         )}
       </div>
     </div>

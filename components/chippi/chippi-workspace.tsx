@@ -1268,11 +1268,14 @@ export function ChippiWorkspace({
         // When the split panel is open this cluster must hug the CHAT pane's
         // right edge, not the workspace's — otherwise it floats on top of the
         // right panel's tab strip and covers the Documents/Browser tabs
-        // (screenshot-verified bug). The inline `right` tracks the live pane
-        // split (and the resize drag); when not split, the class values apply.
+        // (screenshot-verified bug). The inline `right` = the right panel's
+        // width (100 − left pane %) plus the resize-handle gap (0.5rem) and a
+        // 0.5rem breathing margin, so the cluster sits fully inside the chat
+        // pane at every split width and during a resize drag. When not split,
+        // the class values apply.
         style={
           effectiveIsSplit
-            ? { right: `calc(${100 - leftWidthPercent}% + 0.75rem)` }
+            ? { right: `calc(${100 - leftWidthPercent}% + 1rem)` }
             : undefined
         }
       >
