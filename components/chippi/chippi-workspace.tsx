@@ -260,7 +260,16 @@ export function ChippiWorkspace({
     seenMessageIdsRef.current = new Set();
   }, [activeConversationId]);
 
-  const { isSplit, toggle: toggleSplit, rightTab, setRightTab, leftWidthPercent, setLeftWidthPercent } = useSplitPanel();
+  const {
+    isSplit,
+    toggle: toggleSplit,
+    rightTab,
+    setRightTab,
+    leftWidthPercent,
+    setLeftWidthPercent,
+    isMobileOverlay,
+    closeMobileOverlay,
+  } = useSplitPanel();
   // Split / live-work side panel is available on BOTH variants. For broker the
   // RightPanel embeds the brokerage-scoped /broker/* routes (people/deals/
   // properties) plus the universal live-work activity feed and in-panel
@@ -1254,6 +1263,44 @@ export function ChippiWorkspace({
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
+      {/* Conversation history drawer — softened overlay */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+              <span className="font-semibold text-sm">History</span>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                aria-label="Close history"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ConversationSidebar
+                slug={slug}
+                conversations={conversations}
+                activeId={activeConversationId}
+                onSelect={handleSelectConversation}
+                onNew={handleNewConversation}
+                onDelete={handleDeleteConversation}
+                onRename={handleRenameConversation}
+              />
+            </div>
+          </div>
+          <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
+        </div>
+      )}
+
+      {/* ── Main content area — supports split panel on desktop ──── */}
+      <div className="flex flex-1 min-w-0 overflow-hidden" ref={containerRef}>
+        {/* Left panel — all chat/workspace content */}
+        <div
+          className="relative flex flex-col h-full overflow-hidden min-w-0"
+          style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}
+        >
       {/* Floating control cluster — top-right, no top bar chrome.
           Four affordances + one menu trigger. The composer below is the
           focal element on this surface; this row stays a small calm
@@ -1262,23 +1309,21 @@ export function ChippiWorkspace({
           chat, history, approvals, split) earn the visible row.
           Pre-fix this cluster carried eight competing icons plus a
           message-limit counter; the DOET audit (PR #101) called it a
-          score-2 Discoverability failure. */}
-      <div
-        className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5"
-        // When the split panel is open this cluster must hug the CHAT pane's
-        // right edge, not the workspace's — otherwise it floats on top of the
-        // right panel's tab strip and covers the Documents/Browser tabs
-        // (screenshot-verified bug). The inline `right` = the right panel's
-        // width (100 − left pane %) plus the resize-handle gap (0.5rem) and a
-        // 0.5rem breathing margin, so the cluster sits fully inside the chat
-        // pane at every split width and during a resize drag. When not split,
-        // the class values apply.
-        style={
-          effectiveIsSplit
-            ? { right: `calc(${100 - leftWidthPercent}% + 1rem)` }
-            : undefined
-        }
-      >
+          score-2 Discoverability failure.
+
+          STRUCTURAL fix: this cluster lives INSIDE the left (chat) pane's
+          container — which is `relative` and sized to exactly
+          `leftWidthPercent`% — instead of the workspace root. That makes
+          overlap with the right panel impossible by construction: the
+          cluster's `absolute` positioning resolves against a box that never
+          extends past the chat pane's own right edge, split or not, mid-drag
+          or settled. A previous fix chased this with an inline
+          `right: calc((100-leftWidthPercent)% + 1rem)` offset against the
+          workspace root; that arithmetic drifted and the cluster still
+          covered the right panel's Documents/Browser tabs (screenshot-
+          verified bug). No calc() needed once the cluster is anchored to the
+          pane it actually belongs to. */}
+      <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5">
         {!isBroker && <ApprovalsPill />}
         {/* One three-dots menu — folds New chat, History, Brief/Drafts, and
             (realtor) Run now / Memory / Chippi settings into a single animated
@@ -1361,48 +1406,13 @@ export function ChippiWorkspace({
         </DropdownMenu>
         {/* Split / live-work side panel — enabled on both variants. Broker's
             RightPanel embeds the brokerage-scoped /broker/* routes plus the
-            universal activity + browser tabs (see RightPanel variant). */}
-        <SplitPanelToggle isSplit={effectiveIsSplit} onToggle={toggleSplit} />
+            universal activity + browser tabs (see RightPanel variant).
+            Below md, `toggle` opens the mobile full-screen overlay instead
+            of the desktop split (see useSplitPanel) — `isOpen` reflects
+            whichever of the two is actually showing so the icon/label stays
+            honest on every width. */}
+        <SplitPanelToggle isSplit={effectiveIsSplit || isMobileOverlay} onToggle={toggleSplit} />
       </div>
-
-      {/* Conversation history drawer — softened overlay */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-              <span className="font-semibold text-sm">History</span>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                aria-label="Close history"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ConversationSidebar
-                slug={slug}
-                conversations={conversations}
-                activeId={activeConversationId}
-                onSelect={handleSelectConversation}
-                onNew={handleNewConversation}
-                onDelete={handleDeleteConversation}
-                onRename={handleRenameConversation}
-              />
-            </div>
-          </div>
-          <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
-        </div>
-      )}
-
-      {/* ── Main content area — supports split panel on desktop ──── */}
-      <div className="flex flex-1 min-w-0 overflow-hidden" ref={containerRef}>
-        {/* Left panel — all chat/workspace content */}
-        <div
-          className="flex flex-col h-full overflow-hidden min-w-0"
-          style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}
-        >
 
       {/* ── Today view (no active conversation) ───────────────────── */}
       {isLoadingConversation ? (
@@ -1786,6 +1796,38 @@ export function ChippiWorkspace({
           )}
         </AnimatePresence>
       </div>{/* end split panel container */}
+
+      {/* Mobile full-screen panel overlay — below md, the desktop two-pane
+          split has no room, so `toggle` opens THIS instead (see
+          useSplitPanel / nextResizeState). Rather than silently disabling
+          the panel on narrow screens (the old behavior), the realtor gets a
+          real, full-screen People/Deals/Documents/Browser/Activity surface
+          with its own top bar (tabs + an X to dismiss, via RightPanel's
+          `onClose`). Slides up from the bottom on open; reduced-motion
+          collapses that to a plain crossfade. `md:hidden` is a belt-and-
+          braces guard — nextResizeState already closes this the instant the
+          viewport crosses back to desktop width. */}
+      <AnimatePresence>
+        {isMobileOverlay && (
+          <motion.div
+            key="chippi-mobile-panel-overlay"
+            className="fixed inset-0 z-40 bg-background md:hidden"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
+            transition={{ duration: reduceMotion ? 0.15 : 0.28, ease: [0.32, 0.72, 0, 1] }}
+          >
+            <RightPanel
+              slug={slug}
+              variant={variant}
+              activeTab={rightTab}
+              onTabChange={setRightTab}
+              className="h-full"
+              onClose={closeMobileOverlay}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

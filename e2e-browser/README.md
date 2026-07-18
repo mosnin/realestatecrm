@@ -42,8 +42,16 @@ hard-required tier of `lib/env.ts` — Supabase, OpenAI, Clerk — so
 - **Clerk** keys are syntactically valid stubs (`pk_test_` base64-decodes to
   `clerk.example.com$`), enough for `@clerk/nextjs` to boot without keyless
   mode. No session cookie ever exists, so `clerkMiddleware` treats every
-  request as signed-out with no network call — which is exactly the behavior
-  under test at the auth boundary. **No real Clerk login is attempted.**
+  request as signed-out — which is exactly the behavior under test at the
+  auth boundary. **No real Clerk login is attempted.**
+  On http origins, `@clerk/nextjs` also wants a `__clerk_db_jwt` "dev
+  browser" identity cookie and, if it's missing, 307-redirects the *browser*
+  cross-origin to `https://{frontendApi}/v1/client/handshake` to obtain one
+  — `frontendApi` here being the fake `clerk.example.com`, which can never
+  resolve. `playwright.config.ts`'s `use.storageState` pre-seeds that cookie
+  (any non-empty value satisfies the middleware's truthiness check) so this
+  handshake never triggers; see the comment there for the full story and why
+  `page.route()` can't be used to block it instead.
 - **OpenAI** key is a stub; nothing in the suite triggers an LLM call.
 
 Determinism: every test blocks all non-localhost requests

@@ -26,6 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   CURATED_TRIGGERS,
   listTriggersForConnection,
@@ -76,8 +77,10 @@ export async function POST(req: NextRequest) {
   // Only ACTIVE connections — expired/revoked rows mean the realtor
   // can't be helped until they reconnect, so registering triggers for
   // them would just stack failed rows.
-  const { data: rows, error } = await supabase
-    .from('IntegrationConnection')
+  const { data: rows, error } = await unscoped(
+    supabase.from('IntegrationConnection'),
+    'admin ops: idempotent backfill registering curated triggers for every active connection platform-wide, gated by isPlatformAdmin() or CRON_SECRET',
+  )
     .select('*')
     .eq('status', 'active');
   if (error) {

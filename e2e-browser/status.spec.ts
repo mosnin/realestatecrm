@@ -30,9 +30,12 @@ test('status page reports honest per-subsystem states', async ({ page }) => {
     ['Integrations', 'Unknown'],
   ];
   for (const [label, state] of rows) {
-    const row = page.locator('li', { hasText: label });
+    // Filter on label AND state together, not just label: the page footer
+    // also has an "Integrations" nav link in an <li>, which a label-only
+    // filter matches too (strict-mode violation). The footer link never
+    // contains the health-state text, so requiring both disambiguates.
+    const row = page.locator('li').filter({ hasText: label }).filter({ hasText: state });
     await expect(row).toBeVisible();
-    await expect(row).toContainText(state);
   }
 
   expect(errors).toEqual([]);

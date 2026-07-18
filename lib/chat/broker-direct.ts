@@ -58,6 +58,16 @@ interface BrokerDirectInput {
   history: DirectHistoryRow[];
   model?: string;
   abortController: AbortController;
+  /**
+   * Set by the route when the caller explicitly asked for Agent mode but the
+   * turn had to downgrade to this direct snapshot path anyway (Modal
+   * unreachable/unconfigured or no runtime Space to anchor the agent run).
+   * When true, emits an honest `status` note before answering so the degrade
+   * is visible (thinking-indicator line) instead of silently answering as if
+   * Agent mode had run. Absent/false for the ordinary heuristic-router direct
+   * path — no behavior change there.
+   */
+  degradedFromAgentMode?: boolean;
 }
 
 /** Aggregate the brokerage's current numbers into a compact context block the
@@ -99,7 +109,7 @@ async function buildBrokerageSnapshot(brokerage: { id: string; name: string; own
 }
 
 interface SseEvent {
-  type: 'text_delta' | 'turn_complete' | 'error' | 'route_picked';
+  type: 'text_delta' | 'turn_complete' | 'error' | 'route_picked' | 'status';
   [k: string]: unknown;
 }
 
@@ -122,6 +132,19 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
       };
 
       push({ type: 'route_picked', route: 'direct' });
+
+      // Honest degrade note — Agent mode was requested but Modal wasn't
+      // reachable, so this turn is answering from the snapshot instead. The
+      // shared thinking-indicator hook (`use-agent-task.ts`) already renders
+      // `status` events as the action line; no client change needed to see
+      // this. Never claim Agent mode ran when it didn't (product
+      // non-negotiable: no fabricated/silently-degraded UI).
+      if (input.degradedFromAgentMode) {
+        push({
+          type: 'status',
+          label: "Agent mode isn't available right now — answering from the live brokerage snapshot instead.",
+        });
+      }
 
       // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence while
       // the single LLM completion runs. On Stop we abort the completion (via

@@ -41,6 +41,8 @@ import { DeleteDealButton } from '@/components/deals/deal-delete-button';
 import { FlagForReviewButton } from '@/components/deals/flag-for-review-button';
 import { DealTabStrip, isDealTabKey, type DealTabKey } from '@/components/deals/deal-tab-strip';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
+import { MomentumTimeline } from '@/components/deals/momentum-timeline';
+import { computeMomentum } from '@/lib/deals/momentum';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
 import type { Property } from '@/lib/types';
@@ -235,6 +237,18 @@ export default async function DealDetailPage({
   // shows "Send for signature" or a quiet "Connect DocuSign" link. Gated +
   // best-effort inside the helper — never throws.
   const docusignConnected = await isDocusignConnected(userId);
+
+  // Momentum timeline (lib/deals/momentum.ts) — spaceId-scoped, best-effort
+  // like the review-request / signature-request lookups above: a transient
+  // failure here shouldn't take down the whole deal page, it just means the
+  // card doesn't render this pass (MomentumTimeline already renders nothing
+  // on null).
+  let momentum: Awaited<ReturnType<typeof computeMomentum>> = null;
+  try {
+    momentum = await computeMomentum(space.id, id);
+  } catch (momentumErr) {
+    console.warn('[deal-detail] momentum computation failed (ignored)', momentumErr);
+  }
 
   // Headline is the address when present; the deal title otherwise. Addresses
   // are how realtors actually talk about deals — "the Maple Ave place", not
@@ -623,6 +637,8 @@ export default async function DealDetailPage({
                     placeholder="Add notes or description…"
                   />
                 </div>
+
+                <MomentumTimeline momentum={momentum} />
 
                 <DealDetailClient
                   dealId={id}

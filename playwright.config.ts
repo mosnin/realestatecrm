@@ -16,6 +16,25 @@ import { defineConfig, devices, chromium } from '@playwright/test';
  *      satisfies exactly the hard-required tier of lib/env.ts. All values
  *      are fake; Clerk-authed routes therefore redirect to sign-in, which is
  *      itself covered as the auth-boundary test.
+ *
+ * Clerk "dev browser" handshake: on http (non-https) origins, @clerk/nextjs
+ * middleware requires a `__clerk_db_jwt` cookie identifying the anonymous
+ * browser; when it's missing, it 307-redirects the *browser* to
+ * `https://{frontendApi}/v1/client/handshake` to obtain one — a real
+ * cross-origin navigation, not an SDK-internal fetch. Our stub publishable
+ * key's frontendApi (`clerk.example.com`) is intentionally fake and can
+ * never resolve, so without a workaround literally every test's first
+ * navigation fails (ERR_NAME_NOT_RESOLVED / ERR_TUNNEL_CONNECTION_FAILED
+ * depending on ambient proxy config — this is what was breaking the suite in
+ * CI, not a Playwright/proxy bug per se). `page.route()` interception cannot
+ * save you here either: Chromium resolves DNS for a 3xx redirect target
+ * before the Fetch-domain interception hook fires for it, so `route.abort()`
+ * never gets a chance to run (verified via chrome://net-export). The fix
+ * (see `use.storageState` below) is to pre-seed that cookie with any
+ * non-empty value — `@clerk/backend` only checks truthiness to decide
+ * whether the handshake is needed, it doesn't verify the token at that
+ * point — so the handshake never triggers and requests proceed straight to
+ * the normal signed-out path (still exercised by auth-boundary.spec.ts).
  */
 
 const APP_PORT = 3100;
@@ -75,11 +94,27 @@ function chromiumExecutableOverride(): string | undefined {
 }
 
 const stubEnv = loadStubEnv();
-const webServerEnv = {
+
+// Belt-and-suspenders localhost bypass: whatever NO_PROXY the host shell
+// already has (if any), make sure 127.0.0.1/localhost are always in it. Both
+// the webServer children and the browser process (via launchOptions.env
+// below) get this merged env, so a proxy-enabled host (this sandbox, and
+// apparently some CI runners too — see launchOptions comment) can never
+// route loopback traffic through it.
+const LOCALHOST_NO_PROXY = 'localhost,127.0.0.1,::1';
+function withLocalhostBypass(env: Record<string, string>): Record<string, string> {
+  const merged = { ...env };
+  for (const key of ['NO_PROXY', 'no_proxy']) {
+    merged[key] = merged[key] ? `${merged[key]},${LOCALHOST_NO_PROXY}` : LOCALHOST_NO_PROXY;
+  }
+  return merged;
+}
+
+const webServerEnv = withLocalhostBypass({
   ...(process.env as Record<string, string>),
   ...stubEnv,
   STUB_SUPABASE_PORT: String(STUB_SUPABASE_PORT),
-};
+});
 const executablePath = chromiumExecutableOverride();
 
 export default defineConfig({
@@ -103,15 +138,44 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 15_000,
     trace: 'retain-on-failure',
+    // Pre-seed a Clerk "dev browser" identity cookie (see the long comment
+    // below) so no test's first navigation ever depends on reaching the
+    // (fake) Clerk host.
+    storageState: {
+      cookies: [
+        {
+          name: '__clerk_db_jwt',
+          value: 'e2e-stub-dev-browser-token',
+          domain: '127.0.0.1',
+          path: '/',
+          expires: -1,
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [],
+    },
     launchOptions: {
       // e2e containers/CI runners may run as root, where the Chromium
       // user-namespace sandbox can't start.
       chromiumSandbox: false,
-      // Sandboxed containers export HTTP(S)_PROXY, which Chromium would apply
-      // to 127.0.0.1 too (ERR_TUNNEL_CONNECTION_FAILED against the dev
-      // server). The suite talks only to localhost — third-party requests are
-      // aborted by route interception — so skip proxying entirely.
+      // Proxy-enabled hosts (this sandbox's HTTPS_PROXY; apparently some CI
+      // runners too, per the ERR_NAME_NOT_RESOLVED-on-a-literal-IP failure
+      // this config is fixing) make Chromium route 127.0.0.1 traffic through
+      // the proxy. `--no-proxy-server` alone is NOT reliable for this on
+      // Linux: Chromium's ProxyConfigServiceLinux falls back to reading
+      // HTTP(S)_PROXY/NO_PROXY env vars directly and that has been observed
+      // to win over the command-line switch for some navigations (verified
+      // via chrome://net-export). Stripping the proxy env vars from the
+      // browser process's own environment is what actually guarantees DIRECT
+      // connections, so do both.
       args: ['--no-proxy-server'],
+      env: Object.fromEntries(
+        Object.entries(webServerEnv).filter(
+          ([key]) => !/^(https?|all|ftp)_proxy$/i.test(key) && key !== 'NO_PROXY' && key !== 'no_proxy',
+        ),
+      ),
       ...(executablePath ? { executablePath } : {}),
     },
   },

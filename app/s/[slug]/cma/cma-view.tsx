@@ -45,6 +45,7 @@ import {
 } from '@/lib/typography';
 import type { CmaPayload, CmaComp } from '@/lib/cma-types';
 import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
+import { NarrativeSection } from '@/components/cma/narrative-section';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -403,6 +404,8 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
               <Link2 size={14} /> Copy link
             </Button>
           </div>
+
+          <NarrativeSection slug={slug} reportId={preview.id} payload={preview.payload} />
         </section>
       )}
 

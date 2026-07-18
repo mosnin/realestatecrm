@@ -163,3 +163,24 @@ export function wrapGuard<T extends { from: (t: string) => object }>(client: T):
     },
   }) as T;
 }
+
+/**
+ * Production-safe escape hatch: call `unscoped(supabase.from('Table')…, 'reason')`
+ * anywhere in a builder chain to mark a query as intentionally scoped by a
+ * mechanism the guard can't see (admin capability gate, post-fetch ownership
+ * check, capability token, …) — the documented `.unscoped(reason)` pattern.
+ *
+ * Calling `.unscoped(reason)` directly on the chain is only safe while the
+ * guard is actually wrapping the client. `wrapGuard` is a no-op unless
+ * `TENANT_GUARD=1` (the shared `supabase` export in lib/supabase.ts wraps
+ * lazily against that same flag), so most of the time `supabase.from(...)`
+ * returns the REAL supabase-js builder, which has no `.unscoped` method —
+ * calling it directly would throw at runtime and break the request. This
+ * helper checks for the method first and passes the builder through
+ * unchanged whenever the guard isn't active, so call sites are safe
+ * regardless of how TENANT_GUARD is set in the current environment.
+ */
+export function unscoped<T extends object>(builder: T, reason: string): T {
+  const maybeGuarded = builder as unknown as { unscoped?: (r: string) => T };
+  return typeof maybeGuarded.unscoped === 'function' ? maybeGuarded.unscoped(reason) : builder;
+}

@@ -181,6 +181,12 @@ export const CRON_MANIFEST: readonly CronManifestEntry[] = [
     cron: '30 16 * * *',
     load: () => import('@/app/api/cron/review-nudge/route'),
   },
+  {
+    id: 'cron-drip-tick',
+    path: '/api/drip/tick',
+    cron: '*/30 * * * *',
+    load: () => import('@/app/api/drip/tick/route'),
+  },
 ];
 
 /**

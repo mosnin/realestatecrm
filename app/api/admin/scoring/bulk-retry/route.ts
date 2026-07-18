@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { getFormConfigs } from '@/lib/form-builder';
@@ -7,6 +8,16 @@ import { formConfigSchema, type IntakeFormConfig } from '@/lib/form-config-schem
 
 // How many contacts to rescore per call (hard cap prevents timeout on Vercel).
 const BATCH_LIMIT = 50;
+
+// Every Contact read/write below is gated by requireAdmin() above. The
+// candidate query is an intentional platform-wide sweep whenever the caller
+// doesn't narrow it to one spaceId; the per-row updates write back to a
+// Contact this handler already resolved via that same candidate query
+// (post-fetch identification, not a fresh unscoped lookup).
+const CROSS_TENANT_REASON =
+  'admin cross-tenant: platform-wide bulk rescoring sweep (spaceId param optional)';
+const POST_FETCH_WRITE_REASON =
+  'admin cross-tenant: writing scoring result back to a Contact already resolved by the candidate query above';
 
 /**
  * POST /api/admin/scoring/bulk-retry
@@ -58,7 +69,11 @@ export async function POST(req: NextRequest) {
     .limit(limit);
 
   if (leadType) query = query.eq('formLeadType', leadType);
-  if (spaceId) query = query.eq('spaceId', spaceId);
+  if (spaceId) {
+    query = query.eq('spaceId', spaceId);
+  } else {
+    query = unscoped(query, CROSS_TENANT_REASON);
+  }
 
   const { data: candidates, error: fetchErr } = await query;
   if (fetchErr) {
@@ -106,8 +121,7 @@ export async function POST(req: NextRequest) {
     const resolvedLeadType: 'rental' | 'buyer' = contact.formLeadType ?? contact.leadType ?? 'rental';
 
     // Mark pending
-    await supabase
-      .from('Contact')
+    await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
       .update({ scoringStatus: 'pending', updatedAt: new Date().toISOString() })
       .eq('id', contact.id);
 
@@ -142,8 +156,7 @@ export async function POST(req: NextRequest) {
         leadType: resolvedLeadType,
       });
 
-      await supabase
-        .from('Contact')
+      await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
         .update({
           scoringStatus: scoring.scoringStatus,
           leadScore: scoring.leadScore,
@@ -164,8 +177,7 @@ export async function POST(req: NextRequest) {
       });
       rescored++;
     } catch (err) {
-      await supabase
-        .from('Contact')
+      await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
         .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
         .eq('id', contact.id);
 

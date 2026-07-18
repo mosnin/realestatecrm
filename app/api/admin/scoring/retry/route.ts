@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { requireAdmin, logAdminAction } from '@/lib/admin';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
@@ -9,6 +10,15 @@ import { formConfigSchema, type IntakeFormConfig } from '@/lib/form-config-schem
 import type { ApplicationData } from '@/lib/types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Admin looks up a Contact by id across ALL spaces (gated by requireAdmin()
+// above, not derived from the caller's own tenant) — a single-row analogue
+// of the bulk-retry sweep. The subsequent writes act on that same
+// already-resolved row (post-fetch identification).
+const CROSS_TENANT_LOOKUP_REASON =
+  'admin cross-tenant: single-contact rescoring by admin-supplied contactId, not scoped to the caller\'s own space';
+const POST_FETCH_WRITE_REASON =
+  'admin cross-tenant: writing scoring result back to the Contact already resolved above';
 
 export async function POST(req: NextRequest) {
   let admin: { userId: string };
@@ -36,8 +46,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { data: contactRow, error: fetchErr } = await supabase
-      .from('Contact')
+    const { data: contactRow, error: fetchErr } = await unscoped(
+      supabase.from('Contact'),
+      CROSS_TENANT_LOOKUP_REASON,
+    )
       .select(
         'id, spaceId, name, email, phone, budget, leadType, formLeadType, applicationData, formConfigSnapshot, scoringStatus, Space(id, brokerageId)',
       )
@@ -69,8 +81,7 @@ export async function POST(req: NextRequest) {
       contact.formLeadType ?? contact.leadType ?? 'rental';
 
     // Mark as pending immediately so the UI reflects in-flight state
-    await supabase
-      .from('Contact')
+    await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
       .update({ scoringStatus: 'pending', updatedAt: new Date().toISOString() })
       .eq('id', contact.id);
 
@@ -102,8 +113,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (err) {
       console.error('[retry-scoring] scoring threw', { contactId: contact.id, err });
-      await supabase
-        .from('Contact')
+      await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
         .update({
           scoringStatus: 'failed',
           scoreSummary: 'Scoring unavailable right now.',
@@ -124,8 +134,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: updateErr } = await supabase
-      .from('Contact')
+    const { error: updateErr } = await unscoped(supabase.from('Contact'), POST_FETCH_WRITE_REASON)
       .update({
         scoringStatus: scoring.scoringStatus,
         leadScore: scoring.leadScore,
