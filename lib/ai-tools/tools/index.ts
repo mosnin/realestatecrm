@@ -120,6 +120,8 @@ import { readAttachmentTool } from './read-attachment';
 import { listFilesTool } from './list-files';
 import { readFileTool } from './read-file';
 import { attachFileToPropertyTool } from './attach-file-to-property';
+import { readSpreadsheetTool } from './read-spreadsheet';
+import { summarizeDocumentTool } from './summarize-document';
 
 // Planning
 import { createPlanTool } from './plan';
@@ -224,6 +226,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   listFilesTool as ToolDefinition,
   readFileTool as ToolDefinition,
   attachFileToPropertyTool as ToolDefinition,
+  readSpreadsheetTool as ToolDefinition,
+  summarizeDocumentTool as ToolDefinition,
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,

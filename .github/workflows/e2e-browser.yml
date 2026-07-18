@@ -1,9 +1,12 @@
 # Browser e2e suite (Playwright, real Chromium) — see e2e-browser/README.md.
 #
 # NOTE: this job is deliberately SOFT-FAIL (continue-on-error: true) while the
-# suite proves itself stable on real PRs. Once it has run green for a while,
-# flip continue-on-error to false and mark the job required in branch
-# protection so regressions on the public surface block merges.
+# suite proves itself stable on real PRs. Once it has run green for ~10
+# consecutive PR runs with no infra-cause flakes, a human should flip
+# continue-on-error to false and mark the job required in branch protection
+# so regressions on the public surface block merges. Do not flip this
+# automatically — a bot/agent should not be the one deciding the burn-in
+# period is over.
 name: e2e-browser
 
 on:
@@ -17,7 +20,7 @@ jobs:
   e2e-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    continue-on-error: true # soft-fail during burn-in — flip once proven stable
+    continue-on-error: true # soft-fail during burn-in — flip to false after ~10 green runs (see NOTE above)
     steps:
       - uses: actions/checkout@v4
 

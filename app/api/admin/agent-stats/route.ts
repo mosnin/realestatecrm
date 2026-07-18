@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { checkRateLimit } from '@/lib/rate-limit';
+
+// Every AgentTask read below is an intentional platform-wide aggregate across
+// ALL spaces — gated by requirePlatformAdmin() above, not a per-tenant lookup.
+const CROSS_TENANT_REASON =
+  'admin cross-tenant: platform-wide agent task stats aggregated across all spaces';
 
 /** GET /api/admin/agent-stats — aggregated agentic system metrics for platform admins */
 export async function GET(req: Request) {
@@ -24,8 +30,10 @@ export async function GET(req: Request) {
 
   try {
     // ── 1. Task counts by status ──────────────────────────────────────────────
-    const { data: statusRows, error: statusErr } = await supabase
-      .from('AgentTask')
+    const { data: statusRows, error: statusErr } = await unscoped(
+      supabase.from('AgentTask'),
+      CROSS_TENANT_REASON,
+    )
       .select('status')
       .gte('createdAt', since);
 
@@ -46,8 +54,10 @@ export async function GET(req: Request) {
     }
 
     // ── 2. Cost aggregates ────────────────────────────────────────────────────
-    const { data: costRows, error: costErr } = await supabase
-      .from('AgentTask')
+    const { data: costRows, error: costErr } = await unscoped(
+      supabase.from('AgentTask'),
+      CROSS_TENANT_REASON,
+    )
       .select('estimatedCostUsd')
       .gte('createdAt', since);
 
@@ -89,8 +99,10 @@ export async function GET(req: Request) {
       .slice(0, 10);
 
     // ── 4. Tasks + cost by space ──────────────────────────────────────────────
-    const { data: spaceRows, error: spaceErr } = await supabase
-      .from('AgentTask')
+    const { data: spaceRows, error: spaceErr } = await unscoped(
+      supabase.from('AgentTask'),
+      CROSS_TENANT_REASON,
+    )
       .select('spaceId, estimatedCostUsd')
       .gte('createdAt', since);
 

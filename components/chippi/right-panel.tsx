@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 // chippi-workspace — a cross-package context mismatch would silently drop the
 // exit animation.
 import { motion } from 'framer-motion';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 import { RightPanelTabs, type RightPanelTab } from './right-panel-tabs';
@@ -28,6 +29,13 @@ interface RightPanelProps {
    * tab is omitted for the broker variant (see RightPanelTabs).
    */
   variant?: RightPanelVariant;
+  /**
+   * When provided, renders an X button pinned to the top-right corner of the
+   * tab strip that calls this on click. Used by the mobile full-screen panel
+   * overlay (chippi-workspace) to dismiss back to chat — the desktop split
+   * has its own dismissal (SplitPanelToggle) and passes nothing here.
+   */
+  onClose?: () => void;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -45,6 +53,7 @@ export function RightPanel({
   className,
   isResizing,
   variant = 'realtor',
+  onClose,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -86,7 +95,19 @@ export function RightPanel({
       exit={{ x: 24, opacity: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_IN_OUT }}
     >
-      <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} variant={variant} />
+      <div className="relative">
+        <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} variant={variant} />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close panel"
+            className="absolute right-1.5 top-1.5 z-10 w-7 h-7 flex items-center justify-center rounded-md bg-background text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 transition-colors ring-1 ring-border/40"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
 
       <div className="flex-1 relative min-h-0">
         {!isBrowser && (

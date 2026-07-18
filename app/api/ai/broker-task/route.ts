@@ -60,6 +60,7 @@ import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validat
 const brokerTaskBodySchema = z.object({
   conversationId: z.string().max(200).nullish(),
   message: z.string().max(20000),
+  mode: z.string().max(50).optional(),
 });
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
@@ -82,6 +83,21 @@ interface HistoryRow {
 interface PostBody {
   conversationId?: string | null;
   message: string;
+  /**
+   * Explicit per-message runtime pick — mirrors the realtor composer's
+   * Chat/Agent switch (`app/api/ai/task/route.ts`'s `mode` field), threaded
+   * through here so the broker surface can expose the same switch.
+   *   - 'chat'  → force the in-process broker snapshot turn (no Modal hop).
+   *   - 'agent' → force the Modal BROKER_TOOLS dispatch. If Modal isn't
+   *               reachable (MODAL_CHAT_URL unset, or no runtime Space to
+   *               anchor the agent run), degrades to the direct snapshot
+   *               path same as the unset-mode router — but the direct turn
+   *               emits an honest `status` note first so the degrade is
+   *               visible in the thinking indicator, not silent.
+   * Absent (older client / realtor-only UI not yet wired for broker) →
+   * unchanged `decideBrokerRoute` heuristic.
+   */
+  mode?: 'chat' | 'agent' | string;
 }
 
 /** Cap on history messages fed to the model. Mirrors the realtor route's
@@ -513,11 +529,34 @@ export async function POST(req: NextRequest) {
   // saving a user turn and then 503'ing. Missing AGENT_INTERNAL_SECRET is still
   // fail-closed because that is an auth boundary, not an availability issue.
   let route = decideBrokerRoute(message);
+
+  // Explicit per-message mode from the composer's Chat/Agent switch (once
+  // wired — see flag at end of route file) wins over the heuristic router,
+  // same contract as the realtor `/api/ai/task` route. 'chat' always forces
+  // the in-process snapshot turn; 'agent' always forces an attempt at the
+  // Modal BROKER_TOOLS dispatch. An absent/unrecognized mode leaves the
+  // decideBrokerRoute result untouched.
+  const explicitMode: 'chat' | 'agent' | null =
+    body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+  if (explicitMode === 'chat') {
+    route = 'direct';
+  } else if (explicitMode === 'agent') {
+    route = 'agent';
+  }
+
+  // True only when the realtor/broker explicitly asked for Agent mode but we
+  // had to downgrade to the direct snapshot path anyway (Modal unreachable or
+  // unconfigured) — NOT when the plain heuristic router picked 'direct' on
+  // its own. Threaded into streamBrokerDirectTurn so the direct turn can emit
+  // an honest status note instead of silently answering as if nothing
+  // changed (product non-negotiable: no fabricated/silently-degraded UI).
+  let agentModeDegraded = false;
   if (route === 'agent' && !process.env.MODAL_CHAT_URL) {
     logger.warn('[ai/broker-task] MODAL_CHAT_URL not set — falling back to direct broker snapshot', {
       brokerageId,
     });
     route = 'direct';
+    if (explicitMode === 'agent') agentModeDegraded = true;
   }
   if (route === 'agent' && !process.env.AGENT_INTERNAL_SECRET) {
     logger.error('[ai/broker-task] AGENT_INTERNAL_SECRET not set');
@@ -531,6 +570,7 @@ export async function POST(req: NextRequest) {
       brokerageId,
     });
     route = 'direct';
+    if (explicitMode === 'agent') agentModeDegraded = true;
   }
 
   if (route === 'agent') {
@@ -629,6 +669,9 @@ export async function POST(req: NextRequest) {
       userMessage: message,
       history: history.map((h) => ({ role: h.role, content: h.content })),
       abortController,
+      // Honest-degrade signal — see `agentModeDegraded` above. False on the
+      // ordinary heuristic-router direct path, so behavior there is unchanged.
+      degradedFromAgentMode: agentModeDegraded,
     });
   }
 
