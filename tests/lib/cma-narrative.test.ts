@@ -168,7 +168,12 @@ describe('composeCmaNarrative — happy path', () => {
 
 describe('composeCmaNarrative — failure modes', () => {
   it('throws CmaNarrativeError when no LLM key is configured', async () => {
-    vi.unstubAllEnvs();
+    // Explicitly blank BOTH keys instead of relying on the ambient env being
+    // empty — CI exports OPENAI_API_KEY=placeholder workflow-wide, so
+    // unstubAllEnvs() alone leaves hasLLMKey() true there (empty string is
+    // falsy to hasLLMKey, so stubbing '' is the deterministic "no key").
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    vi.stubEnv('OPENAI_API_KEY', '');
     const payload = basePayload();
 
     await expect(composeCmaNarrative(payload, { spaceId: SPACE })).rejects.toBeInstanceOf(
