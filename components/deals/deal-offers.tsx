@@ -88,7 +88,7 @@ const TERMINAL_STATUSES: ReadonlySet<OfferStatus> = new Set([
   'expired',
 ]);
 
-function expiryReadout(
+export function expiryReadout(
   expiresAt: string | null,
   status: OfferStatus,
 ): { text: string; tone: 'overdue' | 'soon' | 'normal' } | null {
@@ -176,9 +176,10 @@ export function DealOffers({ dealId, slug, initialOffers, defaultPropertyAddress
             <button
               type="button"
               onClick={() => setFormOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 h-8 text-xs font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+              aria-expanded={formOpen}
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 h-8 text-xs font-medium text-background transition-all duration-150 motion-reduce:transition-none hover:bg-foreground/90 active:scale-[0.98] motion-reduce:active:scale-100"
             >
-              {formOpen ? <X size={13} /> : <Plus size={13} />}
+              {formOpen ? <X aria-hidden size={13} /> : <Plus aria-hidden size={13} />}
               {formOpen ? 'Cancel' : 'New offer on this deal'}
             </button>
           </div>
@@ -257,7 +258,7 @@ function DealOfferItem({
             expiry.tone === 'normal' && 'text-muted-foreground',
           )}
         >
-          <Clock size={11} />
+          <Clock aria-hidden size={11} />
           {expiry.text}
         </div>
       )}
@@ -385,7 +386,7 @@ function NewDealOfferForm({
           type="button"
           onClick={submit}
           disabled={!buyerName.trim() || submitting}
-          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-8 text-xs font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-8 text-xs font-medium text-background transition-all duration-150 motion-reduce:transition-none hover:bg-foreground/90 active:scale-[0.98] motion-reduce:active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? 'Adding…' : 'Add offer'}
         </button>

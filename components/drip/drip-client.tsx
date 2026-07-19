@@ -116,10 +116,13 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1 border-b border-border pb-0">
+        <div role="tablist" aria-label="Filter sequences" className="flex items-center gap-1 border-b border-border pb-0">
           {filterTabs.map((t) => (
             <button
               key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={filter === t.key}
               onClick={() => setFilter(t.key)}
               className={`relative px-3 py-2 text-sm font-medium transition-colors rounded-t-md ${
                 filter === t.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
@@ -127,13 +130,13 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
             >
               {t.label}
               {filter === t.key && (
-                <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
+                <span aria-hidden className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
               )}
             </button>
           ))}
         </div>
         <Button type="button" size="sm" onClick={openCreate}>
-          <Plus size={14} />
+          <Plus aria-hidden size={14} />
           New sequence
         </Button>
       </div>
@@ -162,7 +165,7 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
                     <div className="flex items-center gap-1.5">
                       <StatusPill>{seq.active ? 'active' : 'archived'}</StatusPill>
                       <Button type="button" size="icon-sm" variant="ghost" aria-label="Edit sequence" onClick={() => openEdit(seq)}>
-                        <Pencil size={14} />
+                        <Pencil aria-hidden size={14} />
                       </Button>
                       <Button
                         type="button"
@@ -171,7 +174,7 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
                         aria-label={seq.active ? 'Archive sequence' : 'Reactivate sequence'}
                         onClick={() => toggleActive(seq)}
                       >
-                        {seq.active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
+                        {seq.active ? <Archive aria-hidden size={14} /> : <ArchiveRestore aria-hidden size={14} />}
                       </Button>
                       <Button
                         type="button"
@@ -180,7 +183,7 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
                         aria-label="Delete sequence"
                         onClick={() => handleDelete(seq)}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 aria-hidden size={14} />
                       </Button>
                     </div>
                   }
@@ -203,9 +206,10 @@ export function DripClient({ slug, initialSequences, initialCounts }: Props) {
                 <button
                   type="button"
                   onClick={() => setExpandedId(isExpanded ? null : seq.id)}
+                  aria-expanded={isExpanded}
                   className="mt-3 flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
-                  {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  {isExpanded ? <ChevronUp aria-hidden size={13} /> : <ChevronDown aria-hidden size={13} />}
                   {isExpanded ? 'Hide enrollments' : 'Manage enrollments'}
                 </button>
 

@@ -135,7 +135,7 @@ export function SequenceBuilder({ open, onOpenChange, initial, onSubmit }: Props
           </div>
 
           {issues.length > 0 && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5">
               <ul className="list-disc space-y-0.5 pl-4 text-xs text-destructive">
                 {issues.map((issue, i) => (
                   <li key={i}>{issue}</li>

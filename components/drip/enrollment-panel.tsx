@@ -121,11 +121,12 @@ export function EnrollmentPanel({ slug, sequence, onCountsChange }: Props) {
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Enrollments</p>
         <Button type="button" size="sm" variant="outline" onClick={() => setEnrollOpen(true)}>
-          <UserPlus size={14} />
+          <UserPlus aria-hidden size={14} />
           Enroll a contact
         </Button>
       </div>
 
+      <div aria-live="polite">
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : error ? (
@@ -167,6 +168,7 @@ export function EnrollmentPanel({ slug, sequence, onCountsChange }: Props) {
           ))}
         </div>
       )}
+      </div>
 
       <EnrollContactDialog
         open={enrollOpen}

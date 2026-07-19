@@ -23,7 +23,7 @@ export function PacketDownloadButton({ slug, reportId }: PacketDownloadButtonPro
   return (
     <Button asChild size="sm" variant="outline">
       <a href={href} target="_blank" rel="noopener noreferrer">
-        <FileDown size={14} /> Download packet
+        <FileDown aria-hidden size={14} /> Download packet
       </a>
     </Button>
   );

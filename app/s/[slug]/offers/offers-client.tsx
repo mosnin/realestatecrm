@@ -92,7 +92,7 @@ const TERMINAL_STATUSES: ReadonlySet<OfferStatus> = new Set(['accepted', 'reject
 
 const EXPIRING_SOON_MS = 48 * 60 * 60 * 1000;
 
-function expiryReadout(expiresAt: string | null, status: OfferStatus): { text: string; tone: 'overdue' | 'soon' | 'normal' } | null {
+export function expiryReadout(expiresAt: string | null, status: OfferStatus): { text: string; tone: 'overdue' | 'soon' | 'normal' } | null {
   if (!expiresAt) return null;
   const ts = new Date(expiresAt).getTime();
   if (Number.isNaN(ts)) return null;
@@ -198,15 +198,16 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className={CAPTION}>
+        <p className={CAPTION} aria-live="polite">
           {hasAny ? `${offers.length} offer${offers.length === 1 ? '' : 's'} tracked` : ''}
         </p>
         <button
           type="button"
           onClick={() => setFormOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+          aria-expanded={formOpen}
+          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 motion-reduce:transition-none hover:bg-foreground/90 active:scale-[0.98] motion-reduce:active:scale-100"
         >
-          {formOpen ? <X size={14} /> : <Plus size={14} />}
+          {formOpen ? <X aria-hidden size={14} /> : <Plus aria-hidden size={14} />}
           {formOpen ? 'Cancel' : 'New offer'}
         </button>
       </div>
@@ -310,7 +311,7 @@ function OfferCard({
             aria-label="Delete draft offer"
             className="h-6 w-6 flex-shrink-0 flex items-center justify-center rounded-md text-muted-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground transition-colors"
           >
-            <Trash2 size={12} />
+            <Trash2 aria-hidden size={12} />
           </button>
         )}
       </div>
@@ -330,7 +331,7 @@ function OfferCard({
             expiry.tone === 'normal' && 'text-muted-foreground',
           )}
         >
-          <Clock size={11} />
+          <Clock aria-hidden size={11} />
           {expiry.text}
         </div>
       )}
@@ -473,7 +474,7 @@ function NewOfferForm({
           type="button"
           onClick={submit}
           disabled={!buyerName.trim() || submitting}
-          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 h-9 text-sm font-medium text-background transition-all duration-150 motion-reduce:transition-none hover:bg-foreground/90 active:scale-[0.98] motion-reduce:active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? 'Adding…' : 'Add offer'}
         </button>

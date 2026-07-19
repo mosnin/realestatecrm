@@ -103,7 +103,7 @@ export function EnrollContactDialog({ open, onOpenChange, slug, sequenceId, sequ
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 
-          <div className="max-h-72 space-y-1 overflow-y-auto">
+          <div className="max-h-72 space-y-1 overflow-y-auto" aria-live="polite">
             {loading && results.length === 0 ? (
               <p className="px-1 py-3 text-sm text-muted-foreground">Searching…</p>
             ) : results.length === 0 ? (

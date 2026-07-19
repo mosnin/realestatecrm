@@ -252,21 +252,23 @@ export function BrowserControlClient() {
         <SurfaceCardHeader
           title="Connected browsers"
           action={
-            status?.session?.status === 'active' ? (
-              <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">
-                Active session · {sourceLabel(status.session.source).label}
-                {status?.session?.hasFrame ? ' · live view' : ''}
-              </StatusPill>
-            ) : hasLinks ? (
-              <StatusPill>Paired, idle</StatusPill>
-            ) : null
+            <span aria-live="polite">
+              {status?.session?.status === 'active' ? (
+                <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">
+                  Active session · {sourceLabel(status.session.source).label}
+                  {status?.session?.hasFrame ? ' · live view' : ''}
+                </StatusPill>
+              ) : hasLinks ? (
+                <StatusPill>Paired, idle</StatusPill>
+              ) : null}
+            </span>
           }
         />
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3" aria-live="polite">
           {loading ? (
             <div className={cn(BODY_MUTED, 'flex items-center gap-2 py-6 justify-center')}>
-              <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+              <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" /> Checking connection…
             </div>
           ) : statusError ? (
             <p className={cn(BODY_MUTED, 'py-6 text-center')}>
@@ -282,7 +284,7 @@ export function BrowserControlClient() {
                 <li key={link.id} className="py-3 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <MonitorSmartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <MonitorSmartphone aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
                         <p className={cn(BODY, 'truncate font-medium')}>
                           {link.deviceLabel || 'Unnamed browser'}
@@ -301,13 +303,13 @@ export function BrowserControlClient() {
                           title="Issue a new token for this browser and invalidate the old one"
                           className={cn(
                             'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
-                            'text-foreground hover:bg-muted transition-colors duration-150 disabled:opacity-50',
+                            'text-foreground hover:bg-muted transition-colors duration-150 motion-reduce:transition-none disabled:opacity-50',
                           )}
                         >
                           {rotatingId === link.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <Loader2 aria-hidden className="h-3 w-3 animate-spin motion-reduce:animate-none" />
                           ) : (
-                            <RefreshCw size={12} />
+                            <RefreshCw aria-hidden size={12} />
                           )}
                           Rotate token
                         </button>
@@ -318,13 +320,13 @@ export function BrowserControlClient() {
                         disabled={revokingId === link.id}
                         className={cn(
                           'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
-                          'text-destructive hover:bg-destructive/10 transition-colors duration-150 disabled:opacity-50',
+                          'text-destructive hover:bg-destructive/10 transition-colors duration-150 motion-reduce:transition-none disabled:opacity-50',
                         )}
                       >
                         {revokingId === link.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 aria-hidden className="h-3 w-3 animate-spin motion-reduce:animate-none" />
                         ) : (
-                          <Trash2 size={12} />
+                          <Trash2 aria-hidden size={12} />
                         )}
                         Revoke
                       </button>
@@ -345,7 +347,7 @@ export function BrowserControlClient() {
                           onClick={handleCopyRotated}
                           className={cn(GHOST_PILL, 'border border-border/70 shrink-0')}
                         >
-                          {rotateCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {rotateCopied ? <Check aria-hidden size={14} /> : <Copy aria-hidden size={14} />}
                           {rotateCopied ? 'Copied' : 'Copy'}
                         </button>
                       </div>
@@ -376,6 +378,11 @@ export function BrowserControlClient() {
               >
                 {pairing.code}
               </p>
+              {/* No aria-live here on purpose — this text re-renders every
+                  second (the countdown tick); an aria-live region would
+                  re-announce it every second, which is disruptive rather
+                  than helpful. The one-time "connected" transition is
+                  already announced via toast.success below. */}
               <p className={CAPTION}>
                 {secondsLeft > 0 ? `Expires in ${formatCountdown(secondsLeft)}` : 'Expired'}
               </p>
@@ -386,7 +393,7 @@ export function BrowserControlClient() {
                 onClick={handleCopy}
                 className={cn(GHOST_PILL, 'border border-border/70')}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? <Check aria-hidden size={14} /> : <Copy aria-hidden size={14} />}
                 {copied ? 'Copied' : 'Copy code'}
               </button>
               <button
@@ -395,7 +402,7 @@ export function BrowserControlClient() {
                 disabled={issuing}
                 className={GHOST_PILL}
               >
-                {issuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {issuing ? <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> : null}
                 New code
               </button>
             </div>
@@ -407,7 +414,7 @@ export function BrowserControlClient() {
             disabled={issuing}
             className={cn(PRIMARY_PILL, 'mt-5')}
           >
-            {issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {issuing ? <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" /> : null}
             Generate pairing code
           </button>
         )}
@@ -422,7 +429,7 @@ export function BrowserControlClient() {
 
       {/* ── What Chippi can and can't do ──────────────────────────────── */}
       <SurfaceCard>
-        <SurfaceCardHeader title="What this connects" action={<ShieldAlert className="h-4 w-4 text-muted-foreground" />} />
+        <SurfaceCardHeader title="What this connects" action={<ShieldAlert aria-hidden className="h-4 w-4 text-muted-foreground" />} />
         <div className="mt-3 space-y-3">
           <div>
             <p className={cn(H3, 'text-sm')}>Two browsers, always labeled</p>

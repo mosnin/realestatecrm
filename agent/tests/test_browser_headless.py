@@ -137,12 +137,33 @@ class ThrowingLocatorPage(FakePage):
         raise RuntimeError("boom: locator() blew up")
 
 
+def fake_resolver(mapping: dict[str, list[str]]):
+    """Injectable `resolve_addr` — never touches real DNS. Any host not in
+    `mapping` raises, mirroring a resolution failure."""
+
+    async def resolve(host: str) -> list[str]:
+        if host not in mapping:
+            raise OSError(f"no such host: {host}")
+        return mapping[host]
+
+    return resolve
+
+
+PUBLIC_RESOLVER = fake_resolver(
+    {"example.com": ["93.184.216.34"], "nope.invalid": ["93.184.216.34"], "x.test": ["93.184.216.34"]}
+)
+
+
 # ── execute_action: navigate ────────────────────────────────────────────
 
 
 async def test_navigate_waits_and_reports_page_info():
     page = FakePage(url="https://example.com/", title="Example Domain")
-    result = await execute_action({"type": "navigate", "url": "https://example.com/page"}, page)
+    result = await execute_action(
+        {"type": "navigate", "url": "https://example.com/page"},
+        page,
+        resolve_addr=PUBLIC_RESOLVER,
+    )
     assert result["ok"] is True
     assert "Navigated to https://example.com/page" in result["summary"]
     goto_calls = [c for c in page.calls if c[0] == "goto"]
@@ -154,9 +175,121 @@ async def test_navigate_waits_and_reports_page_info():
 
 async def test_navigate_failure_is_error_not_exception():
     page = FakePage(raise_on_goto=RuntimeError("net::ERR_NAME_NOT_RESOLVED"))
-    result = await execute_action({"type": "navigate", "url": "https://nope.invalid"}, page)
+    result = await execute_action(
+        {"type": "navigate", "url": "https://nope.invalid"}, page, resolve_addr=PUBLIC_RESOLVER
+    )
     assert result["ok"] is False
     assert "Navigation failed" in result["error"]
+
+
+# ── execute_action: navigate SSRF re-check ──────────────────────────────
+#
+# The Chippi web server already validates a navigate URL once at enqueue
+# time (assertPublicHttpUrl in lib/browser-proxy.ts). These tests cover the
+# SECOND check this module performs immediately before the real fetch — see
+# `_assert_public_http_url`'s module-level comment for why that matters for
+# a headless worker specifically (DNS rebinding across the enqueue-to-poll
+# gap). No real DNS lookup ever happens here — `resolve_addr` is faked.
+
+
+async def test_navigate_blocks_url_resolving_to_private_ip():
+    page = FakePage()
+    resolver = fake_resolver({"internal.example.com": ["10.0.0.5"]})
+    result = await execute_action(
+        {"type": "navigate", "url": "https://internal.example.com/"},
+        page,
+        resolve_addr=resolver,
+    )
+    assert result["ok"] is False
+    assert "blocked" in result["error"].lower()
+    assert not any(c[0] == "goto" for c in page.calls)  # never reached the browser
+
+
+async def test_navigate_blocks_url_resolving_to_cloud_metadata_address():
+    page = FakePage()
+    resolver = fake_resolver({"rebound.example.com": ["169.254.169.254"]})
+    result = await execute_action(
+        {"type": "navigate", "url": "http://rebound.example.com/latest/meta-data"},
+        page,
+        resolve_addr=resolver,
+    )
+    assert result["ok"] is False
+    assert not any(c[0] == "goto" for c in page.calls)
+
+
+async def test_navigate_blocks_cgnat_shared_address_space():
+    # 100.64.0.0/10 is not flagged by ipaddress's built-ins but must be blocked
+    # (mirrors lib/browser-proxy.ts). Both a literal and a DNS-rebound host.
+    page = FakePage()
+    literal = await execute_action(
+        {"type": "navigate", "url": "http://100.64.1.2/x"},
+        page,
+        resolve_addr=fake_resolver({}),
+    )
+    assert literal["ok"] is False
+    assert not any(c[0] == "goto" for c in page.calls)
+
+    page2 = FakePage()
+    rebound = await execute_action(
+        {"type": "navigate", "url": "http://carrier-nat.example.com/x"},
+        page2,
+        resolve_addr=fake_resolver({"carrier-nat.example.com": ["100.100.50.9"]}),
+    )
+    assert rebound["ok"] is False
+    assert not any(c[0] == "goto" for c in page2.calls)
+
+
+async def test_navigate_blocks_ip_literal_targets_without_dns():
+    page = FakePage()
+    called = {"n": 0}
+
+    async def resolver_should_not_be_called(host: str) -> list[str]:
+        called["n"] += 1
+        return ["93.184.216.34"]
+
+    result = await execute_action(
+        {"type": "navigate", "url": "http://127.0.0.1:8080/admin"},
+        page,
+        resolve_addr=resolver_should_not_be_called,
+    )
+    assert result["ok"] is False
+    assert not any(c[0] == "goto" for c in page.calls)
+    assert called["n"] == 0  # IP literal — no DNS resolution needed to judge it
+
+
+async def test_navigate_blocks_non_http_scheme():
+    page = FakePage()
+    result = await execute_action(
+        {"type": "navigate", "url": "file:///etc/passwd"}, page, resolve_addr=PUBLIC_RESOLVER
+    )
+    assert result["ok"] is False
+    assert not any(c[0] == "goto" for c in page.calls)
+
+
+async def test_navigate_blocks_when_any_resolved_address_is_private():
+    # A host with BOTH a public and a private A/AAAA record must be blocked —
+    # the browser could pick either one.
+    page = FakePage()
+    resolver = fake_resolver({"mixed.example.com": ["93.184.216.34", "192.168.1.1"]})
+    result = await execute_action(
+        {"type": "navigate", "url": "https://mixed.example.com/"},
+        page,
+        resolve_addr=resolver,
+    )
+    assert result["ok"] is False
+    assert not any(c[0] == "goto" for c in page.calls)
+
+
+async def test_navigate_allows_public_address():
+    page = FakePage()
+    resolver = fake_resolver({"public.example.com": ["93.184.216.34"]})
+    result = await execute_action(
+        {"type": "navigate", "url": "https://public.example.com/"},
+        page,
+        resolve_addr=resolver,
+    )
+    assert result["ok"] is True
+    assert any(c[0] == "goto" for c in page.calls)
 
 
 # ── execute_action: click ───────────────────────────────────────────────
@@ -426,6 +559,7 @@ async def test_poll_and_execute_runs_actions_in_fifo_order():
         http_post=http_post,
         browser_factory=factory,
         sleep=lambda s: _noop(),
+        resolve_addr=PUBLIC_RESOLVER,
     )
 
     assert summary == {"stopped_reason": "stop", "actions_executed": 2}
@@ -433,6 +567,40 @@ async def test_poll_and_execute_runs_actions_in_fifo_order():
     click_index = next(i for i, c in enumerate(page.calls) if c[0] == "mouse_click")
     assert goto_index < click_index  # FIFO — a1 executed strictly before a2
     assert factory.opened == {"enter": 1, "exit": 1}  # browser opened once, closed once
+
+
+async def test_poll_and_execute_reports_blocked_navigate_instead_of_fetching():
+    """A DNS-rebound navigate action (looked legit when enqueued, resolves
+    to a private address by the time this worker actually polls it) must be
+    reported back to the server as a failed result — never silently
+    dropped, and never actually fetched."""
+    page = FakePage()
+    action = {"type": "navigate", "url": "https://rebound.example.com/"}
+    http_post = FakeHttpPost(
+        [
+            {"action": {"id": "a1", "sessionId": "s1", "input": action}, "stop": False},
+            {"action": None, "stop": True},
+        ]
+    )
+    factory = make_fake_browser_factory(page)
+    resolver = fake_resolver({"rebound.example.com": ["10.1.2.3"]})
+
+    summary = await poll_and_execute(
+        "https://app.test",
+        "secret",
+        "s1",
+        http_post=http_post,
+        browser_factory=factory,
+        sleep=lambda s: _noop(),
+        resolve_addr=resolver,
+    )
+
+    assert summary["actions_executed"] == 1
+    assert not any(c[0] == "goto" for c in page.calls)
+    _, second_body, _ = http_post.call_log[1]
+    assert second_body["completed"]["actionId"] == "a1"
+    assert second_body["completed"]["result"]["ok"] is False
+    assert "blocked" in second_body["completed"]["result"]["error"].lower()
 
 
 async def test_poll_and_execute_sends_secret_and_completed_result():

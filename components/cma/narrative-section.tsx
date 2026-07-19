@@ -95,7 +95,7 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
     <section className={cn(SURFACE_CARD, SURFACE_CARD_PAD, 'space-y-4')}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} strokeWidth={1.75} className="text-[#F25A00]" />
+          <Sparkles aria-hidden size={16} strokeWidth={1.75} className="text-[#F25A00]" />
           <h2 className={CARD_TITLE}>Seller pitch</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
       )}
 
       {hasEstimate && loading && (
-        <div className="space-y-2 animate-pulse" aria-live="polite" aria-label="Generating narrative">
+        <div className="space-y-2 animate-pulse motion-reduce:animate-none" aria-live="polite" aria-label="Generating narrative">
           <div className="h-3 w-full rounded bg-muted/40" />
           <div className="h-3 w-11/12 rounded bg-muted/40" />
           <div className="h-3 w-4/5 rounded bg-muted/40" />
@@ -153,11 +153,11 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
             <Button size="sm" variant="outline" onClick={handleCopy}>
               {copied ? (
                 <>
-                  <Check size={14} /> Copied
+                  <Check aria-hidden size={14} /> Copied
                 </>
               ) : (
                 <>
-                  <Copy size={14} /> Copy
+                  <Copy aria-hidden size={14} /> Copy
                 </>
               )}
             </Button>

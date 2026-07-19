@@ -315,15 +315,17 @@ export function BrowserControlPanel({
       <div className="flex items-center justify-between gap-2">
         <p className={SECTION_LABEL}>Browser control</p>
         {loading ? (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          <Loader2 aria-hidden className="h-3 w-3 animate-spin motion-reduce:animate-none text-muted-foreground" />
         ) : (
           <span
+            aria-live="polite"
             className={cn(
               'inline-flex items-center gap-1.5 text-[11px] font-medium',
               active ? 'text-[#F25A00]' : 'text-muted-foreground',
             )}
           >
             <Circle
+              aria-hidden
               className={cn(
                 'h-2 w-2',
                 active ? 'fill-[#F25A00] text-[#F25A00]' : 'fill-muted-foreground/40 text-muted-foreground/40',
@@ -347,9 +349,9 @@ export function BrowserControlPanel({
           )}
         >
           {isHeadless ? (
-            <Cloud className="h-3.5 w-3.5 shrink-0" />
+            <Cloud aria-hidden className="h-3.5 w-3.5 shrink-0" />
           ) : (
-            <MonitorSmartphone className="h-3.5 w-3.5 shrink-0" />
+            <MonitorSmartphone aria-hidden className="h-3.5 w-3.5 shrink-0" />
           )}
           <div className="min-w-0">
             <p className="truncate font-medium">{source.label}</p>
@@ -360,7 +362,7 @@ export function BrowserControlPanel({
 
       {!active && links.length > 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <MonitorSmartphone className="h-3.5 w-3.5 shrink-0" />
+          <MonitorSmartphone aria-hidden className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">
             {links.length === 1
               ? soleLink!.deviceLabel || soleLink!.tokenPrefix
@@ -389,7 +391,7 @@ export function BrowserControlPanel({
                 )}
               </>
             ) : (
-              <p className={cn(CAPTION, 'px-4 text-center text-white/60')}>
+              <p aria-live="polite" className={cn(CAPTION, 'px-4 text-center text-white/60')}>
                 {liveViewEmptyStateMessage({ source: sessionSource, frameChecked, frameError })}
               </p>
             )}
@@ -416,6 +418,10 @@ export function BrowserControlPanel({
                   <p className={cn(BODY_COMPACT, 'truncate')}>{a.summary}</p>
                   <p className={CAPTION}>
                     {a.type} · {new Date(a.timestamp).toLocaleTimeString()}
+                    {/* Failure is never color-only — the dot above is decorative
+                        (aria-hidden), this text is the real signal for both
+                        screen-reader and colorblind-safe reading. */}
+                    {!a.ok && <span className="font-medium text-destructive"> · Failed</span>}
                   </p>
                 </div>
               </li>
@@ -444,11 +450,15 @@ export function BrowserControlPanel({
             }
             className={cn(
               'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
-              'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150',
+              'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150 motion-reduce:transition-none',
               'disabled:opacity-40 disabled:cursor-not-allowed',
             )}
           >
-            {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
+            {stopping ? (
+              <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
+            )}
             Stop cloud browser
           </button>
           {headlessStopUnavailable && (
@@ -470,11 +480,15 @@ export function BrowserControlPanel({
           }
           className={cn(
             'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
-            'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150',
+            'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150 motion-reduce:transition-none',
             'disabled:opacity-40 disabled:cursor-not-allowed',
           )}
         >
-          {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
+          {stopping ? (
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
+          )}
           Stop
         </button>
       )}

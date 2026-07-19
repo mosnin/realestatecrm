@@ -5,38 +5,69 @@ navigate, click, type, scroll, read the page, and screenshot it — with a
 visible cursor overlay and a one-click kill switch. Manifest V3, vanilla
 JS, **no build step**: load the `extension/` folder directly.
 
+For the full architecture (this extension vs. the headless cloud runtime,
+the shared protocol, the safety/confirmation model, and what's deploy-gated
+vs. verified) see `docs/BROWSER-CONTROL.md`. This README covers only the
+extension itself: loading it, pairing, and Web Store submission.
+
 ## Loading it unpacked
 
-1. `chrome://extensions`
-2. Enable **Developer mode** (top right).
-3. **Load unpacked** → select the `extension/` directory in this repo.
-4. Pin the Chippi icon to the toolbar (optional but recommended).
+1. Open `chrome://extensions` in Chrome.
+2. Enable **Developer mode** (top-right toggle).
+3. Click **Load unpacked** → select the `extension/` directory in this repo
+   (the folder containing `manifest.json`, not the repo root).
+4. Confirm the "Chippi Browser Control" card appears with no errors. If
+   Chrome shows a manifest error, fix it and click the card's **Errors**
+   button — reloading (step below) does not clear a load-time manifest
+   error, only a full re-**Load unpacked** does.
+5. Pin the Chippi icon to the toolbar (optional but recommended — makes the
+   kill switch/status one click away instead of buried in the extensions
+   menu).
+6. Before pairing, open the popup and check the **server URL** field. It
+   defaults to `https://www.usechippi.com` (`DEFAULT_BASE_URL` in both
+   `background.js` and `popup.js`) — correct for pairing against
+   production. Point it at a local dev server (e.g. `http://localhost:3000`)
+   only when testing against `pnpm dev`; leaving it on a dev URL after
+   testing means the extension silently can't reach production.
 
-Reload from `chrome://extensions` after any edit to `background.js`,
-`content-script.js`, `lib/executor.js`, or `manifest.json` — the popup
-(`popup.html`/`popup.js`) reloads on its own each time you open it.
+Reload from `chrome://extensions` (the card's refresh icon, or **Update**
+for all extensions) after any edit to `background.js`, `content-script.js`,
+`lib/executor.js`, or `manifest.json` — Chrome does not hot-reload a
+service worker's code. `popup.html`/`popup.js` need no explicit reload;
+they re-run fresh each time you open the popup.
 
 ## Pairing flow
 
-1. In the Chippi web app, the realtor generates a short-lived (5 minute),
-   8-character pairing code (`PAIRING_CODE_LENGTH` /
-   `PAIRING_CODE_TTL_SECONDS` in `lib/browser-control/protocol.ts`).
+1. In the Chippi web app, the realtor opens Settings → Browser control and
+   generates a pairing code — short-lived (5 minutes) and 8 characters,
+   from an unambiguous alphabet (no `0`/`O`/`1`/`I`/`L`) so it's easy to
+   type correctly (`PAIRING_CODE_LENGTH` / `PAIRING_CODE_TTL_SECONDS` in
+   `lib/browser-control/protocol.ts`; `issuePairingCode()` in
+   `lib/browser-control/auth.ts`).
 2. They open the extension popup, paste the code, click **Connect**.
 3. The extension `POST`s the code to `{baseUrl}/api/browser-control/pair/redeem`
    and stores the returned bearer token in `chrome.storage.local` — **only**
-   the token is stored client-side; the server should only ever persist a
-   hash of it (see "Server contract assumptions" below, mirrors
-   `app/api/mcp-keys/route.ts`'s `chippi_ext_<hex>` / sha256 pattern).
+   the token is stored client-side; the server only ever persists a SHA-256
+   hash of it (`BrowserLink.tokenHash`, `lib/browser-control/auth.ts`),
+   mirroring `app/api/mcp-keys/route.ts`'s `chippi_ext_<hex>` / sha256
+   pattern — see "Server contract assumptions" below for the exact response
+   shape this was built against.
 4. Once paired, the background service worker starts long-polling
    `{baseUrl}/api/browser-control/poll` with `Authorization: Bearer <token>`.
    When the agent enqueues an action, the next poll response carries it; the
    extension executes it against the active tab via `chrome.debugger` (CDP)
    and reports the result on the *following* poll.
-5. **Disconnect** (popup) clears the token and stops the loop entirely.
-   **Stop Chippi** (the on-page kill-switch button, or the popup's Stop
-   button while engaged) detaches the debugger and halts execution
-   immediately without un-pairing — click **Resume** in the popup to
-   continue.
+5. **Disconnect** (popup) clears the token and stops the loop entirely — a
+   subsequent pairing needs a fresh code. **Stop Chippi** (the on-page
+   kill-switch button, or the popup's Stop button while engaged) detaches
+   the debugger and halts execution immediately without un-pairing — click
+   **Resume** in the popup to continue the same paired connection.
+6. **Revoke from the app side**: the realtor can also unpair from
+   Settings → Browser control without touching the extension at all
+   (`DELETE /api/browser-control/link/[id]`) — the extension finds out on
+   its next poll (401) and tears itself down automatically. Use this when a
+   device is lost or a token might have leaked and re-pairing on that
+   device isn't an option.
 
 ## The chrome.debugger banner (read this before demoing)
 
@@ -52,6 +83,14 @@ Chrome's native indicator.
 `chrome.debugger` also cannot attach to internal `chrome://`,
 `chrome-extension://`, or the Chrome Web Store pages — actions targeting
 those will fail with a CDP error surfaced as `{ ok: false, error }`.
+
+**This is unavoidable — do not promise a realtor or a demo audience that it
+won't appear.** It is scoped to the one pinned tab under control, not the
+whole browser, and disappears the moment the debugger detaches (kill switch,
+disconnect, or session end); it is not a sign of anything wrong. If a demo
+needs to explain it in one sentence: "that banner is Chrome's own proof the
+tab really is under the assistant's control, not Chippi's — it always shows
+up, on purpose."
 
 ## Files
 
@@ -119,17 +158,45 @@ this end-to-end:**
   `Page.captureScreenshot` without a `clip` captures the viewport, not the
   full scrollable page; confirm that's the intended behavior for the
   `screenshot` action before shipping.
-- Chrome Web Store review: the `debugger` permission requires a clear
-  justification in the store listing (draft: "Chippi Browser Control uses
-  the debugger permission solely to let a realtor's own AI assistant
-  perform on-screen actions — click, type, navigate, read — in a tab the
-  realtor explicitly pairs and can stop at any time via the visible kill
-  switch; no other tab or window is ever touched."); expect an extended
-  review cycle for `debugger` + `<all_urls>`. `activeTab`/`scripting` are
-  requested but not currently exercised by any code path here — drop them
-  from the manifest if the eventual design doesn't need them, since
-  Web Store review favors the narrowest permission set that actually maps
-  to used code paths.
+- Chrome Web Store review — see the dedicated checklist below.
+
+## Chrome Web Store submission checklist
+
+Not yet submitted. Before submitting:
+
+1. **Trim the manifest to only what's actually exercised.** `activeTab` and
+   `scripting` are currently requested in `manifest.json` but not used by
+   any code path here — drop them before submitting. Web Store review
+   favors the narrowest permission set that maps to used code, and an
+   unused sensitive-adjacent permission is exactly the kind of thing a
+   reviewer flags or a future audit has to re-justify. Keep `debugger`,
+   `storage`, `tabs`, and the `<all_urls>` host permission — all four are
+   load-bearing (CDP control, token storage, active-tab lookup, and
+   navigating to whatever site the realtor's task needs, respectively).
+2. **Write the `debugger` permission justification.** This is the field
+   most likely to trigger extended review. Draft, ready to paste into the
+   listing's permission-justification field: "Chippi Browser Control uses
+   the debugger permission solely to let a realtor's own AI assistant
+   perform on-screen actions — click, type, navigate, read — in a tab the
+   realtor explicitly pairs and can stop at any time via the visible kill
+   switch; no other tab or window is ever touched." Pair it with a short
+   demo video/GIF showing the pairing flow, the visible cursor overlay,
+   and the kill switch in action — reviewers are more likely to approve a
+   sensitive-permission extension quickly when they can see the behavior
+   rather than just read a claim about it.
+3. **Swap the placeholder icons.** `icons/` currently holds generated
+   placeholder art (Chippi orange `#F25A00`, a simple cursor glyph) — swap
+   for final brand assets before submitting; the Web Store listing also
+   needs a separate promotional image set (small tile, marquee) that isn't
+   in this repo yet.
+4. **Expect an extended review cycle.** `debugger` + `<all_urls>` together
+   put this in Chrome Web Store's higher-scrutiny review path — budget
+   days, not hours, and do not schedule a realtor-facing launch date
+   assuming same-day approval.
+5. **Point the popup's default server URL at production** before
+   packaging — `DEFAULT_BASE_URL` in `background.js` and `popup.js`
+   already defaults to `https://www.usechippi.com`; just confirm neither
+   was left pointed at a local/staging URL during testing.
 
 ## Kill switch → server semantics
 

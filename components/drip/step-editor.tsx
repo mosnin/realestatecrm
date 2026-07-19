@@ -94,7 +94,7 @@ export function StepEditor({ steps, onChange }: Props) {
                 onClick={() => moveStep(i, -1)}
                 className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
               >
-                <ChevronUp size={14} />
+                <ChevronUp aria-hidden size={14} />
               </button>
               <span className="text-[11px] tabular-nums text-muted-foreground">{i + 1}</span>
               <button
@@ -104,7 +104,7 @@ export function StepEditor({ steps, onChange }: Props) {
                 onClick={() => moveStep(i, 1)}
                 className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
               >
-                <ChevronDown size={14} />
+                <ChevronDown aria-hidden size={14} />
               </button>
             </div>
 
@@ -140,7 +140,7 @@ export function StepEditor({ steps, onChange }: Props) {
                   onClick={() => removeStep(i)}
                   className="ml-auto rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 aria-hidden size={14} />
                 </button>
               </div>
               <Textarea
@@ -157,7 +157,7 @@ export function StepEditor({ steps, onChange }: Props) {
       ))}
 
       <Button type="button" variant="outline" size="sm" onClick={addStep} disabled={steps.length >= MAX_STEPS}>
-        <Plus size={14} />
+        <Plus aria-hidden size={14} />
         Add step
       </Button>
     </div>

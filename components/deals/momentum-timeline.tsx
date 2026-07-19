@@ -133,10 +133,17 @@ export function MomentumTimeline({ momentum }: { momentum: DealMomentum | null }
         {/* Activity ticks — one bar per week, height proportional to that
             week's logged events. Pure CSS, no chart library. */}
         {hasAnyTicks && (
-          <div className="flex h-8 items-end gap-[3px]">
+          <div
+            className="flex h-8 items-end gap-[3px]"
+            role="img"
+            aria-label={`Weekly activity, last ${ticks.length} weeks: ${ticks
+              .map((t) => `${t.count} ${t.count === 1 ? 'event' : 'events'}`)
+              .join(', ')}`}
+          >
             {ticks.map((t) => (
               <span
                 key={t.weekStart}
+                aria-hidden
                 title={`Week of ${t.weekStart}: ${t.count} ${t.count === 1 ? 'event' : 'events'}`}
                 className={cn('flex-1 rounded-sm', t.count > 0 ? 'bg-foreground/40' : 'bg-muted')}
                 style={{ height: `${Math.max(8, (t.count / maxCount) * 100)}%` }}

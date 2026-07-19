@@ -65,9 +65,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -126,6 +128,93 @@ def _default_sleep(seconds: float) -> Awaitable[None]:
     return asyncio.sleep(seconds)
 
 
+# ── SSRF guard for headless `navigate` ──────────────────────────────────────
+#
+# `enqueueAction` (lib/browser-control/session.ts) already runs
+# `assertPublicHttpUrl` once, server-side, before an action is even queued.
+# But that check happens on the Chippi web server; the actual outbound fetch
+# for a headless session happens later — up to ACTION_TTL_SECONDS (120s), per
+# protocol.ts — on THIS Modal worker, a different machine/network. A domain
+# with a very short DNS TTL can pass the enqueue-time check while resolving
+# to a private/internal/metadata address by the time this worker actually
+# navigates (classic TOCTOU / DNS-rebinding). Re-checking immediately before
+# `page.goto` closes that window down to "right before the real fetch"
+# instead of leaving it open for the full TTL. This mirrors
+# `isPrivateAddress` in lib/browser-proxy.ts; kept as a single self-contained
+# helper here (not imported from anywhere) since this module has zero
+# runtime dependency on the Next.js app.
+#
+# `resolve_addr` is injected (mirrors `sleep`/`http_post`/`browser_factory`)
+# so tests never need a real DNS lookup or network access — only the
+# production default (`_default_resolve_addr`) touches the network.
+ResolveAddr = Callable[[str], Awaitable[list[str]]]
+
+# CGNAT / shared address space — not flagged by ipaddress's built-in checks.
+_CGNAT_NET = ipaddress.ip_network("100.64.0.0/10")
+
+
+async def _default_resolve_addr(host: str) -> list[str]:
+    loop = asyncio.get_event_loop()
+    infos = await loop.getaddrinfo(host, None)
+    return [info[4][0] for info in infos]
+
+
+def _is_private_address(addr: str) -> bool:
+    """True when `addr` (a literal IPv4/IPv6 address) is not publicly
+    routable — private/loopback/link-local/multicast/reserved/unspecified,
+    including the IPv4-mapped IPv6 form (::ffff:10.0.0.1)."""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return True  # not a parseable literal — fail closed
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return _is_private_address(str(ip.ipv4_mapped))
+    # CGNAT / shared address space (100.64.0.0/10) is NOT flagged by
+    # ipaddress.is_private et al., but lib/browser-proxy.ts's isPrivateAddress
+    # blocks it — mirror that here so a carrier-NAT / internal target can't
+    # slip through the headless SSRF re-check.
+    if isinstance(ip, ipaddress.IPv4Address) and ip in _CGNAT_NET:
+        return True
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+async def _assert_public_http_url(url: str | None, resolve_addr: ResolveAddr) -> None:
+    """Raises `ValueError` unless `url` is an http(s) URL whose host resolves
+    ONLY to public addresses right now. See the module-level comment above
+    for why this re-checks a URL the server already validated once."""
+    parsed = urlparse(url or "")
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Only http(s) URLs can be opened.")
+    host = (parsed.hostname or "").strip()
+    if not host or host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+        raise ValueError("That address is not reachable from here.")
+
+    try:
+        ipaddress.ip_address(host)
+        is_literal = True
+    except ValueError:
+        is_literal = False
+
+    if is_literal:
+        if _is_private_address(host):
+            raise ValueError("That address is not reachable from here.")
+        return
+
+    try:
+        addrs = await resolve_addr(host)
+    except Exception as exc:
+        raise ValueError(f"Couldn't resolve {host}.") from exc
+    if not addrs or any(_is_private_address(a) for a in addrs):
+        raise ValueError("That address is not reachable from here.")
+
+
 async def _safe_page_info(page: Any) -> dict[str, Any]:
     """Best-effort `{pageUrl, pageTitle}` after an action — never raises."""
     info: dict[str, Any] = {}
@@ -143,8 +232,14 @@ async def _safe_page_info(page: Any) -> dict[str, Any]:
 # ── per-action handlers ─────────────────────────────────────────────────────
 
 
-async def _do_navigate(action: dict[str, Any], page: Any) -> dict[str, Any]:
+async def _do_navigate(
+    action: dict[str, Any], page: Any, resolve_addr: ResolveAddr
+) -> dict[str, Any]:
     url = action.get("url")
+    try:
+        await _assert_public_http_url(url, resolve_addr)
+    except ValueError as exc:
+        return {"ok": False, "error": f"Navigation blocked: {exc}"}
     try:
         await page.goto(url, wait_until="load", timeout=NAVIGATE_TIMEOUT_MS)
     except Exception as exc:
@@ -273,6 +368,7 @@ async def execute_action(
     page: Any,
     *,
     sleep: Callable[[float], Awaitable[None]] | None = None,
+    resolve_addr: ResolveAddr | None = None,
 ) -> dict[str, Any]:
     """Execute one `BrowserActionInput`-shaped dict against `page`.
 
@@ -281,13 +377,19 @@ async def execute_action(
     NEVER raises — every action branch, and the page-info lookup after it,
     is wrapped so a driver failure always resolves to `{"ok": False,
     "error": ...}` rather than propagating out of the worker loop.
+
+    `resolve_addr` is only consulted by `navigate` (the one action type that
+    performs an outbound fetch to an attacker-influenced host) — see
+    `_assert_public_http_url`. Defaults to real DNS resolution; tests inject
+    a fake so this function never touches the network.
     """
     sleep_fn = sleep or _default_sleep
+    resolve_fn = resolve_addr or _default_resolve_addr
     action_type = action.get("type")
 
     try:
         if action_type == "navigate":
-            result = await _do_navigate(action, page)
+            result = await _do_navigate(action, page, resolve_fn)
         elif action_type == "click":
             result = await _do_click(action, page)
         elif action_type == "type":
@@ -383,6 +485,7 @@ async def poll_and_execute(
     http_post: HttpPost | None = None,
     browser_factory: Callable[[], Any] | None = None,
     sleep: Callable[[float], Awaitable[None]] | None = None,
+    resolve_addr: ResolveAddr | None = None,
     idle_delay_s: float = IDLE_POLL_DELAY_S,
     error_delay_s: float = ERROR_POLL_DELAY_S,
     max_iterations: int | None = None,
@@ -392,9 +495,10 @@ async def poll_and_execute(
     report the result back — repeating FIFO, in the order actions were
     dispatched, until the server says `stop` or `max_iterations` is hit.
 
-    `http_post` and `browser_factory` are injected so this loop is fully
-    unit-testable with no real network and no real browser: supply fakes and
-    the defaults (real HTTP via httpx, real Playwright Chromium) are never
+    `http_post`, `browser_factory`, and `resolve_addr` are injected so this
+    loop is fully unit-testable with no real network and no real browser:
+    supply fakes and the defaults (real HTTP via httpx, real Playwright
+    Chromium, real DNS resolution for the navigate SSRF re-check) are never
     touched. `max_iterations` is a safety valve for tests (and a sane
     ceiling for a runaway server) — production callers can leave it unset
     and rely on the server's `stop` signal.
@@ -455,7 +559,9 @@ async def poll_and_execute(
                 continue
 
             action_input = action.get("input") or {}
-            result = await execute_action(action_input, page, sleep=sleep_fn)
+            result = await execute_action(
+                action_input, page, sleep=sleep_fn, resolve_addr=resolve_addr
+            )
             actions_executed += 1
             completed = {"actionId": action.get("id"), "result": result}
             frame = await _capture_frame(page)
