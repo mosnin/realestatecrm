@@ -1,7 +1,9 @@
 /**
  * POST /api/drip/enroll — enroll one contact into one drip sequence.
  * GET  /api/drip/enroll — the space's enrollments, newest first (optionally
- *                          filtered by ?sequenceId= or ?contactId=).
+ *                          filtered by ?sequenceId= or ?contactId=), each row
+ *                          joined with the enrolled contact's name/email so
+ *                          the enrollment view never has to show a bare id.
  *
  * Owner-scoped: Clerk requireAuth → resolve the owner's Space → every query
  * scoped by spaceId. The actual "does this sequence belong to this space" /
@@ -50,7 +52,39 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Load failed' }, { status: 500 });
   }
 
-  return NextResponse.json({ enrollments: data ?? [] });
+  const enrollments = (data ?? []) as unknown as Array<{ id: string; contactId: string }>;
+
+  // Join contact display names in a second, spaceId-scoped query rather than
+  // a PostgREST embed — DripEnrollment/Contact don't have a registered FK
+  // relationship name to embed on, and a manual `.in()` lookup is simpler to
+  // reason about here than teaching PostgREST a new join.
+  const contactIds = Array.from(new Set(enrollments.map((e) => e.contactId).filter(Boolean)));
+  let contactsById = new Map<string, { name: string | null; email: string | null }>();
+  if (contactIds.length > 0) {
+    const { data: contactRows, error: contactErr } = await supabase
+      .from('Contact')
+      .select('id, name, email')
+      .eq('spaceId', space.id)
+      .in('id', contactIds);
+    if (contactErr) {
+      logger.warn('[drip/enroll] contact join failed — returning enrollments without names', {
+        spaceId: space.id,
+      }, contactErr);
+    } else {
+      contactsById = new Map(
+        ((contactRows ?? []) as unknown as Array<{ id: string; name: string | null; email: string | null }>).map(
+          (c) => [c.id, { name: c.name, email: c.email }],
+        ),
+      );
+    }
+  }
+
+  const enriched = enrollments.map((e) => {
+    const contact = contactsById.get(e.contactId);
+    return { ...e, contactName: contact?.name ?? null, contactEmail: contact?.email ?? null };
+  });
+
+  return NextResponse.json({ enrollments: enriched });
 }
 
 export async function POST(req: NextRequest) {

@@ -133,6 +133,25 @@ export async function listOffers(spaceId: string): Promise<Offer[]> {
   return (data ?? []) as unknown as Offer[];
 }
 
+/**
+ * Offers linked to one deal, scoped to the caller's space. Used by the deal
+ * detail page's Offers section (app/s/[slug]/deals/[id]/page.tsx) — every
+ * read here chains BOTH `.eq('spaceId', spaceId)` AND `.eq('dealId', dealId)`
+ * so a dealId that happens to belong to another tenant's deal can never
+ * surface that tenant's offers: the spaceId filter alone already excludes
+ * them, the dealId filter just narrows within the caller's own space.
+ */
+export async function listOffersForDeal(spaceId: string, dealId: string): Promise<Offer[]> {
+  const { data, error } = await supabase
+    .from('Offer')
+    .select('*')
+    .eq('spaceId', spaceId)
+    .eq('dealId', dealId)
+    .order('createdAt', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as Offer[];
+}
+
 export async function getOffer(spaceId: string, offerId: string): Promise<Offer | null> {
   const { data, error } = await supabase
     .from('Offer')
@@ -158,12 +177,28 @@ export async function listOfferEvents(spaceId: string, offerId: string): Promise
 export async function createOffer(spaceId: string, input: CreateOfferInput): Promise<Offer> {
   const status = input.status ?? 'draft';
   const id = crypto.randomUUID();
+
+  // If a dealId is supplied, confirm it belongs to THIS space before linking —
+  // a caller must not attach an offer to another tenant's deal (the Offer row
+  // is always spaceId-scoped, but a foreign dealId would still be a tenant
+  // data-integrity leak). Unknown/foreign dealId → drop the link, don't throw.
+  let dealId: string | null = null;
+  if (input.dealId) {
+    const { data: deal } = await supabase
+      .from('Deal')
+      .select('id')
+      .eq('id', input.dealId)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    dealId = deal ? input.dealId : null;
+  }
+
   const { data, error } = await supabase
     .from('Offer')
     .insert({
       id,
       spaceId,
-      dealId: input.dealId ?? null,
+      dealId,
       propertyAddress: input.propertyAddress ?? null,
       buyerName: input.buyerName,
       amount: input.amount ?? null,

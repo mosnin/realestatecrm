@@ -42,7 +42,9 @@ import { FlagForReviewButton } from '@/components/deals/flag-for-review-button';
 import { DealTabStrip, isDealTabKey, type DealTabKey } from '@/components/deals/deal-tab-strip';
 import { AgentDealPanel } from '@/components/agent/agent-deal-panel';
 import { MomentumTimeline } from '@/components/deals/momentum-timeline';
+import { DealOffers } from '@/components/deals/deal-offers';
 import { computeMomentum } from '@/lib/deals/momentum';
+import { listOffersForDeal } from '@/lib/offers';
 import type { DealChecklistItem } from '@/lib/deals/checklist';
 import type { DealDocument } from '@/lib/deals/documents';
 import type { Property } from '@/lib/types';
@@ -248,6 +250,18 @@ export default async function DealDetailPage({
     momentum = await computeMomentum(space.id, id);
   } catch (momentumErr) {
     console.warn('[deal-detail] momentum computation failed (ignored)', momentumErr);
+  }
+
+  // Offers linked to this deal (Track 18, extending the #554 offer tracker).
+  // Deal- AND space-scoped read (lib/offers.ts's listOffersForDeal) — same
+  // best-effort pattern as momentum/signature-request lookups above: a
+  // transient failure just means the section renders empty for this pass,
+  // never a hard page failure.
+  let dealOffers: Awaited<ReturnType<typeof listOffersForDeal>> = [];
+  try {
+    dealOffers = await listOffersForDeal(space.id, id);
+  } catch (offersErr) {
+    console.warn('[deal-detail] offers lookup failed (ignored)', offersErr);
   }
 
   // Headline is the address when present; the deal title otherwise. Addresses
@@ -639,6 +653,13 @@ export default async function DealDetailPage({
                 </div>
 
                 <MomentumTimeline momentum={momentum} />
+
+                <DealOffers
+                  dealId={id}
+                  slug={slug}
+                  initialOffers={dealOffers}
+                  defaultPropertyAddress={address}
+                />
 
                 <DealDetailClient
                   dealId={id}

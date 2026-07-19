@@ -5,16 +5,21 @@
  *
  * One intent: the realtor clicks Generate, gets a grounded three-paragraph
  * narrative citing the CMA's real numbers, and copies it into wherever they're
- * writing the listing. Nothing is persisted server-side yet (CmaReport has no
- * narrative column — see app/api/cma/narrative/route.ts) so this component
- * owns the only copy of the generated text; it's lost on refresh, which the
- * copy button exists to prevent mattering.
+ * writing the listing. A successful generation is also persisted server-side
+ * (CmaReport.narrative — see app/api/cma/narrative/route.ts), so the
+ * pre-listing packet export can include it later; this component still keeps
+ * its own copy in state so it survives without a refetch, and the copy
+ * button covers the "lost on refresh" case for a fresh generation this
+ * component doesn't yet rehydrate from the server on mount.
  *
- * Honest UI: hidden entirely when the CMA has no estimate to narrate
- * (stats.insufficientData) — there's nothing true to pitch yet. Loading is a
- * calm shimmer, not a spinner, matching the thinking-indicator's restraint
- * elsewhere in the app. A failed generation surfaces as a plain retry, never
- * a fabricated narrative.
+ * Honest UI: the pitch itself (generate/regenerate, the paragraphs) only
+ * shows when the CMA has an estimate to narrate (stats.insufficientData) —
+ * there's nothing true to pitch yet otherwise. The "Download packet" action
+ * stays available either way — the packet route applies the same honesty
+ * rule on its own (an ungenerated narrative section is simply omitted from
+ * the export, never faked). Loading is a calm shimmer, not a spinner,
+ * matching the thinking-indicator's restraint elsewhere in the app. A failed
+ * generation surfaces as a plain retry, never a fabricated narrative.
  */
 
 import { useState } from 'react';
@@ -25,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { BODY_MUTED, CAPTION } from '@/lib/typography';
 import { toastError } from '@/lib/toast-helpers';
 import type { CmaPayload } from '@/lib/cma-types';
+import { PacketDownloadButton } from '@/components/cma/packet-download-button';
 
 interface NarrativeSectionProps {
   slug: string;
@@ -38,8 +44,9 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
   const [copied, setCopied] = useState(false);
   const [thin, setThin] = useState(false);
 
-  // Honest UI: no estimate, nothing to pitch — the section doesn't exist.
-  if (payload.stats.insufficientData) return null;
+  // Honest UI: no estimate, nothing true to pitch — the generate/regenerate
+  // UI stays off, but the packet download stays available (see file header).
+  const hasEstimate = !payload.stats.insufficientData;
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -91,28 +98,39 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
           <Sparkles size={16} strokeWidth={1.75} className="text-[#F25A00]" />
           <h2 className={CARD_TITLE}>Seller pitch</h2>
         </div>
-        {!loading && (
-          <Button size="sm" variant="outline" onClick={handleGenerate}>
-            {narrative ? 'Regenerate' : 'Generate'}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasEstimate && !loading && (
+            <Button size="sm" variant="outline" onClick={handleGenerate}>
+              {narrative ? 'Regenerate' : 'Generate'}
+            </Button>
+          )}
+          <PacketDownloadButton slug={slug} reportId={reportId} />
+        </div>
       </div>
 
-      {!narrative && !loading && !thin && (
+      {!hasEstimate && (
+        <p className={cn(BODY_MUTED)}>
+          There isn&apos;t enough comparable data yet for an honest seller pitch —
+          add more priced comparables and try again. You can still download a
+          packet with what&apos;s here.
+        </p>
+      )}
+
+      {hasEstimate && !narrative && !loading && !thin && (
         <p className={cn(BODY_MUTED)}>
           Turn this analysis into a short, grounded pitch you can hand a seller —
           citing the range and comps above, nothing invented.
         </p>
       )}
 
-      {thin && !loading && (
+      {hasEstimate && thin && !loading && (
         <p className={cn(BODY_MUTED)}>
           There isn&apos;t enough comparable data yet to write an honest pitch. Add
           more priced comparables and try again.
         </p>
       )}
 
-      {loading && (
+      {hasEstimate && loading && (
         <div className="space-y-2 animate-pulse" aria-live="polite" aria-label="Generating narrative">
           <div className="h-3 w-full rounded bg-muted/40" />
           <div className="h-3 w-11/12 rounded bg-muted/40" />
@@ -122,7 +140,7 @@ export function NarrativeSection({ slug, reportId, payload }: NarrativeSectionPr
         </div>
       )}
 
-      {narrative && !loading && (
+      {hasEstimate && narrative && !loading && (
         <div className="space-y-4">
           <div className="space-y-3">
             {paragraphs.map((p, i) => (

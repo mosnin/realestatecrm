@@ -22,7 +22,6 @@ import { getSignedDownloadUrl } from '@/lib/storage';
 import { defineTool } from '../types';
 import {
   parseDelimitedText,
-  parseXlsxBuffer,
   inferSchema,
   previewRows,
   runQuery,
@@ -30,6 +29,7 @@ import {
   type ColumnSchema,
   type QueryResult,
 } from '@/lib/documents/tabular';
+import { parseXlsxBuffer } from '@/lib/documents/xlsx';
 
 /** Short-lived — just long enough to fetch bytes this call. */
 const SIGN_TTL_SECONDS = 300;

@@ -77,6 +77,11 @@ export default async function PublicApplyPage({
   // a chat is a single session by nature.
   const { preview } = await searchParams;
   const isPreview = preview === '1';
+  // The slug-existence 404 is enforced by layout.tsx (outside loading.tsx's
+  // Suspense boundary, so an unknown slug gets a real 404 status — see the
+  // comment there). This re-lookup is deduped via getSpaceFromSlug's React
+  // cache() to a single query per request; the null check stays only for TS
+  // narrowing since layout.tsx guarantees it's unreachable in practice.
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 

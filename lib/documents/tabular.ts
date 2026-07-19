@@ -9,9 +9,11 @@
  * handle (quoted commas, embedded newlines, ragged rows) and auto-detects
  * the delimiter, so both CSV and TSV go through one code path.
  *
- * XLSX parsing reuses `exceljs` (also already a dependency — same
- * extractor), lazily imported — mirrors `extract.ts::extractXlsx` — so
- * routes that never touch an XLSX file don't pay exceljs's cold-start cost.
+ * XLSX parsing lives in `./xlsx.ts` (kept out of this file so routes that
+ * never touch an XLSX file don't pay exceljs's cold-start cost) — it
+ * normalizes into the same `ParsedTable` shape via `rowsFromMatrix` below,
+ * so schema inference, previews, and aggregate math don't know or care
+ * which format a table came from.
  *
  * Everything below the parse step — schema inference, previews, and
  * sum/avg/count/min/max/group-by — is plain deterministic code. No LLM is
@@ -82,60 +84,6 @@ export function parseDelimitedText(text: string): ParsedTable {
   const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true });
   const rows = (parsed.data ?? []).filter((r): r is string[] => Array.isArray(r));
   return rowsFromMatrix(rows.map((r) => r.map((cell) => (cell == null ? '' : String(cell)))));
-}
-
-/** Result of attempting to parse an XLSX workbook. */
-export type XlsxParseResult =
-  | { sheets: Array<{ name: string; table: ParsedTable }> }
-  | { error: string };
-
-/** Unwrap an exceljs cell value into a display string. Rich cells (formula
- *  results, hyperlinks, rich text runs) are reduced to their display text —
- *  same unwrap exceljs shape `lib/extraction/extract.ts::extractXlsx` uses. */
-function cellToString(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  if (v && typeof v === 'object') {
-    const o = v as { result?: unknown; text?: unknown; hyperlink?: unknown; richText?: Array<{ text?: string }> };
-    if (Array.isArray(o.richText)) return o.richText.map((r) => r.text ?? '').join('');
-    if (o.result !== undefined) return String(o.result ?? '');
-    if (o.text !== undefined) return String(o.text ?? '');
-    if (o.hyperlink !== undefined) return String(o.hyperlink ?? '');
-    if (v instanceof Date) return v.toISOString();
-    return '';
-  }
-  return String(v);
-}
-
-/** Parse an XLSX workbook buffer into one ParsedTable per non-empty sheet.
- *  Never throws — a load failure or an environment without exceljs comes
- *  back as `{ error }` so the caller can report an honest message. */
-export async function parseXlsxBuffer(buffer: Buffer): Promise<XlsxParseResult> {
-  let ExcelJS: typeof import('exceljs');
-  try {
-    ExcelJS = (await import('exceljs')).default as unknown as typeof import('exceljs');
-  } catch {
-    return { error: 'XLSX parsing is unavailable in this deployment — convert the file to CSV and try again.' };
-  }
-
-  const workbook = new ExcelJS.Workbook();
-  try {
-    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
-  } catch (err) {
-    return { error: `Could not parse the XLSX file: ${err instanceof Error ? err.message : 'unknown error'}` };
-  }
-
-  const sheets: Array<{ name: string; table: ParsedTable }> = [];
-  workbook.eachSheet((sheet) => {
-    const matrix: string[][] = [];
-    sheet.eachRow({ includeEmpty: false }, (row) => {
-      const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-      matrix.push(values.map(cellToString));
-    });
-    if (matrix.length > 0) {
-      sheets.push({ name: sheet.name, table: rowsFromMatrix(matrix) });
-    }
-  });
-  return { sheets };
 }
 
 /** Parse a numeric-looking cell: strips thousands separators, currency
