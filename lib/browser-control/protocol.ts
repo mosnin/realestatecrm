@@ -130,14 +130,29 @@ export const RedeemPairingBody = z.object({
   deviceLabel: z.string().max(120).optional(),
 });
 
+/** A live viewport frame the extension pushes on its poll heartbeat so the
+ *  Chippi side panel can show the user what the agent sees. `image` is a
+ *  data: URL (jpeg, low quality — a monitoring feed, not an asset). */
+export const LiveFrame = z.object({
+  image: z.string(),
+  pageUrl: z.string().optional(),
+  pageTitle: z.string().optional(),
+});
+export type LiveFrame = z.infer<typeof LiveFrame>;
+
 /** POST /poll body — extension long-polls for the next action AND (optionally)
- *  reports the result of the one it just finished, in a single round-trip. */
+ *  reports the result of the one it just finished, in a single round-trip.
+ *  It may also pigg-back a live viewport frame and a user-kill signal. */
 export const PollBody = z.object({
   sessionId: z.string().optional(),
   /** Result of the previously-dispatched action, if any. */
   completed: z
     .object({ actionId: z.string(), result: BrowserActionResult })
     .optional(),
+  /** Latest viewport frame for the oversight panel (throttled by the client). */
+  frame: LiveFrame.optional(),
+  /** The user hit the in-page kill switch — server ends the session. */
+  killed: z.boolean().optional(),
 });
 
 /** What /poll returns: the next action to run, or null when the queue is dry. */
