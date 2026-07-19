@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Chippi Browser Control",
+  "version": "0.1.0",
+  "description": "Lets the Chippi real-estate CRM chat agent drive YOUR logged-in browser tab, with a visible cursor and a one-click kill switch. Nothing runs until you pair the extension to your Chippi account and start a session.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Chippi Browser Control"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["debugger", "activeTab", "storage", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "minimum_chrome_version": "116"
+}

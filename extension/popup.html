@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Chippi Browser Control</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    width: 300px;
+    margin: 0;
+    padding: 16px;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #fff;
+    color: #1a1a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #17171a; color: #f2f2f2; }
+    .card { background: #232326 !important; border-color: #34343a !important; }
+    input[type="text"] { background: #17171a !important; color: #f2f2f2 !important; border-color: #3a3a40 !important; }
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .brand .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #F25A00;
+  }
+  .brand h1 { font-size: 14px; margin: 0; font-weight: 700; }
+  .card {
+    background: #fafafa;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; flex-shrink: 0; }
+  .status-dot.connected { background: #1e9e5a; }
+  .status-dot.killed { background: #cf4b26; }
+  .status-text { font-weight: 600; }
+  .sub { opacity: 0.7; font-size: 12px; margin-top: 2px; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 12px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  button {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-primary { background: #F25A00; color: #fff; }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-secondary { background: transparent; color: #cf4b26; border: 1px solid #e5c3b6; }
+  .btn-resume { background: #1e9e5a; color: #fff; }
+  .error { color: #cf4b26; font-size: 12px; margin-top: 6px; display: none; }
+  details { margin-top: 4px; }
+  summary { cursor: pointer; font-size: 12px; opacity: 0.75; }
+  .base-url-row { margin-top: 8px; }
+  small.disclosure { display: block; margin-top: 10px; opacity: 0.6; font-size: 11px; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="dot"></div>
+    <h1>Chippi Browser Control</h1>
+  </div>
+
+  <div class="card">
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text" id="statusText">Checking…</div>
+    </div>
+    <div class="sub" id="statusSub"></div>
+  </div>
+
+  <div class="card" id="pairCard">
+    <label for="codeInput">8-character pairing code</label>
+    <input type="text" id="codeInput" maxlength="8" placeholder="ABCD1234" autocomplete="off" spellcheck="false" />
+    <button class="btn-primary" id="connectBtn">Connect</button>
+    <div class="error" id="pairError"></div>
+  </div>
+
+  <div class="card" id="connectedCard" style="display:none;">
+    <button class="btn-secondary" id="disconnectBtn">Disconnect this device</button>
+  </div>
+
+  <div class="card" id="killedCard" style="display:none;">
+    <div class="sub" style="margin-bottom:8px;">You stopped Chippi on a tab. It won't act again until you resume.</div>
+    <button class="btn-resume" id="resumeBtn">Resume</button>
+  </div>
+
+  <details>
+    <summary>Advanced</summary>
+    <div class="base-url-row">
+      <label for="baseUrlInput">Chippi server URL</label>
+      <input type="text" id="baseUrlInput" placeholder="https://www.usechippi.com" style="text-transform:none; letter-spacing:normal;" />
+      <button class="btn-secondary" id="saveBaseUrlBtn">Save server URL</button>
+    </div>
+  </details>
+
+  <small class="disclosure">
+    While connected, the chat agent can navigate, click, type, and read this
+    browser's active tab on your command. Nothing happens until you pair,
+    and the tab always shows a visible banner + cursor while it's driving.
+  </small>
+
+  <script src="popup.js"></script>
+</body>
+</html>

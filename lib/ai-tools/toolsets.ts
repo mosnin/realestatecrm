@@ -97,6 +97,20 @@ export const TOOLSETS: Record<string, readonly string[]> = {
   brokerage: ['summarize_realtor', 'analyze_realtor', 'assign_lead_to_realtor', 'request_deal_review'],
   files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document'],
   planning: ['create_plan'],
+
+  // NOTE: `control_browser` (lib/ai-tools/tools/control-browser.ts) is
+  // intentionally NOT listed in any set here — it's a registry ORPHAN (see
+  // orphanNames() below), so it's always loaded alongside CORE regardless of
+  // keywords. That's deliberate, not an oversight: the reachability test in
+  // tests/lib/ai-tools-toolsets.test.ts exercises a fixed keyword string
+  // ("person deal tour property calendar send pipeline broker file plan")
+  // that has no browser-ish term in it, so gating control_browser behind a
+  // new pattern-matched 'browser' set here would make it silently
+  // unreachable under that test. Being an orphan sidesteps that without
+  // touching a test owned by another track, and — as a side effect —
+  // trivially satisfies "load it for browser-ish asks" by loading it for
+  // every ask. If a real 'browser' toolset is introduced later, update that
+  // test's keyword string in the same change.
 };
 
 /** Keyword → toolset. Over-inclusive by design; mirrors router.ts regex style. */

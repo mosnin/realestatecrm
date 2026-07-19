@@ -1,0 +1,345 @@
+'use client';
+
+/**
+ * Browser control settings — pairing flow + linked-device list.
+ *
+ * Deliberately its OWN standalone page (`/settings/browser-control`) rather
+ * than folded into the tabbed `/settings` page like most other sections:
+ * this is a brand-new feature (not a legacy surface being consolidated),
+ * the main `/settings/page.tsx` + its tab strip are outside this track's
+ * ownership for this wave, and pairing has enough moving state (a live
+ * countdown, a code that must stay visible while the realtor switches to
+ * the extension popup) that it reads better as a dedicated screen than a
+ * tab section competing for scroll position.
+ *
+ * Talks only to Track B's already-live routes:
+ *   GET    /api/browser-control/status      — connection + linked devices
+ *   POST   /api/browser-control/pair/code    — mint an 8-char pairing code
+ *   DELETE /api/browser-control/link/[id]    — revoke (the kill switch)
+ *
+ * Honest UI: the empty state says "No browser connected yet," never a
+ * fabricated "Connected" state, and a failed fetch says so rather than
+ * silently showing stale data.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Copy, Check, Loader2, MonitorSmartphone, ShieldAlert, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { SurfaceCard, SurfaceCardHeader, StatusPill } from '@/components/ui/surface-card';
+import { BODY, BODY_MUTED, CAPTION, H3, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
+import { PAIRING_CODE_TTL_SECONDS } from '@/lib/browser-control/protocol';
+
+interface BrowserLinkRow {
+  id: string;
+  tokenPrefix: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+interface StatusResponse {
+  links: BrowserLinkRow[];
+  connected: boolean;
+  session: { id: string; status: string; startedAt: string } | null;
+}
+
+interface PairingCode {
+  code: string;
+  expiresAt: string;
+}
+
+const STATUS_POLL_MS = 5_000;
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return 'never';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 60_000) return 'just now';
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  return `${Math.floor(ms / 86_400_000)}d ago`;
+}
+
+function formatCountdown(secondsLeft: number): string {
+  const m = Math.floor(secondsLeft / 60);
+  const s = secondsLeft % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+export function BrowserControlClient() {
+  const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [statusError, setStatusError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [pairing, setPairing] = useState<PairingCode | null>(null);
+  const [issuing, setIssuing] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  const wasConnectedRef = useRef(false);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/browser-control/status');
+      if (!res.ok) {
+        setStatusError(true);
+        return;
+      }
+      const data = (await res.json()) as StatusResponse;
+      setStatusError(false);
+      setStatus(data);
+      // A pairing code that just got redeemed → clear it and celebrate once,
+      // honestly (only when we actually transitioned from disconnected to
+      // connected, not on every poll tick).
+      if (data.connected && !wasConnectedRef.current && pairing) {
+        setPairing(null);
+        toast.success('Browser connected.');
+      }
+      wasConnectedRef.current = data.connected;
+    } catch {
+      setStatusError(true);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pairing]);
+
+  useEffect(() => {
+    fetchStatus();
+    const id = setInterval(fetchStatus, STATUS_POLL_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Countdown tick for the live pairing code.
+  useEffect(() => {
+    if (!pairing) {
+      setSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.round((new Date(pairing.expiresAt).getTime() - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) setPairing(null);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [pairing]);
+
+  async function handleGenerateCode() {
+    setIssuing(true);
+    try {
+      const res = await fetch('/api/browser-control/pair/code', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Couldn't generate a pairing code. Try again.");
+        return;
+      }
+      setPairing({ code: data.code, expiresAt: data.expiresAt });
+      setCopied(false);
+    } catch {
+      toast.error('Lost the connection. Try again.');
+    } finally {
+      setIssuing(false);
+    }
+  }
+
+  async function handleCopy() {
+    if (!pairing) return;
+    await navigator.clipboard.writeText(pairing.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleRevoke(link: BrowserLinkRow) {
+    const label = link.deviceLabel || 'this browser';
+    if (!confirm(`Disconnect ${label}? Chippi immediately loses the ability to drive it — this can't be undone from here; you'd have to pair again.`)) {
+      return;
+    }
+    setRevokingId(link.id);
+    try {
+      const res = await fetch(`/api/browser-control/link/${link.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Couldn't disconnect that browser. Try again.");
+        return;
+      }
+      toast.success(`${label} disconnected.`);
+      await fetchStatus();
+    } catch {
+      toast.error('Lost the connection. Try again.');
+    } finally {
+      setRevokingId(null);
+    }
+  }
+
+  const links = status?.links ?? [];
+  const hasLinks = links.length > 0;
+
+  return (
+    <div className="space-y-8">
+      {/* ── Connection status + linked devices ────────────────────────── */}
+      <SurfaceCard>
+        <SurfaceCardHeader
+          title="Connected browsers"
+          action={
+            status?.session?.status === 'active' ? (
+              <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">Active session</StatusPill>
+            ) : hasLinks ? (
+              <StatusPill>Paired, idle</StatusPill>
+            ) : null
+          }
+        />
+
+        <div className="mt-4 space-y-3">
+          {loading ? (
+            <div className={cn(BODY_MUTED, 'flex items-center gap-2 py-6 justify-center')}>
+              <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+            </div>
+          ) : statusError ? (
+            <p className={cn(BODY_MUTED, 'py-6 text-center')}>
+              Couldn&apos;t check your connection status. Refresh to try again.
+            </p>
+          ) : !hasLinks ? (
+            <p className={cn(BODY_MUTED, 'py-6 text-center')}>
+              No browser connected yet. Generate a pairing code below to connect one.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {links.map((link) => (
+                <li key={link.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <MonitorSmartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className={cn(BODY, 'truncate font-medium')}>
+                        {link.deviceLabel || 'Unnamed browser'}
+                      </p>
+                      <p className={cn(CAPTION, 'truncate font-mono')}>
+                        {link.tokenPrefix} · last used {formatRelative(link.lastUsedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(link)}
+                    disabled={revokingId === link.id}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
+                      'text-destructive hover:bg-destructive/10 transition-colors duration-150 disabled:opacity-50 shrink-0',
+                    )}
+                  >
+                    {revokingId === link.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                    Revoke
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </SurfaceCard>
+
+      {/* ── Connect a browser ─────────────────────────────────────────── */}
+      <SurfaceCard>
+        <SurfaceCardHeader title="Connect a browser" />
+        <p className={cn(BODY_MUTED, 'mt-2')}>
+          Install the Chippi browser extension, then generate a code here and
+          type it into the extension&apos;s popup to pair it to your account.
+        </p>
+
+        {pairing ? (
+          <div className="mt-5 space-y-3">
+            <div className="rounded-2xl bg-muted/60 p-5 text-center space-y-2">
+              <p className={SECTION_LABEL}>Pairing code</p>
+              <p
+                className="text-3xl font-semibold tracking-[0.3em] tabular-nums text-foreground"
+                style={{ fontFamily: 'var(--font-title)' }}
+              >
+                {pairing.code}
+              </p>
+              <p className={CAPTION}>
+                {secondsLeft > 0 ? `Expires in ${formatCountdown(secondsLeft)}` : 'Expired'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={cn(GHOST_PILL, 'border border-border/70')}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? 'Copied' : 'Copy code'}
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateCode}
+                disabled={issuing}
+                className={GHOST_PILL}
+              >
+                {issuing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                New code
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleGenerateCode}
+            disabled={issuing}
+            className={cn(PRIMARY_PILL, 'mt-5')}
+          >
+            {issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Generate pairing code
+          </button>
+        )}
+
+        <p className={cn(CAPTION, 'mt-4')}>
+          Codes are single-use and expire after {Math.round(PAIRING_CODE_TTL_SECONDS / 60)} minutes.
+          Don&apos;t have the extension yet? Ask whoever set up your workspace
+          for the install link — it isn&apos;t in the Chrome Web Store yet, so
+          there&apos;s no public download page here to link to.
+        </p>
+      </SurfaceCard>
+
+      {/* ── What Chippi can and can't do ──────────────────────────────── */}
+      <SurfaceCard>
+        <SurfaceCardHeader title="What this connects" action={<ShieldAlert className="h-4 w-4 text-muted-foreground" />} />
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className={cn(H3, 'text-sm')}>Chippi can</p>
+            <p className={BODY_MUTED}>
+              When you ask, in chat: open a page, click something, type into a
+              field, press a key, scroll, read what&apos;s on the page, and
+              take a screenshot — always in YOUR paired browser, using your
+              own logins.
+            </p>
+          </div>
+          <div>
+            <p className={cn(H3, 'text-sm')}>Chippi can&apos;t</p>
+            <p className={BODY_MUTED}>
+              Run arbitrary code, reach any tab or window besides the one it&apos;s
+              driving, or act without you seeing a visible moving cursor and an
+              orange banner on the page the whole time it&apos;s working.
+            </p>
+          </div>
+          <div>
+            <p className={cn(H3, 'text-sm')}>The kill switch</p>
+            <p className={BODY_MUTED}>
+              A floating Stop button appears on the page whenever Chippi is
+              driving it, and the extension&apos;s popup has its own Stop/Resume.
+              Revoking a device above cuts it off immediately and for good —
+              you&apos;d need to pair again to reconnect.
+            </p>
+          </div>
+        </div>
+      </SurfaceCard>
+    </div>
+  );
+}
