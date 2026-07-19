@@ -28,7 +28,12 @@
  * session, so the realtor always sees exactly what's about to happen before
  * it does. Read-only actions (read_dom/screenshot/wait) still make the
  * realtor confirm; the closed action set plus explicit approval is the
- * point, not a place to cut corners for convenience.
+ * point, not a place to cut corners for convenience. The approval prompt
+ * additionally flags — via `classifyActionSafety`, shared with
+ * `browser-task.ts`'s autonomous loop so the two tools never disagree about
+ * what's sensitive — when an action submits a form, could spend money, or
+ * sends/publishes something, so a single-action approval carries the same
+ * warning the multi-step tool pauses on.
  *
  * Toolset registration: deliberately left as a registry ORPHAN in
  * `toolsets.ts` (not added to any keyword-gated TOOLSETS entry) — the
@@ -44,6 +49,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { BrowserActionInput } from '@/lib/browser-control/protocol';
 import { enqueueAction, awaitActionResult } from '@/lib/browser-control/session';
+import { classifyActionSafety } from './browser-task';
 import { defineTool } from '../types';
 
 const parameters = z
@@ -117,7 +123,13 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
   rateLimit: { max: 40, windowSeconds: 120 },
   summariseCall(args: ControlBrowserArgs) {
     try {
-      return describeAction(args.action);
+      const base = describeAction(args.action);
+      // Same classifier browser_task's loop gates on — surface the same
+      // warning here so a realtor approving a single sensitive action sees
+      // it called out, not just a neutral one-liner.
+      return classifyActionSafety(args.action) === 'needs_confirm'
+        ? `${base} — this may submit something, spend money, or send/publish something`
+        : base;
     } catch {
       return 'Run a browser action';
     }

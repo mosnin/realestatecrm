@@ -59,6 +59,7 @@ vi.mock('@/lib/browser-control/auth', () => ({
 const {
   startSessionMock, getActiveSessionMock, getOrStartSessionForLinkMock, findLinkSessionMock,
   expireStaleQueuedActionsMock, dispatchNextActionMock, recordActionResultMock, endSessionsForLinkMock,
+  recordPollHeartbeatMock, endSessionMock, getLatestFrameMock,
 } = vi.hoisted(() => ({
   startSessionMock: vi.fn(async (opts: any): Promise<any> => ({ id: 'sess_1', status: 'active', startedAt: 'now', endedAt: null, ...opts })),
   getActiveSessionMock: vi.fn(async (..._a: any[]): Promise<any> => null),
@@ -68,6 +69,9 @@ const {
   dispatchNextActionMock: vi.fn(async (..._a: any[]): Promise<any> => null),
   recordActionResultMock: vi.fn(async (..._a: any[]): Promise<any> => undefined),
   endSessionsForLinkMock: vi.fn(async (..._a: any[]): Promise<any> => undefined),
+  recordPollHeartbeatMock: vi.fn(async (..._a: any[]): Promise<any> => undefined),
+  endSessionMock: vi.fn(async (..._a: any[]): Promise<any> => undefined),
+  getLatestFrameMock: vi.fn(async (..._a: any[]): Promise<any> => null),
 }));
 vi.mock('@/lib/browser-control/session', () => ({
   startSession: startSessionMock,
@@ -78,6 +82,9 @@ vi.mock('@/lib/browser-control/session', () => ({
   dispatchNextAction: dispatchNextActionMock,
   recordActionResult: recordActionResultMock,
   endSessionsForLink: endSessionsForLinkMock,
+  recordPollHeartbeat: recordPollHeartbeatMock,
+  endSession: endSessionMock,
+  getLatestFrame: getLatestFrameMock,
 }));
 
 // ── Direct-Supabase mock (status + link/[id] routes query BrowserLink
@@ -149,6 +156,9 @@ beforeEach(() => {
   getOrStartSessionForLinkMock.mockResolvedValue({ id: 'sess_1', spaceId: 'space_1', userId: 'user_1', linkId: 'link_1', status: 'active', startedAt: 'now', endedAt: null });
   findLinkSessionMock.mockResolvedValue(null);
   dispatchNextActionMock.mockResolvedValue(null);
+  recordPollHeartbeatMock.mockResolvedValue(undefined);
+  endSessionMock.mockResolvedValue(undefined);
+  getLatestFrameMock.mockResolvedValue(null);
   eqCalls.length = 0;
   linkRows = [];
 });
@@ -324,7 +334,7 @@ describe('GET /api/browser-control/status', () => {
     expect(body.connected).toBe(true);
     expect(body.links).toHaveLength(1);
     expect(body.links[0].id).toBe('link_1');
-    expect(body.session).toEqual({ id: 'sess_1', status: 'active', startedAt: 'now' });
+    expect(body.session).toEqual({ id: 'sess_1', status: 'active', startedAt: 'now', hasFrame: false });
 
     // Prove the tenant scope was actually applied to the query.
     expect(eqCalls).toContainEqual({ table: 'BrowserLink', column: 'spaceId', value: 'space_1' });

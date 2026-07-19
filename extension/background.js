@@ -9,6 +9,14 @@
  * user's kill switch, a server-issued `stop`, a 401 (token revoked), or the
  * debugger detaching (e.g. the user closed the "cancel debugging" banner).
  *
+ * Also runs a throttled SCREENCAST while a session is pinned to a tab: a
+ * small low-quality JPEG frame captured on a ~1.5s timer (plus once right
+ * after every action) rides along on the next poll as `PollBody.frame` so
+ * the Chippi oversight panel can show the user what the agent sees. And when
+ * the in-page kill switch fires, the very next poll carries
+ * `PollBody.killed = true` so the SERVER ends the session too — not just the
+ * local loop — before the extension detaches.
+ *
  * Server contract this file assumes (owned by the server track, not this
  * file — see extension/README.md "Server contract assumptions"):
  *   POST {baseUrl}/api/browser-control/pair/redeem  RedeemPairingBody -> { token, label }
@@ -22,12 +30,97 @@ const IDLE_POLL_DELAY_MS = 1500;
 const ERROR_POLL_DELAY_MS = 4000;
 const HEARTBEAT_ALARM = 'chippi-poll-heartbeat';
 const CDP_PROTOCOL_VERSION = '1.3';
+const SCREENCAST_INTERVAL_MS = 1500;
+const SCREENCAST_QUALITY = 40;
 
 // In-memory only — a fresh service worker instance always starts with these,
 // and re-derives everything else from chrome.storage.local, which is the
 // durable source of truth across service-worker restarts.
 let loopRunning = false;
 let pendingCompleted = null; // { actionId, result } queued for the next poll
+let killedPending = false; // user hit the kill switch — report it on the next poll
+
+// ── screencast (throttled live frame capture) ───────────────────────────────
+// In-memory only, scoped to the currently pinned tab. Never runs without a
+// pinned session tab — started when one is pinned, stopped the moment it
+// isn't (session end, kill switch, tab lost, loop exit).
+const screencast = {
+  tabId: null,
+  timerId: null,
+  captureInFlight: false,
+  latestFrame: null, // LiveFrame-shaped: { image, pageUrl, pageTitle }
+};
+
+function stopScreencast() {
+  if (screencast.timerId != null) {
+    clearInterval(screencast.timerId);
+  }
+  screencast.tabId = null;
+  screencast.timerId = null;
+  screencast.captureInFlight = false;
+  screencast.latestFrame = null;
+}
+
+async function captureScreencastFrame() {
+  const tabId = screencast.tabId;
+  if (tabId == null) return; // no pinned session tab — never capture
+  if (screencast.captureInFlight) return; // previous capture still running — skip, no pile-up
+  screencast.captureInFlight = true;
+  try {
+    const res = await sendCdpCommand(tabId, 'Page.captureScreenshot', {
+      format: 'jpeg',
+      quality: SCREENCAST_QUALITY,
+    });
+    if (!res || !res.data) return;
+    let pageUrl;
+    let pageTitle;
+    try {
+      const tab = await new Promise((resolve, reject) => {
+        chrome.tabs.get(tabId, (t) => {
+          const err = chrome.runtime.lastError;
+          if (err) reject(new Error(err.message));
+          else resolve(t);
+        });
+      });
+      pageUrl = tab && tab.url;
+      pageTitle = tab && tab.title;
+    } catch {
+      // Tab may have been closed mid-capture — frame is still useful without
+      // the url/title, so keep it rather than discarding.
+    }
+    // Only overwrite if we're still pinned to this same tab — a session
+    // change/stop that raced this capture must not resurrect a stale frame.
+    if (screencast.tabId === tabId) {
+      screencast.latestFrame = {
+        image: `data:image/jpeg;base64,${res.data}`,
+        pageUrl,
+        pageTitle,
+      };
+    }
+  } catch {
+    // Debugger detached / tab gone mid-capture — just skip this frame.
+  } finally {
+    screencast.captureInFlight = false;
+  }
+}
+
+function startScreencast(tabId) {
+  if (screencast.tabId === tabId && screencast.timerId != null) return; // already running for this tab
+  stopScreencast();
+  screencast.tabId = tabId;
+  screencast.timerId = setInterval(captureScreencastFrame, SCREENCAST_INTERVAL_MS);
+  // Kick one off immediately rather than waiting a full interval for the
+  // first frame.
+  captureScreencastFrame();
+}
+
+/** Takes (without clearing) the current live frame for a poll body — the
+ *  frame is a continuous "here's roughly what the tab looks like now" signal,
+ *  not a one-shot event, so repeating it on a poll where nothing new was
+ *  captured yet is harmless. */
+function takeFrameForPoll() {
+  return screencast.latestFrame || undefined;
+}
 
 // ── storage helpers ─────────────────────────────────────────────────────────
 
@@ -140,18 +233,31 @@ async function setSessionUiActive(tabId, active) {
 // ── kill switch ──────────────────────────────────────────────────────────
 
 async function activateKillSwitch(tabId) {
+  // Report the kill to the SERVER too, not just the local loop — the very
+  // next poll (woken immediately below, even if the loop is mid idle-sleep)
+  // carries PollBody.killed = true so the server ends the session and stops
+  // handing out further actions, instead of only the extension going quiet.
+  killedPending = true;
   await setStorage({ killSwitchActive: true });
+  stopScreencast();
   if (tabId) {
     await detachDebugger(tabId);
     await setSessionUiActive(tabId, false);
   }
+  wakeLoop();
   notifyPopup({ type: 'chippi-kill-switch-engaged' });
 }
 
 // ── poll loop ────────────────────────────────────────────────────────────
 
 async function postPoll(baseUrl, token, sessionId) {
-  const body = { sessionId: sessionId || undefined, completed: pendingCompleted || undefined };
+  const killed = killedPending;
+  const body = {
+    sessionId: sessionId || undefined,
+    completed: pendingCompleted || undefined,
+    frame: takeFrameForPoll(),
+    killed: killed || undefined,
+  };
   const res = await fetch(`${baseUrl}/api/browser-control/poll`, {
     method: 'POST',
     headers: {
@@ -161,6 +267,10 @@ async function postPoll(baseUrl, token, sessionId) {
     body: JSON.stringify(body),
   });
   pendingCompleted = null;
+  // Only clear once the POST actually went out carrying it — a failed
+  // request (network error, non-2xx) must retry with killed still pending
+  // rather than silently dropping the kill signal.
+  if (killed && res.ok) killedPending = false;
   if (res.status === 401) {
     const err = new Error('Unauthorized');
     err.status = 401;
@@ -180,8 +290,27 @@ async function handleTokenInvalid() {
   notifyPopup({ type: 'chippi-auth-invalid' });
 }
 
+// A sleep that a concurrent event (the kill switch firing) can cut short, so
+// "the very next poll" after a kill is genuinely immediate rather than
+// waiting out whatever idle/error delay the loop happened to be in.
+let wakeSleepEarly = null;
+
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      wakeSleepEarly = null;
+      resolve();
+    }, ms);
+    wakeSleepEarly = () => {
+      clearTimeout(timer);
+      wakeSleepEarly = null;
+      resolve();
+    };
+  });
+}
+
+function wakeLoop() {
+  if (wakeSleepEarly) wakeSleepEarly();
 }
 
 async function runPollLoop() {
@@ -192,7 +321,10 @@ async function runPollLoop() {
     while (loopRunning) {
       const { baseUrl, token, sessionId, killSwitchActive } = await getConfig();
       if (!token) break;
-      if (killSwitchActive) break;
+      // Don't break on a still-active kill switch until we've actually
+      // reported it (killedPending) to the server on a poll — otherwise the
+      // server never learns the session was user-killed.
+      if (killSwitchActive && !killedPending) break;
 
       let poll;
       try {
@@ -206,7 +338,14 @@ async function runPollLoop() {
         continue;
       }
 
+      if (killSwitchActive) {
+        // Just reported killed=true above (the debugger was already detached
+        // by activateKillSwitch()) — nothing left to do locally.
+        break;
+      }
+
       if (poll.stop) {
+        stopScreencast();
         if (currentTabId) {
           await detachDebugger(currentTabId);
           await setSessionUiActive(currentTabId, false);
@@ -226,6 +365,7 @@ async function runPollLoop() {
         // debugger + banner so no abandoned tab is left in the "controlling"
         // state, then forget the pin so the block below re-pins.
         if (currentTabId != null) {
+          stopScreencast();
           await detachDebugger(currentTabId);
           await setSessionUiActive(currentTabId, false);
           currentTabId = null;
@@ -250,11 +390,13 @@ async function runPollLoop() {
           await setStorage({ activeTabId: currentTabId });
           await attachDebugger(currentTabId);
           await setSessionUiActive(currentTabId, true);
+          startScreencast(currentTabId);
         } else if (!(await tabExists(currentTabId))) {
           // The pinned tab was closed mid-session — fail honestly instead of
           // hopping to whatever is focused now. Clearing the pin lets a
           // subsequent action re-pin to the user's current tab intentionally.
           currentTabId = null;
+          stopScreencast();
           await setStorage({ activeTabId: null });
           throw new Error('The tab Chippi was controlling was closed. Re-issue the action to control the current tab.');
         }
@@ -265,9 +407,15 @@ async function runPollLoop() {
       }
 
       pendingCompleted = { actionId, result };
+      // One extra frame right after every action, in addition to the ~1.5s
+      // timer — fire-and-forget so a slow capture never delays the next
+      // poll; captureScreencastFrame()'s own in-flight guard prevents
+      // pile-up against the timer's own ticks.
+      captureScreencastFrame().catch(() => {});
     }
   } finally {
     loopRunning = false;
+    stopScreencast();
   }
 }
 
@@ -303,6 +451,7 @@ async function redeemPairingCode(code, deviceLabel) {
 
 async function disconnect() {
   loopRunning = false;
+  stopScreencast();
   const { activeTabId } = await getStorage(['activeTabId']);
   if (activeTabId) {
     await detachDebugger(activeTabId);
@@ -365,6 +514,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.debugger.onDetach.addListener((source) => {
   if (source.tabId) {
     setSessionUiActive(source.tabId, false).catch(() => {});
+    // The tab we were screencasting just lost its debugger — no more
+    // captures are possible until (if ever) a session re-pins it.
+    if (screencast.tabId === source.tabId) stopScreencast();
   }
 });
 

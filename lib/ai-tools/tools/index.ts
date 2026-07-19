@@ -128,6 +128,7 @@ import { createPlanTool } from './plan';
 
 // Browser control (paired Chrome extension driving the realtor's own browser)
 import { controlBrowserTool } from './control-browser';
+import { browserTaskTool } from './browser-task';
 
 // Clarification — structured ask (OptionList / QuestionFlow)
 import { askRealtorTool } from './ask-realtor';
@@ -240,6 +241,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
 
   // ── Browser control ────────────────────────────────────────────────────
   controlBrowserTool as ToolDefinition,
+  browserTaskTool as ToolDefinition,
 
   // ── Custom plugins (user-registered HTTP tools) ────────────────────────
   listPluginsTool as ToolDefinition,

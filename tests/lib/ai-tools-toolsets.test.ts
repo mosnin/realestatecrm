@@ -31,7 +31,7 @@ describe('toolsets — per-turn selection', () => {
     // A message that trips every pattern + core + orphans must surface the
     // whole catalog. Guards against a tool silently becoming uncallable.
     const everyKeyword =
-      'person deal tour property calendar send pipeline broker file plan';
+      'person deal tour property calendar send pipeline broker file plan browser';
     const reachable = new Set(getChatTools(everyKeyword).map((t) => t.name));
     const unreachable = [...ALL_NAMES].filter((n) => !reachable.has(n));
     expect(unreachable).toEqual([]);

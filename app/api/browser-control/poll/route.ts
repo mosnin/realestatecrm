@@ -8,10 +8,16 @@
  * `stop: true` tells the extension to tear down its cursor overlay and stop
  * polling this session — either the session was explicitly ended (the
  * realtor's kill switch / a link revoke ended it) while the extension still
- * reports its old sessionId, or the caller announced a foreign sessionId. A
- * fully revoked link fails auth earlier and gets a 401 instead — that's the
- * "unpair me" signal; `stop` is the softer "this run is over, but you're
- * still paired" signal.
+ * reports its old sessionId, or the caller announced a foreign sessionId, or
+ * the extension itself just reported `killed: true` (the user hit the
+ * in-page kill switch this round-trip). A fully revoked link fails auth
+ * earlier and gets a 401 instead — that's the "unpair me" signal; `stop` is
+ * the softer "this run is over, but you're still paired" signal.
+ *
+ * The extension may also piggy-back a live viewport `frame` on any
+ * non-killed heartbeat — stored as the session's LATEST frame (overwritten
+ * each round, not accumulated) so the oversight panel's GET /frame always
+ * reflects what the agent sees right now.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,6 +30,8 @@ import {
   expireStaleQueuedActions,
   dispatchNextAction,
   recordActionResult,
+  recordPollHeartbeat,
+  endSession,
 } from '@/lib/browser-control/session';
 
 export async function POST(req: NextRequest) {
@@ -75,6 +83,18 @@ export async function POST(req: NextRequest) {
   } else {
     session = await getOrStartSessionForLink(link);
   }
+
+  // The user hit the in-page kill switch this round-trip — end the session
+  // and tell the extension to stop immediately. Skip the frame/dispatch work
+  // below entirely; a killed session shouldn't hand out a next action.
+  if (parsed.data.killed) {
+    await endSession(session.id, { spaceId: link.spaceId });
+    return NextResponse.json({ action: null, stop: true });
+  }
+
+  // Heartbeat (feeds session-staleness detection) + latest-frame overwrite,
+  // in one write regardless of whether this round carried a frame.
+  await recordPollHeartbeat(session.id, { spaceId: link.spaceId }, parsed.data.frame);
 
   await expireStaleQueuedActions(session.id, { spaceId: link.spaceId });
   const action = await dispatchNextAction(session.id, { spaceId: link.spaceId });

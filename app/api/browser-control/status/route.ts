@@ -10,7 +10,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { getCurrentDbUser } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
-import { getActiveSession } from '@/lib/browser-control/session';
+import { getActiveSession, getLatestFrame } from '@/lib/browser-control/session';
 
 export async function GET(_req: NextRequest) {
   const authResult = await requireAuth();
@@ -32,12 +32,20 @@ export async function GET(_req: NextRequest) {
   if (error) return NextResponse.json({ error: 'Failed to load browser links' }, { status: 500 });
 
   const activeSession = await getActiveSession(space.id, dbUser.id);
+  // Cheap to fold in: getActiveSession already resolved (and staleness-
+  // checked) the session; this just checks whether it has a frame yet.
+  const latestFrame = activeSession ? await getLatestFrame(space.id, dbUser.id) : null;
 
   return NextResponse.json({
     links: links ?? [],
     connected: (links ?? []).length > 0,
     session: activeSession
-      ? { id: activeSession.id, status: activeSession.status, startedAt: activeSession.startedAt }
+      ? {
+          id: activeSession.id,
+          status: activeSession.status,
+          startedAt: activeSession.startedAt,
+          hasFrame: latestFrame !== null,
+        }
       : null,
   });
 }

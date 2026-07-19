@@ -98,19 +98,25 @@ export const TOOLSETS: Record<string, readonly string[]> = {
   files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document'],
   planning: ['create_plan'],
 
-  // NOTE: `control_browser` (lib/ai-tools/tools/control-browser.ts) is
-  // intentionally NOT listed in any set here — it's a registry ORPHAN (see
-  // orphanNames() below), so it's always loaded alongside CORE regardless of
-  // keywords. That's deliberate, not an oversight: the reachability test in
-  // tests/lib/ai-tools-toolsets.test.ts exercises a fixed keyword string
-  // ("person deal tour property calendar send pipeline broker file plan")
-  // that has no browser-ish term in it, so gating control_browser behind a
-  // new pattern-matched 'browser' set here would make it silently
-  // unreachable under that test. Being an orphan sidesteps that without
-  // touching a test owned by another track, and — as a side effect —
-  // trivially satisfies "load it for browser-ish asks" by loading it for
-  // every ask. If a real 'browser' toolset is introduced later, update that
-  // test's keyword string in the same change.
+  // `control_browser` (single action) + `browser_task` (bounded multi-step
+  // observe→act loop) — driving the realtor's own paired browser. Both were
+  // added in the same change that introduces this 'browser' set and its
+  // TOOLSET_PATTERNS entry below.
+  //
+  // FLAG for whoever owns tests/lib/ai-tools-toolsets.test.ts (not this
+  // track's file — not edited here): that test's "every tool is reachable"
+  // case drives getChatTools() with a FIXED keyword string ("person deal
+  // tour property calendar send pipeline broker file plan") that predates
+  // this set and has no browser-ish term in it, so control_browser +
+  // browser_task will read as unreachable under that string until it grows
+  // one (e.g. append "browser"). Previously control_browser dodged this by
+  // being a registry ORPHAN (see orphanNames() below) — always loaded
+  // regardless of keywords, which trivially passed that test at the cost of
+  // shipping its schema on every single turn. Moving it into a real,
+  // keyword-gated set is the actual token-furnace fix this file exists for
+  // (see the file header); the test needing its fixture string updated is
+  // the anticipated, intentional consequence, not a bug in this set.
+  browser: ['control_browser', 'browser_task'],
 };
 
 /** Keyword → toolset. Over-inclusive by design; mirrors router.ts regex style. */
@@ -125,6 +131,10 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['brokerage', /\b(broker|team|realtor|agent|roster|assign|review|performance|production)\b/i],
   ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|summarize)\b/i],
   ['planning', /\b(plan|sweep|everyone|all (?:my|hot|the)|prepare me|batch)\b/i],
+  [
+    'browser',
+    /\b(browser|browse|website|web ?page|webpage|\burl\b|navigate|zillow|redfin|trulia|realtor\.com|mls listing|log[\s-]?in to|fill (?:out|in) (?:a|the) form|search (?:the )?web|screenshot)\b/i,
+  ],
 ];
 
 /** Tools not assigned to CORE or any TOOLSET — always loaded so nothing is lost. */

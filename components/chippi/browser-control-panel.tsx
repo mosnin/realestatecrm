@@ -23,12 +23,21 @@
  *     BrowserAction rows (Track B's surface is status / pair/code /
  *     pair/redeem / link / poll — no `/actions` list route), so this
  *     component takes recent entries as a prop instead of fetching its own.
- *     The natural source is the chat UI's own per-turn tool-call state
- *     (each `control_browser` tool result already carries a summary + ok +
- *     actionType — see `lib/ai-tools/tools/control-browser.ts`); the caller
- *     wires that state in. With no entries passed, the panel shows an
- *     honest "No browser actions yet" empty state rather than fabricating
- *     activity.
+ *     The natural sources are each `control_browser` tool result (summary +
+ *     ok + actionType — see `lib/ai-tools/tools/control-browser.ts`) AND
+ *     each step of a `browser_task` tool result's `data.steps` (same shape:
+ *     step/action/detail/ok/summary — see `lib/ai-tools/tools/browser-task.ts`);
+ *     the caller flattens both into `actions` in chronological order. With
+ *     no entries passed, the panel shows an honest "No browser actions yet"
+ *     empty state rather than fabricating activity.
+ *   - Live view: polled from `GET /api/browser-control/frame` (added this
+ *     wave) once a second WHILE a session is active — the caller's active
+ *     control session's latest pushed viewport frame, or `{ frame: null }`
+ *     honestly when there is no active session or the extension hasn't
+ *     pushed a frame yet (see `getLatestFrame` in
+ *     `lib/browser-control/session.ts`). Polling stops the instant the
+ *     session goes idle, so this never burns a request loop against a dead
+ *     session.
  *
  * Stop button: the only server-side kill switch available today is
  * `DELETE /api/browser-control/link/[id]` (full revoke — see that route's
@@ -66,7 +75,18 @@ interface StatusResponse {
   session: { id: string; status: string; startedAt: string } | null;
 }
 
+interface LiveFrameData {
+  image: string;
+  pageUrl?: string;
+  pageTitle?: string;
+  at: string;
+}
+
 const POLL_MS = 4_000;
+/** ~1/s while a session is active — matches the extension's own capture
+ *  cadence (extension/background.js), so polling faster wouldn't show a
+ *  fresher frame anyway. */
+const FRAME_POLL_MS = 1_000;
 
 export function BrowserControlPanel({
   actions = [],
@@ -79,6 +99,10 @@ export function BrowserControlPanel({
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [stopping, setStopping] = useState(false);
+
+  const [frame, setFrame] = useState<LiveFrameData | null>(null);
+  const [frameChecked, setFrameChecked] = useState(false);
+  const [frameError, setFrameError] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -102,6 +126,38 @@ export function BrowserControlPanel({
 
   const active = status?.session?.status === 'active';
   const links = status?.links ?? [];
+
+  const fetchFrame = useCallback(async () => {
+    try {
+      const res = await fetch('/api/browser-control/frame');
+      if (!res.ok) {
+        setFrameError(true);
+        return;
+      }
+      const data = (await res.json()) as { frame: LiveFrameData | null };
+      setFrameError(false);
+      setFrame(data.frame);
+    } catch {
+      setFrameError(true);
+    } finally {
+      setFrameChecked(true);
+    }
+  }, []);
+
+  // Only poll the screencast while a session is confirmed active — never
+  // guess a live view exists, and never keep a poll loop running against a
+  // session that just went idle.
+  useEffect(() => {
+    if (!active) {
+      setFrame(null);
+      setFrameChecked(false);
+      setFrameError(false);
+      return;
+    }
+    fetchFrame();
+    const id = setInterval(fetchFrame, FRAME_POLL_MS);
+    return () => clearInterval(id);
+  }, [active, fetchFrame]);
   const soleLink = links.length === 1 ? links[0] : null;
   const ambiguousStop = links.length > 1;
 
@@ -159,6 +215,38 @@ export function BrowserControlPanel({
               ? soleLink!.deviceLabel || soleLink!.tokenPrefix
               : `${links.length} browsers paired`}
           </span>
+        </div>
+      )}
+
+      {/* ── Live view ──────────────────────────────────────────────────── */}
+      {active && (
+        <div className="space-y-1.5">
+          <p className={SECTION_LABEL}>Live view</p>
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/85 flex items-center justify-center">
+            {frame ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- data: URL screencast frame, not a Next-optimizable asset */}
+                <img
+                  src={frame.image}
+                  alt={frame.pageTitle || frame.pageUrl || 'Live browser view'}
+                  className="h-full w-full object-contain"
+                />
+                {(frame.pageTitle || frame.pageUrl) && (
+                  <div className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-2 py-1">
+                    <p className="truncate text-[11px] text-white/90">{frame.pageTitle || frame.pageUrl}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className={cn(CAPTION, 'px-4 text-center text-white/60')}>
+                {frameError
+                  ? "Couldn't load the live view."
+                  : frameChecked
+                    ? 'No live view yet — waiting for the browser to send a frame.'
+                    : 'Loading live view…'}
+              </p>
+            )}
+          </div>
         </div>
       )}
 

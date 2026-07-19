@@ -11,7 +11,7 @@
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { assertPublicHttpUrl } from '@/lib/browser-proxy';
-import { ACTION_TTL_SECONDS, type BrowserActionInput, type BrowserActionResult } from './protocol';
+import { ACTION_TTL_SECONDS, type BrowserActionInput, type BrowserActionResult, type LiveFrame } from './protocol';
 
 export interface BrowserSessionRow {
   id: string;
@@ -21,6 +21,31 @@ export interface BrowserSessionRow {
   status: 'active' | 'ended';
   startedAt: string;
   endedAt: string | null;
+  lastPolledAt?: string | null;
+}
+
+/** What GET /frame returns for a live session's latest pushed viewport frame. */
+export interface LatestFrame {
+  image: string;
+  pageUrl?: string;
+  pageTitle?: string;
+  at: string;
+}
+
+/**
+ * A session with no poll heartbeat in this long is treated as dead even
+ * though its DB row still says `status: 'active'` — the extension went away
+ * (crash, laptop closed, network drop) without a clean kill/revoke. Twice
+ * the action TTL: generous enough that a normal ~1s poll cadence with one
+ * slow round-trip never trips it, but bounded so a stuck session can't
+ * report as "live" indefinitely.
+ */
+const STALE_AFTER_SECONDS = ACTION_TTL_SECONDS * 2;
+
+function isSessionStale(row: { startedAt: string; lastPolledAt?: string | null }): boolean {
+  const lastSeenMs = row.lastPolledAt ? new Date(row.lastPolledAt).getTime() : new Date(row.startedAt).getTime();
+  if (!Number.isFinite(lastSeenMs)) return false;
+  return Date.now() - lastSeenMs > STALE_AFTER_SECONDS * 1000;
 }
 
 interface BrowserActionRow {
@@ -41,14 +66,20 @@ const DEFAULT_POLL_INTERVAL_MS = 400;
 
 // ── Session lifecycle ───────────────────────────────────────────────────────
 
-/** The user's currently active control session, if any (most recent wins). */
+/**
+ * The user's currently active control session, if any (most recent wins).
+ * A session whose extension hasn't polled in STALE_AFTER_SECONDS is lazily
+ * ended here and reported as absent — the agent/UI must never report a dead
+ * session as live just because no one has explicitly killed/revoked it yet
+ * (honest UI, CLAUDE.md #5).
+ */
 export async function getActiveSession(
   spaceId: string,
   userId: string,
 ): Promise<BrowserSessionRow | null> {
   const { data, error } = await supabase
     .from('BrowserSession')
-    .select('id, spaceId, userId, linkId, status, startedAt, endedAt')
+    .select('id, spaceId, userId, linkId, status, startedAt, endedAt, lastPolledAt')
     .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('status', 'active')
@@ -56,7 +87,14 @@ export async function getActiveSession(
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return (data as BrowserSessionRow) ?? null;
+  const row = (data as BrowserSessionRow) ?? null;
+  if (!row) return null;
+
+  if (isSessionStale(row)) {
+    await endSession(row.id, { spaceId });
+    return null;
+  }
+  return row;
 }
 
 /**
@@ -164,6 +202,63 @@ export async function findLinkSession(
     .maybeSingle();
   if (error) throw error;
   return (data as BrowserSessionRow) ?? null;
+}
+
+// ── Screencast frame + liveness heartbeat ───────────────────────────────────
+
+/**
+ * Called once per /poll round-trip for a session: records that the
+ * extension is still alive (feeds isSessionStale / getActiveSession) and, if
+ * the extension piggy-backed a viewport frame this round, OVERWRITES the
+ * session's latest frame — this is a live feed, not an accumulating log, so
+ * only the most recent frame is ever kept.
+ */
+export async function recordPollHeartbeat(
+  sessionId: string,
+  opts: { spaceId: string },
+  frame?: LiveFrame,
+): Promise<void> {
+  const update: Record<string, unknown> = { lastPolledAt: new Date().toISOString() };
+  if (frame) {
+    update.lastFrame = frame;
+    update.lastFrameAt = new Date().toISOString();
+  }
+  const { error } = await supabase
+    .from('BrowserSession')
+    .update(update)
+    .eq('id', sessionId)
+    .eq('spaceId', opts.spaceId);
+  if (error) throw error;
+}
+
+/**
+ * The caller's active session's latest pushed viewport frame, or null when
+ * there's no active session or the extension hasn't pushed one yet — honest
+ * (CLAUDE.md #5): GET /frame must never fabricate a frame. Routes through
+ * getActiveSession so a stale session (no heartbeat) is treated as absent
+ * here too, not just for the settings-page "connected" indicator.
+ */
+export async function getLatestFrame(spaceId: string, userId: string): Promise<LatestFrame | null> {
+  const session = await getActiveSession(spaceId, userId);
+  if (!session) return null;
+
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select('lastFrame, lastFrameAt')
+    .eq('id', session.id)
+    .eq('spaceId', spaceId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const row = data as { lastFrame: LiveFrame | null; lastFrameAt: string | null } | null;
+  if (!row?.lastFrame || !row.lastFrameAt) return null;
+
+  return {
+    image: row.lastFrame.image,
+    pageUrl: row.lastFrame.pageUrl,
+    pageTitle: row.lastFrame.pageTitle,
+    at: row.lastFrameAt,
+  };
 }
 
 // ── Action queue (agent-facing) ─────────────────────────────────────────────

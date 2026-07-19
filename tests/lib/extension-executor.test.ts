@@ -41,7 +41,14 @@ function makeFakeCdp(responses: Record<string, unknown[]> = {}) {
 
 describe('extension executor — navigate', () => {
   it('sends Page.navigate with the target URL and reports success', async () => {
-    const cdp = makeFakeCdp();
+    // readyState already "complete" on the first check — no sleep needed —
+    // then the trailing safeGetPageInfo call reads the landed url/title.
+    const cdp = makeFakeCdp({
+      'Runtime.evaluate': [
+        { result: { value: 'complete' } },
+        { result: { value: { url: 'https://example.com/page', title: 'Example' } } },
+      ],
+    });
     const result = await executeAction({ type: 'navigate', url: 'https://example.com/' }, cdp);
 
     expect(cdp.calls[0]).toEqual({ method: 'Page.navigate', params: { url: 'https://example.com/' } });
@@ -57,6 +64,54 @@ describe('extension executor — navigate', () => {
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain('ERR_NAME_NOT_RESOLVED');
+  });
+
+  it('polls document.readyState (via an injected sleep, not a real timer) until complete, then returns the final pageUrl/title', async () => {
+    // Three Runtime.evaluate calls in order: readyState check #1 ("loading"),
+    // readyState check #2 ("complete") after one injected sleep, then the
+    // trailing safeGetPageInfo call executeAction always makes.
+    const cdp = makeFakeCdp({
+      'Runtime.evaluate': [
+        { result: { value: 'loading' } },
+        { result: { value: 'complete' } },
+        { result: { value: { url: 'https://example.com/landed', title: 'Landed' } } },
+      ],
+    });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const result = await executeAction(
+      { type: 'navigate', url: 'https://example.com/' },
+      cdp,
+      { sleep },
+    );
+
+    const evalCalls = cdp.calls.filter((c) => c.method === 'Runtime.evaluate');
+    expect(evalCalls.length).toBe(3);
+    expect((evalCalls[0].params as { expression: string }).expression).toContain('readyState');
+    expect((evalCalls[1].params as { expression: string }).expression).toContain('readyState');
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(true);
+    expect(result.pageUrl).toBe('https://example.com/landed');
+    expect(result.pageTitle).toBe('Landed');
+  });
+
+  it('gives up polling readyState after a bounded number of attempts instead of spinning forever', async () => {
+    // readyState never reports "complete" — the fake cdp's default fallback
+    // keeps returning null (not "complete") for every Runtime.evaluate call
+    // that isn't the trailing location.href/title probe.
+    const cdp = makeFakeCdp();
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const result = await executeAction(
+      { type: 'navigate', url: 'https://example.com/slow' },
+      cdp,
+      { sleep },
+    );
+
+    // Bounded: finitely many sleeps, not an infinite loop — and the action
+    // still resolves (non-throwing) rather than hanging the whole executor.
+    expect(sleep.mock.calls.length).toBeGreaterThan(0);
+    expect(sleep.mock.calls.length).toBeLessThan(100);
+    expect(result.ok).toBe(true);
+    expect(result.summary).toMatch(/still loading/i);
   });
 });
 
@@ -93,12 +148,28 @@ describe('extension executor — click', () => {
     expect(result.summary).toContain('#submit');
   });
 
-  it('errors when the selector resolves to nothing, without dispatching mouse events', async () => {
+  it('scrolls the selector into view (Runtime.evaluate w/ scrollIntoView) before dispatching any mouse event', async () => {
+    const cdp = makeFakeCdp({
+      'Runtime.evaluate': [{ result: { value: { x: 55, y: 65 } } }],
+    });
+    await executeAction({ type: 'click', selector: '#below-the-fold' }, cdp);
+
+    const firstEval = cdp.calls.find((c) => c.method === 'Runtime.evaluate');
+    expect((firstEval!.params as { expression: string }).expression).toContain('scrollIntoView');
+    const scrollIdx = cdp.calls.findIndex((c) => c.method === 'Runtime.evaluate');
+    const firstMouseIdx = cdp.calls.findIndex((c) => c.method === 'Input.dispatchMouseEvent');
+    expect(scrollIdx).toBeGreaterThanOrEqual(0);
+    expect(firstMouseIdx).toBeGreaterThan(scrollIdx);
+  });
+
+  it('errors with an actionable message when the selector resolves to nothing, without dispatching mouse events', async () => {
     const cdp = makeFakeCdp({ 'Runtime.evaluate': [{ result: { value: null } }] });
     const result = await executeAction({ type: 'click', selector: '.missing' }, cdp);
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain('.missing');
+    expect(result.error).toMatch(/no element matches selector/i);
+    expect(result.error).toMatch(/read_dom|selector/i);
     expect(cdp.calls.some((c) => c.method === 'Input.dispatchMouseEvent')).toBe(false);
   });
 

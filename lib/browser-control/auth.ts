@@ -148,6 +148,42 @@ export async function redeemPairingCode(
 }
 
 /**
+ * Revoke a link's current bearer token and mint a fresh one IN PLACE — same
+ * link id, so any active session / queued actions tied to it are untouched.
+ * For a realtor who suspects their extension token leaked without wanting to
+ * re-pair the extension from scratch. Overwriting tokenHash is itself the
+ * revocation: the old raw token (still held by the extension, if any) simply
+ * stops matching on its next lookup and 401s exactly like a fully revoked
+ * link — same as changing a password invalidates the old one. The caller
+ * MUST have already verified (spaceId, userId) ownership of this link before
+ * calling this (mirrors the DELETE /link/[id] route's ownership check); this
+ * function only re-checks spaceId + non-revoked, matching the sibling
+ * revoke/endSessionsForLink pattern.
+ *
+ * Returns null if the link doesn't exist in this space or is already
+ * revoked (nothing to rotate) — the caller maps that to 404.
+ */
+export async function rotateToken(
+  linkId: string,
+  opts: { spaceId: string },
+): Promise<{ token: string; tokenPrefix: string } | null> {
+  const { raw, hash, prefix } = mintExtToken();
+
+  const { data, error } = await supabase
+    .from('BrowserLink')
+    .update({ tokenHash: hash, tokenPrefix: prefix })
+    .eq('id', linkId)
+    .eq('spaceId', opts.spaceId)
+    .is('revokedAt', null)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  return { token: raw, tokenPrefix: prefix };
+}
+
+/**
  * Resolve the extension's `Authorization: Bearer <token>` header to a
  * non-revoked BrowserLink. Updates lastUsedAt best-effort (never blocks or
  * fails the auth check on that write).

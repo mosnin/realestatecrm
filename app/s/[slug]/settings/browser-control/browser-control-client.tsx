@@ -23,7 +23,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Check, Loader2, MonitorSmartphone, ShieldAlert, Trash2 } from 'lucide-react';
+import { Copy, Check, Loader2, MonitorSmartphone, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { SurfaceCard, SurfaceCardHeader, StatusPill } from '@/components/ui/surface-card';
@@ -42,7 +42,14 @@ interface BrowserLinkRow {
 interface StatusResponse {
   links: BrowserLinkRow[];
   connected: boolean;
-  session: { id: string; status: string; startedAt: string } | null;
+  session: { id: string; status: string; startedAt: string; hasFrame?: boolean } | null;
+}
+
+/** A just-rotated token, shown exactly once (mirrors the pairing-code reveal —
+ *  only its hash is ever persisted, so this is the only chance to see it). */
+interface RotatedToken {
+  linkId: string;
+  token: string;
 }
 
 interface PairingCode {
@@ -78,6 +85,14 @@ export function BrowserControlClient() {
   const [copied, setCopied] = useState(false);
 
   const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [rotated, setRotated] = useState<RotatedToken | null>(null);
+  const [rotateCopied, setRotateCopied] = useState(false);
+  // Guard gracefully: if the rotate route isn't reachable for any reason
+  // (404 / network), hide the affordance rather than offering a button that
+  // always errors — honest UI over a permanently-broken control.
+  const [rotateUnavailable, setRotateUnavailable] = useState(false);
 
   const wasConnectedRef = useRef(false);
 
@@ -155,6 +170,52 @@ export function BrowserControlClient() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleRotate(link: BrowserLinkRow) {
+    const label = link.deviceLabel || 'this browser';
+    if (
+      !confirm(
+        `Rotate the token for ${label}? The old token stops working immediately — you'll need to re-enter the new one in the extension.`,
+      )
+    ) {
+      return;
+    }
+    setRotatingId(link.id);
+    try {
+      const res = await fetch(`/api/browser-control/link/${link.id}/rotate`, { method: 'POST' });
+      if (res.status === 404) {
+        // Route not (yet) live / link vanished mid-flight — degrade honestly
+        // instead of a raw error toast every time the button is pressed.
+        setRotateUnavailable(true);
+        toast.error("Token rotation isn't available right now.");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error ?? "Couldn't rotate that token. Try again.");
+        return;
+      }
+      if (typeof data.token !== 'string' || !data.token) {
+        toast.error("Couldn't rotate that token. Try again.");
+        return;
+      }
+      setRotated({ linkId: link.id, token: data.token });
+      setRotateCopied(false);
+      toast.success(`New token issued for ${label}.`);
+      await fetchStatus();
+    } catch {
+      toast.error('Lost the connection. Try again.');
+    } finally {
+      setRotatingId(null);
+    }
+  }
+
+  async function handleCopyRotated() {
+    if (!rotated) return;
+    await navigator.clipboard.writeText(rotated.token);
+    setRotateCopied(true);
+    setTimeout(() => setRotateCopied(false), 2000);
+  }
+
   async function handleRevoke(link: BrowserLinkRow) {
     const label = link.deviceLabel || 'this browser';
     if (!confirm(`Disconnect ${label}? Chippi immediately loses the ability to drive it — this can't be undone from here; you'd have to pair again.`)) {
@@ -188,7 +249,9 @@ export function BrowserControlClient() {
           title="Connected browsers"
           action={
             status?.session?.status === 'active' ? (
-              <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">Active session</StatusPill>
+              <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">
+                Active session{status?.session?.hasFrame ? ' · live view' : ''}
+              </StatusPill>
             ) : hasLinks ? (
               <StatusPill>Paired, idle</StatusPill>
             ) : null
@@ -211,34 +274,78 @@ export function BrowserControlClient() {
           ) : (
             <ul className="divide-y divide-border/60">
               {links.map((link) => (
-                <li key={link.id} className="flex items-center justify-between gap-3 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <MonitorSmartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className={cn(BODY, 'truncate font-medium')}>
-                        {link.deviceLabel || 'Unnamed browser'}
-                      </p>
-                      <p className={cn(CAPTION, 'truncate font-mono')}>
-                        {link.tokenPrefix} · last used {formatRelative(link.lastUsedAt)}
-                      </p>
+                <li key={link.id} className="py-3 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MonitorSmartphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className={cn(BODY, 'truncate font-medium')}>
+                          {link.deviceLabel || 'Unnamed browser'}
+                        </p>
+                        <p className={cn(CAPTION, 'truncate font-mono')}>
+                          {link.tokenPrefix} · last used {formatRelative(link.lastUsedAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!rotateUnavailable && (
+                        <button
+                          type="button"
+                          onClick={() => handleRotate(link)}
+                          disabled={rotatingId === link.id}
+                          title="Issue a new token for this browser and invalidate the old one"
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
+                            'text-foreground hover:bg-muted transition-colors duration-150 disabled:opacity-50',
+                          )}
+                        >
+                          {rotatingId === link.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw size={12} />
+                          )}
+                          Rotate token
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRevoke(link)}
+                        disabled={revokingId === link.id}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
+                          'text-destructive hover:bg-destructive/10 transition-colors duration-150 disabled:opacity-50',
+                        )}
+                      >
+                        {revokingId === link.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 size={12} />
+                        )}
+                        Revoke
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRevoke(link)}
-                    disabled={revokingId === link.id}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md border border-border/70 px-3 h-8 text-xs font-medium',
-                      'text-destructive hover:bg-destructive/10 transition-colors duration-150 disabled:opacity-50 shrink-0',
-                    )}
-                  >
-                    {revokingId === link.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Trash2 size={12} />
-                    )}
-                    Revoke
-                  </button>
+
+                  {rotated?.linkId === link.id && (
+                    <div className="rounded-xl bg-muted/60 p-3 space-y-2">
+                      <p className={CAPTION}>
+                        New token — copy it into the extension now. It won&apos;t be shown again.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="min-w-0 flex-1 truncate rounded-md bg-background px-2 py-1.5 text-xs font-mono">
+                          {rotated.token}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={handleCopyRotated}
+                          className={cn(GHOST_PILL, 'border border-border/70 shrink-0')}
+                        >
+                          {rotateCopied ? <Check size={14} /> : <Copy size={14} />}
+                          {rotateCopied ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -318,7 +425,11 @@ export function BrowserControlClient() {
               When you ask, in chat: open a page, click something, type into a
               field, press a key, scroll, read what&apos;s on the page, and
               take a screenshot — always in YOUR paired browser, using your
-              own logins.
+              own logins. For a bigger goal (&ldquo;search Zillow for 3-bed
+              homes under $600k and list the top 3&rdquo;), it can also work through up
+              to about 10 steps on its own, pausing to check with you before
+              any step that would submit a form, spend money, or send or
+              publish something.
             </p>
           </div>
           <div>

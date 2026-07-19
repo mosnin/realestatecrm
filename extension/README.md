@@ -58,8 +58,8 @@ those will fail with a CDP error surfaced as `{ ok: false, error }`.
 | File | Role |
 |---|---|
 | `manifest.json` | MV3 manifest: `debugger`/`activeTab`/`storage`/`scripting`/`tabs` permissions, `<all_urls>` host permission, module service worker, top-frame-only content script. |
-| `background.js` | The control loop: pairing, long-poll, CDP attach/dispatch via `lib/executor.js`, cursor-event mirroring, kill switch, 401 handling, service-worker-restart resilience via `chrome.alarms`. |
-| `lib/executor.js` | **Pure** `executeAction(action, cdp, opts)` — the closed allow-list (`navigate`/`click`/`type`/`press`/`scroll`/`read_dom`/`screenshot`/`wait`) mapped to CDP commands. Takes an injected `cdp.send(method, params)` so it has zero `chrome.*` dependency and is unit-tested in plain Node (`tests/lib/extension-executor.test.ts`). There is no "run arbitrary JS" action, on purpose — do not add one. |
+| `background.js` | The control loop: pairing, long-poll, CDP attach/dispatch via `lib/executor.js`, cursor-event mirroring, kill switch (local + reported to the server via `PollBody.killed`), 401 handling, service-worker-restart resilience via `chrome.alarms`, and a throttled screencast (`PollBody.frame`) of the pinned tab. |
+| `lib/executor.js` | **Pure** `executeAction(action, cdp, opts)` — the closed allow-list (`navigate`/`click`/`type`/`press`/`scroll`/`read_dom`/`screenshot`/`wait`) mapped to CDP commands. Takes an injected `cdp.send(method, params)` so it has zero `chrome.*` dependency and is unit-tested in plain Node (`tests/lib/extension-executor.test.ts`). `navigate` waits (bounded, ~8s) for `document.readyState === 'complete'` before returning; `click`/`type` scroll their selector into view and re-read its box before dispatch, and `click` additionally waits (bounded, ~3s) for it to become visible; not-found/not-visible errors are actionable (name the selector, suggest `read_dom`). There is no "run arbitrary JS" action, on purpose — do not add one. |
 | `content-script.js` | Renders (only while a session is active) the top banner, the animated cursor-dot overlay, and the floating orange kill-switch button. Never shows anything unless `background.js` explicitly activates it for that tab. |
 | `popup.html` / `popup.js` | Pairing form, connection status, disconnect, resume-after-kill-switch, server URL setting. |
 | `icons/` | Generated placeholder icons (Chippi orange `#F25A00`, simple cursor glyph) — swap for final brand assets before shipping. |
@@ -87,8 +87,16 @@ executor and UI are shape-agnostic beyond that.
 `tests/lib/extension-executor.test.ts` drives `lib/executor.js` with a fake
 `cdp.send` recorder and asserts the exact CDP methods/params for every
 action type, plus truncation (`read_dom`) and error paths (selector not
-found, unsupported key, missing click target). That's the logic that has to
-be right before it's trusted against a real, logged-in site.
+found, unsupported key, missing click target). It also covers the
+bounded-wait logic added for real-page robustness — `navigate` polling
+`document.readyState` (via an injected fake `sleep`, so the test asserts
+attempt-count-bounded behavior deterministically instead of waiting out a
+real ~8s timeout) until `'complete'` and returning the post-load
+`pageUrl`/`pageTitle`, and `click` scrolling its selector into view (asserted
+via CDP call order) before dispatching any mouse event. That's the logic
+that has to be right before it's trusted against a real, logged-in site.
+`background.js`'s screencast and kill-switch-report wiring are `chrome.*`-only
+and are NOT unit-tested — see "Not unit-covered" below.
 
 **Not unit-covered — needs real-Chrome verification by whoever integrates
 this end-to-end:**
@@ -123,12 +131,39 @@ this end-to-end:**
   Web Store review favors the narrowest permission set that actually maps
   to used code paths.
 
-## Kill-switch → server semantics (flagged for the server track)
+## Kill switch → server semantics
 
-Today the kill switch is 100% client-side: it detaches the debugger and
-stops the poll loop, but the *next* `poll` call (if the user hits Resume)
-carries no signal that the previous stop was a deliberate user abort vs.
-an idle gap. If the server wants to distinguish "user killed this" from
-"extension went idle" for auditing/support, consider adding an optional
-`killed: true` field to `PollBody` — nothing here depends on it, but it
-would be a small, additive, backward-compatible change to `protocol.ts`.
+The kill switch acts locally and INSTANTLY (detach the debugger, hide the
+banner/cursor/button) regardless of network state — a realtor must be able
+to stop Chippi even if the poll request is slow or fails. Separately,
+`activateKillSwitch()` sets an in-memory `killedPending` flag and wakes the
+poll loop's current sleep (if it's idling) so the *very next* `poll` call
+carries `PollBody.killed = true`, telling the server to end the session too
+— not just go quiet locally. The flag is only cleared once a poll carrying
+it actually succeeds (`res.ok`); a failed request retries with `killed`
+still pending on the *following* poll rather than silently dropping it.
+
+## Screencast (`PollBody.frame`)
+
+While a session has a tab pinned, `background.js` captures a small
+low-quality (`quality: 40`) JPEG via `Page.captureScreenshot` on a ~1.5s
+timer, plus once immediately after every action completes, and attaches the
+most recent one as `PollBody.frame` (`{ image, pageUrl, pageTitle }`) on
+every poll so the Chippi oversight panel can show roughly what the agent is
+looking at. An in-flight guard means a slow capture is skipped rather than
+piled up behind the previous one; the frame is never captured (and never
+sent) when there is no pinned session tab, and is cleared the moment the
+session ends, the tab is lost, or the kill switch fires.
+
+**Not unit-covered — needs real-Chrome verification:**
+- Screencast timer accuracy / frame cadence when the MV3 service worker is
+  suspended and resumed mid-session — `setInterval` timers do not survive a
+  service-worker restart, so a suspended-then-woken worker restarts the
+  cadence from whenever the next action or `chrome.alarms` heartbeat fires,
+  not from a persisted schedule. Confirm this doesn't produce noticeably
+  stale frames in practice.
+- Actual JPEG payload size at `quality: 40` on high-DPI / very large tabs —
+  confirm it stays comfortably under the poll body's practical size budget.
+- The kill-switch wake-loop timing (`wakeLoop()` cutting short an in-progress
+  idle/error `sleep()`) under real Chrome's fetch/timer scheduling — verified
+  logically here, not against a live poll endpoint.
