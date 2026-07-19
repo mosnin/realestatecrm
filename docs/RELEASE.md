@@ -166,3 +166,111 @@ renaming an applied migration is itself a drift event, because the remote
 If `db push` / `migration list` ever chokes on a version mismatch, the correct
 fix is `supabase migration repair` against prod — a deliberate, separately
 reviewed change, not something this pipeline does on its own.
+
+---
+
+## Ops runbook: activating drip / offers / browser-control / CMA narrative
+
+This section is the exact, ordered steps to turn on everything shipped in
+the drip-sequences, offers, browser-control, and CMA-narrative features.
+None of it is live in prod until you do these steps — code merged to `main`
+deploys automatically on Vercel, but schema and third-party wiring do not.
+Cross-check against `docs/BROWSER-CONTROL.md` for the browser-control
+architecture/security detail behind steps 3–5.
+
+### 1. Apply the pending migrations
+
+Six migrations back these features, in this order:
+
+| Migration | Feature |
+|---|---|
+| `20260830000000_drip_sequences.sql` | Drip nurture sequences (`DripSequence`, `DripEnrollment`). |
+| `20260831000000_offers.sql` | Offer lifecycle tracker (`Offer`, `OfferEvent`). |
+| `20260901000000_browser_control.sql` | Browser control core: `BrowserLink`, `BrowserPairingCode`, `BrowserSession`, `BrowserAction`. |
+| `20260902000000_browser_control_frames.sql` | Screencast frame storage + session liveness heartbeat. |
+| `20260903000000_browser_control_headless.sql` | Headless (cloud) session source — makes `BrowserSession.linkId` nullable. |
+| `20260904000000_cma_narrative.sql` | `CmaReport.narrative` / `narrativeUpdatedAt` columns for the pre-listing packet export. |
+
+Run `pnpm db:status` first to confirm these are pending, not already
+applied. Then follow the normal path above: run the **DB Migrate
+(production)** GitHub Actions workflow, type `APPLY`, review the dry-run
+diff, get a `production-db` reviewer to approve. Do not apply these by
+hand outside the workflow except as the documented break-glass path. All
+six are idempotent (`IF NOT EXISTS` / guarded `DO` blocks), so re-running
+the workflow after a partial failure is safe.
+
+Verify after: `pnpm db:status` shows all six as applied on both local and
+remote; `supabase db diff --linked --schema public` comes back clean.
+
+### 2. Set `TAVILY_API_KEY`
+
+Property/area "Analyze" web research (`lib/property-analysis.ts`,
+`lib/area-analysis.ts`, and the `browser_task`/`control_browser` agent
+tools' public-web research path) needs **both** `TAVILY_API_KEY` and
+`FIRECRAWL_API_KEY` (`lib/env.ts`) to function — either missing, the
+feature returns an honest "research not configured" state rather than
+crashing (see `lib/env.ts`'s `Property Analyze web research` boot-check
+group), so this is a silent-degradation risk, not a hard outage, if
+skipped. Set both in the Vercel project's environment variables
+(Production **and** Preview, if preview environments exercise this path)
+and redeploy for them to take effect. `FIRECRAWL_API_KEY` is presumably
+already set if property analysis already works today; confirm both are
+present rather than assuming.
+
+### 3. Wire the headless browser-control worker into Modal
+
+This is a **code change**, not a config flip — nothing below is done yet.
+The full context and rationale lives in the "Modal wiring (NOT wired in)"
+comment block at the bottom of `agent/browser_headless.py`; summarized:
+
+1. Add `"playwright>=1.45,<2"` to `agent/pyproject.toml`'s `dependencies`.
+2. Extend the Modal `image` in `agent/modal_app.py` with the same pin and a
+   browser install, e.g.:
+   ```python
+   headless_image = image.pip_install("playwright>=1.45,<2").run_commands(
+       "playwright install --with-deps chromium"
+   )
+   ```
+3. Add an `@app.function` bound to `headless_image` that runs one session
+   to completion by calling `browser_headless.poll_and_execute(...)` — see
+   the sketch in `agent/browser_headless.py`'s trailing comment block for
+   the exact call shape (`base_url`, `internal_secret`, `session_id`).
+4. Wire something to actually **spawn** that function when a
+   `BrowserSession` with `source = 'headless'` is created.
+   `POST /api/browser-control/headless/start`
+   (`app/api/browser-control/headless/start/route.ts`) currently only
+   inserts the DB session row — its own docstring says explicitly it "does
+   NOT itself launch a Modal headless worker." Until this step exists,
+   queued headless actions sit unpicked-up until `ACTION_TTL_SECONDS`
+   (120s, `lib/browser-control/protocol.ts`) expires them. Steps 1–3 alone
+   are not sufficient to make headless sessions actually run.
+
+None of steps 1–4 are implemented as of this doc; they are scoped to the
+`agent/**` / Modal-deploy track, not the docs track that wrote this runbook.
+
+### 4. Redeploy Modal
+
+After step 3 lands: `cd agent && modal deploy modal_app.py` (or your CI's
+equivalent Modal deploy step). Confirm the new headless-worker function
+shows up in `modal app list` / the Modal dashboard before relying on it.
+
+### 5. Load and submit the Chrome extension
+
+For local/internal use: follow "Loading it unpacked" in
+`extension/README.md` (`chrome://extensions` → Developer mode → Load
+unpacked → `extension/`). For distributing to realtors generally: follow
+the same README's Chrome Web Store guidance — the `debugger` permission
+needs an explicit justification in the store listing (a draft is included
+in the README) and should expect an extended review cycle. Confirm the
+extension's configured server URL (popup settings) points at the deployed
+Chippi origin, not `localhost`, before handing it to a realtor.
+
+### Post-activation smoke check
+
+After all five steps: in the app, go to Settings → Browser control, issue
+a pairing code, pair a freshly-loaded extension, and confirm
+`GET /api/browser-control/status` reports a connected link. Then run one
+`control_browser` action from chat (e.g. `navigate` to a public URL) and
+confirm the approval prompt appears, the visible cursor overlay and
+Chrome's own debugger infobar both show up on the target tab, and the
+result comes back honestly (not a fabricated success) either way.

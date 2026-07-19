@@ -11,13 +11,14 @@
  * valuation, this returns `{ narrative: null, reason: 'insufficient_data' }`
  * with NO LLM call — never presents a pitch built on thin data.
  *
- * NOTE (follow-up, not built here): CmaReport has no column to persist a
- * generated narrative on (checked supabase/migrations/20260610000002_cma_reports.sql
- * — payload/title/status/shareToken only). This route is generate-and-return
- * only; a realtor who wants to keep the pitch copies it via the UI. Adding a
- * `narrative` column is a follow-up migration for whoever owns CMA migrations
- * this wave — intentionally not added here (migrations are append-only +
- * ops-gated, and this track does not own supabase/migrations).
+ * Persistence: a successfully generated narrative is saved onto the report's
+ * `narrative` / `narrativeUpdatedAt` columns (migration
+ * supabase/migrations/20260904000000_cma_narrative.sql) via
+ * persistCmaNarrative(), scoped by the same spaceId already verified above.
+ * The packet export (app/api/cma/packet/[id]/route.ts) reads it back from
+ * there. A persistence failure is logged but does not fail the response —
+ * the narrative was already generated and billed; losing the cached copy is
+ * recoverable (regenerate) and shouldn't discard a successful LLM call.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,7 +26,11 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
-import { composeCmaNarrative, CmaNarrativeError } from '@/lib/cma-narrative';
+import {
+  composeCmaNarrative,
+  persistCmaNarrative,
+  CmaNarrativeError,
+} from '@/lib/cma-narrative';
 import type { CmaPayload } from '@/lib/cma-types';
 
 export const runtime = 'nodejs';
@@ -95,6 +100,23 @@ export async function POST(req: NextRequest) {
     if (narrative === null) {
       return NextResponse.json({ narrative: null, reason: 'insufficient_data' });
     }
+
+    // Best-effort: a persistence hiccup must never turn an already-successful
+    // (and already-billed) generation into a failed response — see the
+    // persistence note in the file header.
+    try {
+      const persisted = await persistCmaNarrative({ spaceId: space.id, id, narrative });
+      if (!persisted) {
+        logger.warn('[cma-narrative] generated but not persisted', { spaceId: space.id, id });
+      }
+    } catch (persistErr) {
+      logger.warn('[cma-narrative] persist threw', {
+        spaceId: space.id,
+        id,
+        err: persistErr instanceof Error ? persistErr.message : String(persistErr),
+      });
+    }
+
     return NextResponse.json({ narrative });
   } catch (err) {
     if (err instanceof CmaNarrativeError) {

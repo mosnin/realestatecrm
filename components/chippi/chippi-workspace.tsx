@@ -127,6 +127,20 @@ export function warmupPhraseFor(coldStart: boolean, elapsedMs: number): string {
 }
 
 /**
+ * Whether the composer's Chat/Agent mode switch should render for a given
+ * chat surface variant. Both the realtor surface (`/api/ai/task`) and the
+ * broker surface (`/api/ai/broker-task`) now honor the `mode` field the
+ * turn is sent with, so the switch is offered on both — there is nothing
+ * variant-specific left to gate here. Kept as a named, tested function
+ * (rather than an inline `!isBroker` check) so a future surface that
+ * genuinely can't support one mode has a single, obvious place to encode
+ * that instead of a scattered boolean.
+ */
+export function shouldShowModeSwitch(_variant: 'realtor' | 'broker'): boolean {
+  return true;
+}
+
+/**
  * Opt-in soft "tap" tone on message send. Generated via Web Audio API so
  * we don't ship any asset, fires once at a quiet -28dB-ish gain, and
  * gates on:
@@ -1208,7 +1222,7 @@ export function ChippiWorkspace({
         isLoading={isStreaming}
         prefill={prefill ?? undefined}
         skills={skills}
-        showModeSwitch={!isBroker}
+        showModeSwitch={shouldShowModeSwitch(variant)}
         conversationId={activeConversationId}
         onCommandAction={(action) => {
           if (action === 'work-session') setWorkDialogOpen(true);

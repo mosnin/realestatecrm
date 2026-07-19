@@ -28,6 +28,7 @@ import {
 } from '@/lib/llm';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
 import { DATA_SOURCE_LABEL, type CmaPayload } from '@/lib/cma-types';
 
 /** Raised only for real failures (no key, empty/errored completion) — never
@@ -174,4 +175,51 @@ export async function composeCmaNarrative(
     clearTimeout(timer);
     opts.signal?.removeEventListener('abort', onExternalAbort);
   }
+}
+
+export interface PersistCmaNarrativeOpts {
+  spaceId: string;
+  id: string;
+  narrative: string;
+}
+
+/**
+ * Persists a generated narrative onto its CmaReport row so the pre-listing
+ * packet export (app/api/cma/packet/[id]/route.ts) can include it after this
+ * request ends, rather than the narrative living only in the browser tab
+ * that generated it.
+ *
+ * Tenant scoping: `.eq('id', id).eq('spaceId', spaceId)` IS the security
+ * boundary (see CLAUDE.md) — a cross-tenant id matches no row rather than
+ * writing into another workspace's report. Returns `true` iff a row was
+ * actually updated, so the caller can tell "persisted" apart from "silently
+ * no-opped against someone else's report" without a second read.
+ *
+ * A write failure (RLS surprise, transient DB error) is logged and reported
+ * as `false` rather than thrown — the narrative was still generated and
+ * handed to the caller this turn; failing to cache it for the packet export
+ * is a degraded-but-recoverable outcome (regenerate later), not a reason to
+ * fail the request that already did the expensive LLM call.
+ */
+export async function persistCmaNarrative(
+  opts: PersistCmaNarrativeOpts,
+): Promise<boolean> {
+  const { spaceId, id, narrative } = opts;
+  const { data, error } = await supabase
+    .from('CmaReport')
+    .update({ narrative, narrativeUpdatedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('spaceId', spaceId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    logger.warn('[cma-narrative] persist failed', {
+      spaceId,
+      id,
+      err: error.message,
+    });
+    return false;
+  }
+  return !!data;
 }

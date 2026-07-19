@@ -65,6 +65,10 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   AgentMemory: 'spaceId',
   AppNotification: 'spaceId',
   ReviewCampaign: 'spaceId',
+  BrowserLink: 'spaceId',
+  BrowserPairingCode: 'spaceId',
+  BrowserSession: 'spaceId',
+  BrowserAction: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',
