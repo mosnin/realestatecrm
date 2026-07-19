@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { SurfaceCard, SurfaceCardHeader, StatusPill } from '@/components/ui/surface-card';
 import { BODY, BODY_MUTED, CAPTION, H3, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 import { PAIRING_CODE_TTL_SECONDS } from '@/lib/browser-control/protocol';
+import { sourceLabel } from '@/components/chippi/browser-control-panel';
 
 interface BrowserLinkRow {
   id: string;
@@ -42,7 +43,10 @@ interface BrowserLinkRow {
 interface StatusResponse {
   links: BrowserLinkRow[];
   connected: boolean;
-  session: { id: string; status: string; startedAt: string; hasFrame?: boolean } | null;
+  // `source` is optional + read defensively (see sourceLabel's default
+  // branch) so this page never breaks against an older `/status` payload
+  // that predates the headless track shipping it.
+  session: { id: string; status: string; startedAt: string; hasFrame?: boolean; source?: string } | null;
 }
 
 /** A just-rotated token, shown exactly once (mirrors the pairing-code reveal —
@@ -250,7 +254,8 @@ export function BrowserControlClient() {
           action={
             status?.session?.status === 'active' ? (
               <StatusPill className="bg-[#F25A00]/10 text-[#F25A00]">
-                Active session{status?.session?.hasFrame ? ' · live view' : ''}
+                Active session · {sourceLabel(status.session.source).label}
+                {status?.session?.hasFrame ? ' · live view' : ''}
               </StatusPill>
             ) : hasLinks ? (
               <StatusPill>Paired, idle</StatusPill>
@@ -420,12 +425,28 @@ export function BrowserControlClient() {
         <SurfaceCardHeader title="What this connects" action={<ShieldAlert className="h-4 w-4 text-muted-foreground" />} />
         <div className="mt-3 space-y-3">
           <div>
+            <p className={cn(H3, 'text-sm')}>Two browsers, always labeled</p>
+            <p className={BODY_MUTED}>
+              Chippi can drive a browser two different ways, and it always
+              tells you which one is active. When your own extension is
+              paired (above), Chippi uses <strong>your paired browser</strong> for
+              anything that needs your logins — Zillow, your MLS, your inbox.
+              For public research that doesn&apos;t need a login — looking up
+              listings, comps, neighborhood info — Chippi can instead use{' '}
+              <strong>Chippi&apos;s cloud browser</strong>: a fresh browser Chippi runs
+              for you. The cloud browser is <strong>not logged into any of your
+              accounts</strong> and has no access to your paired extension or
+              its cookies — it can only see what a signed-out visitor sees.
+            </p>
+          </div>
+          <div>
             <p className={cn(H3, 'text-sm')}>Chippi can</p>
             <p className={BODY_MUTED}>
               When you ask, in chat: open a page, click something, type into a
               field, press a key, scroll, read what&apos;s on the page, and
-              take a screenshot — always in YOUR paired browser, using your
-              own logins. For a bigger goal (&ldquo;search Zillow for 3-bed
+              take a screenshot — in whichever browser (yours or the cloud
+              one) the task calls for, using your own logins only when it&apos;s
+              your paired browser. For a bigger goal (&ldquo;search Zillow for 3-bed
               homes under $600k and list the top 3&rdquo;), it can also work through up
               to about 10 steps on its own, pausing to check with you before
               any step that would submit a form, spend money, or send or
@@ -435,18 +456,25 @@ export function BrowserControlClient() {
           <div>
             <p className={cn(H3, 'text-sm')}>Chippi can&apos;t</p>
             <p className={BODY_MUTED}>
-              Run arbitrary code, reach any tab or window besides the one it&apos;s
-              driving, or act without you seeing a visible moving cursor and an
-              orange banner on the page the whole time it&apos;s working.
+              Run arbitrary code, or reach any tab, window, or account beyond
+              the one browser it&apos;s driving for that task. In your paired
+              browser you see a visible moving cursor and an orange banner on
+              the page the whole time it&apos;s working; the cloud browser has no
+              page of yours to show a banner on, so watch it instead through
+              the live view in chat.
             </p>
           </div>
           <div>
             <p className={cn(H3, 'text-sm')}>The kill switch</p>
             <p className={BODY_MUTED}>
-              A floating Stop button appears on the page whenever Chippi is
-              driving it, and the extension&apos;s popup has its own Stop/Resume.
-              Revoking a device above cuts it off immediately and for good —
-              you&apos;d need to pair again to reconnect.
+              In your paired browser, a floating Stop button appears on the
+              page whenever Chippi is driving it, and the extension&apos;s popup
+              has its own Stop/Resume. Revoking a device above cuts it off
+              immediately and for good — you&apos;d need to pair again to
+              reconnect. The cloud browser has no page of yours to put a Stop
+              button on, so Stop in the chat panel is its control, and any
+              cloud session left idle ends itself automatically after a few
+              minutes.
             </p>
           </div>
         </div>

@@ -10,19 +10,30 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { assertPublicHttpUrl } from '@/lib/browser-proxy';
 import { ACTION_TTL_SECONDS, type BrowserActionInput, type BrowserActionResult, type LiveFrame } from './protocol';
+
+/** Who is executing this session's actions — see 20260903000000_browser_control_headless.sql. */
+export type BrowserSessionSource = 'extension' | 'headless';
 
 export interface BrowserSessionRow {
   id: string;
   spaceId: string;
   userId: string;
-  linkId: string;
+  /** Null for headless sessions — they aren't tied to a paired device. */
+  linkId: string | null;
   status: 'active' | 'ended';
+  /** 'extension' (default, realtor's own logged-in browser) or 'headless'
+   *  (cloud browser, no login). Defaults to 'extension' at the DB layer for
+   *  every row this file's extension-facing functions create. */
+  source: BrowserSessionSource;
   startedAt: string;
   endedAt: string | null;
   lastPolledAt?: string | null;
 }
+
+const SESSION_COLUMNS = 'id, spaceId, userId, linkId, status, source, startedAt, endedAt, lastPolledAt';
 
 /** What GET /frame returns for a live session's latest pushed viewport frame. */
 export interface LatestFrame {
@@ -79,7 +90,7 @@ export async function getActiveSession(
 ): Promise<BrowserSessionRow | null> {
   const { data, error } = await supabase
     .from('BrowserSession')
-    .select('id, spaceId, userId, linkId, status, startedAt, endedAt, lastPolledAt')
+    .select(SESSION_COLUMNS)
     .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('status', 'active')
@@ -122,6 +133,7 @@ export async function startSession(opts: {
     userId: opts.userId,
     linkId: opts.linkId,
     status: 'active',
+    source: 'extension',
     startedAt,
   });
   if (error) throw error;
@@ -132,6 +144,7 @@ export async function startSession(opts: {
     userId: opts.userId,
     linkId: opts.linkId,
     status: 'active',
+    source: 'extension',
     startedAt,
     endedAt: null,
   };
@@ -170,7 +183,7 @@ export async function getOrStartSessionForLink(link: {
 }): Promise<BrowserSessionRow> {
   const { data, error } = await supabase
     .from('BrowserSession')
-    .select('id, spaceId, userId, linkId, status, startedAt, endedAt')
+    .select(SESSION_COLUMNS)
     .eq('spaceId', link.spaceId)
     .eq('linkId', link.id)
     .eq('status', 'active')
@@ -195,13 +208,145 @@ export async function findLinkSession(
 ): Promise<BrowserSessionRow | null> {
   const { data, error } = await supabase
     .from('BrowserSession')
-    .select('id, spaceId, userId, linkId, status, startedAt, endedAt')
+    .select(SESSION_COLUMNS)
     .eq('id', sessionId)
     .eq('spaceId', opts.spaceId)
     .eq('linkId', opts.linkId)
     .maybeSingle();
   if (error) throw error;
   return (data as BrowserSessionRow) ?? null;
+}
+
+// ── Headless (cloud) session lifecycle ──────────────────────────────────────
+
+/**
+ * Start (or reuse) a HEADLESS control session for a user: a cloud browser
+ * with NO login, not tied to any BrowserLink (linkId is null — see
+ * 20260903000000_browser_control_headless.sql). Called by POST
+ * /api/browser-control/headless/start and by resolveBrowserRuntime
+ * (lib/browser-control/index.ts) when routing picks headless.
+ *
+ * Reuses an existing active headless session for this user when one exists
+ * and is still alive (same staleness rule as getActiveSession — a headless
+ * worker that died without cleanly ending its session must not be reported
+ * as live forever); otherwise closes the stale one out and starts fresh.
+ */
+export async function startHeadlessSession(opts: {
+  spaceId: string;
+  userId: string;
+}): Promise<BrowserSessionRow> {
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select(SESSION_COLUMNS)
+    .eq('spaceId', opts.spaceId)
+    .eq('userId', opts.userId)
+    .eq('status', 'active')
+    .eq('source', 'headless')
+    .order('startedAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const existing = (data as BrowserSessionRow) ?? null;
+
+  if (existing) {
+    if (!isSessionStale(existing)) return existing;
+    await endSession(existing.id, { spaceId: opts.spaceId });
+  }
+
+  const id = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  const { error: insertErr } = await supabase.from('BrowserSession').insert({
+    id,
+    spaceId: opts.spaceId,
+    userId: opts.userId,
+    linkId: null,
+    status: 'active',
+    source: 'headless',
+    startedAt,
+  });
+  if (insertErr) throw insertErr;
+
+  return {
+    id,
+    spaceId: opts.spaceId,
+    userId: opts.userId,
+    linkId: null,
+    status: 'active',
+    source: 'headless',
+    startedAt,
+    endedAt: null,
+  };
+}
+
+/** End a headless session. Scoped by source='headless' too, so this can never
+ *  accidentally tear down an extension-driven session by id collision. */
+export async function endHeadlessSession(sessionId: string, opts: { spaceId: string }): Promise<void> {
+  const { error } = await supabase
+    .from('BrowserSession')
+    .update({ status: 'ended', endedAt: new Date().toISOString() })
+    .eq('id', sessionId)
+    .eq('spaceId', opts.spaceId)
+    .eq('source', 'headless');
+  if (error) throw error;
+}
+
+/**
+ * POST /headless/poll's session lookup. Unlike findLinkSession, there is no
+ * paired-device auth to derive a scope from — the Modal worker authenticates
+ * with AGENT_INTERNAL_SECRET (a shared bearer for the whole runtime, not a
+ * per-session identity) and passes back the sessionId it was handed by
+ * /headless/start. That sessionId (an unguessable UUID) IS the identity/
+ * capability check here, the same way a bearer token is in verifyExtToken —
+ * so this lookup is deliberately NOT spaceId-scoped (nothing to scope it BY
+ * yet). Every subsequent read/write in the poll route MUST use the spaceId
+ * THIS function returns, never a body-supplied one.
+ */
+export async function getHeadlessSessionById(sessionId: string): Promise<BrowserSessionRow | null> {
+  const { data, error } = await unscoped(
+    supabase.from('BrowserSession').select(SESSION_COLUMNS),
+    'headless /poll session lookup — the sessionId is an unguessable capability token (minted by /headless/start), not user input; it IS the identity check, mirroring verifyExtToken\'s token-hash lookup',
+  )
+    .eq('id', sessionId)
+    .eq('source', 'headless')
+    .maybeSingle();
+  if (error) throw error;
+  return (data as BrowserSessionRow) ?? null;
+}
+
+/**
+ * Record the result the headless worker posted for an action it just
+ * finished. Verifies the action actually belongs to THIS headless session
+ * before writing — mirrors recordActionResult's link check, just without a
+ * link table in the middle. Silently ignores a mismatched/foreign actionId
+ * (same tolerance as recordActionResult) rather than erroring the heartbeat.
+ */
+export async function recordHeadlessActionResult(
+  actionId: string,
+  opts: { spaceId: string; sessionId: string },
+  result: BrowserActionResult,
+): Promise<void> {
+  const { data: action, error } = await supabase
+    .from('BrowserAction')
+    .select('id, sessionId')
+    .eq('id', actionId)
+    .eq('spaceId', opts.spaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!action) return;
+
+  const row = action as { id: string; sessionId: string };
+  if (row.sessionId !== opts.sessionId) return; // belongs to a different session — ignore
+
+  const { error: updateErr } = await supabase
+    .from('BrowserAction')
+    .update({
+      status: result.ok ? 'done' : 'error',
+      result,
+      completedAt: new Date().toISOString(),
+    })
+    .eq('id', row.id)
+    .eq('spaceId', opts.spaceId);
+  if (updateErr) throw updateErr;
 }
 
 // ── Screencast frame + liveness heartbeat ───────────────────────────────────

@@ -1,8 +1,12 @@
 /**
  * GET /api/browser-control/status — Clerk-authed. Powers the settings UI:
  * is an extension paired, which device, and is a control session currently
- * active. Honest UI (CLAUDE.md #5): never reports "connected" when the link
- * is revoked or there's simply no link at all.
+ * active — and, now, which RUNTIME that active session is (`source`:
+ * 'extension' | 'headless'), so the UI can honestly show "driving your
+ * browser" vs. "using a cloud research browser" rather than implying every
+ * active session is the paired extension. Honest UI (CLAUDE.md #5): never
+ * reports "connected" when the link is revoked or there's simply no link at
+ * all.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -43,6 +47,7 @@ export async function GET(_req: NextRequest) {
       ? {
           id: activeSession.id,
           status: activeSession.status,
+          source: activeSession.source,
           startedAt: activeSession.startedAt,
           hasFrame: latestFrame !== null,
         }

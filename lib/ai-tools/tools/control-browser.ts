@@ -14,13 +14,26 @@
  * `enqueueAction` itself against the SSRF/public-URL guard before the
  * action is queued.
  *
- * Honest UI (CLAUDE.md non-negotiable #5): three failure modes, three
- * honest messages — never a fabricated success.
- *   - `no_session`   → no paired extension is currently connected. Tell the
- *     realtor to connect one in Settings → Browser control. Do NOT imply
- *     the action ran.
+ * Runtime routing (resolveBrowserRuntime, lib/browser-control/index.ts): a
+ * CONNECTED extension session is always preferred (it's the realtor's own
+ * logged-in browser). With none connected, a public-web action auto-starts
+ * a cloud HEADLESS session instead of failing outright; an action that
+ * reads as needing the realtor's own login (mentions "my"/being logged in,
+ * or targets a site like Gmail/an MLS/a portal) with no extension connected
+ * gets an honest ask to connect one — headless never silently substitutes
+ * for a login it doesn't have. Which runtime ran is stated in the result
+ * summary.
+ *
+ * Honest UI (CLAUDE.md non-negotiable #5): failure modes get honest
+ * messages — never a fabricated success.
+ *   - `needs_extension` → the action needs the realtor's own login and no
+ *     extension is connected. Says so; does NOT fall back to headless.
+ *   - `no_session`   → no paired extension is currently connected AND
+ *     headless couldn't be started either (defensive fallback — routing
+ *     normally prevents this). Tell the realtor to connect one in
+ *     Settings → Browser control. Do NOT imply the action ran.
  *   - `blocked_url`  → the navigate target failed the public-URL guard.
- *   - timeout (null) → the extension didn't respond in time. Say so plainly
+ *   - timeout (null) → the browser didn't respond in time. Say so plainly
  *     rather than going silent or guessing at what happened.
  *
  * Approval: every call requires realtor approval (`requiresApproval: true`)
@@ -49,6 +62,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { BrowserActionInput } from '@/lib/browser-control/protocol';
 import { enqueueAction, awaitActionResult } from '@/lib/browser-control/session';
+import { resolveBrowserRuntime } from '@/lib/browser-control';
 import { classifyActionSafety } from './browser-task';
 import { defineTool } from '../types';
 
@@ -65,6 +79,9 @@ type ControlBrowserArgs = z.infer<typeof parameters>;
 interface ControlBrowserResult {
   ok: boolean;
   actionType: BrowserActionInput['type'];
+  /** Which runtime executed the action — absent when nothing ran at all
+   *  (needs_extension / no_session). */
+  source?: 'extension' | 'headless';
   /** Bounded page text/aria snapshot — only present for read_dom. */
   dom?: string;
   /** Whether the extension captured a screenshot — the raw bytes are never
@@ -76,6 +93,27 @@ interface ControlBrowserResult {
 
 const NOT_CONNECTED_SUMMARY =
   "Browser control isn't connected — this realtor hasn't paired the Chippi browser extension (or it's currently offline). Tell them to open Settings → Browser control, connect a browser, and try again. Do not say the action ran.";
+
+/** Free text fed to resolveBrowserRuntime's needsLoggedInBrowser heuristic —
+ *  the URL for navigate, or the selector/typed text for click/type, since
+ *  that's where "gmail.com" / "my account" / "portal" language shows up on
+ *  a SINGLE action (browser_task uses the whole English goal instead). */
+function actionIntentText(action: BrowserActionInput): string {
+  switch (action.type) {
+    case 'navigate':
+      return action.url;
+    case 'click':
+      return action.selector ?? '';
+    case 'type':
+      return `${action.text} ${action.selector ?? ''}`;
+    default:
+      return '';
+  }
+}
+
+function runtimeNote(source: 'extension' | 'headless'): string {
+  return source === 'headless' ? ' Ran in a cloud research browser — not your logged-in session.' : '';
+}
 
 const BLOCKED_URL_SUMMARY =
   "That URL can't be opened — it points at a private, internal, or otherwise disallowed address, so it was blocked before being sent to the browser.";
@@ -146,6 +184,19 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
     }
     const userId = (dbUser as { id: string }).id;
 
+    const runtime = await resolveBrowserRuntime({
+      spaceId: ctx.space.id,
+      userId,
+      intentText: actionIntentText(args.action),
+    });
+    if ('needsExtension' in runtime) {
+      return {
+        summary: runtime.reason,
+        data: { ok: false, actionType: args.action.type },
+        display: 'warning',
+      };
+    }
+
     const enqueued = await enqueueAction({
       spaceId: ctx.space.id,
       userId,
@@ -180,7 +231,7 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
       return {
         summary:
           "The browser didn't respond in time. It may be busy, minimized, or the extension may have disconnected — check Settings → Browser control.",
-        data: { ok: false, actionType: args.action.type },
+        data: { ok: false, actionType: args.action.type, source: runtime.source },
         display: 'warning',
       };
     }
@@ -193,6 +244,7 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
         data: {
           ok: false,
           actionType: args.action.type,
+          source: runtime.source,
           pageUrl: result.pageUrl,
           pageTitle: result.pageTitle,
         },
@@ -200,7 +252,7 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
       };
     }
 
-    const parts: string[] = [result.summary ?? `${args.action.type} completed.`];
+    const parts: string[] = [(result.summary ?? `${args.action.type} completed.`) + runtimeNote(runtime.source)];
     if (args.action.type === 'read_dom' && result.dom) {
       parts.push(`(${result.dom.length.toLocaleString()} chars of page content captured.)`);
     }
@@ -213,6 +265,7 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
       data: {
         ok: true,
         actionType: args.action.type,
+        source: runtime.source,
         dom: args.action.type === 'read_dom' ? result.dom : undefined,
         screenshotCaptured: Boolean(result.screenshot),
         pageUrl: result.pageUrl,

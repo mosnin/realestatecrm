@@ -47,10 +47,35 @@
  * tooltip pointing at Settings → Browser control, where each device has its
  * own Revoke button. Flagged as a follow-up: if `/status` starts returning
  * `session.linkId`, Stop can target precisely regardless of device count.
+ *
+ * Source-aware oversight (this wave): `/status`'s `session.source` tells us
+ * WHICH browser is acting — the realtor's own paired extension, or a fresh
+ * Chippi cloud (headless) browser with no logins. Honest UI (CLAUDE.md #5)
+ * means the panel always says which one out loud; the two carry very
+ * different trust implications (a logged-in browser vs. an anonymous cloud
+ * one). `source` is read defensively — an older/absent value degrades to a
+ * neutral "Browser" label rather than guessing or crashing (see
+ * `sourceLabel` below).
+ *
+ * Headless sessions have no in-page kill switch (there is no user tab to
+ * show a banner on), so this panel's Stop button is the ONLY control for
+ * them — rendered more prominently than the extension's Stop, with its own
+ * explanation. There is not yet a dedicated server route to end a headless
+ * session on demand (`endHeadlessSession` in `lib/browser-control/session.ts`
+ * is only called internally, from the poll route's kill-signal path — see
+ * that file). This panel calls a same-shaped `POST
+ * /api/browser-control/headless/stop` optimistically and degrades honestly
+ * (disables with an explanation, mirroring the settings page's
+ * `rotateUnavailable` pattern for `/link/[id]/rotate`) the first time that
+ * 404s, rather than pretending Stop always works. FLAGGED: that route does
+ * not exist yet — this is a Track B / deploy-gated follow-up. Until it
+ * ships, a headless session still ends itself automatically after a few
+ * minutes idle (`STALE_AFTER_SECONDS` in session.ts), which the disabled
+ * state's copy says honestly.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, MonitorSmartphone, Square, Circle } from 'lucide-react';
+import { Loader2, MonitorSmartphone, Cloud, Square, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL, BODY_COMPACT, CAPTION } from '@/lib/typography';
 import type { BrowserActionType } from '@/lib/browser-control/protocol';
@@ -63,6 +88,15 @@ export interface BrowserActionLogEntry {
   ok: boolean;
 }
 
+/**
+ * Mirrors `BrowserSessionSource` from `lib/browser-control/session.ts`
+ * (kept as a local literal union rather than an import — this panel takes
+ * no build-time dependency on that module, matching how `StatusResponse`
+ * below already shapes its own view of the `/status` JSON rather than
+ * importing server types).
+ */
+export type BrowserSessionSource = 'extension' | 'headless';
+
 interface StatusLink {
   id: string;
   deviceLabel: string | null;
@@ -72,7 +106,11 @@ interface StatusLink {
 interface StatusResponse {
   links: StatusLink[];
   connected: boolean;
-  session: { id: string; status: string; startedAt: string } | null;
+  // `source` is optional + typed loosely (not narrowed to the union) on
+  // purpose: `/status` is a Track B surface this panel doesn't control the
+  // rollout of, so a missing or unrecognized value must degrade gracefully
+  // (via `sourceLabel`'s default branch) instead of throwing or lying.
+  session: { id: string; status: string; source?: string; startedAt: string } | null;
 }
 
 interface LiveFrameData {
@@ -80,6 +118,57 @@ interface LiveFrameData {
   pageUrl?: string;
   pageTitle?: string;
   at: string;
+}
+
+export interface SourceLabelInfo {
+  /** Short badge text, e.g. "Your browser" / "Chippi cloud browser". */
+  label: string;
+  /** One-line honest explanation of what that badge means. */
+  description: string;
+}
+
+/**
+ * Pure mapping from a session's `source` to what the panel tells the user.
+ * Exported for tests; also the single place this wording lives so the
+ * settings page and panel never drift.
+ *
+ * Unknown/absent input (older `/status` payloads, a future source value we
+ * don't recognize yet) maps to a neutral "Browser" label rather than
+ * guessing which runtime is acting — honest UI over a confident-looking
+ * wrong answer.
+ */
+export function sourceLabel(source: string | null | undefined): SourceLabelInfo {
+  if (source === 'headless') {
+    return {
+      label: 'Chippi cloud browser',
+      description: 'A fresh cloud browser — not logged into any of your accounts.',
+    };
+  }
+  if (source === 'extension') {
+    return {
+      label: 'Your browser',
+      description: 'Your own paired browser, using your logins.',
+    };
+  }
+  return { label: 'Browser', description: '' };
+}
+
+/**
+ * Pure classification of the live-view empty state, source-aware. Exported
+ * for tests. Priority: a confirmed fetch error beats "still loading" beats
+ * "loaded, nothing there yet" — matches the JSX's existing ternary, just
+ * pulled out so it's independently testable without a DOM harness.
+ */
+export function liveViewEmptyStateMessage(params: {
+  source: string | null | undefined;
+  frameChecked: boolean;
+  frameError: boolean;
+}): string {
+  if (params.frameError) return "Couldn't load the live view.";
+  if (!params.frameChecked) return 'Loading live view…';
+  return params.source === 'headless'
+    ? "No live view yet — the cloud browser hasn't sent a frame."
+    : 'No live view yet — waiting for your browser to send a frame.';
 }
 
 const POLL_MS = 4_000;
@@ -104,6 +193,11 @@ export function BrowserControlPanel({
   const [frameChecked, setFrameChecked] = useState(false);
   const [frameError, setFrameError] = useState(false);
 
+  // Whether ending a headless session on demand isn't wired up server-side
+  // yet — learned honestly from a 404 on first attempt, never assumed
+  // upfront. See the header comment for why this route may not exist yet.
+  const [headlessStopUnavailable, setHeadlessStopUnavailable] = useState(false);
+
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/browser-control/status');
@@ -126,6 +220,11 @@ export function BrowserControlPanel({
 
   const active = status?.session?.status === 'active';
   const links = status?.links ?? [];
+  // Only meaningful once a session is confirmed active — an idle/absent
+  // session has no runtime "acting" to label.
+  const sessionSource = active ? status?.session?.source : undefined;
+  const isHeadless = sessionSource === 'headless';
+  const source = sourceLabel(sessionSource);
 
   const fetchFrame = useCallback(async () => {
     try {
@@ -180,6 +279,34 @@ export function BrowserControlPanel({
     }
   }
 
+  // Headless sessions aren't tied to a paired link, so the link-revoke Stop
+  // above doesn't apply. This is the ONLY stop control for a cloud browser
+  // (no user tab to show an in-page kill switch on) — see header comment on
+  // why the endpoint it calls may not exist yet, and how this degrades.
+  async function handleStopHeadless() {
+    if (!status?.session) return;
+    if (!confirm('Stop the Chippi cloud browser? This ends the session immediately.')) {
+      return;
+    }
+    setStopping(true);
+    try {
+      const res = await fetch('/api/browser-control/headless/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: status.session.id }),
+      });
+      if (res.status === 404) {
+        setHeadlessStopUnavailable(true);
+        return;
+      }
+      if (res.ok) await fetchStatus();
+    } catch {
+      // Transient — leave the button as-is so the user can retry.
+    } finally {
+      setStopping(false);
+    }
+  }
+
   const recent = actions.slice(-8).reverse();
 
   return (
@@ -207,7 +334,31 @@ export function BrowserControlPanel({
         )}
       </div>
 
-      {links.length > 0 && (
+      {/* Source badge — WHICH browser is acting, always shown while a
+          session is confirmed active. Honest UI: this is the single most
+          important thing on the panel, since an action in the realtor's own
+          logged-in browser and one in a fresh cloud browser are very
+          different things (see header comment). */}
+      {active && (
+        <div
+          className={cn(
+            'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
+            isHeadless ? 'bg-[#F25A00]/10 text-[#F25A00]' : 'bg-foreground/[0.04] text-foreground',
+          )}
+        >
+          {isHeadless ? (
+            <Cloud className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <MonitorSmartphone className="h-3.5 w-3.5 shrink-0" />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-medium">{source.label}</p>
+            {source.description && <p className={cn(CAPTION, 'truncate')}>{source.description}</p>}
+          </div>
+        </div>
+      )}
+
+      {!active && links.length > 0 && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <MonitorSmartphone className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">
@@ -239,11 +390,7 @@ export function BrowserControlPanel({
               </>
             ) : (
               <p className={cn(CAPTION, 'px-4 text-center text-white/60')}>
-                {frameError
-                  ? "Couldn't load the live view."
-                  : frameChecked
-                    ? 'No live view yet — waiting for the browser to send a frame.'
-                    : 'Loading live view…'}
+                {liveViewEmptyStateMessage({ source: sessionSource, frameChecked, frameError })}
               </p>
             )}
           </div>
@@ -278,24 +425,59 @@ export function BrowserControlPanel({
       </div>
 
       {/* ── Stop ───────────────────────────────────────────────────────── */}
-      <button
-        type="button"
-        onClick={handleStop}
-        disabled={!active || !soleLink || stopping}
-        title={
-          ambiguousStop
-            ? 'Multiple browsers paired — stop a specific one from Settings → Browser control.'
-            : undefined
-        }
-        className={cn(
-          'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
-          'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150',
-          'disabled:opacity-40 disabled:cursor-not-allowed',
-        )}
-      >
-        {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
-        Stop
-      </button>
+      {isHeadless ? (
+        // The cloud browser has no in-page kill switch — this button is the
+        // ONLY way to stop it, so it gets its own explanation rather than
+        // sharing the terser extension copy below.
+        <div className="space-y-1.5">
+          <p className={CAPTION}>
+            No in-page kill switch for a cloud browser — this is the only way to stop it.
+          </p>
+          <button
+            type="button"
+            onClick={handleStopHeadless}
+            disabled={!active || stopping || headlessStopUnavailable}
+            title={
+              headlessStopUnavailable
+                ? "Stopping the cloud browser on demand isn't available yet — it ends automatically after a few minutes idle."
+                : undefined
+            }
+            className={cn(
+              'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
+              'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150',
+              'disabled:opacity-40 disabled:cursor-not-allowed',
+            )}
+          >
+            {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
+            Stop cloud browser
+          </button>
+          {headlessStopUnavailable && (
+            <p className={CAPTION}>
+              Stopping on demand isn&apos;t available yet — this session ends automatically after a
+              few minutes of inactivity.
+            </p>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleStop}
+          disabled={!active || !soleLink || stopping}
+          title={
+            ambiguousStop
+              ? 'Multiple browsers paired — stop a specific one from Settings → Browser control.'
+              : undefined
+          }
+          className={cn(
+            'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
+            'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+          )}
+        >
+          {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5 fill-current" />}
+          Stop
+        </button>
+      )}
     </div>
   );
 }

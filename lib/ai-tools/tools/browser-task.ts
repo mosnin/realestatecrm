@@ -32,11 +32,21 @@
  *      selector-not-found) is logged into the step history and the loop
  *      continues so the next DECIDE can try something else.
  *
- * Honest UI (CLAUDE.md #5): every terminal state — no_session, blocked,
- * timeout, budget_exhausted, needs_confirm, error, done — gets its own
- * plain-language summary. The tool never claims the goal is done unless the
- * model explicitly said so after seeing real page content, and it never
- * silently keeps going past a needs-confirm action.
+ * Runtime routing (resolveBrowserRuntime, lib/browser-control/index.ts): a
+ * CONNECTED extension session is preferred; with none connected, a
+ * public-web goal auto-starts a cloud HEADLESS session; a goal that reads
+ * as needing the realtor's own login ("my"/"logged in"/Gmail/MLS/portal
+ * language) with no extension connected gets an honest ask instead of a
+ * silent headless attempt. Resolved ONCE up front (before the first LLM
+ * call, so a needs_extension ask costs nothing), and the resulting runtime
+ * is named in the final summary.
+ *
+ * Honest UI (CLAUDE.md #5): every terminal state — no_session,
+ * needs_extension, blocked, timeout, budget_exhausted, needs_confirm,
+ * error, done — gets its own plain-language summary. The tool never claims
+ * the goal is done unless the model explicitly said so after seeing real
+ * page content, and it never silently keeps going past a needs-confirm
+ * action.
  *
  * Billing accuracy (CLAUDE.md #4): the DECIDE call goes through
  * `getLLMClient()` with `usageAccountingParams()` and every completed call
@@ -52,6 +62,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { BrowserActionInput, type BrowserActionResult } from '@/lib/browser-control/protocol';
 import { enqueueAction, awaitActionResult } from '@/lib/browser-control/session';
+import { resolveBrowserRuntime } from '@/lib/browser-control';
 import { getLLMClient, hasLLMKey, openaiModel, usageAccountingParams } from '@/lib/llm';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import { logger } from '@/lib/logger';
@@ -178,6 +189,7 @@ export type BrowserTaskStatus =
   | 'done'
   | 'needs_confirm'
   | 'no_session'
+  | 'needs_extension'
   | 'blocked'
   | 'timeout'
   | 'budget_exhausted'
@@ -189,10 +201,20 @@ interface BrowserTaskResult {
   pageUrl?: string;
   pageTitle?: string;
   pendingAction?: { type: BrowserActionInput['type']; detail: string };
+  /** Which runtime ran the task — absent when nothing ran (no_session /
+   *  needs_extension / the caller couldn't be resolved). */
+  source?: 'extension' | 'headless';
 }
 
 const NOT_CONNECTED_SUMMARY =
   "Browser control isn't connected — this realtor hasn't paired the Chippi browser extension (or it's currently offline). Tell them to open Settings → Browser control, connect a browser, and try again. Do not say the task ran.";
+
+/** Appends which runtime ran, when it wasn't the realtor's own browser —
+ *  honest UI (CLAUDE.md #5): a headless run must never read the same as a
+ *  logged-in one. */
+function withRuntimeNote(summary: string, source: 'extension' | 'headless'): string {
+  return source === 'headless' ? `${summary} (Ran in a cloud research browser — not your logged-in session.)` : summary;
+}
 
 // ── enqueue+await, normalized into an outcome the loop can branch on ───────
 
@@ -388,10 +410,22 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
     }
     const ids = { spaceId: ctx.space.id, userId: (dbUser as { id: string }).id };
 
+    // Resolve the runtime BEFORE anything else — fail fast and honestly,
+    // without spending an LLM call or a browser round-trip, when this goal
+    // needs the realtor's own login and no extension is connected.
+    const runtime = await resolveBrowserRuntime({ spaceId: ids.spaceId, userId: ids.userId, intentText: args.goal });
+    if ('needsExtension' in runtime) {
+      return {
+        summary: runtime.reason,
+        data: { status: 'needs_extension', steps: [] },
+        display: 'warning',
+      };
+    }
+
     if (!hasLLMKey()) {
       return {
         summary: 'No LLM key is configured, so multi-step browser tasks are unavailable right now.',
-        data: { status: 'error', steps: [] },
+        data: { status: 'error', steps: [], source: runtime.source },
         display: 'error',
       };
     }
@@ -410,6 +444,7 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
         data: {
           status: initialObserve.reason === 'no_session' ? 'no_session' : 'timeout',
           steps: [],
+          source: runtime.source,
         },
         display: initialObserve.reason === 'no_session' ? 'warning' : 'warning',
       };
@@ -429,7 +464,7 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
       if (ctx.signal.aborted) {
         return {
           summary: `Stopped "${args.goal}" — the turn was cancelled.`,
-          data: { status: 'error', steps, pageUrl, pageTitle },
+          data: { status: 'error', steps, pageUrl, pageTitle, source: runtime.source },
           display: 'warning',
         };
       }
@@ -438,15 +473,15 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
       if ('error' in decided) {
         return {
           summary: `I couldn't work out a safe next step for "${args.goal}" (${decided.error}). Here's what I found before stopping.`,
-          data: { status: 'error', steps, pageUrl, pageTitle },
+          data: { status: 'error', steps, pageUrl, pageTitle, source: runtime.source },
           display: 'error',
         };
       }
 
       if (decided.decision.done) {
         return {
-          summary: decided.decision.finalAnswer ?? 'Done.',
-          data: { status: 'done', steps, pageUrl, pageTitle },
+          summary: withRuntimeNote(decided.decision.finalAnswer ?? 'Done.', runtime.source),
+          data: { status: 'done', steps, pageUrl, pageTitle, source: runtime.source },
           display: 'plain',
         };
       }
@@ -456,13 +491,17 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
       if (safety === 'needs_confirm') {
         const detail = describeBrowserAction(action);
         return {
-          summary: `I'm ready to ${detail} to keep going on "${args.goal}", but that could submit something, spend money, or send/publish something — so I paused. Reply to confirm, or tell me what to do instead.`,
+          summary: withRuntimeNote(
+            `I'm ready to ${detail} to keep going on "${args.goal}", but that could submit something, spend money, or send/publish something — so I paused. Reply to confirm, or tell me what to do instead.`,
+            runtime.source,
+          ),
           data: {
             status: 'needs_confirm',
             steps,
             pageUrl,
             pageTitle,
             pendingAction: { type: action.type, detail },
+            source: runtime.source,
           },
           display: 'warning',
         };
@@ -473,14 +512,14 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
         if (executed.reason === 'no_session') {
           return {
             summary: NOT_CONNECTED_SUMMARY,
-            data: { status: 'no_session', steps, pageUrl, pageTitle },
+            data: { status: 'no_session', steps, pageUrl, pageTitle, source: runtime.source },
             display: 'warning',
           };
         }
         if (executed.reason === 'timeout' || executed.reason === 'queue_failed') {
           return {
             summary: `${executed.message} Here's what happened before that on "${args.goal}".`,
-            data: { status: 'timeout', steps, pageUrl, pageTitle },
+            data: { status: 'timeout', steps, pageUrl, pageTitle, source: runtime.source },
             display: 'warning',
           };
         }
@@ -526,6 +565,7 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
             steps,
             pageUrl,
             pageTitle,
+            source: runtime.source,
           },
           display: 'warning',
         };
@@ -536,8 +576,11 @@ export const browserTaskTool = defineTool<typeof parameters, BrowserTaskResult>(
     }
 
     return {
-      summary: `I worked on "${args.goal}" for ${MAX_STEPS} steps but didn't finish — here's what I found so far. Ask me to continue and I'll pick up from here.`,
-      data: { status: 'budget_exhausted', steps, pageUrl, pageTitle },
+      summary: withRuntimeNote(
+        `I worked on "${args.goal}" for ${MAX_STEPS} steps but didn't finish — here's what I found so far. Ask me to continue and I'll pick up from here.`,
+        runtime.source,
+      ),
+      data: { status: 'budget_exhausted', steps, pageUrl, pageTitle, source: runtime.source },
       display: 'warning',
     };
   },
