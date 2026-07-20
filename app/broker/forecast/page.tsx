@@ -26,6 +26,7 @@ import {
   CHIPPI_PILL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
 
@@ -487,7 +488,7 @@ export default async function BrokerForecastPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          {monthName} revenue
+          <SplitReveal as="span" text={`${monthName} revenue`} />
         </h1>
         <p className={BODY_MUTED}>{pace}</p>
       </header>
@@ -792,7 +793,7 @@ function EmptyPage({
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerageName}.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          {monthName} revenue
+          <SplitReveal as="span" text={`${monthName} revenue`} />
         </h1>
         <p className={BODY_MUTED}>No active team members yet.</p>
       </header>

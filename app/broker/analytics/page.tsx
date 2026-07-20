@@ -24,6 +24,7 @@ import {
 import { StatCard, SURFACE_CARD, InsightStrip } from '@/components/ui/surface-card';
 import { Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StaggerReveal, SplitReveal, AnimatedNumber } from '@/components/motion';
 import {
   SPEED_TO_LEAD_WINDOW_DAYS,
   formatSpeedToLead,
@@ -219,7 +220,7 @@ export default async function BrokerAnalyticsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Brokerage.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Analytics
+          <SplitReveal as="span" text="Analytics" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>
@@ -237,26 +238,42 @@ export default async function BrokerAnalyticsPage() {
 
           {/* KPI strip -- floating stat cards (reference language: flat,
               borderless, large radius, accent-bar labels). "Lead to win" is
-              the view's ONE solid accent card. */}
-          <section
+              the view's ONE solid accent card. The cells cascade in once on
+              first paint (StaggerReveal on the direct-child grid); each focal
+              numeral then counts up on entry (AnimatedNumber, reduced-motion
+              aware). */}
+          <StaggerReveal
+            as="section"
             className={cn(
               'grid grid-cols-2 gap-4',
               speed ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4',
             )}
-            aria-label="Team totals"
           >
-            <StatCard label="Total leads" value={totalLeads.toLocaleString()} />
-            <StatCard label="Deals won" value={totalWon.toLocaleString()} />
+            <StatCard
+              label="Total leads"
+              value={<AnimatedNumber value={totalLeads} format={(n) => Math.round(n).toLocaleString()} />}
+            />
+            <StatCard
+              label="Deals won"
+              value={<AnimatedNumber value={totalWon} format={(n) => Math.round(n).toLocaleString()} />}
+            />
             {speed && (
               <StatCard
                 label="Speed to lead"
-                value={formatSpeedToLead(speed.medianMinutes)}
+                value={<AnimatedNumber value={speed.medianMinutes} format={formatSpeedToLead} />}
                 sub={`median · p90 ${formatSpeedToLead(speed.p90Minutes)} · ${SPEED_TO_LEAD_WINDOW_DAYS} days`}
               />
             )}
-            <StatCard label="Pipeline value" value={formatCompact(totalPipelineValue)} />
-            <StatCard label="Lead to win" value={`${teamConversion}%`} accent />
-          </section>
+            <StatCard
+              label="Pipeline value"
+              value={<AnimatedNumber value={totalPipelineValue} format={formatCompact} />}
+            />
+            <StatCard
+              label="Lead to win"
+              value={<AnimatedNumber value={teamConversion} format={(n) => `${Math.round(n)}%`} />}
+              accent
+            />
+          </StaggerReveal>
 
           {/* Honest computed read: how often Chippi's instant first-touch
               draft was the lead's actual first touch. Hidden unless it

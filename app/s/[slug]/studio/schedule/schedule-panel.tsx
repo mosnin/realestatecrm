@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL, BODY_MUTED, CAPTION } from '@/lib/typography';
+import { StaggerReveal } from '@/components/motion';
 
 interface Platform {
   toolkit: string;
@@ -197,7 +198,7 @@ export function SchedulePanel({
   }
 
   return (
-    <div className="space-y-10">
+    <StaggerReveal className="space-y-10">
       {/* Compose */}
       <section className="space-y-5">
         <button
@@ -351,6 +352,6 @@ export function SchedulePanel({
           </ul>
         )}
       </section>
-    </div>
+    </StaggerReveal>
   );
 }

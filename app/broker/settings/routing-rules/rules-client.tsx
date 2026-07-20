@@ -41,6 +41,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { DealRoutingRuleRow } from '@/lib/routing-rule-schema';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -213,7 +214,7 @@ export default function RulesClient({
         <div className="space-y-1.5 min-w-0">
           <p className={BODY_MUTED}>Settings.</p>
           <h1 className={H1} style={TITLE_FONT}>
-            Routing rules
+            <SplitReveal as="span" text="Routing rules" />
           </h1>
           <p className={BODY_MUTED}>{subtitle}</p>
         </div>

@@ -9,6 +9,7 @@ import { BrokerageSubscribe } from '@/components/billing/brokerage-subscribe';
 import { CreditsSummary } from '@/components/billing/credits-summary';
 import { isAnnualAvailable, type PlanId } from '@/lib/plans';
 import { getStripe } from '@/lib/stripe';
+import { SplitReveal } from '@/components/motion';
 import type Stripe from 'stripe';
 import type { Metadata } from 'next';
 
@@ -220,7 +221,7 @@ function BillingHeader({ status }: { status: string }) {
         className="text-3xl tracking-tight text-foreground"
         style={{ fontFamily: 'var(--font-title)' }}
       >
-        Your subscription
+        <SplitReveal as="span" text="Your subscription" />
       </h1>
       <p className="text-sm text-muted-foreground">{status}</p>
     </header>

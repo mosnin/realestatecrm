@@ -40,6 +40,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { StaggerReveal } from '@/components/motion';
 import {
   BODY,
   BODY_MUTED,
@@ -465,7 +466,7 @@ export default function TemplatesClient({ canManage }: { canManage: boolean }) {
                     {items.length}
                   </span>
                 </p>
-                <ul className="divide-y divide-border/60 border-y border-border/60">
+                <StaggerReveal as="ul" className="divide-y divide-border/60 border-y border-border/60" distance={8}>
                   {items.map((t) => (
                     <TemplateRow
                       key={t.id}
@@ -477,7 +478,7 @@ export default function TemplatesClient({ canManage }: { canManage: boolean }) {
                       onDelete={() => setDeleteTarget(t)}
                     />
                   ))}
-                </ul>
+                </StaggerReveal>
               </section>
             );
           })}

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { ActivityClient, type ActivityRow } from './activity-client';
+import { SplitReveal } from '@/components/motion';
 
 // Server component: fetch the first page of AuditLog rows scoped to this
 // brokerage, then hand off to the client for filter/pagination. Mirrors the
@@ -142,7 +143,7 @@ export default async function BrokerActivityPage() {
           className="text-3xl tracking-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          What the team&apos;s been doing
+          <SplitReveal as="span" text="What the team’s been doing" />
         </h1>
         <p className="text-sm text-muted-foreground">
           Every action across your brokerage, newest first.

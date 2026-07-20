@@ -13,6 +13,7 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { getInitials } from '@/lib/formatting';
+import { SplitReveal, StaggerReveal } from '@/components/motion';
 
 export const metadata: Metadata = { title: 'My Leads — Chippi' };
 
@@ -35,7 +36,7 @@ export default async function MyLeadsPage() {
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Your routed leads.</p>
           <h1 className={H1} style={TITLE_FONT}>
-            On your plate
+            <SplitReveal as="span" text="On your plate" />
           </h1>
           <p className={BODY_MUTED}>{brokerage.name} hasn&rsquo;t routed anything yet.</p>
         </header>
@@ -124,7 +125,7 @@ export default async function MyLeadsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Your routed leads.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          On your plate
+          <SplitReveal as="span" text="On your plate" />
         </h1>
         <p className={BODY_MUTED}>{subtitle}</p>
       </header>
@@ -154,7 +155,7 @@ export default async function MyLeadsPage() {
               </span>
             )}
           </div>
-          <ul className="divide-y divide-border/60">
+          <StaggerReveal as="ul" className="divide-y divide-border/60" distance={8}>
             {leads.map((lead) => {
               const contacted = !!lead.lastContactedAt;
               return (
@@ -207,7 +208,7 @@ export default async function MyLeadsPage() {
                 </li>
               );
             })}
-          </ul>
+          </StaggerReveal>
         </section>
       )}
     </div>

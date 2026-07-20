@@ -47,6 +47,7 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import { ProfitabilityClient } from './profitability-client';
 
 export const metadata: Metadata = { title: 'Profitability -- Brokerage' };
@@ -160,7 +161,7 @@ export default async function BrokerProfitabilityPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Profitability
+          <SplitReveal as="span" text="Profitability" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>

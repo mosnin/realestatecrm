@@ -5,6 +5,7 @@ import { getSpaceByOwnerId } from '@/lib/space';
 import { LeaderboardClient } from './leaderboard-client';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Leaderboard — Teams' };
@@ -41,7 +42,7 @@ export default async function LeaderboardPage() {
       <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
         <header className="space-y-1.5">
           <h1 className={cn(H1)} style={TITLE_FONT}>
-            Leaderboard
+            <SplitReveal as="span" text="Leaderboard" />
           </h1>
           <p className={cn(BODY_MUTED)}>No real estate agents to rank yet.</p>
         </header>
@@ -177,7 +178,7 @@ export default async function LeaderboardPage() {
     <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
       <header className="space-y-1.5">
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Leaderboard
+          <SplitReveal as="span" text="Leaderboard" />
         </h1>
         <p className={cn(BODY_MUTED)}>{statusSentence}</p>
       </header>

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, CAPTION } from '@/lib/typography';
+import { Reveal, StaggerReveal, AnimatedNumber } from '@/components/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────
 //
@@ -199,7 +200,13 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className={CAPTION} aria-live="polite">
-          {hasAny ? `${offers.length} offer${offers.length === 1 ? '' : 's'} tracked` : ''}
+          {hasAny ? (
+            <>
+              <AnimatedNumber value={offers.length} /> offer{offers.length === 1 ? '' : 's'} tracked
+            </>
+          ) : (
+            ''
+          )}
         </p>
         <button
           type="button"
@@ -223,16 +230,18 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
       )}
 
       {!hasAny ? (
-        <SurfaceCard>
-          <div className="py-10 text-center">
-            <p className={BODY_MUTED}>No offers yet.</p>
-            <p className={cn(CAPTION, 'mt-1')}>
-              Track a buyer&apos;s offer on a listing to see it here.
-            </p>
-          </div>
-        </SurfaceCard>
+        <Reveal variant="fade">
+          <SurfaceCard>
+            <div className="py-10 text-center">
+              <p className={BODY_MUTED}>No offers yet.</p>
+              <p className={cn(CAPTION, 'mt-1')}>
+                Track a buyer&apos;s offer on a listing to see it here.
+              </p>
+            </div>
+          </SurfaceCard>
+        </Reveal>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-2">
+        <StaggerReveal className="flex gap-4 overflow-x-auto pb-2">
           {OFFER_STATUSES.map((status) => {
             const rows = grouped.get(status) ?? [];
             return (
@@ -265,7 +274,7 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
               </div>
             );
           })}
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

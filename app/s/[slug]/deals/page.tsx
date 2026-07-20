@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { DealsPageClient } from '@/components/deals/deals-page-client';
 import { H3, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { Reveal } from '@/components/motion';
 import type { Pipeline, DealStage, Deal } from '@/lib/types';
 
 type StageWithDeals = DealStage & { deals: Deal[] };
@@ -98,7 +99,7 @@ export default async function DealsPage({
     console.error('[deals] DB queries failed', err);
     return (
       <div className="flex min-h-[50vh] items-center justify-center px-6">
-        <div className="text-center max-w-sm">
+        <Reveal variant="rise" className="text-center max-w-sm">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
             <TrendingUp size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
           </div>
@@ -114,7 +115,7 @@ export default async function DealsPage({
             <RotateCcw size={14} />
             Try again
           </a>
-        </div>
+        </Reveal>
       </div>
     );
   }
@@ -126,11 +127,19 @@ export default async function DealsPage({
   const { pipelines, initialStages, initialPipelineId } = await loadInitialDealsData(space.id);
 
   return (
-    <DealsPageClient
-      slug={slug}
-      initialPipelines={pipelines}
-      initialStages={initialStages}
-      initialPipelineId={initialPipelineId}
-    />
+    // The kanban board, stat strip, and page title all live inside
+    // `DealsPageClient` (components/deals/**, outside this team's ownership
+    // of app/s/[slug]/deals/**), so we can't reach in and stagger its
+    // columns/cards or count-up its KPIs from here. This outer Reveal gives
+    // the board a single, restrained arrival on first paint without
+    // touching that component's internals.
+    <Reveal variant="fade">
+      <DealsPageClient
+        slug={slug}
+        initialPipelines={pipelines}
+        initialStages={initialStages}
+        initialPipelineId={initialPipelineId}
+      />
+    </Reveal>
   );
 }

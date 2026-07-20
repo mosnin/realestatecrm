@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatCard, StatusPill, SurfaceCard, SurfaceCardHeader } from '@/components/ui/surface-card';
+import { StaggerReveal, AnimatedNumber } from '@/components/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -584,21 +585,30 @@ export function CommissionsClient({ ledger: initialLedger, defaultAgentRate, def
         </Button>
       </div>
 
-      {/* Summary — surface-card stat row. */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total commissions" value={formatCurrency(summary.totalCommissions)} />
+      {/* Summary — surface-card stat row. Cascades in once on first paint
+          (StaggerReveal); each focal figure counts up on entry and re-counts
+          when the month/status filter changes the underlying total
+          (AnimatedNumber, reduced-motion aware). */}
+      <StaggerReveal as="section" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Total commissions"
+          value={<AnimatedNumber value={summary.totalCommissions} format={formatCurrency} />}
+        />
         <StatCard
           label="Pending (broker)"
-          value={formatCurrency(summary.pendingPayouts)}
+          value={<AnimatedNumber value={summary.pendingPayouts} format={formatCurrency} />}
           dim={summary.pendingPayouts === 0}
         />
         <StatCard
           label="Paid (broker)"
-          value={formatCurrency(summary.paidThisMonth)}
+          value={<AnimatedNumber value={summary.paidThisMonth} format={formatCurrency} />}
           dim={summary.paidThisMonth === 0}
         />
-        <StatCard label="Total deal value" value={formatCurrency(summary.totalValue)} />
-      </section>
+        <StatCard
+          label="Total deal value"
+          value={<AnimatedNumber value={summary.totalValue} format={formatCurrency} />}
+        />
+      </StaggerReveal>
 
       {/* Per-agent summary */}
       <SurfaceCard className="p-0 sm:p-0 overflow-hidden">

@@ -2,6 +2,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import TemplatesClient from './templates-client';
 import type { Metadata } from 'next';
 
@@ -23,7 +24,7 @@ export default async function TemplatesPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Templates.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          The team’s playbook
+          <SplitReveal as="span" text="The team’s playbook" />
         </h1>
         <p className={cn(BODY_MUTED)}>
           {canManage

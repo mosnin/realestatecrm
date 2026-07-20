@@ -18,6 +18,7 @@ import { AIProfileForm } from '@/components/profile/ai-profile-form';
 import { UsageSection } from '@/components/settings/usage-section';
 import { cn } from '@/lib/utils';
 import type { SpaceSetting } from '@/lib/types';
+import { StaggerReveal, SplitReveal } from '@/components/motion';
 import {
   H1,
   TITLE_FONT,
@@ -181,9 +182,11 @@ export default async function SettingsPage({
       {/* Page header */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Settings
-        </h1>
+        <SplitReveal
+          as="h1"
+          text="Settings"
+          className={cn(H1, '[font-family:var(--font-title)]')}
+        />
         <p className={BODY_MUTED}>
           {narration}
           {(isTrialing || isActive || subStatus === 'inactive') && (
@@ -248,7 +251,7 @@ export default async function SettingsPage({
       {/* Workspace — space name, slug, and danger zone. Nothing else; this
           tab is identity, not configuration. */}
       {activeTab === 'workspace' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section className="space-y-5">
             <p className={SECTION_LABEL}>Workspace</p>
             <GeneralSettingsForm space={space} />
@@ -257,14 +260,14 @@ export default async function SettingsPage({
             <p className={cn(SECTION_LABEL, 'text-destructive/80')}>Danger zone</p>
             <DangerZone space={space} />
           </section>
-        </div>
+        </StaggerReveal>
       )}
 
       {/* You — profile photo, bio, AI personalization, chat model. Everything
           that shapes how Chippi sees the realtor and how the realtor shows
           up to leads. Memory has its own tab now. */}
       {activeTab === 'you' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section className="space-y-5">
             <p className={SECTION_LABEL}>Your profile</p>
             <p className={BODY_MUTED}>
@@ -283,7 +286,7 @@ export default async function SettingsPage({
             </p>
             <AIProfileForm slug={slug} spaceId={space.id} />
           </section>
-        </div>
+        </StaggerReveal>
       )}
 
       {/* Connections — every place Chippi acts on the realtor's behalf.
@@ -292,7 +295,7 @@ export default async function SettingsPage({
           through." MCP and API keys are developer-flavored and live in
           Developer instead. */}
       {activeTab === 'connections' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section id="integrations" className="space-y-5">
             <p className={SECTION_LABEL}>Connected apps</p>
             <p className={BODY_MUTED}>
@@ -320,7 +323,7 @@ export default async function SettingsPage({
             <p className={SECTION_LABEL}>Message templates</p>
             <TemplatesSection />
           </section>
-        </div>
+        </StaggerReveal>
       )}
 
       {/* Memory — what Chippi has learned about this workspace. Read-only
@@ -329,7 +332,7 @@ export default async function SettingsPage({
           surface. The tab is a mount point; the list component owns the
           empty/loading/error states. */}
       {activeTab === 'memory' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section className="space-y-5">
             <p className={SECTION_LABEL}>Memory</p>
             <p className={BODY_MUTED}>
@@ -338,14 +341,14 @@ export default async function SettingsPage({
             </p>
             <MemoryList />
           </section>
-        </div>
+        </StaggerReveal>
       )}
 
       {/* Privacy — notifications, legal URL, license, fair-housing notice.
           Everything compliance-flavored and everything that determines what
           reaches the realtor. */}
       {activeTab === 'privacy' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section id="brief" className="space-y-5">
             <p className={SECTION_LABEL}>Daily brief</p>
             <BriefSection slug={space.slug} />
@@ -408,14 +411,14 @@ export default async function SettingsPage({
             </p>
             <YourDataSection spaceName={space.name} />
           </section>
-        </div>
+        </StaggerReveal>
       )}
 
       {/* Developer — MCP, API keys, and usage. Anything programmatic or
           cost-attribution flavored lives here so the realtor side stays
           calm. */}
       {activeTab === 'developer' && (
-        <div className="space-y-12">
+        <StaggerReveal className="space-y-12">
           <section id="mcp" className="space-y-5">
             <p className={SECTION_LABEL}>MCP &amp; API keys</p>
             <McpSection slug={space.slug} />
@@ -427,7 +430,7 @@ export default async function SettingsPage({
             <p className={SECTION_LABEL}>Usage</p>
             <UsageSection />
           </section>
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

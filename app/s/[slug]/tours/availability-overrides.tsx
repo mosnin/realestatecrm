@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, CalendarDays, CalendarOff, Clock, Loader2, Repeat, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { StaggerReveal } from '@/components/motion';
 
 interface Override {
   id: string;
@@ -339,7 +340,10 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
           <p className="text-xs">Your default weekly schedule applies to all upcoming dates.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        // This branch only mounts once the async fetch has landed and
+        // overrides exist, so the cascade always has real items to reveal
+        // (no premature fire against an empty list).
+        <StaggerReveal className="space-y-2" distance={8}>
           {overrides.map((o) => {
             const profile = o.propertyProfileId ? profileMap.get(o.propertyProfileId) : null;
             return (
@@ -397,7 +401,7 @@ export function AvailabilityOverrides({ slug, propertyProfiles = [] }: Availabil
               </div>
             );
           })}
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

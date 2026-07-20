@@ -50,6 +50,8 @@ import type { DealDocument } from '@/lib/deals/documents';
 import type { Property } from '@/lib/types';
 import { isDocusignConnected } from '@/lib/esign';
 import type { SignatureRequestLite } from '@/components/esign/send-for-signature';
+import { Reveal, StaggerReveal, SplitReveal } from '@/components/motion';
+import { AnimatedCurrencyStat } from './deal-stat-value';
 
 
 export default async function DealDetailPage({
@@ -188,7 +190,7 @@ export default async function DealDetailPage({
     console.error('[deal-detail] DB queries failed', err);
     return (
       <div className="flex min-h-[50vh] items-center justify-center px-6">
-        <div className="text-center max-w-sm">
+        <Reveal variant="rise" className="text-center max-w-sm">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
             <TrendingUp size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
           </div>
@@ -204,7 +206,7 @@ export default async function DealDetailPage({
             <RotateCcw size={14} />
             Try again
           </a>
-        </div>
+        </Reveal>
       </div>
     );
   }
@@ -303,12 +305,9 @@ export default async function DealDetailPage({
           hairline-divider snapshot vocabulary as the deal quick panel. */}
       <header className="space-y-5">
         <div className="space-y-2">
-          <h1
-            className={cn(H1)}
-            style={TITLE_FONT}
-          >
-            {headline}
-          </h1>
+          <div style={TITLE_FONT}>
+            <SplitReveal as="h1" text={headline} className={cn(H1)} />
+          </div>
           <p className={cn(BODY_MUTED, 'tabular-nums leading-relaxed')}>
             {statusSentence}
           </p>
@@ -370,7 +369,8 @@ export default async function DealDetailPage({
 
         {/* Hairline-divider snapshot grid — same vocabulary as the deal quick
             panel. Four cells max so each one breathes. */}
-        <section
+        <StaggerReveal
+          as="section"
           className={cn(
             'grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden',
             'border border-border/60 bg-border/60',
@@ -382,7 +382,7 @@ export default async function DealDetailPage({
               style={TITLE_FONT}
             >
               {value != null ? (
-                formatCurrency(value)
+                <AnimatedCurrencyStat value={value} />
               ) : (
                 '—'
               )}
@@ -394,7 +394,7 @@ export default async function DealDetailPage({
               style={TITLE_FONT}
             >
               {gci != null ? (
-                formatCompact(gci)
+                <AnimatedCurrencyStat value={gci} compact />
               ) : (
                 '—'
               )}
@@ -431,7 +431,7 @@ export default async function DealDetailPage({
               {status === 'on_hold' ? 'on hold' : status}
             </p>
           </StatCell>
-        </section>
+        </StaggerReveal>
       </header>
 
       {/* Sidebar + main grid. Card wraps both because the realtor reads the
@@ -446,7 +446,11 @@ export default async function DealDetailPage({
               working with these people"; the fields say "and here's the
               control surface", and the hairline says "these are different
               kinds of information." */}
-          <aside className="border-b lg:border-b-0 lg:border-r border-border/60 p-5 space-y-5">
+          <Reveal
+            as="aside"
+            variant="fade"
+            className="border-b lg:border-b-0 lg:border-r border-border/60 p-5 space-y-5"
+          >
 
             {/* Hero — the assigned realtor on top, contacts beneath. Avatars
                 make the page feel like it's about real people, not a form. */}
@@ -579,7 +583,7 @@ export default async function DealDetailPage({
                 </Link>
               )}
             </div>
-          </aside>
+          </Reveal>
 
           {/* RIGHT MAIN — URL-driven tabs that mirror the People detail
               page. Same `?tab=` contract, same border-b-2 active underline,
@@ -610,7 +614,7 @@ export default async function DealDetailPage({
                 now reordered to match the People detail's general-to-
                 specific flow (Activity first, then the artefacts). */}
             {activeTab === 'activity' && (
-              <div className="space-y-5">
+              <StaggerReveal className="space-y-5">
                 {/* Deal metadata — title / address / notes used to live in
                     the old Overview tab. They're settings on this record,
                     not "activity", but the realtor wants them visible
@@ -668,37 +672,43 @@ export default async function DealDetailPage({
                 />
 
                 <AgentDealPanel dealId={id} slug={slug} dealTitle={title} />
-              </div>
+              </StaggerReveal>
             )}
 
             {activeTab === 'documents' && (
-              <DealDocuments
-                dealId={id}
-                slug={slug}
-                docusignConnected={docusignConnected}
-                signatureRequests={signatureRequests}
-                initial={documents}
-                pipelineType={pipelineType}
-              />
+              <Reveal variant="fade">
+                <DealDocuments
+                  dealId={id}
+                  slug={slug}
+                  docusignConnected={docusignConnected}
+                  signatureRequests={signatureRequests}
+                  initial={documents}
+                  pipelineType={pipelineType}
+                />
+              </Reveal>
             )}
 
             {activeTab === 'contacts' && (
-              <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
+              <Reveal variant="fade">
+                <DealContactsManager dealId={id} slug={slug} initialContacts={linkedContacts} />
+              </Reveal>
             )}
 
             {activeTab === 'commission' && (
-              <DealCommissionSplits
-                dealId={id}
-                dealValue={value}
-                dealCommissionRate={commissionRate}
-              />
+              <Reveal variant="fade">
+                <DealCommissionSplits
+                  dealId={id}
+                  dealValue={value}
+                  dealCommissionRate={commissionRate}
+                />
+              </Reveal>
             )}
 
             {activeTab === 'tasks' && (
-              <div className="space-y-6">
+              <StaggerReveal className="space-y-6">
                 <DealChecklist dealId={id} initial={checklist} />
                 <DealMilestones dealId={id} initialMilestones={milestones} />
-              </div>
+              </StaggerReveal>
             )}
           </main>
         </div>

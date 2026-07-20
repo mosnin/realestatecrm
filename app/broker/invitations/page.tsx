@@ -9,6 +9,7 @@ import { BulkInviteForm } from '@/components/broker/bulk-invite-form';
 import { getSeatUsage } from '@/lib/brokerage-seats';
 import { H1, TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import { timeAgo } from '@/lib/formatting';
 import { effectiveInvitationStatus } from '@/lib/invitation-status';
 import type { InvitationStatus } from '@/lib/types';
@@ -93,7 +94,7 @@ export default async function BrokerInvitationsPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Invitations.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Bring the team in
+          <SplitReveal as="span" text="Bring the team in" />
         </h1>
         <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>

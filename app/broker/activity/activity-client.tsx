@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StaggerReveal } from '@/components/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -378,7 +379,7 @@ export function ActivityClient({
         />
       ) : (
         <>
-          <ul className="divide-y divide-border/60 border-y border-border/60">
+          <StaggerReveal as="ul" className="divide-y divide-border/60 border-y border-border/60" distance={8}>
             {visibleRows.map((r) => {
               const isOpen = expanded.has(r.id);
               const shortRes = shortenId(r.resourceId);
@@ -462,7 +463,7 @@ export function ActivityClient({
                 </li>
               );
             })}
-          </ul>
+          </StaggerReveal>
           {cursor && (
             <div className="flex justify-center pt-2">
               <Button

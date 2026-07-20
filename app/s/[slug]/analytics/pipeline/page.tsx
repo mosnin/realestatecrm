@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildPipelineAnalyticsData } from '@/lib/analytics-data';
 import { PipelineView } from '@/components/analytics/pipeline-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
+import { Reveal } from '@/components/motion';
 
 export default async function PipelineAnalyticsPage({
   params,
@@ -20,7 +21,11 @@ export default async function PipelineAnalyticsPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildPipelineAnalyticsData(raw);
-    return <PipelineView data={data} />;
+    return (
+      <Reveal variant="fade">
+        <PipelineView data={data} />
+      </Reveal>
+    );
   } catch (err) {
     console.error('[analytics/pipeline] DB queries failed', err);
     return (

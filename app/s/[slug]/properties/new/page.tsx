@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
+import { SplitReveal } from '@/components/motion';
 import { PropertyForm } from '@/components/properties/property-form';
 import type { Property } from '@/lib/types';
 
@@ -60,7 +61,7 @@ export default function NewPropertyPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Properties.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          New listing
+          <SplitReveal as="span" text="New listing" />
         </h1>
         <p className={cn(BODY_MUTED)}>What are you taking to market?</p>
       </header>

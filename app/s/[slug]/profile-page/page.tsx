@@ -10,7 +10,9 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { ProfileEditor } from '@/components/profile-page/profile-editor';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
+import { H1, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
+import { Reveal, SplitReveal } from '@/components/motion';
+import { cn } from '@/lib/utils';
 
 export default async function ProfilePageEditor({
   params,
@@ -29,15 +31,19 @@ export default async function ProfilePageEditor({
     <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Profile.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Your public page
-        </h1>
+        <SplitReveal
+          as="h1"
+          text="Your public page"
+          className={cn(H1, '[font-family:var(--font-title)]')}
+        />
         <p className={BODY_MUTED}>
           The one link you share — application, tours, listings, and more.
         </p>
       </header>
 
-      <ProfileEditor slug={slug} />
+      <Reveal>
+        <ProfileEditor slug={slug} />
+      </Reveal>
     </div>
   );
 }

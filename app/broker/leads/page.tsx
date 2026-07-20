@@ -5,6 +5,7 @@ import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
 
 export const metadata: Metadata = { title: 'Leads — Teams' };
@@ -268,7 +269,7 @@ export default async function BrokerLeadsPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Leads.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Your brokerage&rsquo;s intake
+          <SplitReveal as="span" text="Your brokerage’s intake" />
         </h1>
         <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>

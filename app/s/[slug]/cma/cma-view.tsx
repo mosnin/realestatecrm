@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { Reveal, SplitReveal, AnimatedNumber } from '@/components/motion';
 import { toastSuccess, toastError, toastCopied } from '@/lib/toast-helpers';
 import { formatCurrency } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
@@ -269,7 +270,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Comparative market analysis.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Price a home.
+          <SplitReveal as="span" text="Price a home." />
         </h1>
         <p className={cn(BODY_MUTED)}>
           Pick a subject, and Chippi pulls real market comps and computes a range.
@@ -277,7 +278,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
       </header>
 
       {/* ── Builder ────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-4">
+      <Reveal variant="rise" className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-4">
         <div className="space-y-1.5">
           <label htmlFor="cma-subject" className="text-sm font-medium text-foreground">
             Subject property
@@ -338,11 +339,11 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
             {building ? 'Building…' : 'Build analysis'}
           </Button>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Preview ────────────────────────────────────────────────────── */}
       {preview?.payload && (
-        <section className="space-y-3">
+        <Reveal as="section" variant="rise" className="space-y-3">
           <p className={cn(SECTION_LABEL)}>Preview</p>
 
           {(preview.payload.dataSource === 'crm' || preview.payload.stats.insufficientData) && (
@@ -363,17 +364,30 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
                 className="text-3xl tracking-tight text-foreground tabular-nums"
                 style={TITLE_FONT}
               >
-                {money(preview.payload.stats.suggestedLow)} –{' '}
-                {money(preview.payload.stats.suggestedHigh)}
+                <AnimatedNumber value={preview.payload.stats.suggestedLow} format={money} />
+                {' – '}
+                <AnimatedNumber value={preview.payload.stats.suggestedHigh} format={money} />
               </p>
             ) : (
               <p className={cn(BODY_MUTED)}>Add priced comparables to compute a range.</p>
             )}
             <p className={cn(CAPTION)}>
-              {preview.payload.stats.compCount} comparable
+              <AnimatedNumber
+                value={preview.payload.stats.compCount}
+                format={(n) => `${Math.round(n)}`}
+              />{' '}
+              comparable
               {preview.payload.stats.compCount === 1 ? '' : 's'}
-              {preview.payload.stats.avgPricePerSqft != null &&
-                ` · avg $${preview.payload.stats.avgPricePerSqft.toLocaleString()}/sqft`}
+              {preview.payload.stats.avgPricePerSqft != null && (
+                <>
+                  {' · avg '}
+                  <AnimatedNumber
+                    value={preview.payload.stats.avgPricePerSqft}
+                    format={(n) => `$${Math.round(n).toLocaleString()}`}
+                  />
+                  /sqft
+                </>
+              )}
             </p>
             <p className={cn(META)}>
               Source: {DATA_SOURCE_LABEL[preview.payload.dataSource]}
@@ -406,7 +420,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
           </div>
 
           <NarrativeSection slug={slug} reportId={preview.id} payload={preview.payload} />
-        </section>
+        </Reveal>
       )}
 
       {/* ── Past reports ───────────────────────────────────────────────── */}

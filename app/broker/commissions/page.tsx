@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CommissionsClient, type LedgerRow } from './commissions-client';
 import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 export const metadata: Metadata = { title: 'Commissions — Teams' };
 
@@ -146,7 +147,7 @@ export default async function BrokerCommissionsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Commissions
+          <SplitReveal as="span" text="Commissions" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>

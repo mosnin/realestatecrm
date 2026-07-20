@@ -6,6 +6,7 @@ import { dealHealth } from '@/lib/deals/health';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 import {
   PipelineClient,
@@ -217,7 +218,7 @@ export default async function BrokerPipelinePage() {
     <div className="space-y-8 pb-56 md:pb-24">
       <header className="space-y-1.5">
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Pipeline
+          <SplitReveal as="span" text="Pipeline" />
         </h1>
         <p className={cn(BODY_MUTED)}>{statusSentence}</p>
       </header>

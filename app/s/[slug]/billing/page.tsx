@@ -8,7 +8,9 @@ import { CreditsSummary } from '@/components/billing/credits-summary';
 import type { PlanId } from '@/lib/plans';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { H1 } from '@/lib/typography';
+import { Reveal, SplitReveal } from '@/components/motion';
+import { cn } from '@/lib/utils';
 
 export default async function Billing({
   params,
@@ -87,21 +89,27 @@ export default async function Billing({
       </Suspense>
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Billing.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Subscription
-        </h1>
+        <SplitReveal
+          as="h1"
+          text="Subscription"
+          className={cn(H1, '[font-family:var(--font-title)]')}
+        />
         <p className="text-sm text-muted-foreground">{statusLabel}</p>
       </header>
-      <BillingPage
-        slug={slug}
-        plan={(((space as { plan?: string }).plan) ?? 'free') as PlanId}
-        subscriptionStatus={subscriptionStatus}
-        currentPeriodEnd={currentPeriodEnd}
-        cardLast4={cardLast4}
-        cardBrand={cardBrand}
-        invoices={invoices}
-      />
-      <CreditsSummary spaceId={space.id} slug={slug} />
+      <Reveal>
+        <BillingPage
+          slug={slug}
+          plan={(((space as { plan?: string }).plan) ?? 'free') as PlanId}
+          subscriptionStatus={subscriptionStatus}
+          currentPeriodEnd={currentPeriodEnd}
+          cardLast4={cardLast4}
+          cardBrand={cardBrand}
+          invoices={invoices}
+        />
+      </Reveal>
+      <Reveal delay={0.08}>
+        <CreditsSummary spaceId={space.id} slug={slug} />
+      </Reveal>
     </div>
   );
 }

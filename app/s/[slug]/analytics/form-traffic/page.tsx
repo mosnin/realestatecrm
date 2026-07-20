@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { FormAnalytics } from '@/components/analytics/form-analytics';
+import { Reveal } from '@/components/motion';
 
 export default async function FormTrafficAnalyticsPage({
   params,
@@ -15,5 +16,9 @@ export default async function FormTrafficAnalyticsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  return <FormAnalytics slug={slug} showRecentLeads />;
+  return (
+    <Reveal variant="fade">
+      <FormAnalytics slug={slug} showRecentLeads />
+    </Reveal>
+  );
 }

@@ -16,6 +16,7 @@ import {
   PRIMARY_PILL,
   GHOST_PILL,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { ReviewRow, ReviewStatus } from '../reviews-client';
 import { formatRelative } from '../reviews-client';
 
@@ -191,12 +192,12 @@ export function ReviewDetailClient({
               className={cn(H1, 'group-hover:underline underline-offset-2 decoration-foreground/30')}
               style={TITLE_FONT}
             >
-              {review.deal.title ?? 'Untitled deal'}
+              <SplitReveal as="span" text={review.deal.title ?? 'Untitled deal'} />
             </h1>
           </Link>
         ) : (
           <h1 className={H1} style={TITLE_FONT}>
-            {review.deal.title ?? 'Untitled deal'}
+            <SplitReveal as="span" text={review.deal.title ?? 'Untitled deal'} />
           </h1>
         )}
         <p className={BODY_MUTED}>

@@ -6,6 +6,7 @@ import { lastNDaysWindow } from '@/lib/analytics/speed-to-lead';
 import { getSpaceSpeedToLead } from '@/lib/analytics/speed-to-lead-data';
 import { OverviewView } from '@/components/analytics/overview-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
+import { Reveal } from '@/components/motion';
 
 export default async function AnalyticsOverviewPage({
   params,
@@ -30,7 +31,11 @@ export default async function AnalyticsOverviewPage({
       }),
     ]);
     const data = { ...buildOverviewData(raw), speedToLead };
-    return <OverviewView data={data} />;
+    return (
+      <Reveal variant="fade">
+        <OverviewView data={data} />
+      </Reveal>
+    );
   } catch (err) {
     console.error('[analytics/overview] DB queries failed', err);
     return <AnalyticsErrorBlock href={`/s/${slug}/analytics`} />;

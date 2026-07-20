@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { MessageCircle } from 'lucide-react';
+import { StaggerReveal } from '@/components/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ export function ReviewsClient({ slug, initialReviews }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <StaggerReveal className="space-y-2">
           {filtered.map((r) => {
             const dealTitle = r.deal.title ?? 'Untitled deal';
             const preview =
@@ -192,7 +193,7 @@ export function ReviewsClient({ slug, initialReviews }: Props) {
               </Link>
             );
           })}
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

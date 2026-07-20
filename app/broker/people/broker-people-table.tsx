@@ -29,6 +29,7 @@ import {
 import { motion } from 'framer-motion';
 import { EASE_APPLE } from '@/lib/motion';
 import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import Link from 'next/link';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -216,7 +217,7 @@ export function BrokerPeopleTable() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>People.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Everyone your brokerage is working with
+          <SplitReveal as="span" text="Everyone your brokerage is working with" />
         </h1>
         {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
       </header>

@@ -24,6 +24,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DURATION_FAST, DURATION_BASE, EASE_OUT, EASE_APPLE } from '@/lib/motion';
+import { SplitReveal } from '@/components/motion';
 import { Expandable, ExpandableContent } from '@/components/ui/expandable';
 import { useRealtime } from '@/hooks/use-realtime';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -294,7 +295,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <h1 className={H1} style={TITLE_FONT}>
-          Tours
+          <SplitReveal text="Tours" by="char" />
         </h1>
         <div className="flex items-center gap-1">
           {/* View toggle — small two-icon segmented control */}

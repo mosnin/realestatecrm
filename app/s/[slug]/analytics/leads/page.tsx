@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildLeadsAnalyticsData } from '@/lib/analytics-data';
 import { LeadsView } from '@/components/analytics/leads-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
+import { Reveal } from '@/components/motion';
 
 export default async function LeadsAnalyticsPage({
   params,
@@ -20,7 +21,11 @@ export default async function LeadsAnalyticsPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildLeadsAnalyticsData(raw);
-    return <LeadsView data={data} />;
+    return (
+      <Reveal variant="fade">
+        <LeadsView data={data} />
+      </Reveal>
+    );
   } catch (err) {
     console.error('[analytics/leads] DB queries failed', err);
     return (

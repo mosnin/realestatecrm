@@ -72,14 +72,25 @@ beforeEach(() => {
   fetchRawMock.mockResolvedValue({ contacts: [], deals: [], stages: [], tours: [] });
 });
 
+// The page wraps its content in a motion primitive (<Reveal>) for a scroll-in
+// fade. That's presentational — descend through wrappers to the OverviewView
+// element so these tests assert on the DATA wiring, not the animation shell.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findOverview(node: any): any {
+  if (!node || typeof node !== 'object') return null;
+  if (node.type === overviewViewMock) return node;
+  return findOverview(node.props?.children);
+}
+
 describe('analytics overview page — speed-to-lead wiring', () => {
   it('fetches speed-to-lead for the resolved space over the 30-day window and passes it to the view', async () => {
     speedMock.mockResolvedValue(RESULT);
 
     const el = await renderPage();
 
-    expect(el.type).toBe(overviewViewMock);
-    const data = (el.props as { data: Record<string, unknown> }).data;
+    const view = findOverview(el);
+    expect(view).toBeTruthy();
+    const data = (view.props as { data: Record<string, unknown> }).data;
     expect(data.speedToLead).toEqual(RESULT);
     // The rest of the overview payload is still assembled.
     expect(data.totalContacts).toBe(0);
@@ -97,8 +108,9 @@ describe('analytics overview page — speed-to-lead wiring', () => {
 
     const el = await renderPage();
 
-    expect(el.type).toBe(overviewViewMock);
-    const data = (el.props as { data: Record<string, unknown> }).data;
+    const view = findOverview(el);
+    expect(view).toBeTruthy();
+    const data = (view.props as { data: Record<string, unknown> }).data;
     expect(data.speedToLead).toBeNull();
     expect(data.totalContacts).toBe(0);
   });

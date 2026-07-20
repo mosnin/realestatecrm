@@ -11,6 +11,7 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import { BrokerKanbanBoard } from './broker-kanban-board';
 import type { BrokerDealItem } from './broker-deal-card';
 import type { BrokerKanbanColumn } from './broker-kanban-board';
@@ -311,7 +312,7 @@ export default async function BrokerDealsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Brokerage.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Deals
+          <SplitReveal as="span" text="Deals" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>

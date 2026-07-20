@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY, BODY_MUTED } from '@/lib/typography';
 import { SurfaceCard } from '@/components/ui/surface-card';
+import { Reveal, SplitReveal, StaggerReveal } from '@/components/motion';
 import { DraftReply } from '@/components/inbox/draft-reply';
 import type { InboxChannel, InboxDirection } from '@/lib/types';
 
@@ -155,26 +156,28 @@ export default async function InboxPage({
       <header className="mb-5 space-y-0.5">
         <p className="text-sm text-muted-foreground">Conversations.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Inbox
+          <SplitReveal as="span" text="Inbox" />
         </h1>
       </header>
 
       {threads.length === 0 ? (
-        <SurfaceCard>
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <InboxIcon size={28} className="text-muted-foreground/50" />
-            <p className="mt-3 text-base text-foreground">No conversations yet.</p>
-            <p className={cn(BODY_MUTED, 'mt-1 max-w-xs')}>
-              When a client emails, texts, or messages you, the whole thread lands here — every
-              channel in one place.
-            </p>
-          </div>
-        </SurfaceCard>
+        <Reveal variant="fade">
+          <SurfaceCard>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <InboxIcon size={28} className="text-muted-foreground/50" />
+              <p className="mt-3 text-base text-foreground">No conversations yet.</p>
+              <p className={cn(BODY_MUTED, 'mt-1 max-w-xs')}>
+                When a client emails, texts, or messages you, the whole thread lands here — every
+                channel in one place.
+              </p>
+            </div>
+          </SurfaceCard>
+        </Reveal>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
           {/* ── Thread list ─────────────────────────────────────────────── */}
           <SurfaceCard className="p-0 overflow-hidden">
-            <ul className="divide-y divide-border/60">
+            <StaggerReveal as="ul" className="divide-y divide-border/60">
               {threads.map((thread) => {
                 const name = nameById.get(thread.contactId) ?? 'Unknown contact';
                 const preview = previewByThread.get(thread.id);
@@ -223,7 +226,7 @@ export default async function InboxPage({
                   </li>
                 );
               })}
-            </ul>
+            </StaggerReveal>
           </SurfaceCard>
 
           {/* ── Thread view ─────────────────────────────────────────────── */}

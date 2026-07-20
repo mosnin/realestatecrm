@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { AgentActivityClient, type RealtorRollup, type ResponseShape } from './agent-activity-client';
+import { SplitReveal } from '@/components/motion';
 
 const DEFAULT_WINDOW_DAYS = 30;
 const ROLLUP_LOG_CAP = 5000;
@@ -162,7 +163,7 @@ export default async function BrokerAgentActivityPage() {
           className="text-3xl tracking-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          What Chippi did
+          <SplitReveal as="span" text="What Chippi did" />
         </h1>
         <p className="text-sm text-muted-foreground">
           Across {ctx.brokerage.name}. Updates as your team works.

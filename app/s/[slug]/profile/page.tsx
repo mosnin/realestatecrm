@@ -13,7 +13,9 @@ import { UserButton } from '@clerk/nextjs';
 import { Link2, ArrowUpRight, ExternalLink } from 'lucide-react';
 import { buildIntakeUrl } from '@/lib/intake';
 import { CopyLinkButton } from '../copy-link-button';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { H1 } from '@/lib/typography';
+import { StaggerReveal, SplitReveal } from '@/components/motion';
+import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const params = useParams<{ slug: string }>();
@@ -80,12 +82,15 @@ export default function ProfilePage() {
     <div className="space-y-5 max-w-3xl mx-auto pb-12">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Profile.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Your account
-        </h1>
+        <SplitReveal
+          as="h1"
+          text="Your account"
+          className={cn(H1, '[font-family:var(--font-title)]')}
+        />
         <p className="text-sm text-muted-foreground">Name, intake link, and public-facing details.</p>
       </header>
 
+      <StaggerReveal className="space-y-5">
       {/* Intake link card */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-muted/40 flex items-center gap-2">
@@ -183,6 +188,7 @@ export default function ProfilePage() {
           <UserButton />
         </div>
       </div>
+      </StaggerReveal>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { Plus, Trash2, MapPin, Loader2, Pencil, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { StaggerReveal } from '@/components/motion';
 
 interface PropertyProfile {
   id: string;
@@ -282,7 +283,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
           <p className="text-xs">Add properties to give each listing its own tour schedule and booking link.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <StaggerReveal className="space-y-2" distance={8}>
           {profiles.map((p) => (
             <div key={p.id} className={cn(
               'flex items-center justify-between rounded-lg border px-4 py-3',
@@ -318,7 +319,7 @@ export function PropertyProfiles({ slug, profiles: initialProfiles, onUpdate }: 
               </div>
             </div>
           ))}
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

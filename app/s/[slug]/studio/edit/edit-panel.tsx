@@ -19,6 +19,7 @@ import { CAPTION } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { GeneratingState } from '@/components/studio/generating-state';
+import { StaggerReveal } from '@/components/motion';
 
 interface EditResult {
   url: string;
@@ -170,7 +171,7 @@ export function EditPanel({
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerReveal className="space-y-6">
       {/* Source picker */}
       <div className="space-y-2">
         <button
@@ -299,6 +300,6 @@ export function EditPanel({
           </div>
         </motion.div>
       ) : null}
-    </div>
+    </StaggerReveal>
   );
 }

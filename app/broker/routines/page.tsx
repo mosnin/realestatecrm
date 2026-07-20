@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getBrokerContext } from '@/lib/permissions';
 import { RoutinesManager } from '@/components/routines/routines-manager';
+import { SplitReveal } from '@/components/motion';
 
 // Server component: broker-admin only. Renders the shared RoutinesManager
 // pointed at the brokerage-scoped API. Use getBrokerContext (not requireBroker)
@@ -18,7 +19,7 @@ export default async function BrokerRoutinesPage() {
           className="text-3xl tracking-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          Standing instructions for Chippi
+          <SplitReveal as="span" text="Standing instructions for Chippi" />
         </h1>
         <p className="text-sm text-muted-foreground">
           Give Chippi a recurring beat for your brokerage. Every run drafts —

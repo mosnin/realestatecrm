@@ -16,11 +16,15 @@
  *   - theme-aware (bg-background / text-foreground) — light + dark
  *   - responsive bento: 4-col grid on desktop, collapses to 1 col on mobile
  *
- * Motion (this pass): every cell fades up on a 40ms cascade and lifts a
- * hair on hover; stat numbers count up via AnimatedNumber; actionable rows
- * lean toward the realtor (arrow slides, hairline accent) as they reach for
- * them. All of it honors prefers-reduced-motion via brief-motion helpers —
- * confident, never bouncy. The numbers, links, and actions are untouched.
+ * Motion: every cell fades up on a 40ms cascade and lifts a hair on hover
+ * (brief-motion's BriefCell); stat numbers count up via AnimatedNumber; the
+ * greeting headline word-reveals via SplitReveal; the "what needs you" tiles
+ * and pipeline stats cascade in via StaggerReveal; the hero card carries a
+ * whisper of Parallax drift on its decorative glow; actionable rows lean
+ * toward the realtor (arrow slides, hairline accent) as they reach for them.
+ * All of it honors prefers-reduced-motion (brief-motion helpers + the shared
+ * GSAP motion system) — confident, never bouncy. The numbers, links, and
+ * actions are untouched.
  *
  * The bento cells (varied col/row spans):
  *   ┌─────────────────────────────┬───────────────┐
@@ -67,7 +71,7 @@ import {
 } from '@/lib/typography';
 import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
-import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AnimatedNumber, SplitReveal, StaggerReveal, Parallax } from '@/components/motion';
 import { AccentBarLabel, CARD_TITLE } from '@/components/ui/surface-card';
 import { BriefCell, useBriefMotionEnabled } from './brief-motion';
 import type { BriefDashboard as DashboardData } from '@/lib/briefing/dashboard';
@@ -143,7 +147,7 @@ export function BriefDashboard({ slug, data }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
       {/* GREETING — wide hero row. The view's ONE solid accent card. */}
-      <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()} accent>
+      <BriefCell span="md:col-span-2 md:row-span-1" delay={delay()} accent className="overflow-hidden">
         <GreetingCell ownerName={data.ownerName} momentum={brief.momentum} tomorrow={brief.tomorrow} />
       </BriefCell>
 
@@ -286,15 +290,27 @@ function GreetingCell({
   // every line rides white ink on the agent-orange surface.
   const line = ownerName ? `Good morning, ${ownerName}.` : 'Good morning.';
   return (
-    <div className="p-6 sm:p-7">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-white/85">
+    <div className="relative p-6 sm:p-7">
+      {/* Decorative glow only — a whisper of depth behind the greeting, never
+          primary content. Parent BriefCell carries overflow-hidden so the
+          drift never spills past the card's rounded corners. */}
+      <Parallax
+        speed={0.15}
+        className="pointer-events-none absolute -right-8 -top-10 h-40 w-40"
+      >
+        <div aria-hidden className="h-full w-full rounded-full bg-white/20 blur-3xl" />
+      </Parallax>
+      <p className="relative text-[11px] font-medium uppercase tracking-wider text-white/85">
         {formatToday()}
       </p>
-      <h1 className={cn(H1, 'mt-1.5 text-white')} style={TITLE_FONT}>
-        {line}
-      </h1>
+      <SplitReveal
+        as="h1"
+        text={line}
+        by="word"
+        className={cn(H1, 'relative mt-1.5 text-white [font-family:var(--font-title)]')}
+      />
       {(momentum || tomorrow) && (
-        <div className="mt-3 space-y-0.5">
+        <div className="relative mt-3 space-y-0.5">
           {momentum && <p className="text-sm text-white/85">{momentum}</p>}
           {tomorrow && <p className="text-sm text-white/85">{tomorrow}</p>}
         </div>
@@ -353,7 +369,7 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
   return (
     <div className="flex h-full flex-col p-6 sm:p-7">
       <CellHeader label="What needs you" />
-      <div className="mt-3 flex-1 divide-y divide-border/60">
+      <StaggerReveal className="mt-3 flex-1 divide-y divide-border/60" distance={8}>
         {tiles.map((t) => {
           const dim = t.n === 0;
           return (
@@ -399,7 +415,7 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
             </Link>
           );
         })}
-      </div>
+      </StaggerReveal>
       {allClear && (
         <p className={cn(BODY_MUTED, 'text-xs mt-3 pt-3 border-t border-border/60 flex items-center gap-1.5')}>
           <Check size={12} className="text-muted-foreground/70 shrink-0" />
@@ -554,7 +570,7 @@ function PipelineCell({ slug, pipeline }: { slug: string; pipeline: NonNullable<
   return (
     <div className="p-6 sm:p-7">
       <CellHeader label="Pipeline" icon={TrendingUp} href={`/s/${slug}/deals`} cta="Deals" />
-      <div className="mt-3 grid grid-cols-2 gap-y-4 gap-x-3">
+      <StaggerReveal className="mt-3 grid grid-cols-2 gap-y-4 gap-x-3" distance={8}>
         <Stat
           value={<AnimatedNumber value={pipeline.active} />}
           label={pluralize(pipeline.active, 'active deal')}
@@ -581,7 +597,7 @@ function PipelineCell({ slug, pipeline }: { slug: string; pipeline: NonNullable<
           dim={pipeline.atRisk === 0}
           warn={pipeline.atRisk > 0}
         />
-      </div>
+      </StaggerReveal>
     </div>
   );
 }

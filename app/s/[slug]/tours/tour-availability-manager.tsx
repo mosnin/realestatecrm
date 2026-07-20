@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { AvailabilityOverrides } from './availability-overrides';
 import { PropertyProfiles } from './property-profiles';
+import { StaggerReveal } from '@/components/motion';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ export function TourAvailabilityManager({
   );
 
   return (
-    <div className="space-y-6">
+    <StaggerReveal className="space-y-6">
       {/* ── Section 1: Tour Settings ────────────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -315,8 +316,8 @@ export function TourAvailabilityManager({
             <span className="text-[11px] text-muted-foreground ml-1">Applies to all active days</span>
           </div>
 
-          {/* Day toggles */}
-          <div className="space-y-1">
+          {/* Day toggles — calm cascade on first paint, once. */}
+          <StaggerReveal className="space-y-1" stagger={0.03} distance={8}>
             {DAYS_OF_WEEK.map((day) => {
               const isActive = settings.tourDaysAvailable.includes(day.value);
               const isWeekend = day.value === 0 || day.value === 6;
@@ -356,7 +357,7 @@ export function TourAvailabilityManager({
                 </div>
               );
             })}
-          </div>
+          </StaggerReveal>
 
           {settings.tourDaysAvailable.length === 0 && (
             <p className="text-xs text-destructive mt-3">
@@ -410,7 +411,7 @@ export function TourAvailabilityManager({
               dates.
             </p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <StaggerReveal className="flex flex-wrap gap-2" distance={6} stagger={0.03}>
               {futureBlockedDates.map((date) => {
                 const d = new Date(date + 'T12:00:00');
                 const label = d.toLocaleDateString([], {
@@ -441,7 +442,7 @@ export function TourAvailabilityManager({
                   </Badge>
                 );
               })}
-            </div>
+            </StaggerReveal>
           )}
         </CardContent>
       </Card>
@@ -544,6 +545,6 @@ export function TourAvailabilityManager({
           </div>
         )}
       </div>
-    </div>
+    </StaggerReveal>
   );
 }

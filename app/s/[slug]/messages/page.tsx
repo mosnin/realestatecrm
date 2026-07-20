@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getBrokerMemberContext } from '@/lib/permissions';
 import { MessagesApp } from '@/components/messaging/messages-app';
 import { H1, TITLE_FONT } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -28,7 +29,7 @@ export default async function MessagesPage({ params }: PageProps) {
       <header className="mb-3 space-y-0.5">
         <p className="text-sm text-muted-foreground">Team.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Messages
+          <SplitReveal as="span" text="Messages" />
         </h1>
       </header>
       <div className="h-[calc(100dvh-13rem)] min-h-[480px] flex-1">

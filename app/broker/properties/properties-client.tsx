@@ -35,6 +35,7 @@ import {
 import { formatCurrency } from '@/lib/formatting';
 import { PropertyStatusBadge } from '@/components/properties/property-status-badge';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { SplitReveal } from '@/components/motion';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -608,7 +609,7 @@ export function BrokerPropertiesClient() {
         <header className="space-y-1.5">
           <p className={cn(BODY_MUTED)}>Properties.</p>
           <h1 className={cn(H1)} style={TITLE_FONT}>
-            Pool properties
+            <SplitReveal as="span" text="Pool properties" />
           </h1>
         </header>
         <div className="rounded-xl border border-border/70 bg-muted/20 px-5 py-10 text-center">
@@ -644,7 +645,7 @@ export function BrokerPropertiesClient() {
         <div className="space-y-1.5 min-w-0">
           <p className={cn(BODY_MUTED)}>Properties.</p>
           <h1 className={cn(H1)} style={TITLE_FONT}>
-            Pool properties
+            <SplitReveal as="span" text="Pool properties" />
           </h1>
           <p className={cn(BODY_MUTED)}>{statusSentence}</p>
         </div>

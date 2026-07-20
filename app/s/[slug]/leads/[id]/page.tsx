@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ContactFollowUpField } from '@/components/contacts/contact-follow-up-field';
-import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AnimatedNumber, Reveal, StaggerReveal } from '@/components/motion';
 import { getInitials, formatMoney, timeAgo } from '@/lib/formatting';
 import { SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 import type { Contact, ApplicationData, LeadScoreDetails } from '@/lib/types';
@@ -75,7 +75,7 @@ export default async function LeadDetailPage({
         </div>
       </div>
 
-      <section className="rounded-xl border border-border bg-card overflow-hidden">
+      <Reveal as="section" variant="rise" className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-5 border-b border-border flex items-start justify-between gap-4">
           <div className="flex items-start gap-3.5 min-w-0">
             <div className="w-12 h-12 rounded-xl font-bold flex items-center justify-center shrink-0 ring-1 bg-muted text-muted-foreground ring-border/60">
@@ -136,13 +136,13 @@ export default async function LeadDetailPage({
             {lead.scoreSummary && <p className="text-sm text-muted-foreground mt-2.5 leading-relaxed">{lead.scoreSummary}</p>}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <StaggerReveal className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <InfoRow icon={DollarSign} label="Budget" value={typeof app?.monthlyRent === 'number' ? `${formatMoney(app.monthlyRent)}/mo` : lead.budget ? `${formatMoney(lead.budget)}/mo` : null} />
             <InfoRow icon={Briefcase} label="Employment" value={app?.employmentStatus ?? null} />
             <InfoRow icon={Calendar} label="Move-in" value={app?.targetMoveInDate ?? null} />
             <InfoRow icon={MapPin} label="Location" value={app?.propertyAddress ?? lead.preferences ?? null} />
             <InfoRow icon={Home} label="Property type" value={app?.propertyType ?? null} />
-          </div>
+          </StaggerReveal>
 
           {details?.recommendedNextAction && (
             <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground flex items-start gap-2">
@@ -151,7 +151,7 @@ export default async function LeadDetailPage({
             </div>
           )}
         </div>
-      </section>
+      </Reveal>
     </div>
   );
 }
