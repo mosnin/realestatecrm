@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
@@ -256,7 +257,7 @@ export default function BrokerFormBuilderPage() {
           <header className="space-y-1.5">
             <p className={BODY_MUTED}>Settings.</p>
             <h1 className={H1} style={TITLE_FONT}>
-              Brokerage intake form
+              <SplitReveal as="span" text="Brokerage intake form" />
             </h1>
             <p className={BODY_MUTED}>
               {hasChanges

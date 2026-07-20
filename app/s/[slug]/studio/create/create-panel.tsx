@@ -21,6 +21,7 @@ import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 import { GeneratingState } from '@/components/studio/generating-state';
 import { toastLoading, toastSuccess, toastError } from '@/lib/toast-helpers';
+import { StaggerReveal } from '@/components/motion';
 
 interface GenerateResult {
   url: string;
@@ -145,7 +146,7 @@ export function CreatePanel({
   }
 
   return (
-    <div className="space-y-6">
+    <StaggerReveal className="space-y-6">
       {/* Prompt */}
       <div className="space-y-2.5">
         <Textarea
@@ -265,6 +266,6 @@ export function CreatePanel({
           description="Write a prompt above and Studio will generate it."
         />
       )}
-    </div>
+    </StaggerReveal>
   );
 }

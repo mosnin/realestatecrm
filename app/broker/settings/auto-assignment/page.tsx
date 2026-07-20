@@ -18,6 +18,7 @@ import {
   READING_MAX,
   PRIMARY_PILL,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 type AssignmentMethod = 'manual' | 'round_robin' | 'score_based';
 
@@ -161,7 +162,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Auto-assignment
+          <SplitReveal as="span" text="Auto-assignment" />
         </h1>
         <p className={BODY_MUTED}>{subtitle}</p>
       </header>

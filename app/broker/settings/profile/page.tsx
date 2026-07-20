@@ -9,6 +9,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Profile — Broker Settings' };
@@ -32,7 +33,7 @@ export default async function BrokerSettingsProfilePage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Profile
+          <SplitReveal as="span" text="Profile" />
         </h1>
         <p className={BODY_MUTED}>
           Your profile within {brokerage.name} &mdash; how you show up to your

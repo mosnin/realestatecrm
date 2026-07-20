@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SECTION_LABEL, BODY_MUTED, CAPTION } from '@/lib/typography';
+import { StaggerReveal } from '@/components/motion';
 
 interface BrandHandles {
   instagram?: string;
@@ -90,7 +91,7 @@ export function BrandPanel() {
   }
 
   return (
-    <div className="space-y-8">
+    <StaggerReveal className="space-y-8">
       {/* Palette */}
       <section className="space-y-3">
         <div>
@@ -184,6 +185,6 @@ export function BrandPanel() {
         {saved && !saving && <p className={CAPTION}>Saved.</p>}
         {error && <p className="text-[12.5px] text-rose-700 dark:text-rose-400">{error}</p>}
       </div>
-    </div>
+    </StaggerReveal>
   );
 }

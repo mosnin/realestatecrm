@@ -4,6 +4,7 @@ import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { listOffers } from '@/lib/offers';
 import { OffersClient } from './offers-client';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -41,7 +42,7 @@ export default async function OffersPage({ params }: PageProps) {
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Offers.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Offer tracker
+          <SplitReveal as="span" text="Offer tracker" />
         </h1>
         <p className={BODY_MUTED}>
           Every offer in flight on your listings, grouped by where it stands.

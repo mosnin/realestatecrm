@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { formatCompact, getInitials } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { CHIPPI_PILL } from '@/lib/typography';
+import { StaggerReveal } from '@/components/motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -324,7 +325,7 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
           Nobody matches.
         </p>
       ) : (
-        <ul className="divide-y divide-border/60">
+        <StaggerReveal as="ul" className="divide-y divide-border/60" distance={8}>
           {sorted.map((r) => {
             const displayName = r.name ?? r.email;
             const coachHref = buildCoachHref(r);
@@ -382,7 +383,7 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
               </li>
             );
           })}
-        </ul>
+        </StaggerReveal>
       )}
     </div>
   );

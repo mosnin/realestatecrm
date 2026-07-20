@@ -9,6 +9,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'MCP — Broker Settings' };
@@ -26,7 +27,7 @@ export default async function BrokerSettingsMcpPage() {
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Settings.</p>
           <h1 className={H1} style={TITLE_FONT}>
-            MCP
+            <SplitReveal as="span" text="MCP" />
           </h1>
           <p className={BODY_MUTED}>Read-only for your role.</p>
         </header>
@@ -51,7 +52,7 @@ export default async function BrokerSettingsMcpPage() {
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Settings.</p>
           <h1 className={H1} style={TITLE_FONT}>
-            MCP
+            <SplitReveal as="span" text="MCP" />
           </h1>
           <p className={BODY_MUTED}>
             Connect external AI tools to your brokerage data via MCP.
@@ -72,7 +73,7 @@ export default async function BrokerSettingsMcpPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          MCP
+          <SplitReveal as="span" text="MCP" />
         </h1>
         <p className={BODY_MUTED}>
           Connect external AI tools (Claude, Cursor, Windsurf) to {brokerage.name}.

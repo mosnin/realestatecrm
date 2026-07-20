@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { formatRelative, type ReviewStatus } from '../reviews-client';
+import { StaggerReveal } from '@/components/motion';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export function DetailClient({ slug, review, comments: initialComments }: Props)
   };
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto pb-12">
+    <StaggerReveal className="space-y-5 max-w-4xl mx-auto pb-12">
       {/* Breadcrumb */}
       <div>
         <Link
@@ -256,6 +257,6 @@ export function DetailClient({ slug, review, comments: initialComments }: Props)
           </CardContent>
         </Card>
       )}
-    </div>
+    </StaggerReveal>
   );
 }

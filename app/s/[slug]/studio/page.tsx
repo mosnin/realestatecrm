@@ -11,6 +11,7 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { PageTransition } from '@/components/motion/page-transition';
+import { SplitReveal, StaggerReveal } from '@/components/motion';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +73,7 @@ export default async function StudioPage({
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Studio.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Make your listings shine
+          <SplitReveal as="span" text="Make your listings shine" by="word" />
         </h1>
         <p className={BODY_MUTED}>
           AI-generated photos, captions, and scheduled posts — all in one
@@ -82,7 +83,7 @@ export default async function StudioPage({
 
       <section className="space-y-4">
         <p className={SECTION_LABEL}>Workflows</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <StaggerReveal className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {workflows.map((w) => {
             const Icon = w.icon;
             return (
@@ -108,7 +109,7 @@ export default async function StudioPage({
               </Link>
             );
           })}
-        </div>
+        </StaggerReveal>
       </section>
     </PageTransition>
   );

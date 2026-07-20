@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildToursAnalyticsData } from '@/lib/analytics-data';
 import { ToursView } from '@/components/analytics/tours-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
+import { Reveal } from '@/components/motion';
 
 export default async function ToursAnalyticsPage({
   params,
@@ -20,7 +21,11 @@ export default async function ToursAnalyticsPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildToursAnalyticsData(raw);
-    return <ToursView data={data} />;
+    return (
+      <Reveal variant="fade">
+        <ToursView data={data} />
+      </Reveal>
+    );
   } catch (err) {
     console.error('[analytics/tours] DB queries failed', err);
     return (

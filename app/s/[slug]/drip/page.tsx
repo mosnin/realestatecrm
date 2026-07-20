@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { H1, TITLE_FONT } from '@/lib/typography';
+import { Reveal, SplitReveal } from '@/components/motion';
 import { DripClient } from '@/components/drip/drip-client';
 import type { DripSequenceUI, EnrollmentCounts } from '@/components/drip/types';
 import { emptyCounts } from '@/components/drip/types';
@@ -57,7 +58,7 @@ export default async function DripSequencesPage({ params }: PageProps) {
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Automations.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Drip sequences
+          <SplitReveal as="span" text="Drip sequences" />
         </h1>
         <p className="text-sm text-muted-foreground">
           Scripted nurture cadences — each step schedules a message via your normal
@@ -65,7 +66,9 @@ export default async function DripSequencesPage({ params }: PageProps) {
         </p>
       </header>
 
-      <DripClient slug={slug} initialSequences={sequences} initialCounts={counts} />
+      <Reveal variant="rise" delay={0.05}>
+        <DripClient slug={slug} initialSequences={sequences} initialCounts={counts} />
+      </Reveal>
     </div>
   );
 }

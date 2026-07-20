@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
+import { SplitReveal } from '@/components/motion';
 
 type MemberDashboardProps = {
   ctx: {
@@ -53,7 +54,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
         <header className="space-y-1.5">
           <p className={cn(BODY_MUTED)}>Today.</p>
           <h1 className={cn(H1)} style={TITLE_FONT}>
-            {`Welcome, ${firstName}`}
+            <SplitReveal as="span" text={`Welcome, ${firstName}`} />
           </h1>
           <p className={cn(BODY_MUTED)}>
             {`${brokerage.name} · finish your workspace to start tracking leads.`}
@@ -250,7 +251,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Today.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          {`Welcome back, ${firstName}`}
+          <SplitReveal as="span" text={`Welcome back, ${firstName}`} />
         </h1>
         <p className={cn(BODY_MUTED)}>{statusSentence}</p>
       </header>

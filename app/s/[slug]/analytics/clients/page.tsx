@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { fetchRawAnalyticsData, buildClientsAnalyticsData } from '@/lib/analytics-data';
 import { ClientsView } from '@/components/analytics/clients-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
+import { Reveal } from '@/components/motion';
 
 export default async function ClientsAnalyticsPage({
   params,
@@ -20,7 +21,11 @@ export default async function ClientsAnalyticsPage({
   try {
     const raw = await fetchRawAnalyticsData(space.id);
     const data = buildClientsAnalyticsData(raw);
-    return <ClientsView data={data} />;
+    return (
+      <Reveal variant="fade">
+        <ClientsView data={data} />
+      </Reveal>
+    );
   } catch (err) {
     console.error('[analytics/clients] DB queries failed', err);
     return (

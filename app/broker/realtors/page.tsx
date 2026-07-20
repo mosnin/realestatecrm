@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
 
 export const metadata: Metadata = { title: 'Real estate agents — Teams' };
@@ -306,7 +307,7 @@ export default async function BrokerRealtorsPage() {
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Real estate agents.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Your team in flight
+          <SplitReveal as="span" text="Your team in flight" />
         </h1>
         <p className={cn(BODY_MUTED)}>{subtitle}</p>
       </header>

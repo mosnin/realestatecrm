@@ -25,6 +25,15 @@ export interface StaggerRevealProps {
   /** Travel distance in px. */
   distance?: number;
   start?: string;
+  /**
+   * Anti-runaway guardrails (Apple-taste: a cascade must never make the user
+   * wait). At most `maxCount` children are individually staggered; any beyond
+   * that appear with the group (no per-item delay), so a 100-row list can't
+   * take ~6s to finish. The whole cascade is also clamped to `maxWindow`
+   * seconds total — the effective per-child stagger shrinks as count grows.
+   */
+  maxCount?: number;
+  maxWindow?: number;
   as?: ElementType;
   className?: string;
 }
@@ -35,6 +44,8 @@ export function StaggerReveal({
   delay = 0,
   distance = 14,
   start = 'top 85%',
+  maxCount = 24,
+  maxWindow = 0.8,
   as: Tag = 'div',
   className,
 }: StaggerRevealProps) {
@@ -50,13 +61,18 @@ export function StaggerReveal({
         gsap.set(kids, { clearProps: 'all' });
         return;
       }
-      gsap.from(kids, {
+      // Only the first `maxCount` items cascade; the rest are already in place
+      // so a long list never blocks reading. Effective stagger also shrinks so
+      // the animated window never exceeds `maxWindow` seconds.
+      const animated = kids.slice(0, maxCount);
+      const effStagger = Math.min(stagger, maxWindow / Math.max(1, animated.length));
+      gsap.from(animated, {
         y: distance,
         opacity: 0,
         duration: DUR.base,
         delay,
         ease: EASE,
-        stagger,
+        stagger: effStagger,
         scrollTrigger: { trigger: el, start, once: true },
       });
     },

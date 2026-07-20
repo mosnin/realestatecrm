@@ -17,6 +17,7 @@ import {
 import { H1, TITLE_FONT } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
+import { SplitReveal } from '@/components/motion';
 
 /**
  * /broker/floor — The Floor: the brokerage's single command view.
@@ -146,7 +147,7 @@ export default async function BrokerFloorPage() {
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{ctx.brokerage.name}.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          The Floor
+          <SplitReveal as="span" text="The Floor" />
         </h1>
       </header>
 

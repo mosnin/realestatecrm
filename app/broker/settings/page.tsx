@@ -10,6 +10,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'General settings — Teams' };
@@ -40,7 +41,7 @@ export default async function BrokerSettingsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          General
+          <SplitReveal as="span" text="General" />
         </h1>
         <p className={BODY_MUTED}>{subtitle}</p>
       </header>

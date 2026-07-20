@@ -16,6 +16,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { formatFilesStatus } from '@/lib/realtor-page-status';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import { FilesPanel } from './files-panel';
 
 export const dynamic = 'force-dynamic';
@@ -70,7 +71,7 @@ export default async function FilesPage({
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Files.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          All files
+          <SplitReveal as="span" text="All files" />
         </h1>
         <p className={cn(BODY_MUTED)}>{statusSentence}</p>
       </header>

@@ -22,6 +22,7 @@ import {
   READING_MAX,
   PRIMARY_PILL,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 interface ImportResult {
   imported: number;
@@ -147,7 +148,7 @@ export default function ImportExportClient({ totalLeads }: { totalLeads: number 
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Import / export.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Move leads in and out
+          <SplitReveal as="span" text="Move leads in and out" />
         </h1>
         <p className={BODY_MUTED}>{subtitle}</p>
       </header>

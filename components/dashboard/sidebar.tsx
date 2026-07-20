@@ -350,19 +350,27 @@ function FlatNavItem({
       className={cn(
         // h-9 row, same height as the realtor nav rows and canonical button
         // default so every row in the sidebar aligns optically.
-        'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+        'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px]',
+        'transition-[background-color,color,transform] duration-150 hover:translate-x-[1.5px]',
         isActive
           ? 'bg-foreground/[0.045] text-foreground font-medium'
           : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
       )}
+      style={{ willChange: 'transform' }}
     >
       {/* Active accent bar — 2px on the left, foreground tone, rounded
           corner on the inner edge. Matches the realtor sidebar's active
-          rail exactly (STYLESHEET §Border & radius — Active rail). */}
+          rail exactly (STYLESHEET §Border & radius — Active rail).
+          `layoutId` makes the bar GLIDE between rows when the active item
+          changes (shared broker nav + broker settings sub-nav both use
+          FlatNavItem) instead of popping — framer-motion handles the
+          FLIP transform, no scroll-trigger involved so it's instant. */}
       {isActive && (
-        <span
+        <motion.span
+          layoutId="flat-nav-active-rail"
           aria-hidden
           className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         />
       )}
       {isAI ? (
@@ -417,7 +425,7 @@ export function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
         <button
           type="button"
           onClick={open}
-          className="mx-auto flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors duration-150"
+          className="mx-auto flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] hover:scale-[1.05] transition-[background-color,color,transform] duration-150"
           aria-label="Open command palette"
         >
           <Search size={15} className="flex-shrink-0" strokeWidth={1.75} />
@@ -430,7 +438,7 @@ export function SearchPill({ collapsed = false }: { collapsed?: boolean }) {
     <button
       type="button"
       onClick={open}
-      className="mx-3 flex items-center gap-2 h-9 pl-3 pr-1.5 rounded-md text-[13px] text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] transition-colors duration-150 group"
+      className="mx-3 flex items-center gap-2 h-9 pl-3 pr-1.5 rounded-md text-[13px] text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.025] hover:translate-x-[1.5px] transition-[background-color,color,transform] duration-150 group"
       aria-label="Open command palette"
     >
       <Search size={13} className="flex-shrink-0" strokeWidth={1.75} />
@@ -462,7 +470,7 @@ function QuickCreateMenu({ slug }: { slug: string }) {
         <button
           type="button"
           aria-label="Quick create"
-          className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+          className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-foreground/[0.04] hover:scale-[1.08] active:scale-95 transition-[background-color,color,transform] duration-150"
         >
           <SquarePen size={13} strokeWidth={1.75} />
         </button>
@@ -594,14 +602,14 @@ export function WorkspaceSwitcher({
               <button
                 type="button"
                 className={cn(
-                  'rounded-md text-left transition-colors hover:bg-foreground/[0.025] cursor-pointer',
+                  'group/switcher rounded-md text-left transition-colors hover:bg-foreground/[0.025] cursor-pointer',
                   collapsed
                     ? 'flex items-center justify-center w-9 h-9'
                     : 'flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5',
                 )}
                 aria-label={collapsed ? `${currentName} — switch workspace` : undefined}
               >
-                <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6">
+                <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6 transition-transform duration-150 group-hover/switcher:scale-[1.08]">
                   <Icon size={12} className="text-foreground/80" />
                 </div>
                 {!collapsed && (
@@ -907,14 +915,16 @@ function BrokerSidebarConversations() {
               return (
                 <li key={conv.id} className="relative">
                   {isActive && (
-                    <span
+                    <motion.span
+                      layoutId="broker-conv-active-rail"
                       aria-hidden
                       className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     />
                   )}
                   <div
                     className={cn(
-                      'group/row flex items-center gap-1 rounded-md transition-colors duration-150',
+                      'group/row flex items-center gap-1 rounded-md transition-[background-color,transform] duration-150 hover:translate-x-[1.5px]',
                       isActive ? 'bg-foreground/[0.045]' : 'hover:bg-foreground/[0.04]',
                     )}
                   >
@@ -1036,7 +1046,8 @@ function AdminConsoleLink({ collapsed = false }: { collapsed?: boolean }) {
             href="/admin"
             aria-label="Admin console"
             className={cn(
-              'group relative flex items-center justify-center w-9 h-9 mx-auto rounded-md transition-colors duration-150',
+              'group relative flex items-center justify-center w-9 h-9 mx-auto rounded-md',
+              'transition-[background-color,color,transform] duration-150 hover:scale-[1.04]',
               'text-muted-foreground/70 hover:bg-foreground/[0.025] hover:text-foreground',
             )}
           >
@@ -1056,7 +1067,8 @@ function AdminConsoleLink({ collapsed = false }: { collapsed?: boolean }) {
       <Link
         href="/admin"
         className={cn(
-          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px] transition-colors duration-150',
+          'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px]',
+          'transition-[background-color,color,transform] duration-150 hover:translate-x-[1.5px]',
           'text-muted-foreground/70 hover:bg-foreground/[0.025] hover:text-foreground',
         )}
       >

@@ -9,6 +9,7 @@ import { BODY_MUTED } from '@/lib/typography';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
 import { OffboardMemberDialog } from '@/components/broker/offboard-member-dialog';
+import { SplitReveal, StaggerReveal } from '@/components/motion';
 
 interface Member {
   id: string;
@@ -73,7 +74,7 @@ export function MembersClient({
           className="text-3xl tracking-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          Who&apos;s on the team
+          <SplitReveal as="span" text="Who’s on the team" />
         </h1>
         <p className={BODY_MUTED}>{subtitle}</p>
       </header>
@@ -124,7 +125,7 @@ export function MembersClient({
               Nobody matches.
             </p>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <StaggerReveal as="ul" className="divide-y divide-border/60" distance={8}>
               {filtered.map((m) => {
                 const canManage =
                   m.role !== 'broker_owner' &&
@@ -207,7 +208,7 @@ export function MembersClient({
                   </li>
                 );
               })}
-            </ul>
+            </StaggerReveal>
           )}
         </>
       )}

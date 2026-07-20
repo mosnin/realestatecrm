@@ -8,6 +8,7 @@ import {
   BODY_MUTED,
   SECTION_RHYTHM,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 // Server component: fetch the open queue directly via supabase (bypass API
 // round-trip), then hand off to the client for tab-switching.
@@ -126,7 +127,7 @@ export default async function BrokerReviewsPage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Reviews.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Deals flagged for you
+          <SplitReveal as="span" text="Deals flagged for you" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>

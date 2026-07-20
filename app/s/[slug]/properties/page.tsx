@@ -9,6 +9,7 @@ import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { PropertyListGrid } from '@/components/properties/property-list-grid';
 import { AreaIqLauncher } from '@/components/properties/area-iq-launcher';
+import { Reveal, SplitReveal } from '@/components/motion';
 
 export default async function PropertiesPage({
   params,
@@ -79,7 +80,7 @@ export default async function PropertiesPage({
         <div className="space-y-1.5 min-w-0">
           <p className={cn(BODY_MUTED)}>Properties.</p>
           <h1 className={cn(H1)} style={TITLE_FONT}>
-            All properties
+            <SplitReveal as="span" text="All properties" />
           </h1>
           <p className={cn(BODY_MUTED)}>{subtitle}</p>
         </div>
@@ -97,7 +98,7 @@ export default async function PropertiesPage({
 
       {/* Empty state — calm fact, not a directive. */}
       {properties.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-16 text-center">
+        <Reveal variant="rise" className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-16 text-center">
           <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-sm text-foreground">Quiet — no properties yet.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
@@ -110,12 +111,16 @@ export default async function PropertiesPage({
             <Plus size={14} aria-hidden />
             Add property
           </Link>
-        </div>
+        </Reveal>
       ) : (
         /* The listing wall — a responsive card grid with strong photo
            treatment, confident compact prices, hover lift, entrance
            stagger, and per-card expand for quick specs. The card title
-           and cover both link to the full detail page (route unchanged). */
+           and cover both link to the full detail page (route unchanged).
+           PropertyListGrid (components/properties/**, out of this team's
+           ownership) already runs its own framer-motion entrance stagger on
+           mount — intentionally NOT re-wrapped in <StaggerReveal> here to
+           avoid animating the same cards twice. */
         <PropertyListGrid slug={slug} properties={properties} />
       )}
     </div>

@@ -6,6 +6,7 @@
 
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
+import { SplitReveal } from '@/components/motion';
 import { DocumentsPanel } from './documents-panel';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export default async function DocumentsPage({
           className="text-3xl tracking-tight text-foreground"
           style={{ fontFamily: 'var(--font-title)' }}
         >
-          Your documents
+          <SplitReveal as="span" text="Your documents" />
         </h1>
         <p className="text-sm text-muted-foreground">
           Write or paste documents and keep them in one place.

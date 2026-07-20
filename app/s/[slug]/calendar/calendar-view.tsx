@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
+import { Reveal, SplitReveal } from '@/components/motion';
 import { ChevronLeft, ChevronRight, ExternalLink, Calendar as CalendarIcon, Plug, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -408,17 +409,17 @@ export function CalendarView({
           wide ? 'max-w-6xl' : 'max-w-3xl',
         )}
       >
-        <header className="space-y-1.5">
+        <Reveal as="header" variant="rise" className="space-y-1.5">
           <p className={BODY_MUTED}>Calendar.</p>
           <h1 className={H1} style={TITLE_FONT}>
-            Your calendar, in here.
+            <SplitReveal text="Your calendar, in here." by="word" />
           </h1>
           <p className={BODY_MUTED}>
             {connected
               ? `Reading from ${providerLabel(provider)}.`
               : 'Connect your calendar so I can see your day and put tours on it.'}
           </p>
-        </header>
+        </Reveal>
 
         {!connected && <NotConnectedState slug={slug} />}
 

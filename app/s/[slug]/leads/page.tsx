@@ -10,6 +10,7 @@ import { LeadsView } from '@/components/leads/leads-view';
 import { PeopleTabs } from '@/components/people/people-tabs';
 import { H1, H3, BODY_MUTED, TITLE_FONT } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { Reveal, SplitReveal } from '@/components/motion';
 
 export default async function LeadsPage({
   params,
@@ -105,7 +106,7 @@ export default async function LeadsPage({
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">People.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Applications
+          <SplitReveal as="span" text="Applications" />
         </h1>
         <p className="text-sm text-muted-foreground">
           {leads.length === 0
@@ -118,9 +119,10 @@ export default async function LeadsPage({
 
       <PeopleTabs slug={slug} newCount={unreadLeads.length} />
 
-      {/* Tier summary bar */}
+      {/* Tier summary bar — one hero reveal on first paint, not a
+          scroll-triggered replay on every visit to the tab. */}
       {leads.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3">
+        <Reveal variant="fade" className="flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
             {leads.length} {leads.length === 1 ? 'application' : 'applications'}
           </span>
@@ -147,11 +149,11 @@ export default async function LeadsPage({
               </div>
             )}
           </div>
-        </div>
+        </Reveal>
       )}
 
       {leads.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        <Reveal variant="rise" className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-foreground">No applications yet.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Share your intake link — new applications will appear here.
@@ -162,7 +164,7 @@ export default async function LeadsPage({
           >
             Get your intake link <ArrowRight size={12} />
           </Link>
-        </div>
+        </Reveal>
       ) : (
         <Suspense
           fallback={

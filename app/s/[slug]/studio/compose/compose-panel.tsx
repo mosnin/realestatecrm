@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CAPTION } from '@/lib/typography';
 import { COMPOSE_TEMPLATES, type ComposeColor } from '@/lib/studio/templates';
+import { StaggerReveal } from '@/components/motion';
 
 const CANVAS_SIZE = 1080;
 const DEFAULT_ACCENT = '#ff964f';
@@ -141,7 +142,7 @@ export function ComposePanel() {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <StaggerReveal className="grid gap-6 md:grid-cols-2">
       {/* Preview */}
       <div className="space-y-2">
         <canvas
@@ -240,6 +241,6 @@ export function ComposePanel() {
           {saved && !saving && <p className={CAPTION}>Saved to your files.</p>}
         </div>
       </div>
-    </div>
+    </StaggerReveal>
   );
 }

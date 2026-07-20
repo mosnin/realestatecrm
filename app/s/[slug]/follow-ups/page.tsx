@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
-import { FollowUpsView } from '@/components/follow-ups/follow-ups-view';
+import { FollowUpsReveal } from './follow-ups-reveal';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -36,5 +36,5 @@ export default async function FollowUpsPage({ params }: { params: Promise<{ slug
   const contacts = (contactsResult.data ?? []) as any[];
   const deals = (dealsResult.data ?? []) as any[];
 
-  return <FollowUpsView slug={slug} contacts={contacts} deals={deals} />;
+  return <FollowUpsReveal slug={slug} contacts={contacts} deals={deals} />;
 }

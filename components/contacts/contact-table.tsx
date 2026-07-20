@@ -72,7 +72,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { motion } from 'framer-motion';
 import { EASE_APPLE, DURATION_FAST } from '@/lib/motion';
-import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AnimatedNumber, Reveal, SplitReveal } from '@/components/motion';
 
 type Client = {
   id: string;
@@ -757,15 +757,19 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>People.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Your relationships
+          <SplitReveal as="span" text="Your relationships" />
         </h1>
         {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
       </header>
 
       {/* Lead-type chip strip — small line directly under the title, only
           when there's data to filter. The chip count format matches the
-          existing labels (All · New · Rental · Buyer). */}
+          existing labels (All · New · Rental · Buyer). Reveal fires once on
+          first paint — this row doesn't re-choreograph on refetch since the
+          component instance (and its scroll-triggered "once" state) persists
+          across the filter's own re-renders. */}
       {!loading && !error && contacts.length > 0 && (
+        <Reveal variant="fade">
         <div
           role="tablist"
           aria-label="Filter people"
@@ -810,6 +814,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
             );
           })}
         </div>
+        </Reveal>
       )}
 
       {/* ONE filter row — search · stage · tag · sort · view · select ·
@@ -1175,7 +1180,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
           // rounded-3xl, whisper shadow): one headline, one line, one
           // primary action, with the form offered as the quiet alternative.
           return (
-            <div className={cn(SURFACE_CARD, 'px-6 py-16 text-center')}>
+            <Reveal variant="rise" className={cn(SURFACE_CARD, 'px-6 py-16 text-center')}>
               <h2
                 className="text-2xl tracking-tight text-foreground"
                 style={TITLE_FONT}
@@ -1203,13 +1208,13 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                   or fill out the form
                 </button>
               </div>
-            </div>
+            </Reveal>
           );
         }
 
         if (isSearchOrFilterCase) {
           return (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Reveal variant="fade" className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
                 <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
               </div>
@@ -1228,12 +1233,12 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                   <X size={13} /> Clear filters
                 </button>
               )}
-            </div>
+            </Reveal>
           );
         }
 
         return (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Reveal variant="fade" className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
               <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
             </div>
@@ -1252,7 +1257,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                 <X size={13} /> Clear filters
               </button>
             )}
-          </div>
+          </Reveal>
         );
       })()}
 

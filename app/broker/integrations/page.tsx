@@ -8,6 +8,7 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Integrations — Teams' };
@@ -57,7 +58,7 @@ export default async function BrokerIntegrationsPage({
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Integrations.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Integrations
+          <SplitReveal as="span" text="Integrations" />
         </h1>
         <p className={BODY_MUTED}>
           Connect your tools at the {brokerage.name} level so Chippi can act

@@ -14,6 +14,8 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import { Reveal, StaggerReveal, SplitReveal } from '@/components/motion';
+import { cn } from '@/lib/utils';
 
 export default async function BrokerageInvitesPage({
   params,
@@ -101,21 +103,23 @@ export default async function BrokerageInvitesPage({
   return (
     <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       <div className="space-y-2">
-        <h1 className={H1} style={TITLE_FONT}>
-          Brokerage
-        </h1>
+        <SplitReveal
+          as="h1"
+          text="Brokerage"
+          className={cn(H1, '[font-family:var(--font-title)]')}
+        />
         <p className={BODY_MUTED}>{narration}</p>
       </div>
 
       {invitations.length === 0 ? (
-        <div className="rounded-md border border-border/70 bg-background px-5 py-12 text-center space-y-1">
+        <Reveal className="rounded-md border border-border/70 bg-background px-5 py-12 text-center space-y-1">
           <p className={`${BODY} font-medium`}>Nothing here yet</p>
           <p className={CAPTION}>
             When a brokerage invites you, it shows up here.
           </p>
-        </div>
+        </Reveal>
       ) : (
-        <div>
+        <StaggerReveal>
           {invitations.map((inv) => {
             const brokerageName = Array.isArray(inv.Brokerage)
               ? (inv.Brokerage as Array<{ name?: string }>)[0]?.name
@@ -165,7 +169,7 @@ export default async function BrokerageInvitesPage({
               </div>
             );
           })}
-        </div>
+        </StaggerReveal>
       )}
     </div>
   );

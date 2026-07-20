@@ -44,7 +44,7 @@ import { downloadCSV, downloadLeadsCSV } from '@/lib/csv';
 import { timeAgo, formatMoney, getInitials, formatFollowUpDate, toDateInputValue, countLabel } from '@/lib/formatting';
 import { LEAD_TIERS, type TierKey } from '@/lib/constants';
 import { EASE_APPLE } from '@/lib/motion';
-import { AnimatedNumber } from '@/components/motion/animated-number';
+import { AnimatedNumber, Reveal } from '@/components/motion';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { TableRowSkeleton, CardSkeleton } from '@/components/ui/skeleton';
@@ -496,7 +496,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
       )}
 
       {/* ── Search bar ── */}
-      <div className="relative">
+      <Reveal variant="fade" className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         <input
           type="text"
@@ -505,10 +505,10 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
         />
-      </div>
+      </Reveal>
 
       {/* ── Controls bar ── */}
-      <div className="flex flex-wrap items-center gap-2">
+      <Reveal variant="fade" delay={0.05} className="flex flex-wrap items-center gap-2">
         {/* Tier filter pills */}
         <div className="flex gap-1 flex-wrap">
           {TIER_FILTERS.map(({ key, label, icon: Icon }) => {
@@ -660,7 +660,7 @@ export function LeadsView({ leads: initialLeads, slug, newLeadIds, loading = fal
             </button>
           </div>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Loading skeletons ── */}
       {loading && (

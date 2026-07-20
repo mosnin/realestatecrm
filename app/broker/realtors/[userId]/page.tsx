@@ -22,6 +22,7 @@ import {
   TITLE_FONT,
   CHIPPI_PILL,
 } from '@/lib/typography';
+import { SplitReveal } from '@/components/motion';
 
 export const metadata: Metadata = { title: 'Real estate agent Detail — Teams' };
 
@@ -200,7 +201,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
-              {user.name ?? 'No name'}
+              <SplitReveal as="span" text={user.name ?? 'No name'} />
             </h1>
             {user.onboard ? (
               <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 text-foreground bg-foreground/[0.06]">

@@ -14,6 +14,7 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { CommissionStatCell } from '@/components/properties/commission-stat-cell';
+import { Reveal, StaggerReveal, SplitReveal } from '@/components/motion';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,16 +118,18 @@ export default async function PropertiesCommissionsPage({
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Commissions.</p>
         <h1 className={H1} style={TITLE_FONT}>
-          Commissions
+          <SplitReveal as="span" text="Commissions" />
         </h1>
         <p className="text-sm text-muted-foreground">
           {subtitle}
         </p>
       </header>
 
-      {/* Stat strip — paper-flat, hairline-divided. Focal numerals count up
-          on entry (CommissionStatCell → AnimatedNumber, reduced-motion aware). */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      {/* Stat strip — paper-flat, hairline-divided. The four cells cascade in
+          once on first paint (StaggerReveal on the direct-child grid); each
+          focal numeral then counts up on entry (CommissionStatCell →
+          AnimatedNumber, reduced-motion aware). */}
+      <StaggerReveal className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
         <CommissionStatCell
           value={closedNet}
           label="Closed net YTD"
@@ -147,31 +150,35 @@ export default async function PropertiesCommissionsPage({
           label="Still owed out"
           sub="unpaid splits across closed"
         />
-      </div>
+      </StaggerReveal>
 
       {/* Closed this year */}
-      <Section
-        title="Closed this year"
-        count={closedYtd.length}
-        empty={
-          <EmptyRow text="Nothing closed yet this year. The first win lands here." />
-        }
-      >
-        {closedYtd.length > 0 && (
-          <CommissionTable rows={closedYtd} splitsByDeal={splitsByDeal} slug={slug} />
-        )}
-      </Section>
+      <Reveal variant="rise">
+        <Section
+          title="Closed this year"
+          count={closedYtd.length}
+          empty={
+            <EmptyRow text="Nothing closed yet this year. The first win lands here." />
+          }
+        >
+          {closedYtd.length > 0 && (
+            <CommissionTable rows={closedYtd} splitsByDeal={splitsByDeal} slug={slug} />
+          )}
+        </Section>
+      </Reveal>
 
       {/* In flight */}
-      <Section
-        title="In flight"
-        count={inFlight.length}
-        empty={<EmptyRow text="Nothing in flight. Quiet pipeline." />}
-      >
-        {inFlight.length > 0 && (
-          <CommissionTable rows={inFlight} splitsByDeal={splitsByDeal} slug={slug} />
-        )}
-      </Section>
+      <Reveal variant="rise" delay={0.05}>
+        <Section
+          title="In flight"
+          count={inFlight.length}
+          empty={<EmptyRow text="Nothing in flight. Quiet pipeline." />}
+        >
+          {inFlight.length > 0 && (
+            <CommissionTable rows={inFlight} splitsByDeal={splitsByDeal} slug={slug} />
+          )}
+        </Section>
+      </Reveal>
     </div>
   );
 }
@@ -212,7 +219,12 @@ function CommissionTable({
   slug: string;
 }) {
   return (
-    <div className="divide-y divide-border/70">
+    // Rows (plus the header row) cascade in together, once, on first paint —
+    // StaggerReveal doubles as the divide-y container so no extra DOM layer
+    // sits between it and the Link rows (that would break the `divide-y`
+    // child selector). Dense-data table: reveal once, never re-animate on
+    // scroll, never delay reading or clicking.
+    <StaggerReveal as="div" className="divide-y divide-border/70" distance={8}>
       <div className={cn('hidden sm:grid grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] px-5 py-2 bg-foreground/[0.02]', SECTION_LABEL)}>
         <span>Deal</span>
         <span className="text-right">Value</span>
@@ -259,6 +271,6 @@ function CommissionTable({
           </Link>
         );
       })}
-    </div>
+    </StaggerReveal>
   );
 }

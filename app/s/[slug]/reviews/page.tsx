@@ -4,6 +4,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ReviewsClient, type ReviewRow } from './reviews-client';
 import { H1, TITLE_FONT } from '@/lib/typography';
+import { AnimatedNumber } from '@/components/motion';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -139,9 +140,6 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
   });
 
   const openCount = initialReviews.filter((r) => r.status === 'open').length;
-  const statusSentence = openCount > 0
-    ? `${openCount} open ${openCount === 1 ? 'review' : 'reviews'} waiting.`
-    : 'All caught up.';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -150,7 +148,16 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
         <h1 className={H1} style={TITLE_FONT}>
           My reviews
         </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
+        <p className="text-sm text-muted-foreground">
+          {openCount > 0 ? (
+            <>
+              <AnimatedNumber value={openCount} /> open{' '}
+              {openCount === 1 ? 'review' : 'reviews'} waiting.
+            </>
+          ) : (
+            'All caught up.'
+          )}
+        </p>
       </header>
       <ReviewsClient slug={slug} initialReviews={initialReviews} />
     </div>

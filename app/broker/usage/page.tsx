@@ -32,6 +32,7 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
+import { SplitReveal } from '@/components/motion';
 import { BarChart2 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -211,7 +212,7 @@ export default async function BrokerUsagePage() {
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Brokerage.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>
-          Usage
+          <SplitReveal as="span" text="Usage" />
         </h1>
         <p className={BODY_MUTED}>{statusSentence}</p>
       </header>
