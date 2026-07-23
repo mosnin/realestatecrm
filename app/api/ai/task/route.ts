@@ -52,6 +52,7 @@ import { assertCanSpend, CreditsExhaustedError, SubscriptionDelinquentError } fr
 import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
+import { markTurnStarted, markTurnEnded } from '@/lib/chat/turn-presence';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
 import {
   type MultimodalAttachment,
@@ -543,6 +544,9 @@ function proxyModalStream({
           logger.warn('[ai/task] modal stream ended with no terminal event', { spaceId });
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
         }
+        // Clear the turn-presence marker AFTER persistence so a reopening
+        // client that sees inFlight=false can trust the answer is queryable.
+        await markTurnEnded(conversationId);
         // controller may already be torn down if the client disconnected —
         // closing a cancelled controller throws, so guard it.
         try { controller.close(); } catch { /* already closed by cancel() */ }
@@ -798,6 +802,13 @@ export async function POST(req: NextRequest) {
   //      (kept as a fallback / for running heavy turns entirely in Modal).
   // Router errors → 'agent' (its safe default), so a router bug can't silently
   // drop a real action.
+  // Turn presence — mark this conversation busy BEFORE any path starts
+  // streaming, so a client that reopens (even after a full browser close)
+  // can see the turn is in flight via /api/ai/turn-status and wait for the
+  // persisted answer instead of showing a dead transcript. Every path's
+  // finally clears it; the TTL backstops a crashed function.
+  void markTurnStarted(conversationId);
+
   const routerAttachments = hydratedAttachments.map((a) => ({
     id: a.id,
     mimeType: a.mime_type,

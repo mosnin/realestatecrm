@@ -41,6 +41,7 @@ import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/a
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
 import type { MultimodalAttachment } from '@/lib/chat/multimodal';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
+import { markTurnEnded } from '@/lib/chat/turn-presence';
 import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
 
 const COMPACTION_THRESHOLD_CHARS = 80_000;
@@ -701,6 +702,9 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             });
           }
         }
+        // Clear the turn-presence marker AFTER persistence so a reopening
+        // client that sees inFlight=false can trust the answer is queryable.
+        await markTurnEnded(input.conversationId);
         turnDone();
         try {
           controller.close();
