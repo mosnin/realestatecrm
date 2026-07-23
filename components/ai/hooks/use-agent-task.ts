@@ -26,9 +26,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentEvent } from '@/lib/ai-tools/events';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
-import { SSEParser } from '@/lib/ai-tools/client/parse-sse';
 import type { PermissionPromptData } from '@/components/ai/blocks/permission-prompt-view';
 import { chippiErrorMessage, classifyError } from '@/lib/ai-tools/chippi-voice';
+import {
+  startTurn,
+  attachTurn,
+  abortTurn,
+  getTurn,
+  turnKey,
+  type TurnRecord,
+} from './turn-runner';
 
 export interface UiMessage {
   id: string;
@@ -301,7 +308,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     }
   }
 
-  const abortRef = useRef<AbortController | null>(null);
+  // The runner key of the turn THIS hook instance is currently driving.
+  // Turns themselves live at module scope (turn-runner.ts) so they survive
+  // this component unmounting; the key is how abort() reaches them.
+  const activeKeyRef = useRef<string | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
   // True once the turn reaches a real terminal event (turn_complete or a
   // landed error). If the SSE stream closes WITHOUT one — the serverless proxy
@@ -397,8 +407,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         keepalive: true,
       }).catch(() => {});
     }
-    abortRef.current?.abort();
-    abortRef.current = null;
+    if (activeKeyRef.current) {
+      abortTurn(activeKeyRef.current);
+      activeKeyRef.current = null;
+    }
     setCurrentAction(null);
   }, []);
 
@@ -632,51 +644,44 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [landChippiError]);
 
   /**
-   * Shared stream consumer. Opens a POST to `url` with `body`, applies every
-   * event, and returns when the stream ends. The caller is responsible for
-   * pushing the initial user message + starting the assistant turn.
+   * Drive one turn owned by the module-scope TurnRunner: replay whatever
+   * events already arrived (empty for a fresh send, the full buffer on
+   * re-attach after navigation), mirror live events into state, and when
+   * the runner's loop ends run the terminal handling the old inline loop
+   * used to (HTTP errors, cut-off detection, teardown, queue drain).
+   *
+   * The fetch itself does NOT live here — it lives in turn-runner.ts and
+   * keeps consuming when this component unmounts. That is the whole
+   * "turns survive navigation" fix.
    */
-  const consumeStream = useCallback(
-    async (url: string, body: unknown) => {
-      abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+  const runTurn = useCallback(
+    async (rec: TurnRecord) => {
+      activeKeyRef.current = rec.key;
       turnTerminalRef.current = false;
       setIsStreaming(true);
       isStreamingRef.current = true;
       setError(null);
 
+      const { replay, detach } = attachTurn(rec, applyEvent);
       try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+        for (const event of replay) applyEvent(event);
+        await rec.completion;
 
-        if (!res.ok) {
+        if (rec.status === 'http_error') {
+          const he = rec.httpError;
           // Fix 3: on 429 read Retry-After so the composer can count down.
-          if (res.status === 429) {
-            const retryAfter = parseInt(res.headers.get('Retry-After') ?? '0', 10);
-            if (retryAfter > 0) {
-              rateLimitSecondsRef.current = retryAfter;
-              setRateLimitSeconds(retryAfter);
-            }
+          if (he?.status === 429 && he.retryAfterSeconds) {
+            rateLimitSecondsRef.current = he.retryAfterSeconds;
+            setRateLimitSeconds(he.retryAfterSeconds);
           }
           // Server already speaks Chippi for this route; if not, classify
           // by HTTP status as a fallback so the user never sees raw text.
-          let message: string | undefined;
-          try {
-            const parsed = (await res.json()) as { error?: string };
-            if (parsed?.error) message = parsed.error;
-          } catch {
-            /* non-JSON body */
-          }
+          let message = he?.message;
           if (!message || message.length > 400) {
             const code =
-              res.status === 429
+              he?.status === 429
                 ? 'rate_limited'
-                : res.status === 401 || res.status === 403
+                : he?.status === 401 || he?.status === 403
                   ? 'auth'
                   : 'internal';
             message = chippiErrorMessage(code);
@@ -685,19 +690,27 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           return;
         }
 
-        if (!res.body) {
-          landChippiError(chippiErrorMessage('network'));
+        if (rec.status === 'network_error') {
+          landChippiError(
+            chippiErrorMessage(classifyError(rec.networkErrorMessage ?? 'Network error')),
+          );
           return;
         }
 
-        const parser = new SSEParser();
-        const reader = res.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const event of parser.feed(value)) applyEvent(event);
+        if (rec.status === 'aborted') {
+          // Explicit Stop: tidy the trailing empty assistant bubble.
+          const targetId = streamingMsgIdRef.current;
+          if (targetId) {
+            setMessages((prev) =>
+              prev
+                .filter(
+                  (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
+                )
+                .map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
+            );
+          }
+          return;
         }
-        for (const event of parser.end()) applyEvent(event);
 
         // The stream closed cleanly (no throw) but never delivered a
         // turn_complete or error — the turn was cut off mid-response (proxy
@@ -722,26 +735,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           }
           setError('The response was cut off before it finished.');
         }
-      } catch (err) {
-        const aborted = (err as { name?: string }).name === 'AbortError';
-        if (!aborted) {
-          const raw = err instanceof Error ? err.message : 'Network error';
-          landChippiError(chippiErrorMessage(classifyError(raw)));
-        } else {
-          // Aborted: just tidy the trailing empty assistant bubble.
-          const targetId = streamingMsgIdRef.current;
-          if (targetId) {
-            setMessages((prev) =>
-              prev
-                .filter(
-                  (m) => !(m.id === targetId && m.role === 'assistant' && m.blocks.length === 0),
-                )
-                .map((m) => (m.id === targetId ? { ...m, streaming: false } : m)),
-            );
-          }
-        }
       } finally {
-        abortRef.current = null;
+        detach();
+        // The finished record is deliberately LEFT in the runner: it's the
+        // tombstone the workspace's history loader consumes to know "a turn
+        // ended since your server props rendered — fetch fresh." Consuming
+        // it here would let a stale props branch clobber the streamed
+        // answer right after the turn lands. TTL-swept if nobody consumes.
+        activeKeyRef.current = null;
         streamingMsgIdRef.current = null;
         setIsStreaming(false);
         isStreamingRef.current = false;
@@ -766,8 +767,74 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
       }
     },
-    [abort, applyEvent, landChippiError],
+    [applyEvent, landChippiError],
   );
+
+  /**
+   * Start a fresh turn and drive it. `conversationId` keys the turn in the
+   * module-scope runner; `optimistic` is what the runner remembers so a
+   * surface mounting mid-turn can rebuild the user bubble.
+   */
+  const consumeStream = useCallback(
+    async (
+      url: string,
+      body: unknown,
+      conversationId: string,
+      optimistic: { text: string; attachmentBlocks: MessageBlock[] } = {
+        text: '',
+        attachmentBlocks: [],
+      },
+    ) => {
+      abort();
+      const rec = startTurn({
+        url,
+        // Keyed under the surface's task endpoint (not the POST url) so a
+        // resume turn re-attaches exactly like the turn it continues.
+        endpoint: taskEndpoint,
+        conversationId,
+        body,
+        optimistic,
+      });
+      await runTurn(rec);
+    },
+    [abort, runTurn, taskEndpoint],
+  );
+
+  /**
+   * Re-attach after navigation: if the module-scope runner holds a LIVE turn
+   * for this conversation (started here or on any other page), rebuild the
+   * optimistic scaffold send() originally created — user bubble + streaming
+   * assistant placeholder — replay the buffered events, and keep streaming.
+   * This is what makes a turn visibly "run in the background": leave the
+   * page, come back (or open the bar anywhere), and the turn is right there,
+   * still typing.
+   */
+  useEffect(() => {
+    const cid = initialConversationId;
+    if (!cid) return;
+    if (isStreamingRef.current) return; // already driving a turn
+    const rec = getTurn(turnKey(taskEndpoint, cid));
+    if (!rec || rec.status !== 'streaming') return;
+    if (activeKeyRef.current === rec.key) return; // strict-mode double fire
+
+    const userBlocks: MessageBlock[] = [
+      ...rec.optimistic.attachmentBlocks,
+      ...(rec.optimistic.text
+        ? [{ type: 'text', content: rec.optimistic.text } as MessageBlock]
+        : []),
+    ];
+    const assistantMsgId = newId();
+    streamingMsgIdRef.current = assistantMsgId;
+    setMessages((prev) => [
+      ...prev,
+      ...(userBlocks.length > 0
+        ? [{ id: newId(), role: 'user', blocks: userBlocks } as UiMessage]
+        : []),
+      { id: assistantMsgId, role: 'assistant', blocks: [], streaming: true },
+    ]);
+    setCurrentAction('Thinking…');
+    void runTurn(rec);
+  }, [initialConversationId, taskEndpoint, runTurn]);
 
   /**
    * Ensure we have a conversationId before opening a stream. The task route
@@ -889,13 +956,18 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
-      await consumeStream(taskEndpoint, {
-        spaceSlug,
-        conversationId: convId,
-        message: trimmed,
-        mode,
-        ...(hasAttachments ? { attachmentIds } : {}),
-      });
+      await consumeStream(
+        taskEndpoint,
+        {
+          spaceSlug,
+          conversationId: convId,
+          message: trimmed,
+          mode,
+          ...(hasAttachments ? { attachmentIds } : {}),
+        },
+        convId,
+        { text: trimmed, attachmentBlocks },
+      );
     },
     [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
   );
@@ -923,10 +995,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
-        approved: true,
-        ...(editedArgs ? { editedArgs } : {}),
-      });
+      await consumeStream(
+        `${resumeEndpointBase}/${encodeURIComponent(requestId)}`,
+        {
+          approved: true,
+          ...(editedArgs ? { editedArgs } : {}),
+        },
+        conversationIdRef.current ?? `resume-${requestId}`,
+      );
     },
     [isStreaming, consumeStream, resumeEndpointBase],
   );
@@ -975,9 +1051,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       streamingMsgIdRef.current = contId;
       setMessages((prev) => [...prev, contMsg]);
 
-      await consumeStream(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
-        approved: false,
-      });
+      await consumeStream(
+        `${resumeEndpointBase}/${encodeURIComponent(requestId)}`,
+        { approved: false },
+        conversationIdRef.current ?? `resume-${requestId}`,
+      );
     },
     [isStreaming, pendingApproval, consumeStream, resumeEndpointBase],
   );

@@ -29,6 +29,7 @@ import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
+import { getTurn, consumeFinishedTurn, turnKey } from '@/components/ai/hooks/turn-runner';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import type { ChatConversation } from '@/lib/types';
@@ -496,6 +497,26 @@ export function ChippiWorkspace({
       return;
     }
 
+    // A turn for this conversation is LIVE at module scope (turn-runner —
+    // started on this page or before navigating here). The hook's re-attach
+    // path owns the transcript right now; loading history would clobber the
+    // streaming scaffold. This effect re-runs when the turn ends
+    // (isStreaming dependency) and loads the full, settled history then.
+    // Checked via the runner (not the isStreaming closure) because on the
+    // mount that re-attaches, this effect still sees the pre-attach false.
+    if (getTurn(turnKey(endpoints.taskEndpoint, targetId))?.status === 'streaming') {
+      return;
+    }
+
+    // A turn FINISHED since this surface last looked (completed in the
+    // background while the user was on another page, or the turn this very
+    // instance just streamed). Server props predate that answer — fall
+    // through to the fresh client fetch and never trust initialMessages.
+    const finishedInBackground = Boolean(
+      consumeFinishedTurn(turnKey(endpoints.taskEndpoint, targetId)),
+    );
+    if (finishedInBackground) loadedConvIdRef.current = '';
+
     // Already showing this conversation — nothing to do.
     if (targetId === loadedConvIdRef.current) return;
 
@@ -504,7 +525,7 @@ export function ChippiWorkspace({
 
     // Server already fetched the right messages for this exact conversation —
     // use them immediately (zero extra round-trip).
-    if (targetId === initialConversationId && initialMessages.length > 0) {
+    if (!finishedInBackground && targetId === initialConversationId && initialMessages.length > 0) {
       loadedConvIdRef.current = targetId;
       const history = legacyToUi(initialMessages);
       // Pre-warm the seen-set: history arrives settled, never animated.
@@ -552,6 +573,7 @@ export function ChippiWorkspace({
     searchParams,
     router,
     endpoints.routeBase,
+    endpoints.taskEndpoint,
   ]);
 
   useEffect(() => {

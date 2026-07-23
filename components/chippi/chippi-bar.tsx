@@ -12,6 +12,7 @@ import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { ThinkingBar } from '@/components/ai/prompt-kit';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
+import { getAnyLiveTurn } from '@/components/ai/hooks/turn-runner';
 import { useDictation } from './use-dictation';
 
 interface Props {
@@ -168,8 +169,18 @@ export function ChippiBar({ slug }: Props) {
 
   // Restore the most recent bar conversation for this workspace from session.
   // sessionStorage scopes to the tab — closing the tab gives a fresh start.
+  //
+  // A LIVE background turn wins over the stored pick: if Chippi is mid-turn
+  // on ANY conversation (e.g. the user sent from /chippi then navigated
+  // here), adopt that conversation so the hook's re-attach path renders the
+  // running turn in the bar — Chippi visibly keeps working wherever you go.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const live = getAnyLiveTurn('/api/ai/task');
+    if (live) {
+      setConvId(live.conversationId);
+      return;
+    }
     const stored = window.sessionStorage.getItem(STORAGE_KEY(slug));
     if (stored) setConvId(stored);
   }, [slug]);
