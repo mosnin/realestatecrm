@@ -9,6 +9,7 @@ import { countLabel } from '@/lib/formatting';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
+import { ThinkingOrb, type OrbState } from '@/components/chippi/thinking-orb';
 import { ThinkingBar } from '@/components/ai/prompt-kit';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
 import { useDictation } from './use-dictation';
@@ -239,6 +240,13 @@ export function ChippiBar({ slug }: Props) {
 
   // The trailing assistant message — used to detect the "thinking" state.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
+
+  // Orb avatar state from what the mini-chat is doing (mirrors chippi-workspace).
+  const orbState: OrbState = useMemo(() => {
+    if (liveCallIds && liveCallIds.size > 0) return 'solving';
+    if (isStreaming) return 'thinking';
+    return 'listening';
+  }, [liveCallIds, isStreaming]);
   const showThinking =
     isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
@@ -320,10 +328,11 @@ export function ChippiBar({ slug }: Props) {
                 if (msg.role === 'assistant') {
                   return (
                     <div key={msg.id} className="flex gap-2.5">
-                      <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                      </div>
+                      <ThinkingOrb
+                        state={msg.streaming && isStreaming ? orbState : 'idle'}
+                        size={24}
+                        className="mt-0.5"
+                      />
                       <div className="flex-1 min-w-0 pt-0.5">
                         <Transcript
                           blocks={msg.blocks}
@@ -361,10 +370,7 @@ export function ChippiBar({ slug }: Props) {
 
               {showThinking && (
                 <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-border/60">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                  </div>
+                  <ThinkingOrb state={orbState} size={24} />
                   {/* Shimmering "Thinking…" line — same indicator the full
                       workspace uses, not blinking dots. */}
                   <ThinkingBar label="Thinking…" />
