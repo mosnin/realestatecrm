@@ -262,6 +262,44 @@ describe('mapSdkEvent — suppressed events', () => {
     }
   });
 
+  it('suppresses the finalised reasoning item even when it carries text — the raw path already streamed it', () => {
+    expect(
+      mapSdkEvent({
+        type: 'run_item_stream_event',
+        name: 'reasoning_item_created',
+        item: {
+          type: 'reasoning_item',
+          rawItem: { content: [{ type: 'reasoning_text', text: 'the whole trace again' }] },
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('mapSdkEvent — live reasoning deltas (auto-think)', () => {
+  it('maps delta.reasoning inside raw model chunks to reasoning_delta', () => {
+    expect(
+      mapSdkEvent({
+        type: 'raw_model_stream_event',
+        data: {
+          type: 'model',
+          event: { choices: [{ delta: { reasoning: 'Checking the pipeline first… ' } }] },
+        },
+      }),
+    ).toEqual({ type: 'reasoning_delta', delta: 'Checking the pipeline first… ' });
+  });
+
+  it('ignores raw model chunks without a reasoning string', () => {
+    for (const delta of [{}, { reasoning: '' }, { reasoning: 42 }, { content: 'hi' }]) {
+      expect(
+        mapSdkEvent({
+          type: 'raw_model_stream_event',
+          data: { type: 'model', event: { choices: [{ delta }] } },
+        } as Parameters<typeof mapSdkEvent>[0]),
+      ).toBeNull();
+    }
+  });
+
   it('returns null for unknown top-level event types (forward compatibility)', () => {
     // Cast through unknown — we're testing forward-compatibility on
     // events the SDK might add in a future version.

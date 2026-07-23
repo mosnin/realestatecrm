@@ -36,7 +36,14 @@ import type { ToolDefinition, ToolResult } from './types';
 
 type RawModelEvent = {
   type: 'raw_model_stream_event';
-  data: { type?: string; delta?: string };
+  data: {
+    type?: string;
+    delta?: string;
+    /** Present when data.type === 'model' — the raw provider chunk. */
+    event?: {
+      choices?: Array<{ delta?: { reasoning?: unknown } }>;
+    };
+  };
 };
 
 type RunItemEventName =
@@ -112,11 +119,23 @@ export function mapSdkEvent(
 }
 
 function mapRawModelEvent(event: RawModelEvent): PushableEvent | null {
-  // Only surface output_text_delta. Everything else (response_started,
+  // Surface output_text_delta (visible answer) and the thinking deltas the
+  // provider streams inside raw chunks. Everything else (response_started,
   // response_done, etc.) is wire-protocol noise.
   if (event.data?.type === 'output_text_delta' && typeof event.data.delta === 'string') {
     if (event.data.delta.length === 0) return null;
     return { type: 'text_delta', delta: event.data.delta };
+  }
+  // Auto-think: on chat completions the SDK re-emits every provider chunk as
+  // a raw 'model' event; OpenRouter carries thinking tokens in
+  // `delta.reasoning`. Streaming them here makes the trace LIVE — the
+  // realtor watches the thought happen instead of a spinner, and the wire
+  // never goes quiet during a long think.
+  if (event.data?.type === 'model') {
+    const reasoning = event.data.event?.choices?.[0]?.delta?.reasoning;
+    if (typeof reasoning === 'string' && reasoning.length > 0) {
+      return { type: 'reasoning_delta', delta: reasoning };
+    }
   }
   return null;
 }
@@ -207,20 +226,11 @@ function mapRunItemEvent(
       return null;
 
     case 'reasoning_item_created': {
-      // The SDK delivers reasoning as a single finalised item with a content
-      // array of { type: 'reasoning_text' | 'input_text', text }. We extract
-      // the reasoning_text segments and emit them as one delta — the
-      // client-side buffer concatenates and renders a collapsible trace.
-      // Drop silently if the model doesn't produce reasoning (most don't
-      // unless reasoning_effort is enabled).
-      const raw = (event.item as { rawItem?: { content?: Array<{ type?: string; text?: string }> } }).rawItem;
-      const chunks = Array.isArray(raw?.content) ? raw.content : [];
-      const text = chunks
-        .filter((c) => c?.type === 'reasoning_text' && typeof c.text === 'string')
-        .map((c) => c.text as string)
-        .join('');
-      if (!text) return null;
-      return { type: 'reasoning_delta', delta: text };
+      // The finalised reasoning item's text is built by the SDK from the
+      // exact same raw `delta.reasoning` chunks mapRawModelEvent already
+      // streamed live — re-emitting it here would double every trace. Same
+      // suppress-the-duplicate contract as message_output_created above.
+      return null;
     }
 
     default:

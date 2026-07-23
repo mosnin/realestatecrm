@@ -23,6 +23,7 @@
 
 import OpenAI from 'openai';
 import { getLLMClient, detectProvider, usageAccountingParams } from '@/lib/llm';
+import { reasoningBodyParams, type ReasoningEffort } from './auto-think';
 import {
   buildMultimodalContent,
   type MultimodalAttachment,
@@ -82,11 +83,25 @@ export interface DirectChatInput {
   userMessage: string;
   attachments?: MultimodalAttachment[];
   signal?: AbortSignal;
+  /**
+   * Auto-think (lib/chat/auto-think.ts): when set above 'none' AND the model
+   * supports it, the request carries OpenRouter's `reasoning` extension and
+   * the model thinks before answering. Reasoning deltas stream through
+   * `onReasoning` in the streaming variant. Default 'none' — identical
+   * request shape to before this field existed.
+   */
+  reasoningEffort?: ReasoningEffort;
 }
 
 export interface DirectChatResult {
   /** The model's final text (full, accumulated). */
   text: string;
+  /**
+   * The model's reasoning trace (full, accumulated). Empty when thinking
+   * wasn't engaged or the provider returned none. Persisted as a
+   * `reasoning` block so the "Thought for Xs" disclosure survives reload.
+   */
+  reasoningText: string;
   /** Provider prefix derived from model. For ChatUsage.provider telemetry. */
   provider: string;
   /** Token usage if the provider returned it (OpenRouter does for most). */
@@ -140,12 +155,19 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
       messages,
       // No tools — that's the whole point of the direct path.
       // Modest cap to keep direct answers tight; the full agent has higher
-      // ceilings for long-form drafts.
-      max_tokens: 800,
+      // ceilings for long-form drafts. Reasoning tokens bill as completion
+      // tokens, so an engaged thinking phase gets a wider cap or it would
+      // starve the visible answer.
+      max_tokens: maxTokensFor(input.reasoningEffort),
       stream: false,
-      // Cast: `usage` is an OpenRouter request extension the OpenAI SDK's
-      // param type doesn't know about; empty on direct-OpenAI deploys.
+      // Cast: `usage` (usage accounting) and `reasoning` (auto-think) are
+      // OpenRouter request extensions the OpenAI SDK's param type doesn't
+      // know about; both are {} on direct-OpenAI deploys.
       ...(usageAccountingParams() as Record<string, never>),
+      ...(reasoningBodyParams(input.model, input.reasoningEffort ?? 'none') as Record<
+        string,
+        never
+      >),
     },
     { signal: input.signal },
   );
@@ -181,8 +203,17 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
       ? u.cost
       : undefined;
 
+  // OpenRouter surfaces the model's thinking as `message.reasoning` on
+  // non-streaming responses (a request extension, absent when thinking was
+  // never engaged).
+  const reasoningText =
+    typeof (choice?.message as { reasoning?: unknown } | undefined)?.reasoning === 'string'
+      ? ((choice!.message as unknown as { reasoning: string }).reasoning)
+      : '';
+
   return {
     text: finalText,
+    reasoningText,
     provider,
     usage: { promptTokens, completionTokens, cachedTokens, costUsd },
     fallbackNote: userBlocks.fallbackNote,
@@ -200,10 +231,16 @@ export async function runDirectChat(input: DirectChatInput): Promise<DirectChatR
  * will be discarded). Early stop resolves with the text accumulated so far;
  * usage is whatever the provider sent by then (usually nothing — OpenRouter
  * reports usage on the final chunk only).
+ *
+ * `onReasoning` (optional) receives the model's thinking deltas — OpenRouter
+ * streams them as `delta.reasoning` ahead of the visible answer whenever the
+ * request engaged auto-think. They keep the wire alive during the thinking
+ * phase and render as the live collapsible trace.
  */
 export async function runDirectChatStream(
   input: DirectChatInput,
   onDelta: (delta: string) => boolean | void,
+  onReasoning?: (delta: string) => void,
 ): Promise<DirectChatResult> {
   const client = getLLMClient();
   const provider = detectProvider(input.model);
@@ -229,6 +266,7 @@ export async function runDirectChatStream(
   input.signal?.addEventListener('abort', onCallerAbort, { once: true });
 
   let finalText = '';
+  let reasoningText = '';
   let usage:
     | {
         prompt_tokens?: number;
@@ -243,20 +281,33 @@ export async function runDirectChatStream(
       {
         model: input.model,
         messages,
-        max_tokens: 800,
+        max_tokens: maxTokensFor(input.reasoningEffort),
         stream: true,
         // Ask for usage on the final chunk — same fields the non-streaming
         // path reads (OpenRouter also attaches `cost` here when the
         // usage-accounting opt-in below is present).
         stream_options: { include_usage: true },
         ...(usageAccountingParams() as Record<string, never>),
+        ...(reasoningBodyParams(input.model, input.reasoningEffort ?? 'none') as Record<
+          string,
+          never
+        >),
       },
       { signal: local.signal },
     );
 
     for await (const chunk of stream) {
       if (chunk.usage) usage = chunk.usage as typeof usage;
-      const delta = chunk.choices?.[0]?.delta?.content;
+      const d = chunk.choices?.[0]?.delta as
+        | (typeof chunk.choices[0]['delta'] & { reasoning?: unknown })
+        | undefined;
+      // Thinking tokens arrive first (OpenRouter `delta.reasoning`) — feed
+      // the live trace before any visible text exists.
+      if (typeof d?.reasoning === 'string' && d.reasoning.length > 0) {
+        reasoningText += d.reasoning;
+        onReasoning?.(d.reasoning);
+      }
+      const delta = d?.content;
       if (typeof delta === 'string' && delta.length > 0) {
         finalText += delta;
         if (onDelta(delta) === false) {
@@ -282,10 +333,22 @@ export async function runDirectChatStream(
 
   return {
     text: finalText,
+    reasoningText,
     provider,
     usage: { promptTokens, completionTokens, cachedTokens, costUsd },
     fallbackNote: userBlocks.fallbackNote,
   };
+}
+
+/**
+ * Completion cap by thinking depth. Reasoning tokens bill as completion
+ * tokens on every OpenRouter provider, so the 800-token direct-answer cap
+ * would let a medium think starve the visible reply. Non-thinking turns
+ * keep the original tight cap unchanged.
+ */
+function maxTokensFor(effort: ReasoningEffort | undefined): number {
+  if (!effort || effort === 'none') return 800;
+  return effort === 'high' ? 3000 : 2000;
 }
 
 function buildContent(input: DirectChatInput): {

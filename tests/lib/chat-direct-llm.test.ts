@@ -282,4 +282,89 @@ describe('runDirectChatStream', () => {
     expect(result.text).toBe("I can't do that from here. ");
     expect(result.usage.promptTokens).toBe(0);
   });
+
+  it('streams reasoning deltas through onReasoning ahead of text and returns the trace', async () => {
+    createMock.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ delta: { reasoning: 'Weighing the two listings… ' } }], usage: null };
+        yield { choices: [{ delta: { reasoning: 'Oakwood has the newer roof.' } }], usage: null };
+        yield { choices: [{ delta: { content: 'Push Oakwood first.' } }], usage: null };
+      },
+    });
+    const reasoning: string[] = [];
+    const deltas: string[] = [];
+    const result = await runDirectChatStream(
+      {
+        model: 'qwen/qwen3.7-plus',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: 'compare my two listings',
+        reasoningEffort: 'medium',
+      },
+      (d) => {
+        deltas.push(d);
+      },
+      (r) => {
+        reasoning.push(r);
+      },
+    );
+    expect(reasoning).toEqual(['Weighing the two listings… ', 'Oakwood has the newer roof.']);
+    expect(deltas).toEqual(['Push Oakwood first.']);
+    expect(result.reasoningText).toBe('Weighing the two listings… Oakwood has the newer roof.');
+    expect(result.text).toBe('Push Oakwood first.');
+  });
+
+  it('widens max_tokens when thinking is engaged so reasoning cannot starve the answer', async () => {
+    createMock.mockResolvedValue(streamingResponse([{ content: 'ok' }]));
+    await runDirectChatStream(
+      {
+        model: 'qwen/qwen3.7-plus',
+        systemMessage: 'sys',
+        history: [],
+        userMessage: 'analyze my pipeline',
+        reasoningEffort: 'high',
+      },
+      () => {},
+    );
+    expect(createMock.mock.calls[0][0].max_tokens).toBe(3000);
+
+    createMock.mockClear();
+    createMock.mockResolvedValue(streamingResponse([{ content: 'ok' }]));
+    await runDirectChatStream(
+      { model: 'qwen/qwen3.7-plus', systemMessage: 'sys', history: [], userMessage: 'hi' },
+      () => {},
+    );
+    expect(createMock.mock.calls[0][0].max_tokens).toBe(800);
+  });
+
+  it('sends the explicit reasoning state on OpenRouter for hybrid models — effort when engaged, enabled:false when not', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'sk-test');
+    try {
+      createMock.mockResolvedValue(streamingResponse([{ content: 'ok' }]));
+      await runDirectChatStream(
+        {
+          model: 'qwen/qwen3.7-plus',
+          systemMessage: 'sys',
+          history: [],
+          userMessage: 'analyze my pipeline',
+          reasoningEffort: 'medium',
+        },
+        () => {},
+      );
+      expect(createMock.mock.calls[0][0].reasoning).toEqual({ effort: 'medium' });
+
+      createMock.mockClear();
+      createMock.mockResolvedValue(streamingResponse([{ content: 'ok' }]));
+      // No effort input (a caller predating auto-think) → thinking is
+      // EXPLICITLY off, so the hybrid default can't silently spend the
+      // 800-token cap on thought and return an empty answer.
+      await runDirectChatStream(
+        { model: 'qwen/qwen3.7-plus', systemMessage: 'sys', history: [], userMessage: 'hi' },
+        () => {},
+      );
+      expect(createMock.mock.calls[0][0].reasoning).toEqual({ enabled: false });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

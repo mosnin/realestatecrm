@@ -268,12 +268,38 @@ _PLANNING_SIGNALS = (
 )
 
 
+# Signals that lift a turn to "high" — the realtor explicitly asked for
+# depth, or the ask is structuring work (negotiation, deal math, exhaustive
+# review) where shallow answers are visibly wrong. Mirrored in
+# lib/chat/auto-think.ts:DEEP_SIGNALS — keep the two lists in sync.
+_DEEP_SIGNALS = (
+    "think hard",
+    "think deeply",
+    "think carefully",
+    "think really",
+    "deep dive",
+    "deep research",
+    "comprehensive",
+    "exhaustive",
+    "thorough",
+    "root cause",
+    "negotiation strategy",
+    "negotiate ",
+    "counter-offer strategy",
+    "structure the deal",
+    "structure this deal",
+)
+
+
 def decide_reasoning_effort(user_message: str | None = None) -> str:
     """Return 'low' | 'medium' | 'high' for this turn.
 
     Default is "low" — the cheap setting Phase 1 (PR #155) standardised on.
-    Escalates to "medium" when the message carries a planning / research
-    signal (see _PLANNING_SIGNALS).
+    Escalates to "medium" on a planning / research signal
+    (see _PLANNING_SIGNALS) and to "high" on an explicit depth signal
+    (_DEEP_SIGNALS) or a many-question synthesis ask. Mirrors
+    lib/chat/auto-think.ts:decideReasoningEffort (agent surface) — keep the
+    two in sync.
 
     The env var CHIPPI_REASONING_EFFORT, when set to "low"/"medium"/"high",
     overrides the heuristic. Useful to flip the floor per deploy without
@@ -292,9 +318,15 @@ def decide_reasoning_effort(user_message: str | None = None) -> str:
     if not user_message:
         return "low"
     text = user_message.lower()
+    for signal in _DEEP_SIGNALS:
+        if signal in text:
+            return "high"
+    question_marks = text.count("?")
     for signal in _PLANNING_SIGNALS:
         if signal in text:
-            return "medium"
+            return "high" if question_marks >= 3 else "medium"
+    if question_marks >= 3:
+        return "medium"
     return "low"
 
 

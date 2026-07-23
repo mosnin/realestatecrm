@@ -345,6 +345,22 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       // Initial restore only; conversation changes are handled below.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Send flash — one brightness surge on the border beam the moment a
+    // message is dispatched. Keyed to the isLoading RISING edge (send →
+    // turn starts), never the falling edge, so the beam settles back to its
+    // steady glow while the turn streams.
+    const [sendFlash, setSendFlash] = useState(false);
+    const prevLoadingRef = useRef(false);
+    useEffect(() => {
+      const was = prevLoadingRef.current;
+      prevLoadingRef.current = isLoading;
+      if (isLoading && !was) {
+        setSendFlash(true);
+        const t = setTimeout(() => setSendFlash(false), 950);
+        return () => clearTimeout(t);
+      }
+    }, [isLoading]);
     const prevConversationIdRef = useRef<string | null>(conversationId);
     // Sync the choice when the active conversation changes. Two cases:
     //   1. A fresh thread (null id) just got a real id on its first send —
@@ -1111,12 +1127,19 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               wraps the composer shell and travels a sunset beam around its
               1px border while Chippi is in Agent mode. `active` flips with the
               Chat/Agent switch; the beam auto-detects the shell's rounded-3xl
-              radius. In Chat mode it's inert (no ring, no cost). */}
+              radius. In Chat mode it's inert (no ring, no cost).
+              Brightness rides two levels above the package default so the
+              ring reads unmistakably, and the moment a message is sent
+              (`sendFlash`, the isLoading rising edge) it surges brighter and
+              faster for ~a second — the input visibly "fires" the turn. */}
           <BorderBeam
             size="md"
             colorVariant="sunset"
             theme="auto"
             active={chatMode === 'agent'}
+            brightness={sendFlash ? 3.2 : 2.2}
+            saturation={sendFlash ? 1.7 : 1.4}
+            duration={sendFlash ? 1.1 : 1.96}
           >
           <div
             className={cn(

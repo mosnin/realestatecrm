@@ -35,6 +35,7 @@ import {
 } from './sdk-bridge';
 import { getAgentModel } from './agent-model';
 import { resolveChatModel } from '@/lib/llm';
+import { decideReasoningEffort, reasoningBodyParams } from '@/lib/chat/auto-think';
 import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multimodal';
 import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
@@ -156,6 +157,20 @@ export function buildChatAgent(
   // pipeline + connected apps. Callers that already awaited it pass it
   // through `opts.instructions`. The fallback path uses the synchronous
   // static prompt so resume / tests / failure modes still work.
+  // Auto-think (lib/chat/auto-think.ts, mirrors agent/llm.py on Modal):
+  // acting turns floor at 'low' effort and escalate to medium/high when the
+  // message reads as planning / analysis / deep work. The unified OpenRouter
+  // `reasoning` object rides `modelSettings.providerData`, which the SDK
+  // spreads verbatim into the chat-completions body — this is NOT the old
+  // Responses-API `reasoning` setting that wedged non-reasoning models.
+  // reasoningBodyParams() always emits an EXPLICIT state for capable models
+  // (effort, or `enabled:false`): hybrid models like the Qwen3 default think
+  // by default when the request says nothing, silently burning output budget.
+  // Incapable models / non-OpenRouter deploys get {} — today's exact shape.
+  const reasoningEffort = decideReasoningEffort(opts.userMessage ?? null, {
+    surface: 'agent',
+  });
+
   return new Agent({
     name: 'Chippi',
     instructions: opts.instructions ?? buildSystemPrompt(ctx),
@@ -165,11 +180,13 @@ export function buildChatAgent(
     tools: withLoopGuard([delegateTool, ...domainTools, ...(opts.integrationTools ?? [])]),
     model: agentModel,
     // Chat completions across every OpenRouter provider. maxTokens caps the
-    // pre-charge (see DEFAULT_MAX_TOKENS). No `reasoning` setting: that's a
-    // Responses-API concept — on chat completions it's ignored at best and
-    // 400s on non-reasoning models (Grok) at worst, which is what wedged the
-    // old Responses-API path.
-    modelSettings: { maxTokens: DEFAULT_MAX_TOKENS },
+    // pre-charge (see DEFAULT_MAX_TOKENS).
+    modelSettings: {
+      maxTokens: DEFAULT_MAX_TOKENS,
+      providerData: {
+        ...reasoningBodyParams(resolveChatModel(opts.modelSlug), reasoningEffort),
+      },
+    },
   });
 }
 

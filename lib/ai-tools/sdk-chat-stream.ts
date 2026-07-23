@@ -288,6 +288,13 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       const nextSeq = createSeqCounter();
       let textBuffer = '';
 
+      // The model's thinking trace for this turn (auto-think). Accumulated
+      // from reasoning_delta events and persisted as a leading `reasoning`
+      // block so the "Thought for Xs" disclosure survives reload — the
+      // client's live buffer only exists for the session.
+      let thoughtBuffer = '';
+      const turnStartedAt = Date.now();
+
       // Track the assistant text that's accumulated since the last tool
       // call landed. This is the "reasoning" we pin to the next tool
       // call's telemetry — the sentence the realtor sees before the
@@ -333,6 +340,9 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         if (event.type === 'text_delta') {
           textBuffer += event.delta;
           reasoningBuffer += event.delta;
+        }
+        if (event.type === 'reasoning_delta') {
+          thoughtBuffer += event.delta;
         }
         if (event.type === 'tool_call_start') {
           // When the agent invokes `create_plan`, emit a `plan_created` event
@@ -640,6 +650,16 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // top-to-bottom as "here's what I did, here's the answer, here's the
           // deeper job I kicked off".
           const blocks: MessageBlock[] = [
+            // Thinking trace first — same ordering the client renders live.
+            ...(thoughtBuffer.trim()
+              ? [
+                  {
+                    type: 'reasoning',
+                    content: thoughtBuffer.trim(),
+                    durationMs: Date.now() - turnStartedAt,
+                  } as MessageBlock,
+                ]
+              : []),
             ...toolBlocks,
             ...(textBuffer.trim() ? [{ type: 'text', content: textBuffer } as MessageBlock] : []),
             ...subagentBlocks,
