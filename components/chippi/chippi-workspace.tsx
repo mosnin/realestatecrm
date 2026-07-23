@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
+import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
@@ -1179,6 +1180,17 @@ export function ChippiWorkspace({
     tailMessage?.role === 'assistant' &&
     (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan));
 
+  // Live state for Chippi's orb avatar, read from what the turn is doing right
+  // now: running a tool or executing a plan reads as "solving" (energetic);
+  // streaming/reasoning with nothing concrete yet is "working" (the thinking
+  // read); idle between turns is "listening". Settled history rows freeze the
+  // orb via `paused`.
+  const orbState: OrbState = useMemo(() => {
+    if ((liveCallIds && liveCallIds.size > 0) || activePlan) return 'solving';
+    if (isStreaming) return 'working';
+    return 'listening';
+  }, [liveCallIds, activePlan, isStreaming]);
+
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. The `/` skills menu lives
   // inside ChippiPromptBox itself.
@@ -1564,9 +1576,12 @@ export function ChippiWorkspace({
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         >
-                          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
-                            <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                          </div>
+                          <ThinkingOrb
+                            state={msg.streaming && isStreaming ? orbState : 'listening'}
+                            paused={!(msg.streaming && isStreaming)}
+                            size={20}
+                            className="mt-0.5"
+                          />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                             {/* PlanCard — rendered for each create_plan tool
                                 call. Falls back to args so the card appears
@@ -1667,9 +1682,7 @@ export function ChippiWorkspace({
                         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                         className="flex gap-3"
                       >
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5 ring-1 ring-border/60">
-                          <img src="/chip-avatar.png" alt="" className="w-full h-full object-cover" />
-                        </div>
+                        <ThinkingOrb state={orbState} size={20} className="mt-0.5" />
                         <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                           {/* Preview PlanCard — appears immediately when the
                               plan_created event arrives, before the tool call
