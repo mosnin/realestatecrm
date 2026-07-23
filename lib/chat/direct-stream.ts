@@ -29,6 +29,7 @@ import {
 } from './direct-llm';
 import { retrieveContext } from './vector-context';
 import { decideReasoningEffort } from './auto-think';
+import { markTurnEnded } from './turn-presence';
 import { shouldEscalate } from './router';
 import { createStopPoller } from './stop-signal';
 import type { MultimodalAttachment } from './multimodal';
@@ -358,6 +359,11 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           push({ type: 'error', message: chippiErrorMessage('internal') });
         }
       } finally {
+        // Clear the turn-presence marker AFTER persistence so a reopening
+        // client that sees inFlight=false can trust the answer is queryable.
+        // Awaited (inside the after() keep-alive window) so the function
+        // can't suspend before the marker clears.
+        await markTurnEnded(input.conversationId);
         turnDone();
         try {
           controller.close();

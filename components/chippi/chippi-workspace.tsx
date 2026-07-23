@@ -576,6 +576,77 @@ export function ChippiWorkspace({
     endpoints.taskEndpoint,
   ]);
 
+  // ── Reopen recovery — the browser-close half of turn survival ───────────
+  // A turn keeps generating server-side when the browser closes; the marker
+  // (lib/chat/turn-presence.ts) is how a client that reopens later finds
+  // out. When the loaded transcript ends in an unanswered user message, ask
+  // /api/ai/turn-status: while a turn is in flight, show the thinking row
+  // and poll; the moment it clears, fetch fresh history — the persisted
+  // answer lands without a manual reload.
+  const [recoveringTurn, setRecoveringTurn] = useState(false);
+  useEffect(() => {
+    if (isStreaming) return;
+    const convId = activeConversationId;
+    if (!convId || messages.length === 0) return;
+    if (messages[messages.length - 1]?.role !== 'user') return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let sawInFlight = false;
+    const startedAt = Date.now();
+    // Turns are server-bounded (Modal 600s ceiling + presence TTL 15 min);
+    // polling past that would be lying about hope.
+    const CAP_MS = 15 * 60_000;
+
+    const tick = async (): Promise<void> => {
+      if (cancelled) return;
+      if (Date.now() - startedAt > CAP_MS) {
+        setRecoveringTurn(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/ai/turn-status?conversationId=${encodeURIComponent(convId)}`,
+        );
+        if (cancelled) return;
+        const data = res.ok
+          ? ((await res.json()) as { inFlight?: boolean; known?: boolean })
+          : null;
+        if (cancelled) return;
+        if (!data?.known) {
+          // Presence unknowable (no Redis) — don't fake a signal.
+          setRecoveringTurn(false);
+          return;
+        }
+        if (data.inFlight) {
+          sawInFlight = true;
+          setRecoveringTurn(true);
+          timer = setTimeout(() => void tick(), 2500);
+          return;
+        }
+        // No turn in flight. Only refetch when we actually watched one
+        // finish — an unanswered tail with no live turn is settled history
+        // (a failed old turn), and refetching would loop this effect.
+        setRecoveringTurn(false);
+        if (sawInFlight) {
+          const fresh = await loadConversation(convId);
+          if (cancelled || !fresh) return;
+          const history = legacyToUi(fresh);
+          for (const m of history) seenMessageIdsRef.current.add(m.id);
+          setMessages(history);
+        }
+      } catch {
+        if (!cancelled) setRecoveringTurn(false);
+      }
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      setRecoveringTurn(false);
+    };
+  }, [messages, activeConversationId, isStreaming, loadConversation, setMessages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingApproval, isStreaming]);
@@ -1198,9 +1269,10 @@ export function ChippiWorkspace({
   // communicate, otherwise the row would render hollow once real text starts
   // flowing into the assistant bubble below.
   const showThinking =
-    isStreaming &&
-    tailMessage?.role === 'assistant' &&
-    (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan));
+    (isStreaming &&
+      tailMessage?.role === 'assistant' &&
+      (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan))) ||
+    recoveringTurn;
 
   // Live state for Chippi's orb avatar, read from what the turn is doing right
   // now: running a tool or executing a plan reads as "solving" (energetic);
@@ -1209,9 +1281,9 @@ export function ChippiWorkspace({
   // orb via `paused`.
   const orbState: OrbState = useMemo(() => {
     if ((liveCallIds && liveCallIds.size > 0) || activePlan) return 'solving';
-    if (isStreaming) return 'working';
+    if (isStreaming || recoveringTurn) return 'working';
     return 'listening';
-  }, [liveCallIds, activePlan, isStreaming]);
+  }, [liveCallIds, activePlan, isStreaming, recoveringTurn]);
 
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. The `/` skills menu lives
@@ -1718,7 +1790,11 @@ export function ChippiWorkspace({
                             />
                           )}
                           <ThinkingIndicator
-                            currentAction={currentAction}
+                            currentAction={
+                              recoveringTurn
+                                ? 'Still working on your last message…'
+                                : currentAction
+                            }
                             streamingReasoning={streamingReasoning}
                             elapsedMs={isWarmingUp ? warmupElapsedMs : 0}
                           />
