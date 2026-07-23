@@ -1365,129 +1365,14 @@
 /* ──────────────────────────────────────────────────────────────────────────
  * Chippi composer — agent-mode glow.
  *
- * When the composer's runtime is Agent (data-agent="true" on the shell,
- * set by ChippiPromptBox), the 1px neutral border is replaced by a 1px
- * orange→amber gradient ring (mask-composite ring technique — the gradient
- * paints only the 1px band, never the fill) plus a low-opacity outer bloom
- * that breathes on a slow ease-in-out cycle. While a turn is streaming
- * (data-streaming="true") the bloom tightens and brightens slightly and the
- * cycle speeds up — "working" reads as a change in energy, not a new effect.
- *
- * Pure CSS on purpose: two pseudo-elements + one opacity keyframe = cheap,
- * compositor-friendly, and trivially reduced-motion aware. Colors sit in the
- * Apple-orange family (#FF9F0A → #FF6A00) and are deliberately NOT new
- * design tokens — this is the one sanctioned "agent energy" accent, matching
- * the demoted-orange --brand philosophy.
+ * The traveling border beam in Agent mode is the <BorderBeam> component
+ * (border-beam package) wrapping the composer shell in
+ * components/ui/chippi-prompt-box.tsx — it paints its own ring, bloom, and
+ * animation. The shell just needs a positioning context for the beam's
+ * absolutely-positioned bloom layer.
  * ────────────────────────────────────────────────────────────────────────── */
 .chippi-composer-shell {
   position: relative;
-}
-
-/* Smoothly animatable angle for the traveling beam. @property lets the
-   conic-gradient rotate on the compositor without JS; where unsupported the
-   beam simply holds at its initial angle and the static base ring below still
-   reads as "agent mode" (graceful degrade). */
-@property --chippi-beam-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-
-/* The gradient ring replaces the neutral border so the geometry never
-   shifts — same 1px, same radius, different paint. Unlayered rule, so it
-   wins over the Tailwind utility border-color regardless of specificity. */
-.chippi-composer-shell[data-agent='true'] {
-  border-color: transparent;
-}
-
-/* BORDER BEAM — the ::before paints the 1px border band with a faint static
-   sunset ring PLUS a bright arc (conic-gradient) that travels around the
-   perimeter, so a beam of light circles the input while Chippi is in Agent
-   mode. Both layers are clipped to the 1px band by the mask-composite trick,
-   so the fill is never tinted. The base ring keeps the border visible on the
-   far side of the beam. Sunset palette (gold → orange), the sanctioned
-   "agent energy" accent — not new design tokens. */
-.chippi-composer-shell[data-agent='true']::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  /* rounded-3xl (1.5rem) + the 1px outset */
-  border-radius: calc(1.5rem + 1px);
-  padding: 1px;
-  background:
-    /* Traveling beam: a tight bright sunset arc, transparent elsewhere. */
-    conic-gradient(
-      from var(--chippi-beam-angle),
-      transparent 0deg,
-      transparent 300deg,
-      rgba(255, 208, 138, 0) 312deg,
-      #ffd08a 330deg,
-      #ff8a1e 344deg,
-      #ff6a00 350deg,
-      #ffd08a 358deg,
-      transparent 360deg
-    ),
-    /* Base ring underneath, so the border reads all the way around. */
-    linear-gradient(130deg, rgba(255, 159, 10, 0.42) 0%, rgba(255, 106, 0, 0.42) 55%, rgba(255, 159, 10, 0.42) 100%);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  animation: chippi-beam-travel 3.6s linear infinite;
-  pointer-events: none;
-}
-
-/* Outer bloom — box-shadow only (no fill), so content and the page behind
-   the radius are never tinted. Steady soft halo; the beam supplies the motion. */
-.chippi-composer-shell[data-agent='true']::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: calc(1.5rem + 1px);
-  box-shadow:
-    0 0 16px 1px rgba(255, 138, 10, 0.16),
-    0 0 44px 6px rgba(255, 106, 0, 0.08);
-  transition: box-shadow 0.4s ease;
-  pointer-events: none;
-}
-/* Streaming in agent mode: the beam speeds up and the halo leans in — "working"
-   reads as a change in energy, not a new effect. */
-.chippi-composer-shell[data-agent='true'][data-streaming='true']::before {
-  animation-duration: 1.9s;
-}
-.chippi-composer-shell[data-agent='true'][data-streaming='true']::after {
-  box-shadow:
-    0 0 12px 1px rgba(255, 138, 10, 0.26),
-    0 0 32px 4px rgba(255, 106, 0, 0.13);
-}
-/* Dark canvas carries an orange bloom further — lift the alphas a step so
-   the glow reads equally calm on #0c0c0d as on white. */
-.dark .chippi-composer-shell[data-agent='true']::after {
-  box-shadow:
-    0 0 20px 1px rgba(255, 138, 10, 0.22),
-    0 0 56px 8px rgba(255, 106, 0, 0.11);
-}
-.dark .chippi-composer-shell[data-agent='true'][data-streaming='true']::after {
-  box-shadow:
-    0 0 14px 1px rgba(255, 138, 10, 0.34),
-    0 0 36px 5px rgba(255, 106, 0, 0.17);
-}
-@keyframes chippi-beam-travel {
-  to {
-    --chippi-beam-angle: 360deg;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* Drop the travel; hold the full sunset ring bright + steady so agent mode
-     still reads clearly without any motion. */
-  .chippi-composer-shell[data-agent='true']::before {
-    animation: none;
-    background: linear-gradient(130deg, #ff9f0a 0%, #ff6a00 55%, #ff9f0a 100%);
-  }
 }
 
 /* ── The Island (.chippi-island-*) ─────────────────────────────────────────

@@ -9,7 +9,7 @@ import { countLabel } from '@/lib/formatting';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
-import { ThinkingOrb, type OrbState } from '@/components/chippi/thinking-orb';
+import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { ThinkingBar } from '@/components/ai/prompt-kit';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
 import { useDictation } from './use-dictation';
@@ -244,7 +244,7 @@ export function ChippiBar({ slug }: Props) {
   // Orb avatar state from what the mini-chat is doing (mirrors chippi-workspace).
   const orbState: OrbState = useMemo(() => {
     if (liveCallIds && liveCallIds.size > 0) return 'solving';
-    if (isStreaming) return 'thinking';
+    if (isStreaming) return 'working';
     return 'listening';
   }, [liveCallIds, isStreaming]);
   const showThinking =
@@ -329,8 +329,9 @@ export function ChippiBar({ slug }: Props) {
                   return (
                     <div key={msg.id} className="flex gap-2.5">
                       <ThinkingOrb
-                        state={msg.streaming && isStreaming ? orbState : 'idle'}
-                        size={24}
+                        state={msg.streaming && isStreaming ? orbState : 'listening'}
+                        paused={!(msg.streaming && isStreaming)}
+                        size={20}
                         className="mt-0.5"
                       />
                       <div className="flex-1 min-w-0 pt-0.5">
@@ -370,7 +371,7 @@ export function ChippiBar({ slug }: Props) {
 
               {showThinking && (
                 <div className="flex items-center gap-2.5">
-                  <ThinkingOrb state={orbState} size={24} />
+                  <ThinkingOrb state={orbState} size={20} />
                   {/* Shimmering "Thinking…" line — same indicator the full
                       workspace uses, not blinking dots. */}
                   <ThinkingBar label="Thinking…" />

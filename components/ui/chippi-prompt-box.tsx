@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { BorderBeam } from 'border-beam';
 import { cn } from '@/lib/utils';
 
 export interface MentionItem {
@@ -1106,15 +1107,18 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     return (
       <TooltipProvider>
         <div ref={containerRef} className={cn('relative', className)}>
-          {/* Shell — carries the agent-mode gradient ring + breathing bloom
-              via CSS (globals.css, `.chippi-composer-shell[data-agent]`).
-              data-agent flips with the Chat/Agent switch; data-streaming
-              tightens/brightens the bloom while a turn is running. Kept as
-              data-attributes + stylesheet keyframes so the glow costs zero
-              JS per frame. */}
+          {/* Agent-mode border beam — the <BorderBeam> (border-beam package)
+              wraps the composer shell and travels a sunset beam around its
+              1px border while Chippi is in Agent mode. `active` flips with the
+              Chat/Agent switch; the beam auto-detects the shell's rounded-3xl
+              radius. In Chat mode it's inert (no ring, no cost). */}
+          <BorderBeam
+            size="md"
+            colorVariant="sunset"
+            theme="auto"
+            active={chatMode === 'agent'}
+          >
           <div
-            data-agent={chatMode === 'agent' ? 'true' : undefined}
-            data-streaming={isLoading ? 'true' : undefined}
             className={cn(
               'chippi-composer-shell rounded-3xl border border-border/70 bg-background',
               'shadow-[0_1px_2px_rgba(0,0,0,0.03)]',
@@ -1572,6 +1576,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               {renderRightButton()}
             </div>
           </div>
+          </BorderBeam>
 
           {/* Slash (skills) menu — type "/" to open */}
           {slashOpen && (

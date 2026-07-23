@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
-import { ThinkingOrb, type OrbState } from '@/components/chippi/thinking-orb';
+import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
@@ -1182,11 +1182,12 @@ export function ChippiWorkspace({
 
   // Live state for Chippi's orb avatar, read from what the turn is doing right
   // now: running a tool or executing a plan reads as "solving" (energetic);
-  // streaming/reasoning with nothing concrete yet is "thinking"; idle between
-  // turns is "listening". Settled history rows use a still orb ('idle').
+  // streaming/reasoning with nothing concrete yet is "working" (the thinking
+  // read); idle between turns is "listening". Settled history rows freeze the
+  // orb via `paused`.
   const orbState: OrbState = useMemo(() => {
     if ((liveCallIds && liveCallIds.size > 0) || activePlan) return 'solving';
-    if (isStreaming) return 'thinking';
+    if (isStreaming) return 'working';
     return 'listening';
   }, [liveCallIds, activePlan, isStreaming]);
 
@@ -1576,8 +1577,9 @@ export function ChippiWorkspace({
                           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         >
                           <ThinkingOrb
-                            state={msg.streaming && isStreaming ? orbState : 'idle'}
-                            size={28}
+                            state={msg.streaming && isStreaming ? orbState : 'listening'}
+                            paused={!(msg.streaming && isStreaming)}
+                            size={20}
                             className="mt-0.5"
                           />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
@@ -1680,7 +1682,7 @@ export function ChippiWorkspace({
                         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                         className="flex gap-3"
                       >
-                        <ThinkingOrb state={orbState} size={28} className="mt-0.5" />
+                        <ThinkingOrb state={orbState} size={20} className="mt-0.5" />
                         <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                           {/* Preview PlanCard — appears immediately when the
                               plan_created event arrives, before the tool call
