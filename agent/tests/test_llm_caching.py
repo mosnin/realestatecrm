@@ -246,6 +246,15 @@ def test_make_chat_model_does_not_wrap_non_cache_providers():
         # "audited" should NOT match because the signal is "audit ".
         ("I audited the pipeline yesterday", "low"),
         ("researched comparables already", "low"),
+        # Deep signals lift straight to high (mirrors lib/chat/auto-think.ts).
+        ("think hard about how to price this listing", "high"),
+        ("do a deep dive on my stale leads", "high"),
+        ("give me a comprehensive review of the quarter", "high"),
+        ("what's the negotiation strategy for the Oakwood offer", "high"),
+        # A many-question planning ask reads as high; many questions alone
+        # as medium.
+        ("Compare these listings? Which should I push? What's the risk on each?", "high"),
+        ("Who is Jane? Where is the file? When is the tour?", "medium"),
     ],
 )
 def test_decide_reasoning_effort_heuristic(message, expected):

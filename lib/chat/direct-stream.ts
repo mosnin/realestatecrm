@@ -28,6 +28,7 @@ import {
   type DirectHistoryRow,
 } from './direct-llm';
 import { retrieveContext } from './vector-context';
+import { decideReasoningEffort } from './auto-think';
 import { shouldEscalate } from './router';
 import { createStopPoller } from './stop-signal';
 import type { MultimodalAttachment } from './multimodal';
@@ -56,6 +57,7 @@ export interface DirectStreamInput {
 interface SseEvent {
   type:
     | 'text_delta'
+    | 'reasoning_delta'
     | 'turn_complete'
     | 'error'
     | 'route_picked'
@@ -149,7 +151,18 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           spaceId: input.spaceId,
           userMessage: input.userMessage,
         });
-        push({ type: 'status', label: 'Thinking…' });
+
+        // Auto-think: analytical / planning turns get real reasoning; a
+        // phone-number lookup gets none and keeps its sub-second first
+        // token. The reasoning deltas below keep the wire alive through
+        // the thinking phase.
+        const reasoningEffort = decideReasoningEffort(input.userMessage, {
+          surface: 'direct',
+        });
+        push({
+          type: 'status',
+          label: reasoningEffort === 'none' ? 'Thinking…' : 'Thinking it through…',
+        });
 
         const systemMessage = [
           CHIPPI_INSTRUCTIONS_LITE,
@@ -174,6 +187,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         // aborts generation and commits whatever the user already saw.
         const shouldStop = createStopPoller(input.conversationId);
         let stopped = false;
+        const turnStartedAt = Date.now();
         const result = await runDirectChatStream(
           {
             model: input.model,
@@ -182,6 +196,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             userMessage: input.userMessage,
             attachments: input.attachments,
             signal: input.abortController.signal,
+            reasoningEffort,
           },
           (delta) => {
             // Bounded-cadence stop poll (async; flips `stopped` within one
@@ -212,6 +227,17 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
               push({ type: 'text_delta', delta: held });
             }
             return;
+          },
+          // Thinking deltas — streamed live ahead of the answer. NOT subject
+          // to the escalation hold-back (that gates visible *answer* text);
+          // the client renders these as the collapsible trace, so the
+          // thinking phase reads as activity, never a silent gap. Muted once
+          // a stop or escalation is latched — the trace belongs to a turn
+          // the user won't see finish here.
+          (delta) => {
+            if (!stopped && !escalationLatched) {
+              push({ type: 'reasoning_delta', delta });
+            }
           },
         );
 
@@ -283,9 +309,22 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         }
         push({ type: 'turn_complete', reason: stopped ? 'aborted' : 'complete' });
 
-        // Persist the assistant message + telemetry.
+        // Persist the assistant message + telemetry. The reasoning trace
+        // goes first (Claude / o1 pattern — same ordering the client uses
+        // live) so the "Thought for Xs" disclosure survives reload.
         if (result.text.trim()) {
-          const blocks: MessageBlock[] = [{ type: 'text', content: result.text }];
+          const blocks: MessageBlock[] = [
+            ...(result.reasoningText.trim()
+              ? [
+                  {
+                    type: 'reasoning',
+                    content: result.reasoningText.trim(),
+                    durationMs: Date.now() - turnStartedAt,
+                  } as MessageBlock,
+                ]
+              : []),
+            { type: 'text', content: result.text },
+          ];
           try {
             await saveAssistantMessage({
               spaceId: input.spaceId,
