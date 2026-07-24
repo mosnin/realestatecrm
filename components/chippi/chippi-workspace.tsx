@@ -1670,11 +1670,13 @@ export function ChippiWorkspace({
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         >
+                          {/* mt-[3px] centers the 20px orb on the first text
+                              line (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
                           <ThinkingOrb
                             state={msg.streaming && isStreaming ? orbState : 'listening'}
                             paused={!(msg.streaming && isStreaming)}
                             size={20}
-                            className="mt-0.5"
+                            className="mt-[3px]"
                           />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                             {/* PlanCard — rendered for each create_plan tool
@@ -1776,7 +1778,9 @@ export function ChippiWorkspace({
                         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                         className="flex gap-3"
                       >
-                        <ThinkingOrb state={orbState} size={20} className="mt-0.5" />
+                        {/* mt-1.5 centers the 20px orb on the indicator's
+                            first row (pt-0.5 + min-h-7 → center at 16px). */}
+                        <ThinkingOrb state={orbState} size={20} className="mt-1.5" />
                         <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                           {/* Preview PlanCard — appears immediately when the
                               plan_created event arrives, before the tool call
