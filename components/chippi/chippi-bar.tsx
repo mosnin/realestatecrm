@@ -339,11 +339,13 @@ export function ChippiBar({ slug }: Props) {
                 if (msg.role === 'assistant') {
                   return (
                     <div key={msg.id} className="flex gap-2.5">
+                      {/* mt-[3px] centers the 20px orb on the first text line
+                          (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
                       <ThinkingOrb
                         state={msg.streaming && isStreaming ? orbState : 'listening'}
                         paused={!(msg.streaming && isStreaming)}
                         size={20}
-                        className="mt-0.5"
+                        className="mt-[3px]"
                       />
                       <div className="flex-1 min-w-0 pt-0.5">
                         <Transcript

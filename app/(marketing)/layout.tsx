@@ -29,6 +29,7 @@ import { SiteHeader } from '@/components/marketing/giga/header';
 import { SiteFooter } from '@/components/marketing/giga/footer';
 import { FooterReveal } from '@/components/ui/footer-reveal';
 import { FprScript } from '@/components/affiliate/fpr-script';
+import { ChatbaseWidget } from '@/components/marketing/chatbase-widget';
 
 export default function MarketingLayout({
   children,
@@ -46,6 +47,8 @@ export default function MarketingLayout({
     >
       {/* FirstPromoter click tracking, sets _fprom_tid cookie from ?fpr= links */}
       <FprScript />
+      {/* Chatbase chat bubble — bottom-right on every logged-out page */}
+      <ChatbaseWidget />
       {/* Shared gradient def so icons can be stroked with the brand gradient. */}
       <svg aria-hidden width="0" height="0" className="absolute">
         <defs>
