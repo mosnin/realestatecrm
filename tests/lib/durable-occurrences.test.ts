@@ -163,6 +163,17 @@ describe('durable schedule occurrences', () => {
     });
     expect(cancelled.status).toBe('cancelled');
 
+    const cancelledRetry = finishOccurrence({
+      record: { ...claimed, cancellationRequestedAt: NOW.toISOString() },
+      workerId: WORKER_A,
+      leaseGeneration: claimed.leaseGeneration,
+      outcome: 'retryable_failure',
+      now: NOW,
+      retryAfterSeconds: 45,
+    });
+    expect(cancelledRetry.status).toBe('cancelled');
+    expect(cancelledRetry.availableAt).toBe(claimed.availableAt);
+
     const reclaimed = claimOccurrence(
       claimed,
       WORKER_A,

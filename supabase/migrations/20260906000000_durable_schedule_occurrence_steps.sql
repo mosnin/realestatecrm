@@ -272,10 +272,12 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF p_outcome = 'completed' THEN
-    next_status := 'completed';
-  ELSIF p_outcome = 'cancelled' OR current_row."cancellationRequestedAt" IS NOT NULL THEN
+  -- Cancellation is authoritative over a concurrently finishing worker. Once
+  -- persisted, no completion or retry outcome may revive this occurrence.
+  IF current_row."cancellationRequestedAt" IS NOT NULL OR p_outcome = 'cancelled' THEN
     next_status := 'cancelled';
+  ELSIF p_outcome = 'completed' THEN
+    next_status := 'completed';
   ELSIF p_outcome = 'retryable_failure' AND current_row.attempt < current_row."maxAttempts" THEN
     next_status := 'retry_wait';
   ELSIF p_outcome = 'retryable_failure' THEN
