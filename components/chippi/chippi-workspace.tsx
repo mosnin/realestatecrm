@@ -8,6 +8,10 @@ import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { WorkSessionsStrip } from '@/components/chippi/work-sessions-strip';
 import { WorkSessionDialog } from '@/components/chippi/work-session-dialog';
 import {
+  RealtimeVoiceDialog,
+  type DelegatedWork,
+} from '@/components/chippi/realtime-voice-dialog';
+import {
   ChippiPromptBox,
   type MentionItem,
   type SkillItem,
@@ -45,6 +49,7 @@ import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
 import { SystemMessage } from '@/components/ai/prompt-kit';
+import { fallbackHeuristic } from '@/lib/ai-tools/chippi-voice';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -82,6 +87,8 @@ interface ChippiWorkspaceProps {
   spaceId?: string;
   /** Connected apps + custom plugins offered in the @ mention menu. */
   mentionApps?: { slug: string; label: string }[];
+  /** Server-computed readiness. The browser never infers this from secrets. */
+  realtimeVoiceEnabled?: boolean;
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -231,6 +238,7 @@ export function ChippiWorkspace({
   variant = 'realtor',
   spaceId,
   mentionApps = [],
+  realtimeVoiceEnabled = false,
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
@@ -243,6 +251,7 @@ export function ChippiWorkspace({
   const [drawerOpen, setDrawerOpen] = useState(false);
   // /work command → the work-session launcher.
   const [workDialogOpen, setWorkDialogOpen] = useState(false);
+  const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
   // Server-driven loading: pending during the soft-nav so we can show the
   // "One moment" placeholder instead of the previous conversation's
   // transcript flashing for a beat. `useTransition` is the natural fit —
@@ -984,6 +993,68 @@ export function ChippiWorkspace({
     setPrefill({ text, nonce: Date.now() });
   }, []);
 
+  const handleVoiceDelegated = useCallback(
+    (work: DelegatedWork) => {
+      setActiveConversationId(work.conversationId);
+      setConversations((prev) => {
+        const existing = prev.find((conversation) => conversation.id === work.conversationId);
+        if (existing) {
+          return [
+            { ...existing, updatedAt: new Date() },
+            ...prev.filter((conversation) => conversation.id !== work.conversationId),
+          ];
+        }
+        return [
+          {
+            id: work.conversationId,
+            title: fallbackHeuristic(work.goal),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as ChatConversation,
+          ...prev,
+        ];
+      });
+      setMessages((prev) => {
+        if (
+          prev.some((message) =>
+            message.blocks.some(
+              (block) => block.type === 'work_session' && block.sessionId === work.sessionId,
+            ),
+          )
+        ) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `voice-user-${work.sessionId}`,
+            role: 'user',
+            blocks: [{ type: 'text', content: `Start a work session: ${work.goal}` }],
+          },
+          {
+            id: `voice-assistant-${work.sessionId}`,
+            role: 'assistant',
+            blocks: [
+              { type: 'text', content: 'I started this as a background work session.' },
+              {
+                type: 'work_session',
+                sessionId: work.sessionId,
+                goal: work.goal,
+                source: 'voice',
+              },
+            ],
+          },
+        ];
+      });
+      router.replace(
+        `${chippiBaseUrl}?conversationId=${encodeURIComponent(work.conversationId)}`,
+        { scroll: false },
+      );
+      toast.success('Work session started. You can close voice mode.');
+    },
+    [chippiBaseUrl, router, setMessages],
+  );
+
   // Counts for the header status sentence. Fetch only when we're rendering
   // the today view — no point pinging while in an active conversation. The
   // child sections still self-fetch their own data; this is a lightweight
@@ -1149,6 +1220,16 @@ export function ChippiWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tailMessage, liveCallIds]);
 
+  const inlineWorkSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const message of messages) {
+      for (const block of message.blocks) {
+        if (block.type === 'work_session') ids.add(block.sessionId);
+      }
+    }
+    return ids;
+  }, [messages]);
+
   // ── Alive warmup status — Agent (Modal) spin-up ────────────────────────────
   // The FIRST Agent turn of a fresh conversation pays a cold Modal warmup
   // before the first token. That one time we cycle a warm "getting ready" set
@@ -1292,7 +1373,13 @@ export function ChippiWorkspace({
     <div>
       {/* Live background work sessions — plan progress, approvals, questions,
           and the finished report, updating over Supabase Realtime. */}
-      {spaceId && !isBroker && <WorkSessionsStrip slug={slug} spaceId={spaceId} />}
+      {spaceId && !isBroker && (
+        <WorkSessionsStrip
+          slug={slug}
+          spaceId={spaceId}
+          hiddenSessionIds={inlineWorkSessionIds}
+        />
+      )}
       {/* Queued messages — typed while Chippi was working; each dispatches in
           order as a turn finishes. × drops one before it sends. */}
       {queuedMessages.length > 0 && (
@@ -1330,6 +1417,9 @@ export function ChippiWorkspace({
         skills={skills}
         showModeSwitch={shouldShowModeSwitch(variant)}
         conversationId={activeConversationId}
+        onVoiceStart={
+          realtimeVoiceEnabled && !isBroker ? () => setVoiceDialogOpen(true) : undefined
+        }
         onCommandAction={(action) => {
           if (action === 'work-session') setWorkDialogOpen(true);
         }}
@@ -1340,6 +1430,15 @@ export function ChippiWorkspace({
         open={workDialogOpen}
         onOpenChange={setWorkDialogOpen}
       />
+      {realtimeVoiceEnabled && !isBroker && (
+        <RealtimeVoiceDialog
+          slug={slug}
+          conversationId={activeConversationId}
+          open={voiceDialogOpen}
+          onOpenChange={setVoiceDialogOpen}
+          onDelegated={handleVoiceDelegated}
+        />
+      )}
       {/* Rate-limit countdown — shown below the composer when the API is
           throttling. Counts down from 60 s and disappears automatically. */}
       {rateLimitSeconds > 0 && (

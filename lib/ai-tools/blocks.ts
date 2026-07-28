@@ -17,6 +17,7 @@ export type MessageBlock =
   | PermissionBlock
   | ReasoningBlock
   | SubagentTaskBlock
+  | WorkSessionBlock
   | AttachmentBlock;
 
 export interface TextBlock {
@@ -115,6 +116,18 @@ export interface SubagentTaskBlock {
   runId: string;
   /** The task brief handed to the sub-agent. */
   goal: string;
+}
+
+/**
+ * A durable child-work thread created from the conversation. Unlike the
+ * legacy SwarmRun card, a Work Session is conversation-linked, can pause for
+ * approval/input, survives navigation, and produces a durable artifact.
+ */
+export interface WorkSessionBlock {
+  type: 'work_session';
+  sessionId: string;
+  goal: string;
+  source: 'voice' | 'chat';
 }
 
 /**

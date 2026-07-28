@@ -8,6 +8,7 @@ import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
 import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
 import { SubagentTaskBlockView } from './subagent-task-block-view';
+import { WorkSessionBlockView } from './work-session-block-view';
 import { ReasoningBlockView } from './reasoning-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
@@ -114,6 +115,7 @@ export function Transcript({
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
     | { kind: 'subagent'; block: ToolCallBlock }
     | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> }
+    | { kind: 'work-session'; block: Extract<MessageBlock, { type: 'work_session' }> }
     | {
         kind: 'attachments';
         blocks: Array<Extract<MessageBlock, { type: 'attachment' }>>;
@@ -140,6 +142,10 @@ export function Transcript({
     }
     if (block.type === 'subagent_task') {
       items.push({ kind: 'subagent-task', block });
+      continue;
+    }
+    if (block.type === 'work_session') {
+      items.push({ kind: 'work-session', block });
       continue;
     }
     if (block.type === 'tool_call') {
@@ -216,6 +222,13 @@ export function Transcript({
             return (
               <SubagentTaskBlockView
                 key={`subagent-task-${item.block.runId}`}
+                block={item.block}
+              />
+            );
+          case 'work-session':
+            return (
+              <WorkSessionBlockView
+                key={`work-session-${item.block.sessionId}`}
                 block={item.block}
               />
             );

@@ -4,7 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { kickPlan } from '@/lib/work-sessions/kick';
+import { startWorkSession } from '@/lib/work-sessions/start';
 
 export const runtime = 'nodejs';
 
@@ -65,23 +65,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const id = crypto.randomUUID();
-  const { data, error } = await supabase
-    .from('WorkSession')
-    .insert({
-      id,
+  try {
+    const { session } = await startWorkSession({
+      id: crypto.randomUUID(),
       spaceId: auth.space.id,
       conversationId: typeof body.conversationId === 'string' ? body.conversationId : null,
       goal,
       autonomy: body.autonomy === 'just_go' ? 'just_go' : 'plan_first',
       allowQuestions: body.allowQuestions !== false,
-    })
-    .select('*')
-    .single();
-  if (error || !data) {
+    });
+    return NextResponse.json({ session }, { status: 201 });
+  } catch {
     return NextResponse.json({ error: 'Could not start the session.' }, { status: 500 });
   }
-
-  await kickPlan(id);
-  return NextResponse.json({ session: data }, { status: 201 });
 }

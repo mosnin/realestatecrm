@@ -34,7 +34,16 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: string }) {
+export function WorkSessionsStrip({
+  slug,
+  spaceId,
+  hiddenSessionIds,
+}: {
+  slug: string;
+  spaceId: string;
+  /** Sessions already rendered inline in the open conversation. */
+  hiddenSessionIds?: ReadonlySet<string>;
+}) {
   const [sessions, setSessions] = useState<WorkSessionRow[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -73,17 +82,18 @@ export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: st
       (a, b) => Number(ACTIVE.has(b.status)) - Number(ACTIVE.has(a.status)),
     );
     // Every active session + the most recent finished one (until dismissed).
-    const active = sorted.filter((s) => ACTIVE.has(s.status));
-    const finished = sorted.find((s) => !ACTIVE.has(s.status) && !dismissed.has(s.id));
+    const eligible = sorted.filter((s) => !hiddenSessionIds?.has(s.id));
+    const active = eligible.filter((s) => ACTIVE.has(s.status));
+    const finished = eligible.find((s) => !ACTIVE.has(s.status) && !dismissed.has(s.id));
     return finished ? [...active, finished] : active;
-  }, [sessions, dismissed]);
+  }, [sessions, dismissed, hiddenSessionIds]);
 
   if (visible.length === 0) return null;
 
   return (
     <div className="mb-2 space-y-2">
       {visible.map((s) => (
-        <SessionCard
+        <WorkSessionCard
           key={s.id}
           session={s}
           slug={slug}
@@ -103,7 +113,7 @@ function StepIcon({ status }: { status: PlanStep['status'] }) {
   return <Circle size={8} className="mt-0.5 text-muted-foreground/40" />;
 }
 
-function SessionCard({
+export function WorkSessionCard({
   session, slug, onDismiss,
 }: {
   session: WorkSessionRow;
