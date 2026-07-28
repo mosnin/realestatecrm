@@ -2,7 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/supabase', () => ({ supabase: {} }));
+const { spaceOwnerMock } = vi.hoisted(() => ({
+  spaceOwnerMock: vi.fn(async () => ({ data: { id: 'space-1', ownerId: 'user-1' }, error: null })),
+}));
+
+vi.mock('@/lib/supabase', () => {
+  function chain() {
+    const value: Record<string, unknown> = {};
+    for (const method of ['select', 'eq', 'limit']) value[method] = vi.fn(() => value);
+    value.maybeSingle = spaceOwnerMock;
+    return value;
+  }
+  return { supabase: { from: vi.fn(() => chain()) } };
+});
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true, remaining: 1, resetAt: Date.now() + 1000 })),
 }));
@@ -79,6 +91,16 @@ describe('internal team-message run-policy boundary', () => {
       ),
     );
     expect(wrongScope.status).toBe(403);
+  });
+
+  it('denies a grant issued for someone other than the resolved space owner', async () => {
+    const res = await POST(
+      request(
+        grant({ mode: 'interactive', subject: 'user-2' }),
+      ),
+    );
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RUN_POLICY_DENIED' });
   });
 
   it('rejects malformed signed headers in shadow mode and unsigned callers in enforce mode', async () => {

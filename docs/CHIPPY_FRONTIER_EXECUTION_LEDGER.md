@@ -61,6 +61,9 @@ Evidence labels: **SR** source review, **LT** local test, **UI** captured intera
 | D011 | Signed-but-invalid/underprivileged grants are denied even in shadow mode | Shadow exception is only for genuinely absent legacy policy, never restricted callers | implemented locally |
 | D012 | Voice write authority requires an approval-decision capability in addition to action capability | Voice is a control plane; ordinary conversation is not execution consent | implemented in policy contract |
 | D013 | Keep the legacy Python Agents SDK seam frozen until a provider/cache compatibility harness exists | The repository pins a pre-1.0 SDK/provider adapter; an in-place upgrade could break OpenRouter routing, tracing, or cached prompt composition | accepted migration gate |
+| D014 | Mint Python/Modal internal-action grants per call with one capability | Preserves run/tenant/subject binding without turning a process secret into broad authority; autonomous writes are stopped locally even while endpoints remain in shadow | implemented locally; runtime validation pending |
+| D015 | Add schedule occurrences and step records as a disabled seam, not a cron rewrite | A durable occurrence/lease/fencing contract must be proven before it owns legacy schedule advancement | implemented locally; migration unrun and no executor wiring |
+| D016 | Reject expired leases and changed step idempotency keys | An expired worker may not renew or complete work; a stable step key must not silently point at a changed effect | independently reviewed and implemented locally |
 
 ## Current architecture target
 
@@ -98,16 +101,16 @@ Core additive records:
 
 ## Exact next safe actions
 
-1. Propagate signed run grants through every Python/Modal autonomous caller; keep enforcement disabled until a complete caller inventory and negative-path suite pass.
-2. Validate migration syntax, roles, tenant guards, claims, leases, and concurrency in a disposable local Supabase/Postgres instance.
-3. Implement `ScheduleOccurrence` claiming plus per-step idempotency before changing legacy workflow watermark behavior.
+1. Start a disposable local Supabase/Postgres service and execute the additive migrations; prove role, tenant, unique-occurrence, lease-fencing, heartbeat, stale-worker, cancellation, retry, and step-idempotency invariants. Do not use remote data as a substitute.
+2. Propagate the stable occurrence/step idempotency key into a small, explicitly selected provider-effect adapter and prove duplicate/replay behavior before enabling any occurrence executor.
+3. Complete the Python/Modal caller inventory with runtime shadow telemetry and negative-path callback tests; keep policy enforcement disabled until the inventory and telemetry gates pass.
 4. Add feature-flagged durable run read/control services without changing existing conversation responses.
 5. Build a measured OpenRouter/Agents SDK/prompt-cache compatibility harness before any SDK or cache-composition migration.
 6. Capture the current Chippy workspace UI only if an authenticated non-production/local surface is safely available; re-audit without advancing any critical score below 9.
 
 ## Anti-loop control
 
-- **Last verified state:** 111 focused tests across 11 files, direct TypeScript compilation, and diff whitespace validation passed after policy, Redis, trigger, state-machine, delegation, and team-message boundary changes.
+- **Last verified state:** Python/Modal grant propagation and disabled occurrence/step-idempotency seams passed focused and full local suites; TypeScript compilation and diff whitespace validation passed. Disposable database validation is blocked by unavailable local Docker/Postgres.
 - **Duplicate-work check:** before each work item, inspect this ledger, `git diff`, current tests, and prior reviewer findings; do not reopen a closed lane without new evidence.
 - **Autonomous loop stop conditions:** cancellation requested; terminal state; wall/cycle/token budget exhausted; tool or child quota exhausted; repeated observation; repeated no-progress; verification failure requiring input; approval required.
 - **Retry rule:** retry only a persisted occurrence/job with remaining budget, explicit backoff, and idempotent completed steps. Never retry an entire side-effecting workflow merely because a watermark stayed due.
@@ -122,6 +125,7 @@ Core additive records:
 | `DURABLE_AGENT_RUNS_ENABLED` | unset/off (planned) | dual-write new run protocol | disable new writer/reader, retain rows |
 | `DURABLE_AGENT_WORKSPACE_ENABLED` | unset/off (planned) | new task workspace UI | return to legacy conversation/Work Session UI |
 | `REALTIME_VOICE_GATEWAY_ENABLED` | unset/off (planned) | server-managed Realtime control plane | hide voice control, preserve text/task state |
+| `DURABLE_SCHEDULE_OCCURRENCES_ENABLED` | unset/off | permit a future occurrence executor only after DB/provider fault gates | unset; legacy schedule behavior is untouched |
 
 ## Verification record — append only
 
@@ -136,6 +140,11 @@ Core additive records:
 | V007 | 2026-07-28 | independent migration review | found cross-tenant child references, parent capability drift, lease index, and lifecycle integrity gaps; migration revised, DB execution still pending |
 | V008 | 2026-07-28 | `supabase db lint --local` | blocked: no local Postgres on 127.0.0.1:54322; no remote fallback used |
 | V009 | 2026-07-28 | focused suite after team-message policy coverage | 111 tests passed across 11 files; direct `tsc --noEmit` and `git diff --check` passed |
+| V010 | 2026-07-28 | Python/Modal caller inventory and focused grant suite | dispatcher, curated tools, tour-calendar mirror, and team-message caller paths now emit a per-call grant; 11 focused Python tests and `compileall` pass; no Modal runtime invoked |
+| V011 | 2026-07-28 | disposable local database discovery | blocked: Supabase cannot reach Docker daemon; `pg_isready` reports no service on 127.0.0.1:54321 or :54322. No remote database was contacted. |
+| V012 | 2026-07-28 | Python/Modal grant and TypeScript endpoint seam regression | 15 targeted Vitest tests, 11 focused Python tests, `tsc --noEmit`, and `git diff --check` pass; Python-issued grant verifies in TypeScript and tenant/subject mismatch is denied. |
+| V013 | 2026-07-28 | full local regression after grant + occurrence seam | full Vitest suite and `agent/.venv/bin/python -m pytest -q agent/tests` pass (211 Python tests); expected fixture warnings only. |
+| V014 | 2026-07-28 | durable occurrence/step pure-contract suite | 5 tests pass: tenant-scoped occurrence key, version drift refusal, completed-step replay skip, retry/dead-letter/cancel states, stale lease-generation refusal, and feature-off default. SQL RPC execution remains unverified. |
 
 ## Deployment and rollback notes
 
@@ -153,8 +162,10 @@ Core additive records:
 - OpenAI Realtime gateway and current API behavior require official-doc conformance and synthetic runtime validation.
 - New migration has not been applied or executed against a database.
 - Existing customer UI has not yet been interaction-audited in this implementation phase.
-- Actual Python autonomous callers do not yet mint/forward run-policy grants; `enforce` is a rollout blocker and `shadow` is not a complete safety boundary.
+- Python autonomous callers mint/forward per-call grants for dispatcher, curated, tour-calendar, and team-message routes. Runtime Modal secret availability and end-to-end callback verification remain **RU**; `enforce` is still blocked on runtime validation and complete shadow telemetry.
+- The Python reviewed-read list mirrors `lib/integrations/action-policy.ts`; it is a deliberate temporary duplicate. Add a parity/generation check before `enforce`, and treat any drift as a release gate failure.
 - Returned-failed scheduled workflows still advance the legacy watermark intentionally until occurrence-based, resumable, idempotent step retry is implemented; this audit finding is not closed.
+- `ScheduleOccurrence` and `ScheduleOccurrenceStep` now have a feature-off TypeScript/SQL contract with unique tenant-scoped occurrence identity, lease generation, expiry checks, cancellation, bounded retry, and stable step keys. The migration is unexecuted, no cron/executor calls it, and provider crash-after-effect-before-step-completion remains a release blocker.
 - Python pins a pre-1.0 `openai-agents` range and uses a custom OpenRouter adapter; API currency, provider behavior, tracing, prompt-cache correctness/hit rate/latency/cost, and upgrade rollback remain unverified.
 - Notion pages remain privately owned because the connector cannot grant access.
 
@@ -184,3 +195,5 @@ Do not add these as disconnected features. The durable task graph, proposal boun
 - 2026-07-28: Preserved legacy workflow watermark behavior to avoid duplicating successful earlier steps; occurrence/idempotent retry remains a no-go dependency.
 - 2026-07-28: Added focused team-message run-policy tests; 111 tests, direct TypeScript compilation, and diff checks pass. Recorded the SDK/provider/cache compatibility harness as a prerequisite to framework migration.
 - 2026-07-28: Published the full Frontier Quality Gate and current execution-control checkpoint to the dedicated Notion workspace; overview, evidence, and roadmap pages were substantively updated and verified.
+- 2026-07-28: Propagated narrow signed grants through Python/Modal internal integration and team-message callers; autonomous write attempts now stop locally before an HTTP call, while run-policy endpoint rollout remains shadow. Added 11 focused Python grant/correlation tests and compile validation.
+- 2026-07-28: Independently hardened Python-issued grants with TypeScript compatibility and subject-binding checks at integration/message endpoints. Added a feature-off `ScheduleOccurrence`/step-idempotency seam with tenant-scoped occurrence keys, expiry/fencing checks, definition-version refusal, and stale-worker protection; legacy cron and watermark behavior remain unchanged. Disposable DB validation is blocked by unavailable local Docker/Postgres; full local regression and 211 Python tests pass.

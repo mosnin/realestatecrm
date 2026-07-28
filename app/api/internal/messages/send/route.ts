@@ -106,6 +106,21 @@ export async function POST(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
   const senderId = (space as { ownerId: string }).ownerId;
+  // This route resolves the sender from the space rather than trusting a body
+  // field.  A signed policy is still subject-bound: prevent a valid grant for
+  // a different user in the same workspace from sending as the owner.
+  if (policy.ok && policy.claims.subject !== senderId) {
+    logger.warn('[internal/messages/send] run policy subject mismatch', {
+      runId: policy.claims.runId,
+      spaceId,
+      claimedSubject: policy.claims.subject,
+      senderId,
+    });
+    return NextResponse.json(
+      { error: 'Run capability grant is not bound to this sender.', code: 'RUN_POLICY_DENIED' },
+      { status: 403 },
+    );
+  }
   const { data: membership } = await supabase
     .from('BrokerageMembership')
     .select('brokerageId')

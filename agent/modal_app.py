@@ -242,6 +242,14 @@ async def run_now_webhook(item: dict) -> dict:
             else {}
         )
 
+        # Routine and sweep dispatchers already write a UUID ledger id before
+        # invoking Modal. Preserve it for policy-grant correlation rather than
+        # silently replacing it in the worker. Older trigger/manual callers
+        # may omit it; the autonomous context remains read-only at action
+        # boundaries in that compatibility case.
+        raw_run_id = item.get("run_id")
+        run_id = raw_run_id.strip() if isinstance(raw_run_id, str) else ""
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -262,6 +270,7 @@ async def run_now_webhook(item: dict) -> dict:
             instruction=instruction or None,
             owner_clerk_id=user_id or None,
             trigger_source=trigger_source or None,
+            run_id=run_id or None,
         )
         return {"ok": True, "space_id": space_id}
 
@@ -443,6 +452,15 @@ async def chat_turn(item: dict):
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
     resolved_model = resolve_chat_model(agent_settings.chat_model)
 
+    # Preserve the legacy conversation-derived stream key, but never feed a
+    # non-UUID value into a signed capability claim.  A fresh UUID is an
+    # authority correlation id for this chat execution only; it is not shown
+    # to the client and cannot grant a capability outside this exact context.
+    try:
+        policy_run_id = str(uuid.UUID(conversation_id)) if conversation_id else str(uuid.uuid4())
+    except (ValueError, TypeError, AttributeError):
+        policy_run_id = str(uuid.uuid4())
+
     ctx = AgentContext.from_settings(
         agent_settings,
         run_id=conversation_id or f"chat-{uuid.uuid4()}",
@@ -450,6 +468,8 @@ async def chat_turn(item: dict):
         user_id=user_id,
         brokerage_id=brokerage_id,
         broker_role=broker_role,
+        run_mode="interactive",
+        run_policy_run_id=policy_run_id,
     )
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────

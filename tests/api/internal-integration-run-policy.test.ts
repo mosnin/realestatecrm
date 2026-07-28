@@ -84,6 +84,12 @@ describe('internal integration run-policy boundary', () => {
     expect(executeMock).not.toHaveBeenCalled();
   });
 
+  it('denies a grant issued for another Composio entity', async () => {
+    const res = await POST(request('GMAIL_FETCH_EMAILS', grant({ subject: 'user-2' })));
+    expect(res.status).toBe(403);
+    expect(executeMock).not.toHaveBeenCalled();
+  });
+
   it('denies a malformed signed header even during shadow rollout', async () => {
     const res = await POST(request('GMAIL_FETCH_EMAILS', 'not-a-valid-grant'));
     expect(res.status).toBe(403);

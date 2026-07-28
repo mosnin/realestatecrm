@@ -91,6 +91,21 @@ export async function POST(req: NextRequest) {
   const policyToken = req.headers.get(RUN_POLICY_HEADER);
   const policy = verifyRunPolicy(policyToken, { spaceId });
   if (policy.ok) {
+    // The signed grant is issued for exactly the Composio entity whose body
+    // userId will receive the effect.  A valid grant for another user is not
+    // transferable merely because both users can access the same space.
+    if (policy.claims.subject !== userId) {
+      logger.warn('[integrations.execute] run policy subject mismatch', {
+        runId: policy.claims.runId,
+        spaceId,
+        claimedSubject: policy.claims.subject,
+        userId,
+      });
+      return NextResponse.json(
+        { ok: false, error: 'Run capability grant is not bound to this user.', code: 'RUN_POLICY_DENIED' },
+        { status: 403 },
+      );
+    }
     if (!mayExecuteIntegrationAction(policy.claims, actionClass)) {
       logger.warn('[integrations.execute] run policy denied action', {
         runId: policy.claims.runId,
