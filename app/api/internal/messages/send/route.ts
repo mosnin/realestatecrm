@@ -18,6 +18,11 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { ensureDmChannel, postMessage, rosterForBrokerage } from '@/lib/messaging';
 import { logger } from '@/lib/logger';
+import {
+  RUN_POLICY_HEADER,
+  runPolicyEnforcementMode,
+  verifyRunPolicy,
+} from '@/lib/agent/run-policy';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +49,45 @@ export async function POST(req: NextRequest) {
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, MAX_MESSAGE) : '';
   if (!spaceId || !recipient || !message) {
     return NextResponse.json({ error: 'spaceId, recipient, and message are required' }, { status: 400 });
+  }
+
+  const policyToken = req.headers.get(RUN_POLICY_HEADER);
+  const policy = verifyRunPolicy(policyToken, {
+    spaceId,
+    requiredCapability: 'team_message:send',
+  });
+  if (policy.ok) {
+    if (
+      policy.claims.mode !== 'interactive' &&
+      !(
+        policy.claims.mode === 'voice_control' &&
+        policy.claims.capabilities.includes('proposal:decide')
+      )
+    ) {
+      logger.warn('[internal/messages/send] unattended run denied', {
+        runId: policy.claims.runId,
+        spaceId,
+        mode: policy.claims.mode,
+      });
+      return NextResponse.json(
+        { error: 'Unattended runs must propose team messages for review.', code: 'RUN_POLICY_DENIED' },
+        { status: 403 },
+      );
+    }
+  } else if (policyToken || runPolicyEnforcementMode() === 'enforce') {
+    logger.warn('[internal/messages/send] missing or invalid run policy', {
+      spaceId,
+      reason: policy.reason,
+    });
+    return NextResponse.json(
+      { error: 'A valid run capability grant is required.', code: 'RUN_POLICY_REQUIRED' },
+      { status: 403 },
+    );
+  } else {
+    logger.warn('[internal/messages/send] legacy caller allowed in shadow mode', {
+      spaceId,
+      reason: policy.reason,
+    });
   }
 
   // Runaway-loop guard: a compromised secret or looping agent must not be

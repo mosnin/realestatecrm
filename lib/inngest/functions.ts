@@ -27,7 +27,7 @@ import {
   planSession as planWorkSession,
   executeSession as executeWorkSession,
 } from '@/lib/work-sessions/engine';
-import { redis } from '@/lib/redis';
+import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
 
@@ -250,6 +250,12 @@ export const handleComposioTrigger = inngest.createFunction(
       userId: string;
       payload: Record<string, unknown>;
     };
+
+    if (!isRedisConfigured()) {
+      throw new Error(
+        'Redis is required by the legacy Composio handler idempotency path; refusing to acknowledge delivery',
+      );
+    }
 
     // 0. In-handler idempotency. The receiver dedupes on webhook-id at
     //    HTTP-arrival time, but Inngest itself is at-least-once: if a

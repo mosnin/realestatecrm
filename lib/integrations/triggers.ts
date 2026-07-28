@@ -1414,12 +1414,20 @@ export async function dispatchTrigger(args: {
       toolkit: args.connection.toolkit,
       deliveryId: args.deliveryId ?? '',
     };
-    await fireRoutineRun(
+    const runStatus = await fireRoutineRun(
       args.connection.spaceId,
       tagged,
       args.connection.userId,
       triggerSource,
     );
+    if (runStatus === 'error') {
+      logger.error('[integrations.triggers] autonomous draft dispatch failed', {
+        slug: args.triggerSlug,
+        connectionId: args.connection.id,
+        deliveryId: args.deliveryId ?? null,
+      });
+      throw new Error(`Autonomous draft dispatch failed for ${args.triggerSlug}`);
+    }
     return { dispatched: 'DRAFT', workflowsRan };
   }
 

@@ -149,8 +149,9 @@ async function handler(req: NextRequest) {
   async function worker() {
     while (cursor < due.length) {
       const { row, slot } = due[cursor++];
+      let occurrenceHandled = false;
       try {
-        await runWorkflow({
+        const result = await runWorkflow({
           workflow: {
             id: row.id,
             spaceId: row.spaceId,
@@ -162,7 +163,19 @@ async function handler(req: NextRequest) {
           context: { event: { type: 'schedule', firedAt } },
           triggerEvent: { type: 'schedule', firedAt },
         });
-        ran++;
+        if (result.status === 'failed') {
+          errored++;
+          // Compatibility guard: until ScheduleOccurrence owns bounded retries
+          // and per-action idempotency, re-running the whole workflow can
+          // duplicate earlier successful actions. Preserve the legacy
+          // watermark advancement while reporting the failure honestly.
+          // The durable occurrence scheduler must remove this only together
+          // with resumable/idempotent step execution.
+          occurrenceHandled = true;
+        } else {
+          occurrenceHandled = true;
+          ran++;
+        }
       } catch (err) {
         // runWorkflow already swallows its own errors; this is belt-and-
         // suspenders so one bad workflow can't abort the loop.
@@ -170,11 +183,10 @@ async function handler(req: NextRequest) {
         errored++;
       }
 
-      // Stamp the SLOT (not `now`) as the watermark — even on error, mirroring
-      // /api/cron/routines, so a permanently failing workflow can't refire
-      // every tick forever. Best-effort: a failed stamp only means the next
-      // tick may refire this slot once (at-least-once, never silently dropped).
-      if (watermarkColumnAvailable && slot) {
+      // Legacy compatibility: completed/skipped and returned-failed runs stamp.
+      // Thrown failures do not. Returned failures cannot be safely replayed
+      // until ScheduleOccurrence + per-step idempotency are active.
+      if (occurrenceHandled && watermarkColumnAvailable && slot) {
         const { error: stampErr } = await supabase
           .from('Workflow')
           .update({ lastScheduledFireAt: slot.toISOString() })

@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTriggerWebhook } from '@/lib/integrations/composio';
 import { inngest } from '@/lib/inngest/client';
-import { redis } from '@/lib/redis';
+import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -117,6 +117,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Redis is authoritative for this legacy receiver's dedupe and rate cap.
+  // The no-op adapter returns null for SET, which is indistinguishable from a
+  // duplicate. Fail retryably instead of acknowledging and losing the event.
+  // The durable EventInbox migration will remove Redis from this authority.
+  if (!isRedisConfigured()) {
+    logger.error('[composio-webhook] Redis is required for durable delivery handling', {
+      webhookId,
+      triggerSlug: payload.triggerSlug,
+    });
+    return NextResponse.json(
+      { error: 'delivery_dependency_unavailable', dependency: 'redis' },
+      { status: 503, headers: { 'Retry-After': '30' } },
+    );
+  }
+
   // Make inbound-trigger health observable. Environment-variable presence
   // only proves credentials exist; this timestamp proves a signed delivery
   // actually reached the canonical endpoint. Monitoring must never break the
@@ -153,9 +168,25 @@ export async function POST(req: NextRequest) {
   // connectedAccountId was validated non-empty by the shape guard above.
   const hourBucket = Math.floor(Date.now() / 1000 / RATE_WINDOW_SECONDS);
   const rateKey = `composio:trigger:rate:${connectedAccountId}:${payload.triggerSlug}:${hourBucket}`;
-  const count = (await redis.incr(rateKey)) as number;
-  if (count === 1) {
-    await redis.expire(rateKey, RATE_WINDOW_SECONDS);
+  let count: number;
+  try {
+    count = (await redis.incr(rateKey)) as number;
+    if (count === 1) {
+      await redis.expire(rateKey, RATE_WINDOW_SECONDS);
+    }
+  } catch (err) {
+    // A configured Redis can still be unavailable. Release the delivery claim
+    // before returning a retryable error; otherwise the provider retry would
+    // receive a false duplicate acknowledgement and the event would be lost.
+    await redis.del(dedupeKey).catch(() => null);
+    logger.error('[composio-webhook] rate dependency failed — dedupe released', {
+      webhookId,
+      rateKey,
+    }, err);
+    return NextResponse.json(
+      { error: 'delivery_dependency_unavailable', dependency: 'redis' },
+      { status: 503, headers: { 'Retry-After': '30' } },
+    );
   }
   if (count > HOURLY_CAP_PER_TRIGGER) {
     logger.warn('[composio-webhook] hourly cap exceeded — dropping', {

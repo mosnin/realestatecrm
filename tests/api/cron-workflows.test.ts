@@ -39,7 +39,9 @@ vi.mock('@/lib/supabase', () => {
 
 // ── Executor mock ───────────────────────────────────────────────────────────
 const { runWorkflowMock } = vi.hoisted(() => ({
-  runWorkflowMock: vi.fn(async (_input: unknown) => undefined),
+  runWorkflowMock: vi.fn<
+    (_input: unknown) => Promise<{ runId: string; status: 'completed' | 'failed' | 'skipped' }>
+  >(async () => ({ runId: 'run-1', status: 'completed' })),
 }));
 vi.mock('@/lib/workflows/executor', () => ({ runWorkflow: runWorkflowMock }));
 
@@ -85,7 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   supabaseQueue = [];
   supabaseCalls.length = 0;
-  runWorkflowMock.mockReset().mockResolvedValue(undefined);
+  runWorkflowMock.mockReset().mockResolvedValue({ runId: 'run-1', status: 'completed' });
   savedSecret.CRON_SECRET = process.env.CRON_SECRET;
   savedSecret.DISABLED = process.env.CRON_WORKFLOWS_DISABLED;
   process.env.CRON_SECRET = 'test-secret';
@@ -200,8 +202,19 @@ describe('GET /api/cron/workflows', () => {
     expect(supabaseCalls.filter((c) => c.table === 'Workflow')).toHaveLength(2);
   });
 
-  it('a throwing workflow run is counted errored but STILL stamps (no refire loop)', async () => {
+  it('a throwing workflow run is counted errored and does not falsely advance the watermark', async () => {
     runWorkflowMock.mockRejectedValueOnce(new Error('executor blew up'));
+    supabaseQueue = [
+      { data: [wf('w1', { cadence: 'hourly' }, '2026-06-29T10:00:00.000Z')], error: null },
+    ];
+
+    const body = await (await invoke('Bearer test-secret')).json();
+    expect(body).toMatchObject({ due: 1, ran: 0, errored: 1 });
+    expect(stampCalls()).toHaveLength(0);
+  });
+
+  it('a returned failed workflow is counted errored but preserves the legacy watermark until step retries are idempotent', async () => {
+    runWorkflowMock.mockResolvedValueOnce({ runId: 'run-failed', status: 'failed' });
     supabaseQueue = [
       { data: [wf('w1', { cadence: 'hourly' }, '2026-06-29T10:00:00.000Z')], error: null },
       { data: null, error: null },
@@ -210,7 +223,6 @@ describe('GET /api/cron/workflows', () => {
     const body = await (await invoke('Bearer test-secret')).json();
     expect(body).toMatchObject({ due: 1, ran: 0, errored: 1 });
     expect(stampCalls()).toHaveLength(1);
-    expect(stampCalls()[0].payload).toEqual({ lastScheduledFireAt: '2026-06-29T11:00:00.000Z' });
   });
 
   it('rows with a malformed trigger config are skipped, others still run', async () => {

@@ -8,8 +8,8 @@ import 'server-only';
  * push. Every transition is an UPDATE on the WorkSession row, which the
  * client watches over Supabase Realtime — the row IS the progress feed.
  *
- * Safety posture: session runs execute with the read-only tool subset
- * (requiresApproval === false). A background run can research, analyze, and
+ * Safety posture: session runs execute with an explicit audited pure-read
+ * allowlist. A background run can research, analyze, and
  * produce documents; it can never send, create, or delete — actions stay in
  * chat where the approval UI lives. The session's deliverable proposes next
  * actions instead of taking them.
@@ -27,6 +27,7 @@ import { getAgentModel } from '@/lib/ai-tools/agent-model';
 import { toSdkTool } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import type { ToolContext, ToolDefinition } from '@/lib/ai-tools/types';
+import { unattendedReadTools } from '@/lib/agent/unattended-tool-policy';
 import { uploadObject, buildKey } from '@/lib/storage';
 import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
@@ -82,9 +83,9 @@ async function contextForSpace(spaceId: string): Promise<ToolContext | null> {
   };
 }
 
-/** The read-only tool subset a background run may use. */
+/** The explicit pure-read tool subset a background run may use. */
 function readOnlyTools(): ToolDefinition[] {
-  return ALL_TOOLS.filter((t) => t.requiresApproval === false);
+  return unattendedReadTools(ALL_TOOLS);
 }
 
 // ── Phase 1: plan ────────────────────────────────────────────────────────────

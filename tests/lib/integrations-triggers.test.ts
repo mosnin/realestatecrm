@@ -29,7 +29,7 @@ vi.mock('@/lib/integrations/composio', () => ({
 // ── fireRoutineRun mock ───────────────────────────────────────────────
 
 const { fireRoutineRunMock } = vi.hoisted(() => ({
-  fireRoutineRunMock: vi.fn(async () => 'ok' as const),
+  fireRoutineRunMock: vi.fn<() => Promise<'ok' | 'error'>>(async () => 'ok'),
 }));
 vi.mock('@/lib/routines', () => ({
   fireRoutineRun: fireRoutineRunMock,
@@ -476,6 +476,21 @@ describe('dispatchTrigger', () => {
     expect(instruction).toContain('we accept');
     // The honest cue: instruction must tell the model NOT to act on noise.
     expect(instruction.toLowerCase()).toContain('noise');
+  });
+
+  it('throws so Inngest retries/DLQs when the autonomous dispatch failed', async () => {
+    fireRoutineRunMock.mockResolvedValueOnce('error');
+    await expect(
+      dispatchTrigger({
+        triggerSlug: 'GMAIL_NEW_GMAIL_MESSAGE',
+        connection: freshConnection(),
+        payload: {
+          subject: 'Synthetic message',
+          from: 'synthetic@example.invalid',
+          snippet: 'Please review this synthetic event.',
+        },
+      }),
+    ).rejects.toThrow(/dispatch failed/i);
   });
 
   it('skips fireRoutineRun when the payload is too thin to act on', async () => {
