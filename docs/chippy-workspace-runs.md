@@ -12,10 +12,15 @@ Completed workspaces may optionally be continued from the same right panel.
 This is a separate allowlist: in addition to the Workspace Run switches, set
 `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED=true`,
 `NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED=true`, and list the Space
-ID in `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS`. The panel shows a bounded
-three-command plan, live terminal callbacks, and one new private
-`workspace-follow-up-N.md` artifact. Existing packet generation remains
-unchanged when this switch is off.
+ID in `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS`. Before a task is enqueued,
+the server uses the shared text-model client to create and persist a bounded
+Python transformation program grounded in the request and hydrated private
+files. The panel shows its bounded three-command plan, live terminal callbacks,
+and one new private `workspace-follow-up-N.md` artifact. The program executes
+only in the fresh no-network VM; it is not returned to the browser. Active
+continuations can be cancelled from the same panel, and cancellation wins
+publication. Existing packet generation remains unchanged when this switch is
+off.
 
 `MODAL_WORKSPACE_RUN_TASK_URL` must target `launch_workspace_task` in the same
 Modal app. Its function needs `CHIPPI_WORKSPACE_TASK_CALLBACK_URL` and

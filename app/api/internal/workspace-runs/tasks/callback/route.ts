@@ -31,8 +31,14 @@ export async function POST(req: NextRequest) {
     await supabase.rpc('finish_workspace_run_task', { p_task_id: taskId, p_space_id: spaceId, p_outcome: 'failed', p_error: message, p_sequence: sequence, p_message: message });
     return NextResponse.json({ error: message }, { status: 409 });
   };
+  // Re-read immediately before object persistence so cancellation wins even
+  // when it arrived while the isolated VM was finishing its program.
+  const { data: current } = type === 'completed'
+    ? await supabase.from('WorkspaceRunTask').select('cancellationRequestedAt,status').eq('id', taskId).eq('spaceId', spaceId).maybeSingle()
+    : { data: task };
+  const cancelledBeforePublish = Boolean(current?.cancellationRequestedAt) || current?.status === 'cancelled';
   const publishedFiles: Array<{ id: string; storageKey: string; name: string; mimeType: string; sizeBytes: number }> = [];
-  if (type === 'completed' && !task.cancellationRequestedAt) {
+  if (type === 'completed' && !cancelledBeforePublish) {
     const rawFiles = Array.isArray(body.files) ? body.files : []; const expectedName = `workspace-follow-up-${task.sequence}.md`;
     if (rawFiles.length !== 1 || rawFiles[0]?.name !== expectedName || typeof rawFiles[0]?.content !== 'string') return fail('Workspace continuation manifest is incomplete.');
     const content = Buffer.from(rawFiles[0].content, 'base64');
@@ -43,7 +49,7 @@ export async function POST(req: NextRequest) {
       publishedFiles.push({ id: crypto.createHash('sha256').update(`${taskId}:${expectedName}`).digest('hex').slice(0, 32), storageKey: key, name: expectedName, mimeType: 'text/markdown', sizeBytes: content.byteLength });
     } catch { return fail('Could not persist workspace continuation file.'); }
   }
-  const terminal = task.cancellationRequestedAt || type === 'cancelled' ? 'cancelled' : type === 'completed' ? 'completed' : type === 'failed' ? 'failed' : type === 'workspace_started' ? 'running' : null;
+  const terminal = cancelledBeforePublish || task.cancellationRequestedAt || type === 'cancelled' ? 'cancelled' : type === 'completed' ? 'completed' : type === 'failed' ? 'failed' : type === 'workspace_started' ? 'running' : null;
   if (terminal === 'completed' || terminal === 'failed' || terminal === 'cancelled') {
     const { data: finished, error } = await supabase.rpc('finish_workspace_run_task', { p_task_id: taskId, p_space_id: spaceId, p_outcome: terminal, p_error: terminal === 'failed' ? event.message : null, p_sequence: sequence, p_message: event.message, p_output: terminal === 'completed' ? event.output : null, p_files: terminal === 'completed' ? publishedFiles : [] });
     if (error) return NextResponse.json({ error: 'Workspace continuation terminal update failed.' }, { status: 409 });

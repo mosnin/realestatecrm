@@ -11,7 +11,7 @@ describe('Workspace Run vertical contract', () => {
     expect(read('components/chippi/work-session-dialog.tsx')).toContain('Workspace Run');
     expect(read('components/chippi/chippi-workspace.tsx')).toContain("setRightTab('workspace')");
     expect(read('components/chippi/chippi-workspace.tsx')).toContain('setWorkspaceRunId(null);');
-    expect(read('components/chippi/workspace-run-panel.tsx')).toContain("['queued','launching','running'].includes(run.status)");
+    expect(read('components/chippi/workspace-run-panel.tsx')).toContain("const active = (status: string)");
     expect(read('components/chippi/right-panel-tabs.tsx')).toContain("'workspace'");
     expect(read('lib/chippi/workspace-run-flag.ts')).toContain('CHIPPI_WORKSPACE_RUNS_SPACE_IDS');
     expect(read('app/s/[slug]/chippi/page.tsx')).toContain('workspaceRunsEnabled={isWorkspaceRunsEnabledForSpace(space.id)}');
@@ -31,7 +31,7 @@ describe('Workspace Run vertical contract', () => {
     expect(migration).toContain('launchToken');
     expect(migration).toContain("'brief.md','launch-checklist.md','comps.csv','handoff.md'");
     expect(read('app/api/internal/workspace-runs/callback/route.ts')).toContain('p_files: terminal === \'completed\' ? publishedFiles : []');
-    expect(read('components/chippi/workspace-run-panel.tsx')).toContain('/api/workspace-runs/${encodeURIComponent(run.id)}/files/');
+    expect(read('components/chippi/workspace-run-panel.tsx')).toContain('/api/workspace-runs/${encodeURIComponent(runId)}/files/');
     expect(read('app/api/workspace-runs/[id]/files/[fileId]/route.ts')).toContain('requireSpaceOwner');
     expect(read('lib/work-sessions/engine.ts')).toContain('await dispatchWorkspaceRun');
     expect(read('app/api/internal/workspace-runs/callback/route.ts')).toContain("ignored: 'terminal'");
