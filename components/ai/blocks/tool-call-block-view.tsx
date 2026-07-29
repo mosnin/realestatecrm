@@ -18,6 +18,7 @@ import {
   Mail,
   MessageSquare,
   Wrench,
+  Table2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tool, ToolStatus, type ToolState } from '@/components/ai/prompt-kit';
@@ -208,6 +209,7 @@ interface ToolCallBlockViewProps {
    *  through this prop. The workspace forwards them as the next user
    *  message. Omitted on read-only history surfaces. */
   onUserIntent?: (text: string) => void;
+  onOpenWorkbench?: (artifactId: string) => void;
   className?: string;
 }
 
@@ -215,6 +217,7 @@ export function ToolCallBlockView({
   block,
   live,
   onUserIntent,
+  onOpenWorkbench,
   className,
 }: ToolCallBlockViewProps) {
   const [expanded, setExpanded] = useState(false);
@@ -284,6 +287,22 @@ export function ToolCallBlockView({
     if (status !== 'complete' || !block.result?.ok) return null;
     const data = block.result.data as Record<string, unknown> | undefined;
     if (!data) return null;
+    if (block.display === 'workbench' && typeof data.artifactId === 'string') {
+      return (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+          <span className="inline-flex items-center gap-2 text-xs text-foreground"><Table2 className="size-3.5" /> Workbook ready</span>
+          {onOpenWorkbench && (
+            <button
+              type="button"
+              onClick={() => onOpenWorkbench(data.artifactId as string)}
+              className="text-xs font-medium underline underline-offset-4"
+            >
+              Open in Workbench
+            </button>
+          )}
+        </div>
+      );
+    }
     // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
     // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {

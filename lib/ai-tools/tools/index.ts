@@ -125,6 +125,7 @@ import { summarizeDocumentTool } from './summarize-document';
 
 // Planning
 import { createPlanTool } from './plan';
+import { openSpreadsheetInWorkbenchTool } from './open-spreadsheet-in-workbench';
 
 // Browser control (paired Chrome extension driving the realtor's own browser)
 import { controlBrowserTool } from './control-browser';
@@ -227,6 +228,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+  openSpreadsheetInWorkbenchTool as ToolDefinition,
   listFilesTool as ToolDefinition,
   readFileTool as ToolDefinition,
   attachFileToPropertyTool as ToolDefinition,

@@ -18,6 +18,8 @@ export interface WorkbenchColumn {
 
 export interface WorkbenchVersion {
   id: string;
+  /** Durable ArtifactVersion.versionNumber when this came from the server. */
+  versionNumber?: number;
   label: string;
   createdAt: string;
   author: 'Chippi' | 'You';
@@ -37,6 +39,36 @@ export interface WorkbenchArtifact {
   subtitle: string;
   columns: WorkbenchColumn[];
   sourceVersion: WorkbenchVersion;
+}
+
+export interface WorkbenchVersionOption {
+  id: string;
+  versionNumber: number;
+  label: string;
+  author: 'Chippi' | 'You';
+}
+
+/** One selector source of truth for server history, newly saved versions, and
+ * browser-local fixtures. Loaded versions win so a save is selectable
+ * immediately without waiting for a history refetch. */
+export function mergeWorkbenchVersionOptions(
+  history: ReadonlyArray<{ id: string; versionNumber: number; createdByAgent?: string }>,
+  loaded: ReadonlyArray<WorkbenchVersion>,
+): WorkbenchVersionOption[] {
+  const byId = new Map<string, WorkbenchVersionOption>();
+  for (const version of history) {
+    byId.set(version.id, {
+      id: version.id,
+      versionNumber: version.versionNumber,
+      label: version.versionNumber === 1 ? 'Source' : `Version ${version.versionNumber}`,
+      author: version.versionNumber === 1 || version.createdByAgent === 'chippi' ? 'Chippi' : 'You',
+    });
+  }
+  for (const version of loaded) {
+    const versionNumber = version.versionNumber ?? (Number(version.label.replace(/\D/g, '')) || 1);
+    byId.set(version.id, { id: version.id, versionNumber, label: version.label, author: version.author });
+  }
+  return [...byId.values()].sort((a, b) => a.versionNumber - b.versionNumber);
 }
 
 function isStoredWorkbookVersion(value: unknown): value is WorkbenchVersion {

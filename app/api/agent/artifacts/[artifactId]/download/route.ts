@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { parseStoredWorkbook, workbookToXlsxBytes } from '@/lib/chippi/workbench-store';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 // MIME type + file extension for each artifact type
 function getMimeAndExt(artifactType: string): { mime: string; ext: string } {
@@ -17,6 +20,8 @@ function getMimeAndExt(artifactType: string): { mime: string; ext: string } {
       return { mime: 'text/plain', ext: 'txt' };
     case 'report':
       return { mime: 'text/markdown', ext: 'md' };
+    case 'workbook':
+      return { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext: 'xlsx' };
     default:
       return { mime: 'application/octet-stream', ext: 'bin' };
   }
@@ -34,11 +39,16 @@ export async function GET(
   const { artifactId } = await params;
   const versionParam = req.nextUrl.searchParams.get('version');
 
-  // 1. Fetch artifact
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Scope the id lookup to the caller's tenant so a foreign id is never
+  // resolved before authorization.
   const { data: artifact, error: artifactError } = await supabase
     .from('Artifact')
     .select('id, title, artifactType, spaceId, currentVersionId')
     .eq('id', artifactId)
+    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (artifactError) {
@@ -48,18 +58,16 @@ export async function GET(
   // Return 404 regardless of whether artifact doesn't exist or belongs to another tenant —
   // avoids confirming artifact existence to cross-tenant callers.
   if (!artifact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (artifact.artifactType === 'workbook' && !isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  // 2. Ownership check — cross-tenant returns 404, not 403, to avoid leaking existence
-  const space = await getSpaceForUser(userId);
-  if (!space || space.id !== artifact.spaceId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
+  try { await assertSpaceEnabled(artifact.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
 
   // 3. Fetch the target ArtifactVersion
   let versionQuery = supabase
     .from('ArtifactVersion')
     .select('id, versionNumber, content')
-    .eq('artifactId', artifactId);
+    .eq('artifactId', artifactId)
+    .eq('spaceId', artifact.spaceId);
 
   if (versionParam !== null) {
     const versionNumber = parseInt(versionParam, 10);
@@ -87,7 +95,17 @@ export async function GET(
   const safeTitle = (artifact.title ?? 'artifact').replace(/[^a-zA-Z0-9_\-. ]/g, '_');
   const filename = `${safeTitle}-v${version.versionNumber}.${ext}`;
 
-  return new Response(version.content, {
+  let body: string | Buffer = version.content;
+  if (artifact.artifactType === 'workbook') {
+    const workbookData = parseStoredWorkbook(version.content);
+    if (!workbookData) return NextResponse.json({ error: 'Workbook content is invalid' }, { status: 500 });
+    try {
+      body = await workbookToXlsxBytes(workbookData);
+    } catch {
+      return NextResponse.json({ error: 'Workbook export is temporarily unavailable' }, { status: 503 });
+    }
+  }
+  return new Response(body, {
     status: 200,
     headers: {
       'Content-Type': mime,

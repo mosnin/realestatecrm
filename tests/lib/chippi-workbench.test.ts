@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_PIPELINE_ARTIFACT,
+  mergeWorkbenchVersionOptions,
   nextWorkbookVersionNumber,
   reconcileWorkbookVersions,
   saveWorkbookVersion,
@@ -84,5 +85,30 @@ describe('Chippi Workbench versioning', () => {
     expect(restored[0]).toBe(artifact.sourceVersion);
     expect(restored[0].rows.find((row) => row.id === 'morgan-price')?.target).toBe('$860K');
     expect(restored[1].id).toBe(versionTwo.id);
+  });
+
+  it('keeps fixture source and a newly saved version selectable without refresh', () => {
+    const artifact = DEMO_PIPELINE_ARTIFACT;
+    const sourceOnly = mergeWorkbenchVersionOptions([], [artifact.sourceVersion]);
+    expect(sourceOnly.map((option) => option.id)).toEqual([artifact.sourceVersion.id]);
+
+    const saved = saveWorkbookVersion({
+      artifactId: artifact.id,
+      sourceVersion: artifact.sourceVersion,
+      rows: updateWorkbookCell(artifact.sourceVersion.rows, 'avery-nguyen', 'stage', 'Qualified'),
+      columns: artifact.columns,
+      now: new Date('2026-07-29T15:00:00.000Z'),
+      versionNumber: 2,
+    });
+    expect(saved).not.toBeNull();
+    if (!saved) return;
+    saved.versionNumber = 2;
+
+    const optionsAfterSave = mergeWorkbenchVersionOptions([], [artifact.sourceVersion, saved]);
+    expect(optionsAfterSave.map((option) => option.label)).toEqual(['Source', 'Version 2']);
+    const oldSelection = optionsAfterSave.find((option) => option.id === artifact.sourceVersion.id);
+    const reselectedSave = optionsAfterSave.find((option) => option.id === saved.id);
+    expect(oldSelection?.label).toBe('Source');
+    expect(reselectedSave?.label).toBe('Version 2');
   });
 });

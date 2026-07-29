@@ -80,6 +80,8 @@ const taskBodySchema = z.object({
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
+import { isWorkbookAttachment } from '@/lib/chippi/workbench-store';
+import { isExplicitWorkbenchIntent } from '@/lib/chippi/workbench-intent';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -823,8 +825,12 @@ export async function POST(req: NextRequest) {
   const explicitMode: 'chat' | 'agent' | null =
     body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
   const heuristicRoute = decideRoute(message, routerAttachments);
+  const workbenchRequested =
+    process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true'
+    && hydratedAttachments.some((attachment) => isWorkbookAttachment({ mimeType: attachment.mime_type, filename: attachment.filename }))
+    && isExplicitWorkbenchIntent(message);
   const route =
-    explicitMode === 'agent'
+    workbenchRequested || explicitMode === 'agent'
       ? 'agent'
       : explicitMode === 'chat' && heuristicRoute === 'direct'
         ? 'direct'
@@ -878,12 +884,13 @@ export async function POST(req: NextRequest) {
       onEscalate: async () => {
         logger.info('[ai/task] direct → agent escalation', { spaceSlug, model: turnModel });
         return streamTsChatTurn({
-          ctx,
+          ctx: { ...ctx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
           conversationId,
           userMessage: message,
           history,
           model: turnModel,
           attachments: turnAttachments,
+          attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mime_type })),
           abortController,
         });
       },
@@ -900,7 +907,13 @@ export async function POST(req: NextRequest) {
   //      (it has the full tool surface too) instead of failing the one turn.
   const forcedModal = chatRuntime() === 'modal';
   const perMessageModal = explicitMode === 'agent' && Boolean(process.env.MODAL_CHAT_URL);
-  if (route === 'agent' && (forcedModal || perMessageModal)) {
+  // Workbench is deliberately a TypeScript-native vertical slice: its tool
+  // accepts stable Attachment ids and returns a typed UI result. Do not send
+  // this one request to the legacy Modal catalog, where that contract does not
+  // exist. This is feature-gated and only narrows requests that explicitly ask
+  // to open this turn's uploaded spreadsheet.
+  const requiresTsWorkbenchTool = workbenchRequested;
+  if (route === 'agent' && !requiresTsWorkbenchTool && (forcedModal || perMessageModal)) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
       ctx,
@@ -921,12 +934,13 @@ export async function POST(req: NextRequest) {
   // streamed back inline.
   logger.info('[ai/task] router → agent (in-process TS)', { spaceSlug, model: turnModel });
   return streamTsChatTurn({
-    ctx,
+    ctx: { ...ctx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
     conversationId,
     userMessage: message,
     history,
     model: turnModel,
     attachments: turnAttachments,
+    attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mime_type })),
     abortController,
   });
 }

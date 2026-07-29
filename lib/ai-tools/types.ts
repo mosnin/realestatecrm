@@ -58,6 +58,9 @@ export interface ToolContext {
   };
   /** The AbortSignal for the current turn — handlers should respect it. */
   signal: AbortSignal;
+  /** Exact Attachment ids hydrated for this turn; not a workspace-wide grant. */
+  attachmentIds?: readonly string[];
+  attachmentManifest?: readonly { id: string; filename: string }[];
 }
 
 // ── Tool result ───────────────────────────────────────────────────────────
@@ -102,6 +105,7 @@ export interface ToolResult<TData = unknown> {
     | 'message-draft'
     | 'question-flow'
     | 'option-list'
+    | 'workbench'
     | 'plain'
     | 'success'
     | 'error'

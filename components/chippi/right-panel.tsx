@@ -37,6 +37,7 @@ interface RightPanelProps {
    * has its own dismissal (SplitPanelToggle) and passes nothing here.
    */
   onClose?: () => void;
+  workbenchArtifactId?: string | null;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -55,6 +56,7 @@ export function RightPanel({
   isResizing,
   variant = 'realtor',
   onClose,
+  workbenchArtifactId,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -156,7 +158,7 @@ export function RightPanel({
             <BrowserView slug={slug} isResizing={isResizing} />
           </div>
         )}
-        {isWorkbench && <LiveWorkbench />}
+        {isWorkbench && <LiveWorkbench artifactId={workbenchArtifactId} />}
       </div>
     </motion.div>
   );

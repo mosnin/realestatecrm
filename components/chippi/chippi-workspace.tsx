@@ -307,8 +307,26 @@ export function ChippiWorkspace({
   // tracking the cursor instead of "getting stuck". The callbacks are stable so
   // the handle's listener effect doesn't tear down/re-add on every drag frame.
   const [isResizingSplit, setIsResizingSplit] = useState(false);
+  const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
+  const openedWorkbenchUrlRef = useRef<string | null>(null);
   const handleSplitDragStart = useCallback(() => setIsResizingSplit(true), []);
   const handleSplitDragEnd = useCallback(() => setIsResizingSplit(false), []);
+  const openWorkbenchArtifact = useCallback((artifactId: string) => {
+    openedWorkbenchUrlRef.current = artifactId;
+    setWorkbenchArtifactId(artifactId);
+    setRightTab('workbench');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('workbenchArtifact', artifactId);
+      router.replace(`${endpoints.routeBase}?${params.toString()}`, { scroll: false });
+    }
+  }, [effectiveIsSplit, endpoints.routeBase, isMobileOverlay, router, setRightTab, toggleSplit]);
+  const handleWorkbenchToolResult = useCallback(({ name, data, ok }: { name: string; data: unknown; ok: boolean }) => {
+    if (!ok || name !== 'open_spreadsheet_in_workbench' || !data || typeof data !== 'object') return;
+    const artifactId = (data as { artifactId?: unknown }).artifactId;
+    if (typeof artifactId === 'string') openWorkbenchArtifact(artifactId);
+  }, [openWorkbenchArtifact]);
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -366,6 +384,7 @@ export function ChippiWorkspace({
       // grow a step for every new chat.
       router.replace(`${endpoints.routeBase}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
     },
+    onToolResult: handleWorkbenchToolResult,
   });
 
   // ── Retry support ────────────────────────────────────────────────────────
@@ -427,7 +446,19 @@ export function ChippiWorkspace({
   // when onConversationCreated updates the URL to the just-created conv).
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
+  const workbenchUrlArtifactId = searchParams.get('workbenchArtifact');
   const loadedConvIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!workbenchUrlArtifactId) {
+      openedWorkbenchUrlRef.current = null;
+      return;
+    }
+    if (openedWorkbenchUrlRef.current === workbenchUrlArtifactId) return;
+    openedWorkbenchUrlRef.current = workbenchUrlArtifactId;
+    setWorkbenchArtifactId(workbenchUrlArtifactId);
+    setRightTab('workbench');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+  }, [effectiveIsSplit, isMobileOverlay, setRightTab, toggleSplit, workbenchUrlArtifactId]);
 
   // Deep-link to history: ?view=history (used by the collapsed sidebar's
   // Chats icon) opens the conversation-history drawer on mount, then
@@ -1808,6 +1839,7 @@ export function ChippiWorkspace({
                               onUserIntent={(text) => {
                                 void handleSend(text, [], undefined);
                               }}
+                              onOpenWorkbench={openWorkbenchArtifact}
                               pendingApproval={
                                 isTail && pendingApproval && !isStreaming
                                   ? {
@@ -1862,6 +1894,7 @@ export function ChippiWorkspace({
                           onUserIntent={(text) => {
                             void handleSend(text, [], undefined);
                           }}
+                          onOpenWorkbench={openWorkbenchArtifact}
                         />
                       </motion.div>
                     );
@@ -2016,6 +2049,7 @@ export function ChippiWorkspace({
               key="chippi-right-panel"
               slug={slug}
               variant={variant}
+              workbenchArtifactId={workbenchArtifactId}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
@@ -2048,6 +2082,7 @@ export function ChippiWorkspace({
             <RightPanel
               slug={slug}
               variant={variant}
+              workbenchArtifactId={workbenchArtifactId}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="h-full"

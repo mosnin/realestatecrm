@@ -33,10 +33,14 @@ const { streamResumeMock } = vi.hoisted(() => ({
       }),
   ),
 }));
+const { assertEnabledMock } = vi.hoisted(() => ({ assertEnabledMock: vi.fn(async () => undefined) }));
+const { workbenchEnabledMock } = vi.hoisted(() => ({ workbenchEnabledMock: vi.fn(() => true) }));
 vi.mock('@/lib/ai-tools/sdk-chat-stream', () => ({
   streamTsChatTurn: vi.fn(),
   streamTsResumeTurn: streamResumeMock,
 }));
+vi.mock('@/lib/agent/kill-switch', () => ({ assertSpaceEnabled: assertEnabledMock }));
+vi.mock('@/lib/chippi/workbench-flag', () => ({ isWorkbenchEnabled: workbenchEnabledMock }));
 
 // Per-table queue so we can return different rows for AgentPausedRun
 // vs Space. Hoisted because vi.mock factories are pulled to the top.
@@ -87,6 +91,8 @@ beforeEach(() => {
   // per-test to exercise the mismatch path.
   tableQueue.User = [{ data: { id: 'u_1' } }];
   updateMock.mockResolvedValue({ data: [{ id: 'run_1' }], error: null });
+  assertEnabledMock.mockResolvedValue(undefined);
+  workbenchEnabledMock.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -111,6 +117,7 @@ interface PausedRow {
   conversationId: string;
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
+  attachmentManifest: Array<{ id: string; filename: string }>;
   status: string;
   expiresAt: string;
 }
@@ -123,6 +130,7 @@ const ROW: PausedRow = {
   approvals: [
     { callId: 'call_xyz', toolName: 'send_email', arguments: { to: 'a@b.c' }, summary: 'Email a@b.c' },
   ],
+  attachmentManifest: [],
   status: 'pending',
   expiresAt: new Date(Date.now() + 3600_000).toISOString(),
 };
@@ -241,6 +249,61 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
       decision: { approved: boolean; message?: string };
     };
     expect(call.decision).toEqual({ approved: false, message: 'wrong recipient' });
+  });
+
+  it('stops a paused run when the workspace is disabled after the pause', async () => {
+    queueRow(ROW);
+    queueSpace(SPACE);
+    assertEnabledMock.mockRejectedValueOnce(new Error('disabled'));
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(403);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('allows only the persisted Workbench approval to resume under a Modal global runtime', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { ctx: { attachmentIds?: string[]; attachmentManifest?: Array<{ id: string; filename: string }> } };
+    expect(call.ctx.attachmentIds).toEqual(['attachment-1']);
+    expect(call.ctx.attachmentManifest).toEqual([{ id: 'attachment-1', filename: 'buyers.csv' }]);
+  });
+
+  it('rejects an approved Workbench call when its id or filename is not in the persisted manifest', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-other', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(400);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a wrong approved filename even when the attachment id is manifest-authorized', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'swapped.csv' }, summary: 'Open swapped.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(400);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Workbench is disabled after its pause', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    workbenchEnabledMock.mockReturnValue(false);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(404);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('permits denial of a legacy Workbench pause that has no manifest', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: false, message: 'do not open it' }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { decision: unknown; ctx: { attachmentIds?: string[] } };
+    expect(call.decision).toEqual({ approved: false, message: 'do not open it' });
+    expect(call.ctx.attachmentIds).toBeUndefined();
   });
 
   it('uses the explicit callId when the body provides one (multi-pending case)', async () => {

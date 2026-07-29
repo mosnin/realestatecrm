@@ -102,6 +102,8 @@ export interface UseAgentTaskOptions {
   conversationsEndpoint?: string;
   resumeEndpointBase?: string;
   conversationCreatePayload?: Record<string, unknown>;
+  /** Receives typed rich tool results that drive workspace-level UI state. */
+  onToolResult?: (input: { name: string; data: unknown; ok: boolean }) => void;
 }
 
 export interface UseAgentTaskResult {
@@ -201,6 +203,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     conversationsEndpoint = '/api/ai/conversations',
     resumeEndpointBase = '/api/ai/task/resume',
     conversationCreatePayload,
+    onToolResult,
   } = options;
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -313,6 +316,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // this component unmounting; the key is how abort() reaches them.
   const activeKeyRef = useRef<string | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
+  const toolNameByCallIdRef = useRef<Map<string, string>>(new Map());
   // True once the turn reaches a real terminal event (turn_complete or a
   // landed error). If the SSE stream closes WITHOUT one — the serverless proxy
   // hit its duration cap mid-response, the socket dropped, or Modal was killed
@@ -458,6 +462,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'tool_call_start': {
+        toolNameByCallIdRef.current.set(event.callId, event.name);
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setCurrentAction(`${friendlyToolAction(event.name)}…`);
@@ -488,6 +493,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'tool_call_result': {
+        const toolName = toolNameByCallIdRef.current.get(event.callId);
+        toolNameByCallIdRef.current.delete(event.callId);
+        if (toolName && event.data !== undefined) onToolResult?.({ name: toolName, data: event.data, ok: event.ok });
         setLiveCallIds((s) => {
           if (!s.has(event.callId)) return s;
           const next = new Set(s);
@@ -641,7 +649,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
     }
-  }, [landChippiError]);
+  }, [landChippiError, onToolResult]);
 
   /**
    * Drive one turn owned by the module-scope TurnRunner: replay whatever

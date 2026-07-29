@@ -35,6 +35,8 @@ import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import { streamTsResumeTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 interface PostBody {
   approved: boolean;
@@ -49,6 +51,7 @@ interface PausedRunRow {
   conversationId: string | null;
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
+  attachmentManifest: Array<{ id: string; filename?: string }>;
   status: 'pending' | 'resumed' | 'cancelled' | 'expired';
   expiresAt: string | null;
 }
@@ -57,12 +60,6 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ pausedRunId: string }> },
 ) {
-  // Guardrail: this endpoint only makes sense when the TS runtime is on.
-  // If someone hits it on a default-modal deploy we 404 — keeps the
-  // contract honest with the flag.
-  if (chatRuntime() !== 'ts') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
 
   const { pausedRunId } = await params;
   if (!pausedRunId || typeof pausedRunId !== 'string') {
@@ -91,7 +88,7 @@ export async function POST(
   // Load + scope check. The userId stored on the row is the Clerk userId.
   const { data: row, error } = await supabase
     .from('AgentPausedRun')
-    .select('id, spaceId, userId, conversationId, runState, approvals, status, expiresAt')
+    .select('id, spaceId, userId, conversationId, runState, approvals, attachmentManifest, status, expiresAt')
     .eq('id', pausedRunId)
     .maybeSingle();
   if (error) {
@@ -153,6 +150,25 @@ export async function POST(
   if (!callId) {
     return NextResponse.json({ error: 'No pending approvals on this run' }, { status: 400 });
   }
+  const approvedCall = paused.approvals.find((approval) => approval.callId === callId);
+  if (!approvedCall) return NextResponse.json({ error: 'Approval not found' }, { status: 400 });
+  if (chatRuntime() !== 'ts' && approvedCall?.toolName !== 'open_spreadsheet_in_workbench') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (approvedCall?.toolName === 'open_spreadsheet_in_workbench') {
+    if (!isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const args = approvedCall.arguments as { attachmentId?: unknown; attachmentFilename?: unknown } | null;
+    const attachmentId = args?.attachmentId;
+    const attachment = typeof attachmentId === 'string'
+      ? paused.attachmentManifest?.find((candidate) => candidate.id === attachmentId)
+      : undefined;
+    // Approval arguments select a member of the server-hydrated, persisted
+    // manifest; they never create attachment authority themselves.
+    if (body.approved) {
+      if (!attachment || typeof args?.attachmentFilename !== 'string' || args.attachmentFilename !== attachment.filename) return NextResponse.json({ error: 'Invalid approved attachment' }, { status: 400 });
+      ctx.attachmentIds = [attachment.id];
+      ctx.attachmentManifest = [{ id: attachment.id, filename: attachment.filename ?? '' }];
+    }
+  }
+  try { await assertSpaceEnabled(paused.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
 
   // Mark the row resumed before we kick off the stream. If the model's
   // continuation lands a NEW pause, the stream pump will write a NEW

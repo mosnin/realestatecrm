@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 import {
   CORE_TOOL_NAMES,
@@ -8,6 +8,8 @@ import {
 } from '@/lib/ai-tools/toolsets';
 
 const ALL_NAMES = new Set(ALL_TOOLS.map((t) => t.name));
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe('toolsets — per-turn selection', () => {
   it('every CORE + TOOLSET name is a real registered tool (no typos)', () => {
@@ -28,6 +30,9 @@ describe('toolsets — per-turn selection', () => {
   });
 
   it('every tool is reachable — getChatTools over all toolsets covers ALL_TOOLS', () => {
+    // Conditional tools still need registry reachability coverage. Opt in for
+    // this assertion only; production remains feature-off by default.
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', 'true');
     // A message that trips every pattern + core + orphans must surface the
     // whole catalog. Guards against a tool silently becoming uncallable.
     const everyKeyword =

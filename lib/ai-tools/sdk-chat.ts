@@ -49,6 +49,7 @@ import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
 import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
 import { isComposioAuthError } from '@/lib/integrations/composio-errors';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ export function buildChatAgent(
 ): Agent {
   const selectedDomain =
     opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
-  const domainTools = selectedDomain.map((t: ToolDefinition) =>
+  const domainTools = selectedDomain.filter((t) => t.name !== 'open_spreadsheet_in_workbench' || isWorkbenchEnabled()).map((t: ToolDefinition) =>
     toSdkTool(t, ctx, opts.resultSink),
   );
 
@@ -408,6 +409,8 @@ export interface RunChatTurnInput {
    * the card") no longer has to detour through Modal.
    */
   attachments?: MultimodalAttachment[];
+  /** Stable IDs and names that let file tools act on exactly this turn's uploads. */
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   /**
    * Sink for tool `data`/`display` keyed by SDK call id. The stream pump
    * creates this and reads it back to attach rich-card payloads to the SSE
@@ -447,10 +450,14 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // otherwise a plain string. The builder splices a calm note onto the text
   // when an attachment can't be shown, so the model never pretends it saw
   // something it didn't.
-  let userContent: unknown = input.userMessage;
+  const attachmentManifest = input.attachmentManifest?.slice(0, 20) ?? [];
+  const manifestNote = attachmentManifest.length
+    ? `\n\nAttachment manifest for this turn (use these exact Attachment ids for file tools): ${attachmentManifest.map((a) => `${a.filename} [${a.mimeType}] id=${a.id}`).join('; ')}`
+    : '';
+  let userContent: unknown = input.userMessage + manifestNote;
   if (input.attachments && input.attachments.length > 0) {
     const resolved = resolveChatModel(input.model);
-    userContent = buildSdkUserContent(resolved, input.userMessage, input.attachments).content;
+    userContent = buildSdkUserContent(resolved, input.userMessage + manifestNote, input.attachments).content;
   }
 
   // Build the SDK input as history + new user message. The SDK accepts

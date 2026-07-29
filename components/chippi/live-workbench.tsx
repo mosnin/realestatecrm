@@ -1,19 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, FileSpreadsheet, History, RotateCcw, Save, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Download, FileSpreadsheet, History, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   nextWorkbookVersionNumber,
+  mergeWorkbenchVersionOptions,
   reconcileWorkbookVersions,
   saveWorkbookVersion,
   snapshotRows,
   updateWorkbookCell,
   type WorkbenchArtifact,
   type WorkbenchCellValue,
+  type WorkbenchRow,
   type WorkbenchVersion,
 } from '@/lib/chippi/workbench';
+import { parseStoredWorkbook, stringifyWorkbook, type StoredWorkbook } from '@/lib/chippi/workbench-format';
 
 const STORAGE_PREFIX = 'chippi:workbench:v1:';
 
@@ -21,8 +24,24 @@ type WorkbenchState = 'ready' | 'empty' | 'error';
 
 interface LiveWorkbenchProps {
   artifact?: WorkbenchArtifact;
+  artifactId?: string | null;
   state?: WorkbenchState;
   className?: string;
+}
+
+interface PersistedWorkbookView {
+  artifact: WorkbenchArtifact;
+  versions: WorkbenchVersion[];
+  sourceWorkbook: StoredWorkbook;
+  history: PersistedVersionMeta[];
+  historyIncomplete: boolean;
+}
+
+interface PersistedVersionMeta {
+  id: string;
+  versionNumber: number;
+  createdAt: string;
+  createdByAgent?: string;
 }
 
 function formatSavedAt(value: string): string {
@@ -57,6 +76,14 @@ function persistVersions(artifact: WorkbenchArtifact, versions: WorkbenchVersion
 
 function Receipt({ version }: { version: WorkbenchVersion }) {
   if (!version.receipt) {
+    if (version.author === 'You') {
+      return (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5 text-[11px] leading-relaxed text-foreground/75">
+          <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span>Your saved version from {formatSavedAt(version.createdAt)}. The source attachment remains unchanged.</span>
+        </div>
+      );
+    }
     return (
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-border/50 bg-muted/25 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-foreground/65" />
@@ -108,36 +135,96 @@ function ErrorState() {
 }
 
 /**
- * A feature-off local work surface. The artifact begins as an immutable
- * snapshot, edits stay in the browser in this slice, and each save appends a
- * distinct version. There is deliberately no customer data mutation here.
+ * Feature-off Workbench. Fixture previews remain browser-local; an artifact id
+ * uses the tenant-scoped durable API and appends immutable versions.
  */
-export function LiveWorkbench({ artifact, state = 'ready', className }: LiveWorkbenchProps) {
+export function LiveWorkbench({ artifact, artifactId, state = 'ready', className }: LiveWorkbenchProps) {
   if (state === 'empty') return <EmptyState />;
   if (state === 'error') return <ErrorState />;
+  if (artifactId) return <PersistedWorkbench artifactId={artifactId} className={className} />;
   if (!artifact) return <EmptyState />;
 
   return <WorkbenchEditor artifact={artifact} className={className} />;
 }
 
-function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact; className?: string }) {
-  const [versions, setVersions] = useState<WorkbenchVersion[]>([artifact.sourceVersion]);
+function PersistedWorkbench({ artifactId, className }: { artifactId: string; className?: string }) {
+  const [view, setView] = useState<PersistedWorkbookView | null>(null);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setView(null); setError(false);
+    void fetch(`/api/agent/artifacts/${encodeURIComponent(artifactId)}`, { cache: 'no-store' })
+      .then(async (response) => response.ok ? response.json() : Promise.reject(new Error('load failed')))
+      .then((payload) => active && setView(fromPersistedArtifact(payload.artifact)))
+      .catch(() => active && setError(true));
+    return () => { active = false; };
+  }, [artifactId]);
+  if (error) return <ErrorState />;
+  if (!view) return <div className="p-5 text-xs text-muted-foreground">Loading workbook…</div>;
+  const loadVersion = async (versionNumber: number) => {
+    const response = await fetch(`/api/agent/artifacts/${encodeURIComponent(artifactId)}?version=${encodeURIComponent(String(versionNumber))}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error('version load failed');
+    const payload = await response.json() as { version?: PersistedVersionMeta & { content?: unknown } };
+    if (!payload.version || typeof payload.version.content !== 'string') throw new Error('invalid version payload');
+    const workbook = parseStoredWorkbook(payload.version.content);
+    if (!workbook) throw new Error('invalid workbook');
+    return toVersion(artifactId, payload.version as PersistedVersionMeta & { content: string }, workbook);
+  };
+  return <WorkbenchEditor artifact={view.artifact} versions={view.versions} sourceWorkbook={view.sourceWorkbook} history={view.history} historyIncomplete={view.historyIncomplete} loadVersion={loadVersion} className={className} persist />;
+}
+
+function fromPersistedArtifact(value: { id: string; title: string; versions?: PersistedVersionMeta[]; sourceVersion?: PersistedVersionMeta & { content: string }; currentVersion?: PersistedVersionMeta & { content: string }; history?: { incomplete?: boolean } }): PersistedWorkbookView {
+  if (!value.sourceVersion || !value.currentVersion) throw new Error('missing workbook');
+  const workbook = parseStoredWorkbook(value.sourceVersion.content);
+  const currentWorkbook = parseStoredWorkbook(value.currentVersion.content);
+  if (!workbook || !currentWorkbook) throw new Error('invalid workbook');
+  const source = toVersion(value.id, value.sourceVersion, workbook);
+  const current = toVersion(value.id, value.currentVersion, currentWorkbook);
+  const versions = source.id === current.id ? [source] : [source, current];
+  const history: PersistedVersionMeta[] = [...(value.versions ?? []), value.sourceVersion, value.currentVersion]
+    .map(({ id, versionNumber, createdAt, createdByAgent }) => ({ id, versionNumber: Number(versionNumber), createdAt, createdByAgent }))
+    .filter((version, index, all) => all.findIndex((candidate) => candidate.id === version.id) === index)
+    .sort((a, b) => a.versionNumber - b.versionNumber);
+  const sheetScope = workbook.importedFirstSheetOnly && (workbook.sourceSheetCount ?? 1) > 1
+    ? `Showing first sheet “${workbook.sheetName}” of ${workbook.sourceSheetCount}.`
+    : `Showing sheet “${workbook.sheetName}”.`;
+  return { artifact: {
+    id: value.id, title: value.title, subtitle: `Source: ${workbook.sourceFilename}. ${sheetScope} Edits are saved as immutable versions.`,
+    columns: workbook.columns.map((label, index) => ({ key: `c${index}`, label })), sourceVersion: source,
+  }, versions, sourceWorkbook: workbook, history, historyIncomplete: value.history?.incomplete === true };
+}
+
+function toVersion(artifactId: string, version: { id: string; versionNumber: number; createdAt: string; createdByAgent?: string; content: string }, workbook: StoredWorkbook): WorkbenchVersion {
+  return { id: version.id, versionNumber: version.versionNumber, label: version.versionNumber === 1 ? 'Source' : `Version ${version.versionNumber}`, createdAt: version.createdAt,
+    author: version.versionNumber === 1 || version.createdByAgent === 'chippi' ? 'Chippi' : 'You',
+    rows: workbook.rows.map((row, rowIndex) => Object.fromEntries([['id', String(rowIndex)], ...row.map((cell, index) => [`c${index}`, cell])]) as WorkbenchRow), };
+}
+
+function WorkbenchEditor({ artifact, versions: initialVersions, sourceWorkbook, history = [], historyIncomplete = false, loadVersion, className, persist = false }: { artifact: WorkbenchArtifact; versions?: WorkbenchVersion[]; sourceWorkbook?: StoredWorkbook; history?: PersistedVersionMeta[]; historyIncomplete?: boolean; loadVersion?: (versionNumber: number) => Promise<WorkbenchVersion>; className?: string; persist?: boolean }) {
+  const [versions, setVersions] = useState<WorkbenchVersion[]>(initialVersions ?? [artifact.sourceVersion]);
   const [selectedVersionId, setSelectedVersionId] = useState(artifact.sourceVersion.id);
   const [rows, setRows] = useState(() => snapshotRows(artifact.sourceVersion.rows));
   const [storageReady, setStorageReady] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle');
+  const saveInFlight = useRef(false);
 
   useEffect(() => {
-    const loaded = readStoredVersions(artifact);
+    const loaded = initialVersions ?? readStoredVersions(artifact);
     const latest = loaded.at(-1) ?? artifact.sourceVersion;
     setVersions(loaded);
     setSelectedVersionId(latest.id);
     setRows(snapshotRows(latest.rows));
     setStorageReady(true);
-  }, [artifact]);
+    setSaveState('idle');
+  }, [artifact, initialVersions]);
 
   const selectedVersion = useMemo(
     () => versions.find((version) => version.id === selectedVersionId) ?? versions.at(-1) ?? artifact.sourceVersion,
     [artifact.sourceVersion, selectedVersionId, versions],
+  );
+  const versionOptions = useMemo(
+    () => mergeWorkbenchVersionOptions(history, versions),
+    [history, versions],
   );
   const savePreview = useMemo(
     () => saveWorkbookVersion({ artifactId: artifact.id, sourceVersion: selectedVersion, rows, columns: artifact.columns, now: new Date(0) }),
@@ -145,14 +232,27 @@ function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact;
   );
   const hasChanges = savePreview !== null;
 
-  const selectVersion = (id: string) => {
+  const selectVersion = async (id: string) => {
     const next = versions.find((version) => version.id === id);
-    if (!next) return;
-    setSelectedVersionId(next.id);
-    setRows(snapshotRows(next.rows));
+    if (next) {
+      setSelectedVersionId(next.id);
+      setRows(snapshotRows(next.rows));
+      return;
+    }
+    const metadata = history.find((version) => version.id === id);
+    if (!metadata || !loadVersion) return;
+    try {
+      const loaded = await loadVersion(metadata.versionNumber);
+      setVersions((existing) => [...existing.filter((version) => version.id !== loaded.id), loaded].sort((a, b) => Number(a.versionNumber) - Number(b.versionNumber)));
+      setSelectedVersionId(loaded.id);
+      setRows(snapshotRows(loaded.rows));
+    } catch {
+      setSaveState('error');
+    }
   };
 
-  const saveVersion = () => {
+  const saveVersion = async () => {
+    if (saveInFlight.current || saveState === 'saving') return;
     const next = saveWorkbookVersion({
       artifactId: artifact.id,
       sourceVersion: selectedVersion,
@@ -162,11 +262,49 @@ function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact;
       versionNumber: nextWorkbookVersionNumber(versions),
     });
     if (!next) return;
+    if (persist) {
+      const workbook = sourceWorkbook ?? { kind: 'chippi.workbook.v1' as const, sourceAttachmentId: '', sourceFilename: artifact.title, sheetName: 'Sheet1', columns: artifact.columns.map((column) => column.label), rows: [] };
+      const content = stringifyWorkbook({ ...workbook, columns: artifact.columns.map((column) => column.label), rows: next.rows.map((row) => artifact.columns.map((column) => String(row[column.key] ?? ''))), });
+      try {
+        saveInFlight.current = true;
+        setSaveState('saving');
+        const response = await fetch(`/api/agent/artifacts/${encodeURIComponent(artifact.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, metadata: { kind: 'chippi.workbook.v1' } }) });
+        if (!response.ok) throw new Error('save failed');
+        const payload = await response.json() as {
+          artifact?: {
+            newVersion?: {
+              id?: unknown;
+              versionNumber?: unknown;
+              createdAt?: unknown;
+            };
+          };
+        };
+        const persisted = payload.artifact?.newVersion;
+        if (
+          !persisted
+          || typeof persisted.id !== 'string'
+          || typeof persisted.versionNumber !== 'number'
+          || typeof persisted.createdAt !== 'string'
+        ) {
+          throw new Error('save returned an invalid version');
+        }
+        next.id = persisted.id;
+        next.versionNumber = persisted.versionNumber;
+        next.label = `Version ${persisted.versionNumber}`;
+        next.createdAt = persisted.createdAt;
+      } catch {
+        saveInFlight.current = false;
+        setSaveState('error');
+        return;
+      }
+    }
     const nextVersions = [...versions, next];
     setVersions(nextVersions);
     setSelectedVersionId(next.id);
     setRows(snapshotRows(next.rows));
-    if (storageReady) persistVersions(artifact, nextVersions);
+    if (!persist && storageReady) persistVersions(artifact, nextVersions);
+    setSaveState('idle');
+    saveInFlight.current = false;
   };
 
   return (
@@ -185,18 +323,19 @@ function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact;
           <button
             type="button"
             onClick={saveVersion}
-            disabled={!hasChanges}
+            disabled={!hasChanges || saveState === 'saving'}
             className={cn(
               'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors',
-              hasChanges
+              hasChanges && saveState !== 'saving'
                 ? 'bg-foreground text-background shadow-sm hover:bg-foreground/85'
                 : 'cursor-not-allowed border border-border/55 bg-muted/30 text-muted-foreground/55',
             )}
           >
             <Save className="size-3.5" />
-            Save version
+            {saveState === 'saving' ? 'Saving…' : 'Save version'}
           </button>
         </div>
+        {saveState === 'error' && <p role="alert" className="mt-2 text-xs text-destructive">Couldn’t save this version. Your edit is still here; try again.</p>}
 
         <div className="mt-3 flex items-center gap-2">
           <History className="size-3.5 shrink-0 text-muted-foreground" />
@@ -208,7 +347,7 @@ function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact;
               onChange={(event) => selectVersion(event.target.value)}
               className="h-8 w-full appearance-none rounded-lg border border-border/60 bg-background py-0 pl-2.5 pr-8 text-[11px] font-medium text-foreground outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-foreground/20"
             >
-              {versions.map((version) => (
+              {versionOptions.map((version) => (
                 <option key={version.id} value={version.id}>
                   {version.label} · {version.author}
                 </option>
@@ -216,11 +355,21 @@ function WorkbenchEditor({ artifact, className }: { artifact: WorkbenchArtifact;
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           </div>
+          {persist && (
+            <a
+              href={`/api/agent/artifacts/${encodeURIComponent(artifact.id)}/download?version=${encodeURIComponent(String(selectedVersion.versionNumber ?? (Number(selectedVersion.label.replace(/\D/g, '')) || 1)))}`}
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border/60 px-2 text-[11px] font-medium text-foreground hover:bg-muted/35"
+            >
+              <Download className="size-3.5" /> Export
+            </a>
+          )}
         </div>
+        {persist && historyIncomplete && <p className="mt-2 text-[11px] text-muted-foreground">Showing the newest 20 versions. Older versions are not loaded in this view.</p>}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-        <div className="min-w-[37rem] overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_1px_2px_rgb(0_0_0_/_0.025)]">
+        <p className="mb-2 text-[11px] text-muted-foreground sm:hidden">Swipe the table horizontally to edit every column.</p>
+        <div role="region" aria-label="Scrollable spreadsheet table" tabIndex={0} className="min-w-[37rem] overflow-hidden rounded-xl border border-border/70 bg-background shadow-[0_1px_2px_rgb(0_0_0_/_0.025)]">
           <table
             aria-label={`${artifact.title} spreadsheet`}
             className="w-full border-collapse text-left"

@@ -60,6 +60,8 @@ interface TranscriptProps {
    *  picker). The workspace forwards the text as the realtor's next
    *  message. Omit on read-only history surfaces. */
   onUserIntent?: (text: string) => void;
+  /** Opens a durable workbook artifact from a live or historical tool result. */
+  onOpenWorkbench?: (artifactId: string) => void;
   /**
    * Optimistic object URLs for just-sent attachments, keyed by attachment id.
    * Lets a freshly-sent image thumbnail render instantly without waiting on a
@@ -85,6 +87,7 @@ export function Transcript({
   pendingApproval,
   approvalCelebration,
   onUserIntent,
+  onOpenWorkbench,
   localUrls,
   className,
 }: TranscriptProps) {
@@ -199,6 +202,7 @@ export function Transcript({
                 block={item.block}
                 live={liveCallIds?.has(item.block.callId)}
                 onUserIntent={onUserIntent}
+                onOpenWorkbench={onOpenWorkbench}
               />
             );
           case 'tool-group':

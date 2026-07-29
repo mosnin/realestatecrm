@@ -61,6 +61,7 @@ interface StreamTsChatTurnInput {
   model?: string;
   /** Attachments for this turn (images / PDFs), hydrated to signed URLs. */
   attachments?: MultimodalAttachment[];
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   abortController: AbortController;
 }
 
@@ -96,6 +97,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
 
   const stream = buildSseStream({
     ctx: input.ctx,
+    attachmentManifest: input.attachmentManifest,
     conversationId: input.conversationId,
     abortController: input.abortController,
     initialEvents,
@@ -108,6 +110,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         history,
         model: input.model,
         attachments: input.attachments,
+        attachmentManifest: input.attachmentManifest,
         resultSink,
       });
       return { result: result as unknown as SdkResultLike };
@@ -200,6 +203,8 @@ function withIdleTimeout<T>(p: Promise<T>, abortController: AbortController): Pr
 
 interface BuildStreamInput {
   ctx: ToolContext;
+  /** Fresh-turn hydrated attachment manifest, retained for pause durability. */
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   conversationId: string;
   abortController: AbortController;
   /**
@@ -579,6 +584,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         if (result.interruptions && result.interruptions.length > 0 && result.state) {
           const pausedRunId = await persistPausedRun({
             ctx: input.ctx,
+            attachmentManifest: input.attachmentManifest,
             conversationId: input.conversationId,
             state: result.state,
             interruptions: result.interruptions,
@@ -730,6 +736,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
 interface PersistPausedInput {
   ctx: ToolContext;
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   conversationId: string;
   state: { toString(): string };
   interruptions: ReadonlyArray<unknown>;
@@ -763,6 +770,11 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
       conversationId: input.conversationId,
       runState: serializeRunState(input.state),
       approvals,
+      // The fresh-turn manifest comes from the server's attachment hydration,
+      // not tool approval arguments. Resume intersects that durable grant.
+      attachmentManifest: input.attachmentManifest?.map(({ id, filename }) => ({ id, filename }))
+        ?? input.ctx.attachmentManifest
+        ?? (input.ctx.attachmentIds ?? []).map((id) => ({ id, filename: '' })),
       status: 'pending',
       expiresAt: expires,
     });

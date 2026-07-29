@@ -49,6 +49,9 @@ const ALLOWED_MIME = new Set<string>([
   // text
   'text/plain',
   'text/csv',
+  'text/tab-separated-values',
+  'application/csv',
+  'application/vnd.ms-excel',
   'application/json',
   'text/markdown',
 ]);
