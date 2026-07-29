@@ -140,5 +140,5 @@ async def launch_workspace(item: dict):
     except Exception:
         # Never start on an unavailable/ambiguous authority decision.
         return JSONResponse({"error":"launch claim unavailable"}, status_code=503)
-    run_workspace.spawn(item)
+    await run_workspace.spawn.aio(item)
     return JSONResponse({"accepted": True, "run_id": run_id}, status_code=202)

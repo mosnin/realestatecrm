@@ -22,7 +22,7 @@ describe('Workspace Run vertical contract', () => {
     expect(worker).toContain('experimental_options={"vm_runtime": True}');
     expect(worker).toContain('block_network=True');
     expect(worker).toContain('launch_workspace');
-    expect(worker).toContain('run_workspace.spawn(item)');
+    expect(worker).toContain('await run_workspace.spawn.aio(item)');
     expect(worker).toContain('await sandbox.terminate.aio()');
   });
   it('persists ordered lifecycle evidence and private per-file links', () => {
