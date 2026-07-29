@@ -7,6 +7,7 @@ import type { WorkspaceRunTaskPlanStep, WorkspaceRunTaskView, WorkspaceRunView }
 import { getObjectText } from '@/lib/storage';
 import { getLLMClient } from '@/lib/llm';
 import { rankWorkspaceComparisons, selectWorkspaceTarget, type WorkspaceProperty } from './packet';
+import { commandPlanForPersistedWorkspaceTask, commandPlanForWorkspaceTask, isSafeWorkspaceInputName, type WorkspaceTaskExecutionPlan, validatePersistedWorkspaceTaskPlan, validateWorkspaceTaskPlan } from './typed-plan';
 
 const MAX_GOAL = 1_000;
 const LAUNCH_LEASE_MS = 120_000;
@@ -41,7 +42,7 @@ export async function createWorkspaceRun(input: { id: string; workSessionId: str
 }
 export async function getWorkspaceRun(runId: string, spaceId: string): Promise<WorkspaceRunView | null> {
   const { data: run } = await supabase.from('WorkspaceRun').select('*').eq('id', runId).eq('spaceId', spaceId).maybeSingle(); if (!run) return null;
-  const [{ data: events }, { data: files }, { data: taskRows }] = await Promise.all([supabase.from('WorkspaceRunEvent').select('*').eq('runId', runId).order('sequence').limit(100), supabase.from('WorkspaceRunFile').select('*').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(16), supabase.from('WorkspaceRunTask').select('id,sequence,instruction,commandPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('sequence', { ascending: false }).limit(12)]);
+  const [{ data: events }, { data: files }, { data: taskRows }] = await Promise.all([supabase.from('WorkspaceRunEvent').select('*').eq('runId', runId).order('sequence').limit(100), supabase.from('WorkspaceRunFile').select('*').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(16), supabase.from('WorkspaceRunTask').select('id,sequence,instruction,commandPlan,executionPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('sequence', { ascending: false }).limit(12)]);
   const tasks = await hydrateWorkspaceTasks(taskRows ?? [], spaceId);
   // A partially published packet is never a deliverable. The terminal RPC is
   // the only authority allowed to expose the manifest.
@@ -58,30 +59,18 @@ async function hydrateWorkspaceTasks(rows: any[], spaceId: string): Promise<Work
   return rows.map((row) => ({
     ...row,
     commandPlan: Array.isArray(row.commandPlan) ? row.commandPlan : [],
+    operations: Array.isArray(row.executionPlan?.operations) ? row.executionPlan.operations.filter((operation: unknown): operation is { id: string; type: 'grounded_markdown_report' | 'comps_csv_projection' | 'json_action_register' } => {
+      if (!operation || typeof operation !== 'object') return false;
+      const candidate = operation as { id?: unknown; type?: unknown };
+      return typeof candidate.id === 'string' && ['grounded_markdown_report', 'comps_csv_projection', 'json_action_register'].includes(String(candidate.type));
+    }).map((operation: { id: string; type: 'grounded_markdown_report' | 'comps_csv_projection' | 'json_action_register' }) => ({ id: operation.id, type: operation.type })) : [],
     events: (events ?? []).filter((event: any) => event.taskId === row.id).sort((a: any, b: any) => a.sequence - b.sequence),
     files: row.status === 'completed' ? (files ?? []).filter((file: any) => file.taskId === row.id) : [],
   })) as WorkspaceRunTaskView[];
 }
 
-type GroundedEvidence = { file: string; quote: string };
-export type WorkspaceTaskExecutionPlan = { summary: string; title: string; evidence: GroundedEvidence[]; nextSteps: string[] };
-const TASK_PLAN_PROMPT = `You create a bounded private workspace continuation plan. Return ONLY JSON with keys summary, title, evidence, nextSteps. evidence must be 1-3 exact verbatim quotes from the supplied private files, each as {"file":"exact supplied filename","quote":"exact text from that file"}. nextSteps is 1-5 short grounded recommendations. Do not invent facts or code. The fixed isolated terminal interpreter will re-read and verify every quoted file before writing the artifact.`;
-
-export function validateWorkspaceTaskPlan(value: unknown, files: Array<{ name: string; content: string }>): WorkspaceTaskExecutionPlan {
-  if (!value || typeof value !== 'object') throw new Error('Workspace continuation planning returned unreadable output.');
-  const raw = value as Record<string, unknown>;
-  const summary = typeof raw.summary === 'string' ? raw.summary.replace(/\s+/g, ' ').trim().slice(0, 180) : '';
-  const title = typeof raw.title === 'string' ? raw.title.replace(/[\r\n]+/g, ' ').trim().slice(0, 160) : '';
-  const source = new Map(files.map((file) => [file.name, file.content]));
-  const evidence = (Array.isArray(raw.evidence) ? raw.evidence : []).slice(0, 3).flatMap((item): GroundedEvidence[] => {
-    if (!item || typeof item !== 'object') return [];
-    const row = item as Record<string, unknown>; const file = typeof row.file === 'string' ? row.file : ''; const quote = typeof row.quote === 'string' ? row.quote.trim().slice(0, 500) : '';
-    return file && quote && source.get(file)?.includes(quote) ? [{ file, quote }] : [];
-  });
-  const nextSteps = (Array.isArray(raw.nextSteps) ? raw.nextSteps : []).filter((step): step is string => typeof step === 'string').map((step) => step.replace(/\s+/g, ' ').trim().slice(0, 220)).filter(Boolean).slice(0, 5);
-  if (!summary || !title || evidence.length < 1 || nextSteps.length < 1) throw new Error('Workspace continuation plan was not grounded in the private workspace.');
-  return { summary, title, evidence, nextSteps };
-}
+export { validateWorkspaceTaskPlan } from './typed-plan';
+const TASK_PLAN_PROMPT = `You create a bounded private workspace continuation plan. Return ONLY JSON with keys summary, title, evidence, nextSteps, operations. evidence must be 1-3 exact verbatim quotes from supplied private files, each as {"file":"exact supplied filename","quote":"exact text from that file"}. nextSteps must be 1-5 short grounded recommendations. operations must contain 2-3 unique entries selected only from: {"id":"report","type":"grounded_markdown_report"}; {"id":"comps","type":"comps_csv_projection","source":"comps.csv","columns":["exact header"],"sort":{"column":"selected header","direction":"asc"},"rowLimit":1}; {"id":"actions","type":"json_action_register"}. Include the CSV operation only when comps.csv is supplied. Do not invent facts, code, commands, paths, or operation types. The fixed isolated interpreter revalidates the plan.`;
 
 export async function findWorkspaceRunTaskByIdempotency(runId: string, spaceId: string, idempotencyKey: string): Promise<{ id: string; status: string; instruction: string } | null> {
   const { data } = await supabase.from('WorkspaceRunTask').select('id,status,instruction').eq('runId', runId).eq('spaceId', spaceId).eq('idempotencyKey', idempotencyKey).maybeSingle();
@@ -99,11 +88,7 @@ export async function planWorkspaceRunTask(input: { instruction: string; files: 
   ] });
   let parsed: unknown; try { parsed = JSON.parse(response.choices[0]?.message?.content ?? ''); } catch { throw new Error('Workspace continuation planning returned unreadable output.'); }
   const executionPlan = validateWorkspaceTaskPlan(parsed, input.files);
-  return { commandPlan: [
-    { command: 'python /workspace/continue_workspace.py --inspect', description: 'Inspect the hydrated private workspace files.' },
-    { command: 'python /workspace/continue_workspace.py --apply', description: executionPlan.summary },
-    { command: 'python /workspace/continue_workspace.py --validate', description: 'Validate and package the private follow-up file.' },
-  ], executionPlan };
+  return { commandPlan: commandPlanForWorkspaceTask(executionPlan), executionPlan };
 }
 
 export async function enqueueWorkspaceRunTask(input: { runId: string; spaceId: string; taskId: string; idempotencyKey: string; instruction: string; commandPlan: WorkspaceRunTaskPlanStep[]; executionPlan: WorkspaceTaskExecutionPlan }) {
@@ -139,7 +124,7 @@ export async function workspaceTaskFiles(runId: string, spaceId: string): Promis
     const file = byId.get(row.fileId) as any;
     if (!file || typeof file.storageKey !== 'string' || !Number.isInteger(file.sizeBytes) || file.sizeBytes < 0 || file.sizeBytes > MAX_TASK_FILE_BYTES) throw new Error('Workspace file manifest is unsafe.');
     const name = String(row.name ?? '');
-    if (!/^(brief\.md|launch-checklist\.md|comps\.csv|handoff\.md|workspace-follow-up-[1-9][0-9]*\.md)$/.test(name)) throw new Error('Workspace file manifest is unsafe.');
+    if (!isSafeWorkspaceInputName(name)) throw new Error('Workspace file manifest is unsafe.');
     const content = await getObjectText(file.storageKey);
     if (Buffer.byteLength(content, 'utf8') > MAX_TASK_FILE_BYTES) throw new Error('Workspace file is too large to continue safely.');
     result.push({ name, content });
@@ -172,10 +157,11 @@ export async function dispatchWorkspaceRunTask(input: { taskId: string; runId: s
   if (!endpoint || !secret) { await markWorkspaceTaskTerminal(input, 'failed', 'Workspace continuation runtime is not configured.'); return; }
   let url: URL; try { url = new URL(endpoint); } catch { await markWorkspaceTaskTerminal(input, 'failed', 'Workspace continuation runtime URL is invalid.'); return; }
   if (url.protocol !== 'https:' || !url.hostname.endsWith('.modal.run')) { await markWorkspaceTaskTerminal(input, 'failed', 'Workspace continuation runtime URL is invalid.'); return; }
-  let executionPlan: WorkspaceTaskExecutionPlan;
-  try { executionPlan = validateWorkspaceTaskPlan(task.executionPlan, files); } catch { await markWorkspaceTaskTerminal(input, 'failed', 'Workspace continuation plan is unavailable.'); return; }
+  let executionPlan: WorkspaceTaskExecutionPlan | import('./typed-plan').WorkspaceLegacyExecutionPlan;
+  try { executionPlan = validatePersistedWorkspaceTaskPlan(task.executionPlan, files); } catch { await markWorkspaceTaskTerminal(input, 'failed', 'Workspace continuation plan is unavailable.'); return; }
+  const commandPlan = commandPlanForPersistedWorkspaceTask(executionPlan);
   try {
-    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-chippy-workspace-request': crypto.createHash('sha256').update(input.taskId).digest('hex') }, body: JSON.stringify({ secret, task_id: input.taskId, run_id: input.runId, space_id: input.spaceId, task_sequence: task.sequence, instruction: task.instruction, command_plan: task.commandPlan, execution_plan: executionPlan, files, launch_token: launchToken }), signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-chippy-workspace-request': crypto.createHash('sha256').update(input.taskId).digest('hex') }, body: JSON.stringify({ secret, task_id: input.taskId, run_id: input.runId, space_id: input.spaceId, task_sequence: task.sequence, instruction: task.instruction, command_plan: commandPlan, execution_plan: executionPlan, files, launch_token: launchToken }), signal: AbortSignal.timeout(10_000) });
     if (response.status !== 202) await markWorkspaceTaskTerminal(input, 'failed', `Workspace continuation runtime rejected launch (${response.status}).`);
   } catch (error) { logger.error('[workspace-run-task] Modal launch outcome is unknown; lease recovery will decide', { taskId: input.taskId }, error); }
   await scheduleWorkspaceTaskRecovery(input.taskId, input.runId, input.spaceId, launchToken);

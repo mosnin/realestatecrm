@@ -52,41 +52,94 @@ packet = json.loads((p / "input.json").read_text())["packet"]
 for name, content in packet.items(): (p / {"brief":"brief.md","checklist":"launch-checklist.md","comps":"comps.csv","handoff":"handoff.md"}[name]).write_text(content)
 print("Created brief.md, launch-checklist.md, comps.csv, handoff.md")
 '''
-TASK_SCRIPT = '''import argparse, json, pathlib, re
+TASK_SCRIPT = '''import argparse, csv, io, json, pathlib, re
 p = pathlib.Path("/workspace"); payload = json.loads((p / "task-input.json").read_text())
-safe = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md)$")
-for item in payload["files"]:
+safe_input = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md|workspace-report-[1-9][0-9]*\\.md|workspace-comps-[1-9][0-9]*\\.csv|workspace-actions-[1-9][0-9]*\\.json)$")
+op_id = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
+seq = payload.get("task_sequence")
+if not isinstance(seq, int) or seq < 1: raise SystemExit("invalid task sequence")
+files = payload.get("files")
+if not isinstance(files, list) or not files or len(files) > 16: raise SystemExit("unsafe workspace manifest")
+seen = set()
+for item in files:
+    if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not isinstance(item.get("content"), str): raise SystemExit("unsafe workspace manifest")
     name = item["name"]
-    if not safe.fullmatch(name) or "/" in name or "\\\\" in name: raise SystemExit("unsafe workspace filename")
-    (p / name).write_text(item["content"], encoding="utf-8")
-parser = argparse.ArgumentParser(); parser.add_argument("--inspect", action="store_true"); parser.add_argument("--apply", action="store_true"); parser.add_argument("--validate", action="store_true"); args = parser.parse_args()
-output_name = "workspace-follow-up-%d.md" % payload["task_sequence"]
+    if not safe_input.fullmatch(name) or name in seen or len(item["content"].encode()) > 32000: raise SystemExit("unsafe workspace filename")
+    seen.add(name); (p / name).write_text(item["content"], encoding="utf-8")
+plan = payload.get("execution_plan")
+if not isinstance(plan, dict): raise SystemExit("invalid typed plan")
+title = str(plan.get("title", "")).replace("\\n", " ").strip()[:160]
+summary = str(plan.get("summary", "")).replace("\\n", " ").strip()[:180]
+steps = [str(step).replace("\\n", " ").strip()[:220] for step in plan.get("nextSteps", []) if str(step).strip()]
+evidence_raw = plan.get("evidence")
+if not title or not summary or not isinstance(evidence_raw, list) or not 1 <= len(evidence_raw) <= 3 or not 1 <= len(steps) <= 5 or len(set(steps)) != len(steps): raise SystemExit("invalid grounded plan")
+evidence = []
+for item in evidence_raw:
+    if not isinstance(item, dict) or not isinstance(item.get("file"), str) or not isinstance(item.get("quote"), str): raise SystemExit("invalid grounded evidence")
+    name, quote = item["file"], item["quote"].strip()
+    if not safe_input.fullmatch(name) or name not in seen or not quote or len(quote) > 500: raise SystemExit("unsafe grounded evidence")
+    if quote not in (p / name).read_text(encoding="utf-8"): raise SystemExit("grounded evidence does not match private file")
+    evidence.append((name, quote))
+if len(set(evidence)) != len(evidence): raise SystemExit("duplicate grounded evidence")
+operations_raw = plan.get("operations")
+legacy = operations_raw is None
+if legacy:
+    operations_raw = [{"id": "legacy-report", "type": "legacy_markdown_report"}]
+elif not isinstance(operations_raw, list) or not 2 <= len(operations_raw) <= 3: raise SystemExit("invalid typed operations")
+operations = []
+for item in operations_raw:
+    if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not op_id.fullmatch(item["id"]): raise SystemExit("invalid operation id")
+    kind = item.get("type")
+    if kind not in (("legacy_markdown_report",) if legacy else ("grounded_markdown_report", "comps_csv_projection", "json_action_register")): raise SystemExit("unknown operation")
+    op = {"id": item["id"], "type": kind}
+    if kind == "comps_csv_projection":
+        if item.get("source") != "comps.csv" or "comps.csv" not in seen: raise SystemExit("invalid CSV source")
+        reader = csv.DictReader(io.StringIO((p / "comps.csv").read_text(encoding="utf-8")))
+        header = reader.fieldnames or []
+        columns = item.get("columns")
+        row_limit = item.get("rowLimit")
+        if not isinstance(columns, list) or not 1 <= len(columns) <= 5 or any(not isinstance(col, str) or col not in header for col in columns) or len(set(columns)) != len(columns) or not isinstance(row_limit, int) or not 1 <= row_limit <= 20: raise SystemExit("invalid CSV projection")
+        op.update({"source": "comps.csv", "columns": columns, "rowLimit": row_limit})
+        sort = item.get("sort")
+        if sort is not None:
+            if not isinstance(sort, dict) or sort.get("column") not in columns or sort.get("direction") not in ("asc", "desc"): raise SystemExit("invalid CSV sort")
+            op["sort"] = {"column": sort["column"], "direction": sort["direction"]}
+    operations.append(op)
+if len({op["id"] for op in operations}) != len(operations) or len({op["type"] for op in operations}) != len(operations): raise SystemExit("duplicate typed operations")
+def artifact(op):
+    return "workspace-follow-up-%d.md" % seq if op["type"] == "legacy_markdown_report" else "workspace-report-%d.md" % seq if op["type"] == "grounded_markdown_report" else "workspace-comps-%d.csv" % seq if op["type"] == "comps_csv_projection" else "workspace-actions-%d.json" % seq
+parser = argparse.ArgumentParser(); group = parser.add_mutually_exclusive_group(required=True); group.add_argument("--inspect", action="store_true"); group.add_argument("--execute"); group.add_argument("--validate", action="store_true"); args = parser.parse_args()
 if args.inspect:
-    print("Hydrated: " + ", ".join(sorted(item["name"] for item in payload["files"])))
-elif args.apply:
-    plan = payload.get("execution_plan")
-    if not isinstance(plan, dict) or not isinstance(plan.get("evidence"), list) or not plan["evidence"]: raise SystemExit("invalid grounded plan")
-    evidence = []
-    for item in plan["evidence"][:3]:
-        if not isinstance(item, dict) or not isinstance(item.get("file"), str) or not isinstance(item.get("quote"), str): raise SystemExit("invalid grounded evidence")
-        name, quote = item["file"], item["quote"].strip()
-        if not safe.fullmatch(name) or not quote or len(quote) > 500: raise SystemExit("unsafe grounded evidence")
-        source = (p / name).read_text(encoding="utf-8")
-        if quote not in source: raise SystemExit("grounded evidence does not match private file")
-        evidence.append((name, quote))
-    title = str(plan.get("title", "")).replace("\\n", " ").strip()[:160]
-    steps = [str(step).replace("\\n", " ").strip()[:220] for step in plan.get("nextSteps", [])[:5] if str(step).strip()]
-    if not title or not steps: raise SystemExit("incomplete grounded plan")
-    lines = ["# " + title, "", "## Request", payload["instruction"], "", "## Grounded evidence"]
-    for name, quote in evidence: lines.extend(["", "### " + name, "> " + quote])
-    lines.extend(["", "## Suggested next steps"] + ["- " + step for step in steps])
-    (p / output_name).write_text("\\n".join(lines) + "\\n", encoding="utf-8")
-    print("Created " + output_name + " from " + ", ".join(name for name, _ in evidence))
+    print("Hydrated: " + ", ".join(sorted(seen)))
+elif args.execute:
+    op = next((candidate for candidate in operations if candidate["id"] == args.execute), None)
+    if op is None: raise SystemExit("unknown operation")
+    target = p / artifact(op)
+    if op["type"] in ("legacy_markdown_report", "grounded_markdown_report"):
+        lines = ["# " + title, "", "## Request", str(payload.get("instruction", ""))[:1000], "", "## Summary", summary, "", "## Grounded evidence"]
+        for name, quote in evidence: lines.extend(["", "### " + name, "> " + quote])
+        lines.extend(["", "## Suggested next steps"] + ["- " + step for step in steps])
+        target.write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+    elif op["type"] == "comps_csv_projection":
+        rows = list(csv.DictReader(io.StringIO((p / "comps.csv").read_text(encoding="utf-8"))))
+        if op.get("sort"):
+            def sort_key(row):
+                value = (row.get(op["sort"]["column"]) or "").strip()
+                try: return (0, float(value.replace(",", "")))
+                except ValueError: return (1, value.casefold())
+            rows.sort(key=sort_key, reverse=op["sort"]["direction"] == "desc")
+        output = io.StringIO(newline=""); writer = csv.DictWriter(output, fieldnames=op["columns"], extrasaction="ignore", lineterminator="\\n"); writer.writeheader(); writer.writerows([{column: row.get(column, "") for column in op["columns"]} for row in rows[:op["rowLimit"]]])
+        target.write_text(output.getvalue(), encoding="utf-8")
+    else:
+        target.write_text(json.dumps({"title": title, "summary": summary, "actions": [{"id": index + 1, "nextStep": step, "evidence": [{"file": name, "quote": quote} for name, quote in evidence]} for index, step in enumerate(steps)]}, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    if not target.is_file() or target.stat().st_size < 1 or target.stat().st_size > 32000: raise SystemExit("typed artifact is invalid")
+    print("Created " + target.name)
 elif args.validate:
-    target = p / output_name
-    if not target.is_file() or target.stat().st_size > 32000: raise SystemExit("follow-up artifact is invalid")
-    print("Validated " + output_name)
-else: raise SystemExit("choose --inspect, --apply, or --validate")
+    expected = {artifact(op) for op in operations}
+    current_candidates = {"workspace-follow-up-%d.md" % seq, "workspace-report-%d.md" % seq, "workspace-comps-%d.csv" % seq, "workspace-actions-%d.json" % seq}
+    actual = {path.name for path in p.iterdir() if path.name in current_candidates}
+    if actual != expected or any(not (p / name).is_file() or (p / name).stat().st_size < 1 or (p / name).stat().st_size > 32000 for name in expected): raise SystemExit("typed artifact manifest is invalid")
+    print("Validated " + ", ".join(sorted(expected)))
 '''
 
 def _callback_headers(signature: str) -> dict[str, str]:
@@ -227,20 +280,33 @@ async def run_workspace_task(item: dict):
         event("workspace_started", "Opened a fresh isolated workspace for this continuation.")
         sandbox = await modal.Sandbox.create.aio("sleep", "120", app=app, image=image, timeout=120, cpu=1, memory=1024, block_network=True, experimental_options={"vm_runtime": True})
         mkdir = await sandbox.exec.aio("mkdir", "-p", "/workspace", timeout=5); await mkdir.wait.aio()
-        output_path = f"/workspace/workspace-follow-up-{task_sequence}.md"
         payload = {"instruction": instruction, "files": files, "task_sequence": task_sequence, "execution_plan": execution_plan}
         await sandbox.filesystem.write_text.aio(json.dumps(payload), "/workspace/task-input.json")
         await sandbox.filesystem.write_text.aio(TASK_SCRIPT, "/workspace/continue_workspace.py")
-        for command, label in ((["python", "/workspace/continue_workspace.py", "--inspect"], "Inspecting the current private workspace."), (["python", "/workspace/continue_workspace.py", "--apply"], "Applying the grounded continuation."), (["python", "/workspace/continue_workspace.py", "--validate"], "Validating the private follow-up file.")):
+        operations = execution_plan.get("operations")
+        if operations is None:
+            operations = [{"id": "legacy-report", "type": "legacy_markdown_report"}]
+        elif not isinstance(operations, list) or not 2 <= len(operations) <= 3: raise RuntimeError("invalid typed workspace plan")
+        commands = [(["python", "/workspace/continue_workspace.py", "--inspect"], "Inspecting the current private workspace.")]
+        for operation in operations:
+            if not isinstance(operation, dict) or not isinstance(operation.get("id"), str) or not isinstance(operation.get("type"), str): raise RuntimeError("invalid typed workspace plan")
+            commands.append((["python", "/workspace/continue_workspace.py", "--execute", operation["id"]], f"Executing typed {operation['type']} operation."))
+        commands.append((["python", "/workspace/continue_workspace.py", "--validate"], "Validating the typed private workspace artifacts."))
+        for command, label in commands:
             shown = " ".join(command)
             if event("command_started", label, command=shown): event("cancelled", "Workspace continuation cancelled."); return {"cancelled": True}
             process = await sandbox.exec.aio(*command, timeout=45); stdout = await process.stdout.read.aio(); stderr = await process.stderr.read.aio(); await process.wait.aio()
             if process.returncode != 0: raise RuntimeError((stderr or stdout or "workspace task failed")[:1000])
             if event("command_finished", label, command=shown, output=stdout[:2000]): event("cancelled", "Workspace continuation cancelled."); return {"cancelled": True}
-        name = f"workspace-follow-up-{task_sequence}.md"; content = await sandbox.filesystem.read_bytes.aio(f"/workspace/{name}")
-        if len(content) > 32000: raise RuntimeError("workspace task file exceeded limit")
-        event("file_created", f"Created {name}.")
-        event("completed", "Workspace continuation is ready.", output="\n".join(step.get("description", "") for step in item.get("command_plan", []) if isinstance(step, dict))[:2000], files=[{"name": name, "content": base64.b64encode(content).decode()}])
+        names = []
+        for operation in operations:
+            kind = operation["type"]
+            name = f"workspace-follow-up-{task_sequence}.md" if kind == "legacy_markdown_report" else f"workspace-report-{task_sequence}.md" if kind == "grounded_markdown_report" else f"workspace-comps-{task_sequence}.csv" if kind == "comps_csv_projection" else f"workspace-actions-{task_sequence}.json"
+            content = await sandbox.filesystem.read_bytes.aio(f"/workspace/{name}")
+            if not content or len(content) > 32000: raise RuntimeError("workspace task file exceeded limit")
+            names.append({"name": name, "content": base64.b64encode(content).decode()})
+            event("file_created", f"Created {name}.")
+        event("completed", "Workspace continuation is ready.", output="\n".join(operation["type"] for operation in operations)[:2000], files=names)
         return {"accepted": True, "task_id": task_id}
     except Exception as exc:
         try: event("failed", "Workspace continuation could not finish.", output=re.sub(r"[^ -~]", "", str(exc))[:1000])
