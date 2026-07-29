@@ -14,10 +14,11 @@ This is a separate allowlist: in addition to the Workspace Run switches, set
 `NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED=true`, and list the Space
 ID in `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS`. Before a task is enqueued,
 the server uses the shared text-model client to create and persist a bounded
-Python transformation program grounded in the request and hydrated private
-files. The panel shows its bounded three-command plan, live terminal callbacks,
-and one new private `workspace-follow-up-N.md` artifact. The program executes
-only in the fresh no-network VM; it is not returned to the browser. Active
+declarative plan with exact private-file evidence. A fixed interpreter in the
+fresh no-network VM re-reads and verifies that evidence before it writes the
+artifact; the model never supplies executable code. The panel shows its
+bounded three-command plan, live terminal callbacks, and one new private
+`workspace-follow-up-N.md` artifact. Active
 continuations can be cancelled from the same panel, and cancellation wins
 publication. Existing packet generation remains unchanged when this switch is
 off.

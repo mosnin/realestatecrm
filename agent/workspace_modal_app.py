@@ -50,15 +50,34 @@ for item in payload["files"]:
     name = item["name"]
     if not safe.fullmatch(name) or "/" in name or "\\\\" in name: raise SystemExit("unsafe workspace filename")
     (p / name).write_text(item["content"], encoding="utf-8")
-parser = argparse.ArgumentParser(); parser.add_argument("--inspect", action="store_true"); parser.add_argument("--validate", action="store_true"); args = parser.parse_args()
+parser = argparse.ArgumentParser(); parser.add_argument("--inspect", action="store_true"); parser.add_argument("--apply", action="store_true"); parser.add_argument("--validate", action="store_true"); args = parser.parse_args()
 output_name = "workspace-follow-up-%d.md" % payload["task_sequence"]
 if args.inspect:
     print("Hydrated: " + ", ".join(sorted(item["name"] for item in payload["files"])))
+elif args.apply:
+    plan = payload.get("execution_plan")
+    if not isinstance(plan, dict) or not isinstance(plan.get("evidence"), list) or not plan["evidence"]: raise SystemExit("invalid grounded plan")
+    evidence = []
+    for item in plan["evidence"][:3]:
+        if not isinstance(item, dict) or not isinstance(item.get("file"), str) or not isinstance(item.get("quote"), str): raise SystemExit("invalid grounded evidence")
+        name, quote = item["file"], item["quote"].strip()
+        if not safe.fullmatch(name) or not quote or len(quote) > 500: raise SystemExit("unsafe grounded evidence")
+        source = (p / name).read_text(encoding="utf-8")
+        if quote not in source: raise SystemExit("grounded evidence does not match private file")
+        evidence.append((name, quote))
+    title = str(plan.get("title", "")).replace("\\n", " ").strip()[:160]
+    steps = [str(step).replace("\\n", " ").strip()[:220] for step in plan.get("nextSteps", [])[:5] if str(step).strip()]
+    if not title or not steps: raise SystemExit("incomplete grounded plan")
+    lines = ["# " + title, "", "## Request", payload["instruction"], "", "## Grounded evidence"]
+    for name, quote in evidence: lines.extend(["", "### " + name, "> " + quote])
+    lines.extend(["", "## Suggested next steps"] + ["- " + step for step in steps])
+    (p / output_name).write_text("\\n".join(lines) + "\\n", encoding="utf-8")
+    print("Created " + output_name + " from " + ", ".join(name for name, _ in evidence))
 elif args.validate:
     target = p / output_name
     if not target.is_file() or target.stat().st_size > 32000: raise SystemExit("follow-up artifact is invalid")
     print("Validated " + output_name)
-else: raise SystemExit("choose --inspect or --validate")
+else: raise SystemExit("choose --inspect, --apply, or --validate")
 '''
 
 def _callback_headers(signature: str) -> dict[str, str]:
@@ -184,10 +203,9 @@ async def run_workspace_task(item: dict):
     task_id, run_id, space_id = str(item.get("task_id", "")), str(item.get("run_id", "")), str(item.get("space_id", ""))
     try: uuid.UUID(task_id); uuid.UUID(run_id)
     except ValueError: return {"error": "invalid id"}
-    instruction, files, task_sequence, program = str(item.get("instruction", "")).strip()[:MAX_GOAL], item.get("files"), item.get("task_sequence"), item.get("program")
-    if not space_id or len(instruction) < 3 or not isinstance(files, list) or not isinstance(task_sequence, int) or task_sequence < 1 or len(files) > 16 or not isinstance(program, str) or not program or len(program) > 12000: return {"error": "invalid workspace task"}
+    instruction, files, task_sequence, execution_plan = str(item.get("instruction", "")).strip()[:MAX_GOAL], item.get("files"), item.get("task_sequence"), item.get("execution_plan")
+    if not space_id or len(instruction) < 3 or not isinstance(files, list) or not isinstance(task_sequence, int) or task_sequence < 1 or len(files) > 16 or not isinstance(execution_plan, dict): return {"error": "invalid workspace task"}
     safe_name = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md)$")
-    if re.search(r"\b(import\s+(?:os|sys|subprocess|socket|urllib|http|requests|ctypes|multiprocessing|inspect)|from\s+(?:os|sys|subprocess|socket|urllib|http|requests|ctypes|multiprocessing|inspect)\b|\b(?:eval|exec|compile|__import__|open)\s*\(|\.system\s*\(|\.popen\s*\()", program, re.I) or not all(term in program for term in ("instruction", "read_text", "output_path", "write_text")) or re.search(r"\.\.[/\\\\]|/etc|/proc|/dev|~/", program): return {"error": "unsafe workspace program"}
     for file in files:
         if not isinstance(file, dict) or not isinstance(file.get("name"), str) or not isinstance(file.get("content"), str) or not safe_name.fullmatch(file["name"]) or len(file["content"].encode()) > 32000: return {"error": "unsafe workspace manifest"}
     seq = 1
@@ -202,12 +220,10 @@ async def run_workspace_task(item: dict):
         sandbox = await modal.Sandbox.create.aio("sleep", "120", app=app, image=image, timeout=120, cpu=1, memory=1024, block_network=True, experimental_options={"vm_runtime": True})
         mkdir = await sandbox.exec.aio("mkdir", "-p", "/workspace", timeout=5); await mkdir.wait.aio()
         output_path = f"/workspace/workspace-follow-up-{task_sequence}.md"
-        payload = {"instruction": instruction, "files": files, "task_sequence": task_sequence}
+        payload = {"instruction": instruction, "files": files, "task_sequence": task_sequence, "execution_plan": execution_plan}
         await sandbox.filesystem.write_text.aio(json.dumps(payload), "/workspace/task-input.json")
         await sandbox.filesystem.write_text.aio(TASK_SCRIPT, "/workspace/continue_workspace.py")
-        harness = "from pathlib import Path\\ninstruction = " + repr(instruction) + "\\nworkspace = Path('/workspace')\\noutput_path = Path(" + repr(output_path) + ")\\n" + program
-        await sandbox.filesystem.write_text.aio(harness, "/workspace/generated_follow_up.py")
-        for command, label in ((["python", "/workspace/continue_workspace.py", "--inspect"], "Inspecting the current private workspace."), (["python", "-I", "/workspace/generated_follow_up.py"], "Applying the grounded continuation."), (["python", "/workspace/continue_workspace.py", "--validate"], "Validating the private follow-up file.")):
+        for command, label in ((["python", "/workspace/continue_workspace.py", "--inspect"], "Inspecting the current private workspace."), (["python", "/workspace/continue_workspace.py", "--apply"], "Applying the grounded continuation."), (["python", "/workspace/continue_workspace.py", "--validate"], "Validating the private follow-up file.")):
             shown = " ".join(command)
             if event("command_started", label, command=shown): event("cancelled", "Workspace continuation cancelled."); return {"cancelled": True}
             process = await sandbox.exec.aio(*command, timeout=45); stdout = await process.stdout.read.aio(); stderr = await process.stderr.read.aio(); await process.wait.aio()

@@ -22,7 +22,9 @@ class WorkspaceSequenceTests(unittest.TestCase):
         self.assertIn('"fastapi[standard]>=0.115.0,<1"', source)
         self.assertIn('remote_path="/root/workspace_sequence.py"', source)
         self.assertNotIn("from fastapi.responses import JSONResponse\nfrom workspace_sequence", source)
-        self.assertEqual(source.count("headers=_callback_headers(signature)"), 2)
+        # Base-run and continuation callback/claim requests all share the
+        # staging-protection header helper.
+        self.assertEqual(source.count("headers=_callback_headers(signature)"), 4)
 
 
 if __name__ == '__main__':

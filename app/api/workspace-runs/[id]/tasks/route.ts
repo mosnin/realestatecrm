@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (checked.run.tasks.some((task) => ['queued','launching','running'].includes(task.status))) return NextResponse.json({ error: 'A workspace continuation is already running.' }, { status: 409 });
     const files = await workspaceTaskFiles(checked.id, checked.auth.space.id);
     const planned = await planWorkspaceRunTask({ instruction, files });
-    const task = await enqueueWorkspaceRunTask({ runId: checked.id, spaceId: checked.auth.space.id, taskId, idempotencyKey, instruction, commandPlan: planned.commandPlan, program: planned.program });
+    const task = await enqueueWorkspaceRunTask({ runId: checked.id, spaceId: checked.auth.space.id, taskId, idempotencyKey, instruction, commandPlan: planned.commandPlan, executionPlan: planned.executionPlan });
     if (task.created || task.status === 'queued') await kickWorkspaceRunTask({ taskId: task.taskId, runId: checked.id, spaceId: checked.auth.space.id });
     const refreshed = await getWorkspaceRun(checked.id, checked.auth.space.id);
     const view = refreshed?.tasks.find((item) => item.id === task.taskId);
