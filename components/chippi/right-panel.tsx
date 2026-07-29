@@ -13,6 +13,8 @@ import { RightPanelTabs, type RightPanelTab } from './right-panel-tabs';
 import { BrowserView } from './browser-view';
 import { embedSrcFor, type EmbedTab, type RightPanelVariant } from './right-panel-embeds';
 import { LiveWorkbench } from './live-workbench';
+import { BrowserControlPanel, type BrowserActionLogEntry } from './browser-control-panel';
+import type { ResearchSourceLink } from '@/lib/chippi/research-workspace';
 
 interface RightPanelProps {
   slug: string;
@@ -39,6 +41,11 @@ interface RightPanelProps {
   onClose?: () => void;
   workbenchArtifactId?: string | null;
   workbenchRefreshVersion?: number | null;
+  /** Bounded in-conversation activity, supplemented by the server history. */
+  researchActions?: BrowserActionLogEntry[];
+  researchSources?: ResearchSourceLink[];
+  /** Server-computed per-space entitlement; never inferred client-side. */
+  researchEnabled?: boolean;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -59,6 +66,9 @@ export function RightPanel({
   onClose,
   workbenchArtifactId,
   workbenchRefreshVersion,
+  researchActions,
+  researchSources,
+  researchEnabled = false,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -66,13 +76,21 @@ export function RightPanel({
   // history survive hopping between tabs. Embed tabs keep their original
   // remount-per-switch behavior.
   const [browserMounted, setBrowserMounted] = useState(false);
+  const [researchMounted, setResearchMounted] = useState(false);
   const isBrowser = activeTab === 'browser';
   // Slice A is off unless a deployment explicitly provides this public flag.
   // The panel is therefore safe to merge without exposing a partial local-only
   // artifact workflow to paying customers.
   const workbenchEnabled = process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true';
   const isWorkbench = activeTab === 'workbench' && workbenchEnabled;
-  const isEmbedded = !isBrowser && !isWorkbench;
+  // Research is an oversight workspace for the existing browser-control
+  // runtime. It is independently gated so it never advertises a partial
+  // surface in a deployment that has not opted in.
+  const isResearch = activeTab === 'research' && researchEnabled;
+  const isUnavailableSpecialTab =
+    (activeTab === 'workbench' && !workbenchEnabled) ||
+    (activeTab === 'research' && !researchEnabled);
+  const isEmbedded = !isBrowser && !isWorkbench && !isResearch && !isUnavailableSpecialTab;
   // Broker has no surface for some realtor tabs (Documents). If a stale
   // persisted tab (the split-panel state is shared across variants) lands on
   // one, self-correct to the always-present live-work activity feed rather
@@ -83,15 +101,18 @@ export function RightPanel({
   useEffect(() => {
     setIsLoading(true);
     if (activeTab === 'browser') setBrowserMounted(true);
+    if (activeTab === 'research') setResearchMounted(true);
   }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'workbench' && !workbenchEnabled) {
       onTabChange('activity');
+    } else if (activeTab === 'research' && !researchEnabled) {
+      onTabChange('activity');
     } else if (variant === 'broker' && isEmbedded && embedSrc === null) {
       onTabChange('activity');
     }
-  }, [activeTab, embedSrc, isEmbedded, onTabChange, variant, workbenchEnabled]);
+  }, [activeTab, embedSrc, isEmbedded, onTabChange, researchEnabled, variant, workbenchEnabled]);
 
   return (
     <motion.div
@@ -114,6 +135,7 @@ export function RightPanel({
           onTabChange={onTabChange}
           variant={variant}
           workbenchEnabled={workbenchEnabled}
+          researchEnabled={researchEnabled}
         />
         {onClose && (
           <button
@@ -161,6 +183,11 @@ export function RightPanel({
           </div>
         )}
         {isWorkbench && <LiveWorkbench artifactId={workbenchArtifactId} refreshVersionNumber={workbenchRefreshVersion} />}
+        {researchMounted && (
+          <div className={cn('absolute inset-0 overflow-y-auto p-3', !isResearch && 'hidden')}>
+            <BrowserControlPanel actions={researchActions} sources={researchSources} />
+          </div>
+        )}
       </div>
     </motion.div>
   );

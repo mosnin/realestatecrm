@@ -6,79 +6,33 @@
  * button. Designed to drop into a chat side panel while the agent is
  * driving the realtor's browser.
  *
- * NOT wired into RightPanel's existing 'browser' tab
- * (components/chippi/right-panel-tabs.tsx / right-panel-embeds.ts) — that
- * tab is a DIFFERENT, pre-existing feature: an in-panel read-only iframe web
- * view backed by lib/browser-proxy (see components/chippi/browser-view.tsx).
- * Mounting THIS panel as a new RightPanel tab/mode touches right-panel.tsx +
- * right-panel-tabs.tsx + right-panel-embeds.ts, none of which are in this
- * track's ownership for this wave — flagged as a follow-up integration
- * point, not done here.
+ * Wired as the feature-gated RightPanel Research tab. It stays separate from
+ * the existing Browser tab, which is an in-panel read-only iframe backed by
+ * lib/browser-proxy (see components/chippi/browser-view.tsx).
  *
  * Live data sources:
- *   - Connection/session status: polled from the existing, Clerk-authed
- *     `GET /api/browser-control/status` (Track B). Honest by construction —
- *     "Active" is only ever shown after a confirmed fetch says so.
- *   - Recent action log: there is no server-side history endpoint for
- *     BrowserAction rows (Track B's surface is status / pair/code /
- *     pair/redeem / link / poll — no `/actions` list route), so this
- *     component takes recent entries as a prop instead of fetching its own.
- *     The natural sources are each `control_browser` tool result (summary +
- *     ok + actionType — see `lib/ai-tools/tools/control-browser.ts`) AND
- *     each step of a `browser_task` tool result's `data.steps` (same shape:
- *     step/action/detail/ok/summary — see `lib/ai-tools/tools/browser-task.ts`);
- *     the caller flattens both into `actions` in chronological order. With
- *     no entries passed, the panel shows an honest "No browser actions yet"
- *     empty state rather than fabricating activity.
- *   - Live view: polled from `GET /api/browser-control/frame` (added this
- *     wave) once a second WHILE a session is active — the caller's active
- *     control session's latest pushed viewport frame, or `{ frame: null }`
- *     honestly when there is no active session or the extension hasn't
- *     pushed a frame yet (see `getLatestFrame` in
- *     `lib/browser-control/session.ts`). Polling stops the instant the
- *     session goes idle, so this never burns a request loop against a dead
- *     session.
+ *   - Connection/session status: polled in the backend's exact cloud-source
+ *     mode. "Active" is only ever shown after a confirmed fetch says so.
+ *   - Recent action log: loaded from the bounded, tenant-scoped `/actions`
+ *     route and supplemented by streamed tool results until the next poll.
+ *   - Live view: polled from the exact headless-frame endpoint while this
+ *     session is active. A frame must match both session id and source before
+ *     it is displayed.
  *
- * Stop button: the only server-side kill switch available today is
- * `DELETE /api/browser-control/link/[id]` (full revoke — see that route's
- * header comment), and `/status` doesn't report which linkId owns the
- * active session. So Stop only enables when there is exactly ONE paired
- * device (the unambiguous case); with more than one, it's disabled with a
- * tooltip pointing at Settings → Browser control, where each device has its
- * own Revoke button. Flagged as a follow-up: if `/status` starts returning
- * `session.linkId`, Stop can target precisely regardless of device count.
- *
- * Source-aware oversight (this wave): `/status`'s `session.source` tells us
- * WHICH browser is acting — the realtor's own paired extension, or a fresh
- * Chippi cloud (headless) browser with no logins. Honest UI (CLAUDE.md #5)
- * means the panel always says which one out loud; the two carry very
- * different trust implications (a logged-in browser vs. an anonymous cloud
- * one). `source` is read defensively — an older/absent value degrades to a
- * neutral "Browser" label rather than guessing or crashing (see
- * `sourceLabel` below).
- *
- * Headless sessions have no in-page kill switch (there is no user tab to
- * show a banner on), so this panel's Stop button is the ONLY control for
- * them — rendered more prominently than the extension's Stop, with its own
- * explanation. There is not yet a dedicated server route to end a headless
- * session on demand (`endHeadlessSession` in `lib/browser-control/session.ts`
- * is only called internally, from the poll route's kill-signal path — see
- * that file). This panel calls a same-shaped `POST
- * /api/browser-control/headless/stop` optimistically and degrades honestly
- * (disables with an explanation, mirroring the settings page's
- * `rotateUnavailable` pattern for `/link/[id]/rotate`) the first time that
- * 404s, rather than pretending Stop always works. FLAGGED: that route does
- * not exist yet — this is a Track B / deploy-gated follow-up. Until it
- * ships, a headless session still ends itself automatically after a few
- * minutes idle (`STALE_AFTER_SECONDS` in session.ts), which the disabled
- * state's copy says honestly.
+ * The Stop control affects only the cloud research session. A paired browser
+ * remains in the existing Browser experience and is never exposed here.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, MonitorSmartphone, Cloud, Square, Circle } from 'lucide-react';
+import { Loader2, Cloud, Square, Circle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SECTION_LABEL, BODY_COMPACT, CAPTION } from '@/lib/typography';
 import type { BrowserActionType } from '@/lib/browser-control/protocol';
+import {
+  boundedResearchSources,
+  toResearchSourceLink,
+  type ResearchSourceLink,
+} from '@/lib/chippi/research-workspace';
 
 export interface BrowserActionLogEntry {
   id: string;
@@ -86,6 +40,36 @@ export interface BrowserActionLogEntry {
   summary: string;
   timestamp: string;
   ok: boolean;
+  /** Server queue state when available; local completed results use done/error. */
+  status?: 'queued' | 'running' | 'done' | 'error' | 'expired';
+}
+
+export function browserActionVisualState(action: BrowserActionLogEntry): {
+  status: 'queued' | 'running' | 'done' | 'error' | 'expired';
+  pending: boolean;
+  failed: boolean;
+} {
+  const status = action.status ?? (action.ok ? 'done' : 'error');
+  return {
+    status,
+    pending: status === 'queued' || status === 'running',
+    failed: status === 'error' || status === 'expired',
+  };
+}
+
+export function researchSessionLabel(state: ResearchSessionState | undefined): string {
+  switch (state) {
+    case 'launching': return 'Launching';
+    case 'active': return 'Active';
+    case 'error': return 'Error';
+    case 'stopped': return 'Stopped';
+    default: return 'Not running';
+  }
+}
+
+/** Exact status removes the workspace when entitlement is revoked. */
+export function clearsResearchWorkspaceForStatus(status: number): boolean {
+  return status === 403 || status === 404;
 }
 
 /**
@@ -97,20 +81,18 @@ export interface BrowserActionLogEntry {
  */
 export type BrowserSessionSource = 'extension' | 'headless';
 
-interface StatusLink {
-  id: string;
-  deviceLabel: string | null;
-  tokenPrefix: string;
-}
+export type ResearchSessionState = 'launching' | 'active' | 'error' | 'stopped';
 
 interface StatusResponse {
-  links: StatusLink[];
-  connected: boolean;
-  // `source` is optional + typed loosely (not narrowed to the union) on
-  // purpose: `/status` is a Track B surface this panel doesn't control the
-  // rollout of, so a missing or unrecognized value must degrade gracefully
-  // (via `sourceLabel`'s default branch) instead of throwing or lying.
-  session: { id: string; status: string; source?: string; startedAt: string } | null;
+  session: {
+    id: string;
+    source: 'headless';
+    state: ResearchSessionState;
+    startedAt: string;
+    lastHeartbeatAt: string | null;
+    leaseExpiresAt: string | null;
+    error?: string;
+  } | null;
 }
 
 interface LiveFrameData {
@@ -118,6 +100,12 @@ interface LiveFrameData {
   pageUrl?: string;
   pageTitle?: string;
   at: string;
+}
+
+interface LiveFrameResponse {
+  sessionId: string | null;
+  source: 'headless' | null;
+  frame: LiveFrameData | null;
 }
 
 export interface SourceLabelInfo {
@@ -176,16 +164,24 @@ const POLL_MS = 4_000;
  *  cadence (extension/background.js), so polling faster wouldn't show a
  *  fresher frame anyway. */
 const FRAME_POLL_MS = 1_000;
+const BROWSER_ACTION_TYPES = new Set([
+  'navigate', 'click', 'type', 'press', 'scroll', 'read_dom', 'screenshot', 'wait',
+]);
 
 export function BrowserControlPanel({
   actions = [],
+  sources: incomingSources = [],
   className,
 }: {
   /** Recent control_browser tool results for this conversation, newest last. */
   actions?: BrowserActionLogEntry[];
+  /** Public page links returned by completed browser actions, newest last. */
+  sources?: ResearchSourceLink[];
   className?: string;
 }) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [historyActions, setHistoryActions] = useState<BrowserActionLogEntry[]>([]);
+  const [historySources, setHistorySources] = useState<ResearchSourceLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [stopping, setStopping] = useState(false);
 
@@ -193,16 +189,24 @@ export function BrowserControlPanel({
   const [frameChecked, setFrameChecked] = useState(false);
   const [frameError, setFrameError] = useState(false);
 
-  // Whether ending a headless session on demand isn't wired up server-side
-  // yet — learned honestly from a 404 on first attempt, never assumed
-  // upfront. See the header comment for why this route may not exist yet.
+  // Compatibility fallback: an older deployment may not expose the dedicated
+  // stop endpoint yet. Learn that once rather than promising a Stop that fails.
   const [headlessStopUnavailable, setHeadlessStopUnavailable] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/browser-control/status');
+      // Never reuse general browser status here: a newer paired extension can
+      // coexist with a cloud research run. This endpoint is exact-source.
+      const res = await fetch('/api/browser-control/headless/status');
       if (res.ok) {
         setStatus((await res.json()) as StatusResponse);
+      } else if (clearsResearchWorkspaceForStatus(res.status)) {
+        // An entitlement can be removed while this panel is open. Do not keep
+        // a stale green "Active" state or its last frame after that removal.
+        setStatus(null);
+        setFrame(null);
+        setFrameChecked(true);
+        setFrameError(false);
       }
     } catch {
       // Keep last-known status on a transient failure — the indicator below
@@ -212,28 +216,77 @@ export function BrowserControlPanel({
     }
   }, []);
 
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/browser-control/actions');
+      if (!res.ok) return;
+      const body = (await res.json()) as { actions?: unknown };
+      if (!Array.isArray(body.actions)) return;
+      const rows = body.actions.flatMap((raw): Array<BrowserActionLogEntry & { source: ResearchSourceLink | null }> => {
+        if (!raw || typeof raw !== 'object') return [];
+        const row = raw as Record<string, unknown>;
+        if (
+          typeof row.id !== 'string' ||
+          typeof row.type !== 'string' ||
+          !BROWSER_ACTION_TYPES.has(row.type) ||
+          typeof row.summary !== 'string' ||
+          typeof row.timestamp !== 'string' ||
+          typeof row.ok !== 'boolean' ||
+          (row.status !== 'queued' && row.status !== 'running' && row.status !== 'done' && row.status !== 'error' && row.status !== 'expired')
+        ) return [];
+        return [{
+          id: row.id,
+          type: row.type as BrowserActionType,
+          summary: row.summary,
+          timestamp: row.timestamp,
+          ok: row.ok,
+          status: row.status as BrowserActionLogEntry['status'],
+          source: toResearchSourceLink({
+            id: `${row.id}:source`,
+            pageUrl: row.pageUrl,
+            pageTitle: row.pageTitle,
+            timestamp: row.timestamp,
+          }),
+        }];
+      });
+      setHistoryActions(rows.map(({ source: _source, ...action }) => action));
+      setHistorySources(boundedResearchSources(rows.flatMap(({ source }) => source ? [source] : [])));
+    } catch {
+      // Keep the most recent verified timeline through a transient failure.
+    }
+  }, []);
+
   useEffect(() => {
     fetchStatus();
-    const id = setInterval(fetchStatus, POLL_MS);
+    fetchHistory();
+    const id = setInterval(() => {
+      fetchStatus();
+      fetchHistory();
+    }, POLL_MS);
     return () => clearInterval(id);
-  }, [fetchStatus]);
+  }, [fetchHistory, fetchStatus]);
 
-  const active = status?.session?.status === 'active';
-  const links = status?.links ?? [];
-  // Only meaningful once a session is confirmed active — an idle/absent
-  // session has no runtime "acting" to label.
-  const sessionSource = active ? status?.session?.source : undefined;
-  const isHeadless = sessionSource === 'headless';
+  const researchState = status?.session?.state;
+  const active = researchState === 'active';
+  const sessionSource = status?.session?.source;
   const source = sourceLabel(sessionSource);
 
   const fetchFrame = useCallback(async () => {
     try {
-      const res = await fetch('/api/browser-control/frame');
+      const res = await fetch('/api/browser-control/headless/frame');
       if (!res.ok) {
+        setFrame(null);
         setFrameError(true);
         return;
       }
-      const data = (await res.json()) as { frame: LiveFrameData | null };
+      const data = (await res.json()) as LiveFrameResponse;
+      // A frame for a different browser session is not a research frame. Do
+      // not display it optimistically while sessions are overlapping/stopping.
+      if (data.source !== 'headless' || data.sessionId !== status?.session?.id) {
+        setFrame(null);
+        setFrameError(false);
+        return;
+      }
       setFrameError(false);
       setFrame(data.frame);
     } catch {
@@ -241,7 +294,7 @@ export function BrowserControlPanel({
     } finally {
       setFrameChecked(true);
     }
-  }, []);
+  }, [status?.session?.id]);
 
   // Only poll the screencast while a session is confirmed active — never
   // guess a live view exists, and never keep a poll loop running against a
@@ -257,32 +310,8 @@ export function BrowserControlPanel({
     const id = setInterval(fetchFrame, FRAME_POLL_MS);
     return () => clearInterval(id);
   }, [active, fetchFrame]);
-  const soleLink = links.length === 1 ? links[0] : null;
-  const ambiguousStop = links.length > 1;
-
-  async function handleStop() {
-    if (!soleLink) return;
-    const label = soleLink.deviceLabel || 'this browser';
-    if (
-      !confirm(
-        `Stop Chippi and disconnect ${label}? You'll need to pair again to reconnect.`,
-      )
-    ) {
-      return;
-    }
-    setStopping(true);
-    try {
-      const res = await fetch(`/api/browser-control/link/${soleLink.id}`, { method: 'DELETE' });
-      if (res.ok) await fetchStatus();
-    } finally {
-      setStopping(false);
-    }
-  }
-
-  // Headless sessions aren't tied to a paired link, so the link-revoke Stop
-  // above doesn't apply. This is the ONLY stop control for a cloud browser
-  // (no user tab to show an in-page kill switch on) — see header comment on
-  // why the endpoint it calls may not exist yet, and how this degrades.
+  // The cloud browser has no user-tab kill switch. On older deployments the
+  // dedicated endpoint can be absent; the compatibility state below says so.
   async function handleStopHeadless() {
     if (!status?.session) return;
     if (!confirm('Stop the Chippi cloud browser? This ends the session immediately.')) {
@@ -307,69 +336,60 @@ export function BrowserControlPanel({
     }
   }
 
-  const recent = actions.slice(-8).reverse();
+  const recent = [...historyActions, ...actions]
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    .slice(-8)
+    .reverse();
+  const sources = boundedResearchSources([...historySources, ...incomingSources]);
 
   return (
     <div className={cn('rounded-2xl bg-muted/50 p-4 space-y-3', className)}>
       {/* ── Status row ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2">
-        <p className={SECTION_LABEL}>Browser control</p>
+        <p className={SECTION_LABEL}>Research workspace</p>
         {loading ? (
           <Loader2 aria-hidden className="h-3 w-3 animate-spin motion-reduce:animate-none text-muted-foreground" />
         ) : (
           <span
             aria-live="polite"
-            className={cn(
-              'inline-flex items-center gap-1.5 text-[11px] font-medium',
-              active ? 'text-[#F25A00]' : 'text-muted-foreground',
-            )}
+            className={cn('inline-flex items-center gap-1.5 text-[11px] font-medium',
+              researchState === 'error' ? 'text-destructive' : active ? 'text-[#F25A00]' : 'text-muted-foreground')}
           >
             <Circle
               aria-hidden
               className={cn(
                 'h-2 w-2',
-                active ? 'fill-[#F25A00] text-[#F25A00]' : 'fill-muted-foreground/40 text-muted-foreground/40',
+                researchState === 'error'
+                  ? 'fill-destructive text-destructive'
+                  : active ? 'fill-[#F25A00] text-[#F25A00]' : 'fill-muted-foreground/40 text-muted-foreground/40',
               )}
             />
-            {active ? 'Active' : links.length > 0 ? 'Paired, idle' : 'Not connected'}
+            {researchSessionLabel(researchState)}
           </span>
         )}
       </div>
 
-      {/* Source badge — WHICH browser is acting, always shown while a
-          session is confirmed active. Honest UI: this is the single most
-          important thing on the panel, since an action in the realtor's own
-          logged-in browser and one in a fresh cloud browser are very
-          different things (see header comment). */}
-      {active && (
+      {/* Exact headless-status endpoint guarantees this is never a paired,
+          logged-in extension session. Show it through launch/error/stopped,
+          not only after a live frame arrives. */}
+      {status?.session && (
         <div
-          className={cn(
-            'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',
-            isHeadless ? 'bg-[#F25A00]/10 text-[#F25A00]' : 'bg-foreground/[0.04] text-foreground',
-          )}
+          className="flex items-center gap-2 rounded-lg bg-[#F25A00]/10 px-2.5 py-1.5 text-xs text-[#F25A00]"
         >
-          {isHeadless ? (
-            <Cloud aria-hidden className="h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <MonitorSmartphone aria-hidden className="h-3.5 w-3.5 shrink-0" />
-          )}
+          <Cloud aria-hidden className="h-3.5 w-3.5 shrink-0" />
           <div className="min-w-0">
             <p className="truncate font-medium">{source.label}</p>
             {source.description && <p className={cn(CAPTION, 'truncate')}>{source.description}</p>}
           </div>
         </div>
       )}
-
-      {!active && links.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <MonitorSmartphone aria-hidden className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">
-            {links.length === 1
-              ? soleLink!.deviceLabel || soleLink!.tokenPrefix
-              : `${links.length} browsers paired`}
-          </span>
-        </div>
+      {researchState === 'error' && status?.session?.error && (
+        <p className={cn(CAPTION, 'text-destructive')}>{status.session.error}</p>
       )}
+      {researchState === 'launching' && (
+        <p className={CAPTION}>Creating the cloud research browser…</p>
+      )}
+      {researchState === 'stopped' && <p className={CAPTION}>The cloud research browser has stopped.</p>}
 
       {/* ── Live view ──────────────────────────────────────────────────── */}
       {active && (
@@ -401,81 +421,81 @@ export function BrowserControlPanel({
 
       {/* ── Recent action log ─────────────────────────────────────────── */}
       <div className="space-y-1.5">
+        <p className={SECTION_LABEL}>Recent actions</p>
         {recent.length === 0 ? (
           <p className={cn(CAPTION, 'py-1')}>No browser actions yet.</p>
         ) : (
           <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-            {recent.map((a) => (
-              <li key={a.id} className="flex items-start gap-2">
-                <span
-                  aria-hidden
-                  className={cn(
-                    'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
-                    a.ok ? 'bg-emerald-500' : 'bg-destructive',
+            {recent.map((a) => {
+              const { status, pending, failed } = browserActionVisualState(a);
+              return (
+                <li key={a.id} className="flex items-start gap-2">
+                  {pending ? (
+                    <Loader2 aria-label={status === 'queued' ? 'Queued' : 'In progress'} className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin motion-reduce:animate-none text-muted-foreground" />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
+                        failed ? 'bg-destructive' : 'bg-emerald-500',
+                      )}
+                    />
                   )}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className={cn(BODY_COMPACT, 'truncate')}>{a.summary}</p>
-                  <p className={CAPTION}>
-                    {a.type} · {new Date(a.timestamp).toLocaleTimeString()}
-                    {/* Failure is never color-only — the dot above is decorative
-                        (aria-hidden), this text is the real signal for both
-                        screen-reader and colorblind-safe reading. */}
-                    {!a.ok && <span className="font-medium text-destructive"> · Failed</span>}
-                  </p>
-                </div>
-              </li>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <p className={cn(BODY_COMPACT, 'truncate')}>{a.summary}</p>
+                    <p className={CAPTION}>
+                      {a.type} · {new Date(a.timestamp).toLocaleTimeString()}
+                      {status === 'queued' && <span> · Queued</span>}
+                      {status === 'running' && <span> · In progress</span>}
+                      {/* Failure is never color-only — the dot above is decorative
+                          (aria-hidden), this text is the real signal for both
+                          screen-reader and colorblind-safe reading. */}
+                      {failed && <span className="font-medium text-destructive"> · Failed</span>}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
-      {/* ── Stop ───────────────────────────────────────────────────────── */}
-      {isHeadless ? (
-        // The cloud browser has no in-page kill switch — this button is the
-        // ONLY way to stop it, so it gets its own explanation rather than
-        // sharing the terser extension copy below.
+      {/* A compact provenance trail: these are page URLs reported by completed
+          browser actions, not inferred citations and never raw page content. */}
+      {sources.length > 0 && (
         <div className="space-y-1.5">
-          <p className={CAPTION}>
-            No in-page kill switch for a cloud browser — this is the only way to stop it.
-          </p>
-          <button
-            type="button"
-            onClick={handleStopHeadless}
-            disabled={!active || stopping || headlessStopUnavailable}
-            title={
-              headlessStopUnavailable
-                ? "Stopping the cloud browser on demand isn't available yet — it ends automatically after a few minutes idle."
-                : undefined
-            }
-            className={cn(
-              'w-full inline-flex items-center justify-center gap-2 rounded-xl h-10 text-sm font-semibold',
-              'bg-destructive text-white hover:bg-destructive/90 transition-colors duration-150 motion-reduce:transition-none',
-              'disabled:opacity-40 disabled:cursor-not-allowed',
-            )}
-          >
-            {stopping ? (
-              <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
-            ) : (
-              <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
-            )}
-            Stop cloud browser
-          </button>
-          {headlessStopUnavailable && (
-            <p className={CAPTION}>
-              Stopping on demand isn&apos;t available yet — this session ends automatically after a
-              few minutes of inactivity.
-            </p>
-          )}
+          <p className={SECTION_LABEL}>Sources visited</p>
+          <ul className="space-y-1 max-h-36 overflow-y-auto pr-1">
+            {sources.map((source) => (
+              <li key={source.id}>
+                <a
+                  href={source.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={source.href}
+                  className="group flex items-center gap-1.5 rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-foreground/[0.035] hover:text-foreground"
+                >
+                  <ExternalLink aria-hidden className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{source.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : (
+      )}
+
+      {/* ── Stop ───────────────────────────────────────────────────────── */}
+      <div className="space-y-1.5">
+        <p className={CAPTION}>
+          Stop ends this cloud research session. It does not affect a paired browser.
+        </p>
         <button
           type="button"
-          onClick={handleStop}
-          disabled={!active || !soleLink || stopping}
+          onClick={handleStopHeadless}
+          disabled={!status?.session || researchState === 'stopped' || researchState === 'error' || stopping || headlessStopUnavailable}
           title={
-            ambiguousStop
-              ? 'Multiple browsers paired — stop a specific one from Settings → Browser control.'
+            headlessStopUnavailable
+              ? 'This deployment does not expose cloud-browser stopping on demand.'
               : undefined
           }
           className={cn(
@@ -489,9 +509,14 @@ export function BrowserControlPanel({
           ) : (
             <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
           )}
-          Stop
+          Stop cloud browser
         </button>
-      )}
+        {headlessStopUnavailable && (
+          <p className={CAPTION}>
+            This deployment does not expose cloud-browser stopping on demand.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

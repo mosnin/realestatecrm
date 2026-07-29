@@ -8,6 +8,7 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { composioConfigured } from '@/lib/integrations/composio';
 import { loadUserInvocableSkills } from '@/lib/ai-tools/skills/loader';
 import { realtimeVoiceGatewayReady } from '@/lib/realtime/voice-feature';
+import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
 import {
   isRealtorConversation,
   RESERVED_TITLE_LIKE_PATTERNS,
@@ -189,6 +190,7 @@ export default async function ChippiPage({
         spaceId={space.id}
         mentionApps={mentionApps}
         realtimeVoiceEnabled={realtimeVoiceGatewayReady()}
+        researchEnabled={isResearchWorkspaceEnabledForSpace(space.id)}
       />
     </div>
   );

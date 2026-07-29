@@ -13,3 +13,14 @@ describe('Chippi Workbench feature gate', () => {
     expect(visibleRightPanelTabs('broker', true).map((tab) => tab.id)).not.toContain('documents');
   });
 });
+
+describe('Research Workspace feature gate', () => {
+  it('keeps Research out until the explicit server entitlement is present', () => {
+    expect(visibleRightPanelTabs('realtor', true, false).map((tab) => tab.id)).not.toContain('research');
+    expect(visibleRightPanelTabs('broker', true, false).map((tab) => tab.id)).not.toContain('research');
+  });
+
+  it('adds Research only for an entitled workspace', () => {
+    expect(visibleRightPanelTabs('realtor', true, true).map((tab) => tab.id)).toContain('research');
+  });
+});

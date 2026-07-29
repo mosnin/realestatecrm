@@ -104,6 +104,12 @@ export interface UseAgentTaskOptions {
   conversationCreatePayload?: Record<string, unknown>;
   /** Receives typed rich tool results that drive workspace-level UI state. */
   onToolResult?: (input: { name: string; data: unknown; ok: boolean }) => void;
+  /**
+   * Narrow lifecycle signal for workspace surfaces that must open while a
+   * long-running tool is still active. It carries no tool arguments and does
+   * not create a generic tool-event rendering channel.
+   */
+  onToolStart?: (input: { name: string }) => void;
   /** A Workbench the user has actively opened. The server re-resolves it in
    * the caller's tenant before putting any workbook state in the tool context. */
   activeWorkbookArtifactId?: string | null;
@@ -207,6 +213,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     resumeEndpointBase = '/api/ai/task/resume',
     conversationCreatePayload,
     onToolResult,
+    onToolStart,
     activeWorkbookArtifactId,
   } = options;
 
@@ -467,6 +474,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       case 'tool_call_start': {
         toolNameByCallIdRef.current.set(event.callId, event.name);
+        onToolStart?.({ name: event.name });
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setCurrentAction(`${friendlyToolAction(event.name)}…`);
@@ -653,7 +661,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
     }
-  }, [landChippiError, onToolResult]);
+  }, [landChippiError, onToolResult, onToolStart]);
 
   /**
    * Drive one turn owned by the module-scope TurnRunner: replay whatever

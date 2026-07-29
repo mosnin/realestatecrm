@@ -45,11 +45,17 @@ import { PlanCard } from '@/components/chippi/plan-card';
 import { useSplitPanel } from '@/hooks/use-split-panel';
 import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
+import type { BrowserActionLogEntry } from '@/components/chippi/browser-control-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
 import { SystemMessage } from '@/components/ai/prompt-kit';
 import { fallbackHeuristic } from '@/lib/ai-tools/chippi-voice';
+import {
+  boundedResearchSources,
+  researchActivityFromToolResult,
+  type ResearchSourceLink,
+} from '@/lib/chippi/research-workspace';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -89,6 +95,8 @@ interface ChippiWorkspaceProps {
   mentionApps?: { slug: string; label: string }[];
   /** Server-computed readiness. The browser never infers this from secrets. */
   realtimeVoiceEnabled?: boolean;
+  /** Server-authorized, per-space entitlement for the Research Workspace. */
+  researchEnabled?: boolean;
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -110,6 +118,9 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
+const RESEARCH_BROWSER_ACTION_TYPES = new Set([
+  'navigate', 'click', 'type', 'press', 'scroll', 'read_dom', 'screenshot', 'wait',
+]);
 
 /**
  * The warmup status line, chosen by how long the turn has been waiting with no
@@ -239,6 +250,7 @@ export function ChippiWorkspace({
   spaceId,
   mentionApps = [],
   realtimeVoiceEnabled = false,
+  researchEnabled = false,
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
@@ -309,7 +321,18 @@ export function ChippiWorkspace({
   const [isResizingSplit, setIsResizingSplit] = useState(false);
   const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
   const [workbenchRefreshVersion, setWorkbenchRefreshVersion] = useState<number | null>(null);
+  // Immediate, in-conversation activity. The Research Workspace also reads
+  // the persisted browser-action timeline, so this state is just the small
+  // gap between a streamed tool result and the next server refresh.
+  const [researchActions, setResearchActions] = useState<BrowserActionLogEntry[]>([]);
+  const [researchSources, setResearchSources] = useState<ResearchSourceLink[]>([]);
   const openedWorkbenchUrlRef = useRef<string | null>(null);
+  const researchResultSequenceRef = useRef(0);
+  useEffect(() => {
+    researchResultSequenceRef.current = 0;
+    setResearchActions([]);
+    setResearchSources([]);
+  }, [activeConversationId]);
   const handleSplitDragStart = useCallback(() => setIsResizingSplit(true), []);
   const handleSplitDragEnd = useCallback(() => setIsResizingSplit(false), []);
   const openWorkbenchArtifact = useCallback((artifactId: string, refreshVersion?: number) => {
@@ -333,6 +356,40 @@ export function ChippiWorkspace({
     const { artifactId, versionNumber } = data as { artifactId?: unknown; versionNumber?: unknown };
     if (typeof artifactId === 'string') openWorkbenchArtifact(artifactId, name === 'apply_workbook_transformation' && typeof versionNumber === 'number' ? versionNumber : undefined);
   }, [openWorkbenchArtifact]);
+  const openResearchWorkspace = useCallback(() => {
+    // This matches the tab's deployment gate. A streamed browser result must
+    // never expose a surface the deployment intentionally kept dark.
+    if (!researchEnabled) return;
+    setRightTab('research');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+  }, [effectiveIsSplit, isMobileOverlay, researchEnabled, setRightTab, toggleSplit]);
+  const handleResearchToolStart = useCallback(({ name }: { name: string }) => {
+    // browser_task is the bounded cloud-research flow for an entitled public
+    // task. control_browser may act in the realtor's paired extension, which
+    // belongs in the existing Browser experience instead.
+    if (name === 'browser_task') openResearchWorkspace();
+  }, [openResearchWorkspace]);
+  const handleResearchToolResult = useCallback(({ name, data, ok }: { name: string; data: unknown; ok: boolean }) => {
+    const timestamp = new Date().toISOString();
+    const idPrefix = `research:${++researchResultSequenceRef.current}`;
+    const activity = researchActivityFromToolResult({ name, data, ok, idPrefix, timestamp });
+    if (!activity) return;
+
+    const validActions = activity.actions
+      .filter((action) => RESEARCH_BROWSER_ACTION_TYPES.has(action.type))
+      .map((action) => ({ ...action, type: action.type as BrowserActionLogEntry['type'] }));
+    if (validActions.length > 0) {
+      setResearchActions((previous) => [...previous, ...validActions].slice(-24));
+    }
+    if (activity.sources.length > 0) {
+      setResearchSources((previous) => boundedResearchSources([...previous, ...activity.sources]));
+    }
+    if (activity.shouldOpen) openResearchWorkspace();
+  }, [openResearchWorkspace]);
+  const handleWorkspaceToolResult = useCallback((input: { name: string; data: unknown; ok: boolean }) => {
+    handleWorkbenchToolResult(input);
+    handleResearchToolResult(input);
+  }, [handleResearchToolResult, handleWorkbenchToolResult]);
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -364,6 +421,7 @@ export function ChippiWorkspace({
     conversationsEndpoint: endpoints.conversationsEndpoint,
     resumeEndpointBase: endpoints.resumeEndpointBase,
     conversationCreatePayload: endpoints.conversationCreatePayload,
+    onToolStart: handleResearchToolStart,
     activeWorkbookArtifactId: workbenchArtifactId,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
@@ -391,7 +449,7 @@ export function ChippiWorkspace({
       // grow a step for every new chat.
       router.replace(`${endpoints.routeBase}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
     },
-    onToolResult: handleWorkbenchToolResult,
+    onToolResult: handleWorkspaceToolResult,
   });
 
   // ── Retry support ────────────────────────────────────────────────────────
@@ -2058,6 +2116,9 @@ export function ChippiWorkspace({
               variant={variant}
               workbenchArtifactId={workbenchArtifactId}
               workbenchRefreshVersion={workbenchRefreshVersion}
+              researchActions={researchActions}
+              researchSources={researchSources}
+              researchEnabled={researchEnabled}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
@@ -2092,6 +2153,9 @@ export function ChippiWorkspace({
               variant={variant}
               workbenchArtifactId={workbenchArtifactId}
               workbenchRefreshVersion={workbenchRefreshVersion}
+              researchActions={researchActions}
+              researchSources={researchSources}
+              researchEnabled={researchEnabled}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="h-full"
