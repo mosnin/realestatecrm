@@ -31,6 +31,8 @@ import { unattendedReadTools } from '@/lib/agent/unattended-tool-policy';
 import { uploadObject, buildKey } from '@/lib/storage';
 import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
+import { dispatchWorkspaceRun } from '@/lib/workspace-runs/server';
+import { selectWorkspaceTarget, type WorkspaceProperty } from '@/lib/workspace-runs/packet';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 // Shared with the client strip via lib/work-sessions/types.ts (types-only
@@ -110,6 +112,26 @@ export async function planSession(sessionId: string): Promise<WorkSessionRow['st
   const session = await getSession(sessionId);
   if (!session || session.status !== 'planning') return session?.status ?? null;
 
+  // Workspace Runs use an honest fixed packet plan; unlike research, the VM
+  // will execute exactly these four visible deliverable steps.
+  if (session.kind === 'workspace') {
+    const { data: properties } = await supabase.from('Property').select('*').eq('spaceId', session.spaceId).order('updatedAt', { ascending: false }).limit(50);
+    const target = selectWorkspaceTarget(`${session.goal}\n${session.answer ?? ''}`, (properties ?? []) as WorkspaceProperty[]);
+    if (!target && session.allowQuestions && !session.answer) {
+      await patchSession(sessionId, { status: 'awaiting_input', question: 'Which property should I use? Please provide the address or MLS number.' });
+      return 'awaiting_input';
+    }
+    const steps: PlanStep[] = [
+      { id: 's1', title: target ? `Confirm target property: ${target.address}` : 'Identify or flag the target property', status: 'pending' },
+      { id: 's2', title: 'Prepare the listing intelligence brief', status: 'pending' },
+      { id: 's3', title: 'Build comparable and launch-checklist files', status: 'pending' },
+      { id: 's4', title: 'Package the handoff files in the workspace', status: 'pending' },
+    ];
+    const next = session.autonomy === 'plan_first' ? 'awaiting_approval' : 'running';
+    await patchSession(sessionId, { plan: steps, status: next, question: null });
+    return next;
+  }
+
   let raw = '';
   try {
     const llm = getLLMClient();
@@ -183,6 +205,17 @@ export async function planSession(sessionId: string): Promise<WorkSessionRow['st
 export async function executeSession(sessionId: string): Promise<void> {
   const session = await getSession(sessionId);
   if (!session || session.status !== 'running') return;
+
+  // A Workspace Run is a separate VM substrate, not a broader permission set
+  // for the background research agent. Planning remains deliberately shared.
+  if (session.kind === 'workspace') {
+    if (!session.workspaceRunId) {
+      await patchSession(sessionId, { status: 'failed', error: 'Workspace Run is missing its durable link.' });
+      return;
+    }
+    await dispatchWorkspaceRun({ runId: session.workspaceRunId, spaceId: session.spaceId, workSessionId: session.id, goal: session.goal, answer: session.answer });
+    return;
+  }
 
   const ctx = await contextForSpace(session.spaceId);
   if (!ctx) {

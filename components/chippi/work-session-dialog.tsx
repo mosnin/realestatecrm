@@ -17,17 +17,20 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function WorkSessionDialog({
-  slug, conversationId, open, onOpenChange, onStarted,
+  slug, conversationId, open, onOpenChange, onStarted, workspaceRunsEnabled = false,
 }: {
   slug: string;
   conversationId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStarted?: () => void;
+  onStarted?: (session?: { kind?: string; workspaceRunId?: string | null }) => void;
+  workspaceRunsEnabled?: boolean;
 }) {
   const [goal, setGoal] = useState('');
   const [autonomy, setAutonomy] = useState<'plan_first' | 'just_go'>('plan_first');
   const [allowQuestions, setAllowQuestions] = useState(true);
+  const [kind, setKind] = useState<'research' | 'workspace'>('research');
+  const workspaceEnabled = workspaceRunsEnabled;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,16 +41,16 @@ export function WorkSessionDialog({
       const res = await fetch('/api/work-sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, goal, autonomy, allowQuestions, conversationId }),
+        body: JSON.stringify({ slug, goal, autonomy, allowQuestions, conversationId, kind }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; session?: { kind?: string; workspaceRunId?: string | null } };
       if (!res.ok) {
         setError(data.error || "Couldn't start the session.");
         return;
       }
       setGoal('');
       onOpenChange(false);
-      onStarted?.();
+      onStarted?.(data.session);
     } finally {
       setBusy(false);
     }
@@ -95,6 +98,7 @@ export function WorkSessionDialog({
               </button>
             ))}
           </div>
+          {workspaceEnabled && <div className="space-y-1.5"><p className="text-[11px] font-medium text-muted-foreground">Run type</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setKind('research')} className={cn('rounded-lg border p-2.5 text-left transition-colors', kind === 'research' ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20')}><p className="text-[13px] font-medium text-foreground">Research session</p><p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">Read, analyze, and return a report.</p></button><button type="button" onClick={() => setKind('workspace')} className={cn('rounded-lg border p-2.5 text-left transition-colors', kind === 'workspace' ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/20')}><p className="text-[13px] font-medium text-foreground">Workspace Run</p><p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">Build a multi-file packet in an isolated workspace.</p></button></div></div>}
 
           <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
             <input
@@ -107,8 +111,8 @@ export function WorkSessionDialog({
           </label>
 
           <p className="text-[11px] leading-snug text-muted-foreground/80">
-            Sessions research and analyze — they never send messages or change records. Actions come
-            back as recommendations in the report.
+            {kind === 'workspace' ? 'Workspace Runs create private packet files in an isolated VM. They never send messages or change records.' : 'Sessions research and analyze — they never send messages or change records. Actions come'}
+            {kind === 'workspace' ? '' : ' back as recommendations in the report.'}
           </p>
 
           {error && <p className="text-xs text-destructive">{error}</p>}

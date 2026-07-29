@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { kickPlan } from './kick';
+import { createWorkspaceRun } from '@/lib/workspace-runs/server';
 import type { WorkSessionRow } from './types';
 
 export interface StartWorkSessionInput {
@@ -12,6 +13,7 @@ export interface StartWorkSessionInput {
   goal: string;
   autonomy: 'plan_first' | 'just_go';
   allowQuestions: boolean;
+  kind?: 'research' | 'workspace';
 }
 
 export interface StartWorkSessionResult {
@@ -40,6 +42,7 @@ export async function startWorkSession(
       goal: input.goal,
       autonomy: input.autonomy,
       allowQuestions: input.allowQuestions,
+      kind: input.kind ?? 'research',
     })
     .select('*')
     .single();
@@ -61,6 +64,21 @@ export async function startWorkSession(
 
   if (!session) {
     throw insert.error ?? new Error('Could not create Work Session');
+  }
+
+  if (input.kind === 'workspace') {
+    // A stable run id is the idempotency key shared with the Modal worker.
+    const runId = crypto.randomUUID();
+    const workspace = await createWorkspaceRun({ id: runId, workSessionId: session.id, spaceId: input.spaceId, goal: input.goal });
+    if (workspace.id !== runId || !session.workspaceRunId) {
+      const { data: linked, error: linkError } = await supabase.from('WorkSession').update({ workspaceRunId: workspace.id }).eq('id', session.id).eq('spaceId', input.spaceId).select('*').maybeSingle();
+      if (linkError || !linked || (linked as WorkSessionRow).workspaceRunId !== workspace.id) {
+        const error = 'Workspace Run could not be linked to this session.';
+        await supabase.from('WorkSession').update({ status: 'failed', error, updatedAt: new Date().toISOString() }).eq('id', session.id).eq('spaceId', input.spaceId);
+        throw new Error(error);
+      }
+      session = linked as WorkSessionRow;
+    }
   }
 
   // Planning is idempotent: it only acts while status === "planning".

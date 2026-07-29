@@ -97,6 +97,8 @@ interface ChippiWorkspaceProps {
   realtimeVoiceEnabled?: boolean;
   /** Server-authorized, per-space entitlement for the Research Workspace. */
   researchEnabled?: boolean;
+  /** Server-authorized, per-space entitlement for isolated Workspace Runs. */
+  workspaceRunsEnabled?: boolean;
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -251,6 +253,7 @@ export function ChippiWorkspace({
   mentionApps = [],
   realtimeVoiceEnabled = false,
   researchEnabled = false,
+  workspaceRunsEnabled = false,
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
@@ -321,6 +324,23 @@ export function ChippiWorkspace({
   const [isResizingSplit, setIsResizingSplit] = useState(false);
   const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
   const [workbenchRefreshVersion, setWorkbenchRefreshVersion] = useState<number | null>(null);
+  const [workspaceRunId, setWorkspaceRunId] = useState<string | null>(null);
+  // Durable re-entry: a page reload does not discard the latest workspace
+  // attached to this conversation; the Workspace tab can reopen it.
+  useEffect(() => {
+    // Clear first: a new/no-match conversation must never borrow the prior
+    // thread's local workspace id while this durable lookup is in flight.
+    setWorkspaceRunId(null);
+    if (!workspaceRunsEnabled || !activeConversationId) return;
+    let active = true;
+    void fetch(`/api/work-sessions?slug=${encodeURIComponent(slug)}&conversationId=${encodeURIComponent(activeConversationId)}`, { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((payload: { sessions?: Array<{ conversationId?: string | null; workspaceRunId?: string | null }> } | null) => {
+        const match = payload?.sessions?.find((session) => session.workspaceRunId);
+        if (active && match?.workspaceRunId) setWorkspaceRunId(match.workspaceRunId);
+      }).catch(() => {});
+    return () => { active = false; };
+  }, [activeConversationId, slug, workspaceRunsEnabled]);
   // Immediate, in-conversation activity. The Research Workspace also reads
   // the persisted browser-action timeline, so this state is just the small
   // gap between a streamed tool result and the next server refresh.
@@ -1525,6 +1545,13 @@ export function ChippiWorkspace({
         conversationId={activeConversationId}
         open={workDialogOpen}
         onOpenChange={setWorkDialogOpen}
+        workspaceRunsEnabled={workspaceRunsEnabled}
+        onStarted={(session) => {
+          if (session?.kind !== 'workspace' || !session.workspaceRunId) return;
+          setWorkspaceRunId(session.workspaceRunId);
+          setRightTab('workspace');
+          if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+        }}
       />
       {realtimeVoiceEnabled && !isBroker && (
         <RealtimeVoiceDialog
@@ -2119,6 +2146,9 @@ export function ChippiWorkspace({
               researchActions={researchActions}
               researchSources={researchSources}
               researchEnabled={researchEnabled}
+              workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunId={workspaceRunId}
+              onContinueWorkspace={() => { setRightTab('activity'); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
@@ -2156,6 +2186,9 @@ export function ChippiWorkspace({
               researchActions={researchActions}
               researchSources={researchSources}
               researchEnabled={researchEnabled}
+              workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunId={workspaceRunId}
+              onContinueWorkspace={() => { setRightTab('activity'); closeMobileOverlay(); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="h-full"

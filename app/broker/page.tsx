@@ -103,6 +103,7 @@ export default async function BrokerHomePage({
         // Browser research is scoped to an individual Space. The brokerage
         // surface deliberately has no implicit member-space fallback.
         researchEnabled={false}
+        workspaceRunsEnabled={false}
       />
     </div>
   );

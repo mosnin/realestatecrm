@@ -5,13 +5,14 @@ import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { startWorkSession } from '@/lib/work-sessions/start';
+import { isWorkspaceRunsEnabledForSpace } from '@/lib/chippi/workspace-run-flag';
 
 export const runtime = 'nodejs';
 
 const MAX_GOAL = 1000;
 
 /**
- * GET  /api/work-sessions?slug= — recent sessions (active first), for the
+ * GET  /api/work-sessions?slug=&conversationId= — owner-scoped recent sessions
  *      workspace strip. Live updates ride Supabase Realtime; this is the
  *      initial load + reconnect catch-up.
  * POST /api/work-sessions — start one: { slug, goal, autonomy?, allowQuestions?,
@@ -23,10 +24,13 @@ export async function GET(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
-  const { data } = await supabase
+  const conversationId = req.nextUrl.searchParams.get('conversationId');
+  let query = supabase
     .from('WorkSession')
     .select('*')
-    .eq('spaceId', auth.space.id)
+    .eq('spaceId', auth.space.id);
+  if (conversationId) query = query.eq('conversationId', conversationId);
+  const { data } = await query
     .order('createdAt', { ascending: false })
     .limit(20);
   return NextResponse.json({ sessions: data ?? [] });
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
   const body = (read.data ?? {}) as {
-    slug?: string; goal?: string; autonomy?: string; allowQuestions?: boolean; conversationId?: string;
+    slug?: string; goal?: string; autonomy?: string; allowQuestions?: boolean; conversationId?: string; kind?: string;
   };
   if (!body.slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
   const auth = await requireSpaceOwner(body.slug);
@@ -45,6 +49,10 @@ export async function POST(req: NextRequest) {
   const goal = typeof body.goal === 'string' ? body.goal.trim().slice(0, MAX_GOAL) : '';
   if (goal.length < 10) {
     return NextResponse.json({ error: 'Describe the goal in a sentence or two.' }, { status: 400 });
+  }
+  const kind = body.kind === 'workspace' ? 'workspace' : 'research';
+  if (kind === 'workspace' && !isWorkspaceRunsEnabledForSpace(auth.space.id)) {
+    return NextResponse.json({ error: 'Workspace Runs are not enabled for this workspace.' }, { status: 404 });
   }
 
   // A background run is real compute — cap starts, and one active session at
@@ -73,6 +81,7 @@ export async function POST(req: NextRequest) {
       goal,
       autonomy: body.autonomy === 'just_go' ? 'just_go' : 'plan_first',
       allowQuestions: body.allowQuestions !== false,
+      kind,
     });
     return NextResponse.json({ session }, { status: 201 });
   } catch {

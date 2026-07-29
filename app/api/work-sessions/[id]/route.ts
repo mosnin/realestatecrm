@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { data: session } = await supabase
     .from('WorkSession')
-    .select('id, status')
+    .select('id, status, workspaceRunId')
     .eq('id', id)
     .eq('spaceId', auth.space.id)
     .maybeSingle();
@@ -86,11 +86,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!['planning', 'awaiting_approval', 'awaiting_input', 'running'].includes(status)) {
       return NextResponse.json({ error: 'This session already finished.' }, { status: 409 });
     }
-    await supabase
-      .from('WorkSession')
-      .update({ status: 'cancelled', updatedAt: new Date().toISOString() })
-      .eq('id', id)
-      .in('status', ['planning', 'awaiting_approval', 'awaiting_input', 'running']);
+    const { data: cancelled, error: cancelError } = await supabase.rpc('cancel_workspace_run_and_session', { p_session_id: id, p_space_id: auth.space.id });
+    if (cancelError || !cancelled) return NextResponse.json({ error: 'This session already finished.' }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 
