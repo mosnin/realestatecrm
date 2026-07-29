@@ -142,7 +142,9 @@ image = (
 # model, integrations, files, or customer credentials are available here.
 headless_image = (
     modal.Image.debian_slim(python_version="3.12")
-    .pip_install("httpx>=0.28.0,<1", "playwright>=1.45,<2")
+    # `route_web_socket` (introduced in Playwright 1.48) closes every
+    # bidirectional connection in the anonymous research context.
+    .pip_install("httpx>=0.28.0,<1", "playwright>=1.48,<2")
     .run_commands("playwright install --with-deps chromium")
     .add_local_file(_AGENT_DIR / "browser_headless.py", remote_path="/app/browser_headless.py")
 )

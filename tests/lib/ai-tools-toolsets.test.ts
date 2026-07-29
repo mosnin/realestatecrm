@@ -6,6 +6,7 @@ import {
   selectToolsets,
   getChatTools,
 } from '@/lib/ai-tools/toolsets';
+import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 const ALL_NAMES = new Set(ALL_TOOLS.map((t) => t.name));
 
@@ -67,5 +68,22 @@ describe('toolsets — per-turn selection', () => {
     expect(selectToolsets('move the deal to closing')).toContain('deals');
     expect(selectToolsets('find a comparable property')).toContain('properties');
     expect(selectToolsets('hello there')).toEqual([]);
+  });
+
+  it.each([
+    'Research current mortgage rates from three public sources',
+    'compare sources for latest market data',
+    'find latest rate data',
+  ])('gives each canonical Research Workspace prompt the browser tools: %s', (message) => {
+    expect(isResearchWorkspaceIntent(message)).toBe(true);
+    const names = getChatTools(message).map((tool) => tool.name);
+    expect(names).toContain('browser_task');
+    expect(names).toContain('control_browser');
+  });
+
+  it('does not add browser tools to ordinary CRM work', () => {
+    const message = 'set a follow-up for my lead next Tuesday';
+    expect(isResearchWorkspaceIntent(message)).toBe(false);
+    expect(getChatTools(message).map((tool) => tool.name)).not.toContain('browser_task');
   });
 });

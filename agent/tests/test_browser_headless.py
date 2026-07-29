@@ -28,6 +28,7 @@ if _AGENT_DIR not in sys.path:
 
 from browser_headless import (  # noqa: E402
     _headless_action_allowed,
+    _open_anonymous_browser_page,
     execute_action,
     poll_and_execute,
 )
@@ -156,6 +157,32 @@ class ThrowingLocatorPage(FakePage):
         raise RuntimeError("boom: locator() blew up")
 
 
+class FakeWebSocketRoute:
+    def __init__(self, url: str):
+        self.url = url
+        self.closed = False
+
+    async def close(self):
+        self.closed = True
+
+
+class FakeAnonymousContext:
+    def __init__(self):
+        self.calls: list[str] = []
+        self.web_socket_handler: Any = None
+
+    async def route(self, _pattern: str, _handler: Any):
+        self.calls.append("route")
+
+    async def route_web_socket(self, _pattern: str, handler: Any):
+        self.calls.append("route_web_socket")
+        self.web_socket_handler = handler
+
+    async def new_page(self):
+        self.calls.append("new_page")
+        return FakePage()
+
+
 def fake_resolver(mapping: dict[str, list[str]]):
     """Injectable `resolve_addr` — never touches real DNS. Any host not in
     `mapping` raises, mirroring a resolution failure."""
@@ -175,6 +202,27 @@ PUBLIC_RESOLVER = fake_resolver(
         "x.test": ["93.184.216.34"],
     }
 )
+
+
+# ── anonymous browser context ───────────────────────────────────────────
+
+
+async def test_anonymous_context_blocks_every_websocket_before_page_creation():
+    context = FakeAnonymousContext()
+
+    await _open_anonymous_browser_page(context, PUBLIC_RESOLVER)
+
+    assert context.calls == ["route", "route_web_socket", "new_page"]
+    assert context.web_socket_handler is not None
+    for url in (
+        "ws://public.example.com/live",
+        "wss://public.example.com/live",
+        "ws://127.0.0.1/private",
+        "wss://metadata.internal/stream",
+    ):
+        route = FakeWebSocketRoute(url)
+        await context.web_socket_handler(route)
+        assert route.closed is True
 
 
 # ── execute_action: navigate ────────────────────────────────────────────

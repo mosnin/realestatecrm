@@ -502,6 +502,54 @@ async def _default_http_post(
         return resp.json()
 
 
+async def _configure_anonymous_browser_context(
+    context: Any, resolve_addr: ResolveAddr = _default_resolve_addr
+) -> None:
+    """Install the anonymous public-web boundary before a page exists.
+
+    Ordinary context routes do not govern WebSocket upgrades. This worker is
+    read-only, so every ws/wss connection is closed rather than risk a
+    bidirectional private-host, DNS-rebinding, or exfiltration channel.
+    `route_web_socket` was added in Playwright 1.48; fail before page creation
+    if a future environment no longer supports the required control.
+    """
+
+    async def route_public_requests(route: Any) -> None:
+        url = route.request.url
+        if route.request.method not in {"GET", "HEAD", "OPTIONS"}:
+            await route.abort()
+            return
+        parsed = urlparse(url)
+        if parsed.scheme in ("data", "blob", "about"):
+            await route.continue_()
+            return
+        try:
+            await _assert_public_http_url(url, resolve_addr)
+        except ValueError:
+            await route.abort()
+            return
+        await route.continue_()
+
+    async def block_websocket(web_socket_route: Any) -> None:
+        await web_socket_route.close()
+
+    route_web_socket = getattr(context, "route_web_socket", None)
+    if not callable(route_web_socket):
+        raise RuntimeError(
+            "Cloud research browser requires Playwright >=1.48 for WebSocket blocking."
+        )
+    await context.route("**/*", route_public_requests)
+    await route_web_socket("**/*", block_websocket)
+
+
+async def _open_anonymous_browser_page(
+    context: Any, resolve_addr: ResolveAddr = _default_resolve_addr
+) -> Any:
+    """Configure the context first; no page exists without these guards."""
+    await _configure_anonymous_browser_context(context, resolve_addr)
+    return await context.new_page()
+
+
 @asynccontextmanager
 async def _default_browser_factory():
     """Launches a real headless Chromium page via Playwright.
@@ -527,32 +575,15 @@ async def _default_browser_factory():
             # New context per worker: no persisted cookies, storage, or
             # cross-customer session material ever enters this browser.
             context = await browser.new_context(accept_downloads=False, service_workers="block")
-            page = await context.new_page()
-
-            async def route_public_requests(route: Any) -> None:
-                url = route.request.url
-                if route.request.method not in {"GET", "HEAD", "OPTIONS"}:
-                    await route.abort()
-                    return
-                parsed = urlparse(url)
-                if parsed.scheme in ("data", "blob", "about"):
-                    await route.continue_()
-                    return
-                try:
-                    await _assert_public_http_url(url, _default_resolve_addr)
-                except ValueError:
-                    await route.abort()
-                    return
-                await route.continue_()
-
-            # Guard every document, redirect, script, image, and XHR request;
-            # checking only the initial goto leaves redirect/subresource SSRF
-            # and DNS-rebinding paths open.
-            await context.route("**/*", route_public_requests)
+            page = None
             try:
+                # Guard every document, redirect, script, image, XHR, and
+                # WebSocket before page creation.
+                page = await _open_anonymous_browser_page(context)
                 yield page
             finally:
-                await page.close()
+                if page is not None:
+                    await page.close()
                 await context.close()
         finally:
             await browser.close()

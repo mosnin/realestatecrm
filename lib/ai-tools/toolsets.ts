@@ -29,6 +29,7 @@
 import { ALL_TOOLS } from './tools';
 import type { ToolDefinition } from './types';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 /**
  * Always loaded. The verbs that answer the everyday turn: find/list a person
@@ -152,6 +153,10 @@ export function selectToolsets(message: string): string[] {
   for (const [name, re] of TOOLSET_PATTERNS) {
     if (re.test(text)) selected.add(name);
   }
+  // Keep tool exposure and the TS-native route on the same natural-language
+  // contract. The route still requires the server-side feature/tenant gate;
+  // selecting this existing browser toolset alone never enables cloud work.
+  if (isResearchWorkspaceIntent(text)) selected.add('browser');
   return [...selected];
 }
 
