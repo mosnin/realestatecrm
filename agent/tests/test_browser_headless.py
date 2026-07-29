@@ -811,6 +811,7 @@ async def test_poll_and_execute_sends_secret_and_completed_result():
     first_url, first_body, first_headers = http_post.call_log[0]
     assert first_url == "https://app.test/api/browser-control/headless/poll"
     assert first_headers["Authorization"] == "Bearer secret-abc"
+    assert "x-vercel-protection-bypass" not in first_headers
     assert first_body["sessionId"] == "s1"
     assert "completed" not in first_body  # nothing finished yet on the first poll
 
@@ -818,6 +819,27 @@ async def test_poll_and_execute_sends_secret_and_completed_result():
     assert second_body["completed"]["actionId"] == "a1"
     assert second_body["completed"]["result"]["ok"] is True
     assert "frame" in second_body  # screenshot captured after the action
+
+
+async def test_poll_and_execute_sends_optional_vercel_bypass_on_every_poll():
+    page = FakePage()
+    http_post = FakeHttpPost([{"action": None, "stop": True}])
+
+    await poll_and_execute(
+        "https://protected-staging.example",
+        "browser-worker-secret",
+        "s1",
+        worker_lease_token="lease-1",
+        vercel_bypass_secret="bypass-secret",
+        http_post=http_post,
+        browser_factory=make_fake_browser_factory(page),
+        sleep=lambda s: _noop(),
+    )
+
+    _, body, headers = http_post.call_log[0]
+    assert body == {"sessionId": "s1", "workerLeaseToken": "lease-1"}
+    assert headers["Authorization"] == "Bearer browser-worker-secret"
+    assert headers["x-vercel-protection-bypass"] == "bypass-secret"
 
 
 async def test_poll_and_execute_stops_without_running_further_actions():
@@ -968,6 +990,7 @@ async def test_poll_and_execute_stop_cancels_an_inflight_action_without_late_com
         "secret",
         "s1",
         worker_lease_token="lease-1",
+        vercel_bypass_secret="bypass-secret",
         http_post=http_post,
         browser_factory=make_fake_browser_factory(page),
         sleep=long_action_sleep,
@@ -980,6 +1003,10 @@ async def test_poll_and_execute_stop_cancels_an_inflight_action_without_late_com
     assert len(http_post.call_log) == 2
     assert all(body["sessionId"] == "s1" for _, body, _ in http_post.call_log)
     assert all(body["workerLeaseToken"] == "lease-1" for _, body, _ in http_post.call_log)
+    assert all(
+        headers["x-vercel-protection-bypass"] == "bypass-secret"
+        for _, _, headers in http_post.call_log
+    )
     assert "completed" not in http_post.call_log[1][1]
 
 

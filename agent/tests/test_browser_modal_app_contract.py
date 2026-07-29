@@ -37,6 +37,19 @@ def _environment_keys(tree: ast.AST) -> set[str]:
     return keys
 
 
+def _function_secret_binding(tree: ast.AST, function_name: str) -> str | None:
+    for node in tree.body:
+        if not isinstance(node, ast.AsyncFunctionDef) or node.name != function_name:
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            for keyword in decorator.keywords:
+                if keyword.arg == "secrets" and isinstance(keyword.value, ast.Name):
+                    return keyword.value.id
+    return None
+
+
 def test_browser_modal_entrypoint_has_only_browser_configuration_and_surface():
     tree = ast.parse(BROWSER_APP.read_text())
 
@@ -45,6 +58,8 @@ def test_browser_modal_entrypoint_has_only_browser_configuration_and_surface():
         "CHIPPI_BROWSER_MODAL_SECRET_NAME",
         "CHIPPI_BROWSER_APP_URL",
         "CHIPPI_BROWSER_WORKER_SECRET",
+        "CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME",
+        "CHIPPI_BROWSER_VERCEL_BYPASS_SECRET",
     }
     top_level_functions = {
         node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -58,6 +73,13 @@ def test_browser_modal_entrypoint_has_only_browser_configuration_and_surface():
     assert ".add_local_file(" in source
     assert '"browser_headless.py"' in source
     assert ".add_local_dir(" not in source
+    assert "x-vercel-protection-bypass" in source
+    assert "vercel_bypass_secret=vercel_bypass_secret" in source
+    assert "if bypass_secret_name:" in source
+    assert "worker_secrets = list(browser_secrets)" in source
+    assert "worker_secrets.append(modal.Secret.from_name(bypass_secret_name))" in source
+    assert _function_secret_binding(tree, "run_headless_browser_session") == "worker_secrets"
+    assert _function_secret_binding(tree, "start_headless_browser_workspace") == "browser_secrets"
     for forbidden in (
         "chippi-secrets",
         "OPENAI_API_KEY",

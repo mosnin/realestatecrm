@@ -27,17 +27,21 @@ app = modal.App(
     os.environ.get("CHIPPI_BROWSER_MODAL_APP_NAME", "chippi-browser"), image=browser_image
 )
 
-# This secret must contain ONLY these two values. Do not attach the broad chat
-# application secret, database credentials, model/provider keys, integrations,
-# or customer files to this app.
+# The public launch endpoint receives only this required two-key secret.
+# The optional Vercel bypass is worker-only; never add it here or rotate this
+# existing secret.
 browser_secrets = [
     modal.Secret.from_name(
         os.environ.get("CHIPPI_BROWSER_MODAL_SECRET_NAME", "chippi-browser-secrets")
     )
 ]
+worker_secrets = list(browser_secrets)
+bypass_secret_name = os.environ.get("CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME", "").strip()
+if bypass_secret_name:
+    worker_secrets.append(modal.Secret.from_name(bypass_secret_name))
 
 
-@app.function(image=browser_image, secrets=browser_secrets, timeout=900, max_containers=20)
+@app.function(image=browser_image, secrets=worker_secrets, timeout=900, max_containers=20)
 async def run_headless_browser_session(session_id: str, lease_token: str) -> dict:
     """Run one fresh, fenced public-web browser for at most fifteen minutes."""
     import logging
@@ -50,6 +54,7 @@ async def run_headless_browser_session(session_id: str, lease_token: str) -> dic
 
     base_url = os.environ.get("CHIPPI_BROWSER_APP_URL", "").rstrip("/")
     worker_secret = os.environ.get("CHIPPI_BROWSER_WORKER_SECRET", "")
+    vercel_bypass_secret = os.environ.get("CHIPPI_BROWSER_VERCEL_BYPASS_SECRET", "")
     if not base_url or not worker_secret:
         raise RuntimeError("Cloud research worker is missing its dedicated configuration.")
 
@@ -61,6 +66,7 @@ async def run_headless_browser_session(session_id: str, lease_token: str) -> dic
             internal_secret=worker_secret,
             session_id=session_id,
             worker_lease_token=lease_token,
+            vercel_bypass_secret=vercel_bypass_secret,
             max_iterations=600,
         )
         return result
@@ -74,9 +80,12 @@ async def run_headless_browser_session(session_id: str, lease_token: str) -> dic
         # Best effort only: a process kill is recovered by the fenced lease.
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
+                completion_headers = {"Authorization": f"Bearer {worker_secret}"}
+                if vercel_bypass_secret:
+                    completion_headers["x-vercel-protection-bypass"] = vercel_bypass_secret
                 await client.post(
                     f"{base_url}/api/browser-control/headless/complete",
-                    headers={"Authorization": f"Bearer {worker_secret}"},
+                    headers=completion_headers,
                     json={
                         "sessionId": session_id,
                         "workerLeaseToken": lease_token,

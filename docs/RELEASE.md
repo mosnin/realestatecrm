@@ -229,7 +229,11 @@ when staging this browser-only surface.
    name (the default is `chippi-browser`).
 2. Set `CHIPPI_BROWSER_MODAL_SECRET_NAME` to a staging-only Modal secret
    containing only `CHIPPI_BROWSER_APP_URL` and
-   `CHIPPI_BROWSER_WORKER_SECRET`.
+   `CHIPPI_BROWSER_WORKER_SECRET`. Do not alter that existing two-key secret.
+   If the staging Vercel origin uses Deployment Protection, set
+   `CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME` while deploying; it names an
+   optional second Modal secret containing only
+   `CHIPPI_BROWSER_VERCEL_BYPASS_SECRET`.
 3. Apply the Research Workspace lease migration to the staging Supabase
    project after its duplicate-active-session preflight passes.
 4. Configure the preview deployment's worker URL, matching worker secret,

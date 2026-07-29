@@ -613,6 +613,7 @@ async def poll_and_execute(
     internal_secret: str,
     session_id: str,
     worker_lease_token: str = "",
+    vercel_bypass_secret: str = "",
     *,
     http_post: HttpPost | None = None,
     browser_factory: Callable[[], Any] | None = None,
@@ -661,6 +662,11 @@ async def poll_and_execute(
         "Authorization": f"Bearer {internal_secret}",
         "Content-Type": "application/json",
     }
+    # Vercel Deployment Protection runs before the app route can evaluate the
+    # worker bearer. This optional browser-only bypass is sent on normal and
+    # active polls while preserving the app authentication above unchanged.
+    if vercel_bypass_secret:
+        headers["x-vercel-protection-bypass"] = vercel_bypass_secret
 
     actions_executed = 0
     stop_reason = "max_iterations"
@@ -800,5 +806,6 @@ async def poll_and_execute(
     return {"stopped_reason": stop_reason, "actions_executed": actions_executed}
 
 
-# Modal wiring lives in agent/modal_app.py. This module remains independently
-# testable because poll_and_execute accepts injected transport/browser fakes.
+# Modal wiring lives in agent/browser_modal_app.py. This module remains
+# independently testable because poll_and_execute accepts injected
+# transport/browser fakes.

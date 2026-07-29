@@ -182,6 +182,12 @@ by the `(spaceId, userId)` resolved from that authenticated identity.
   browser-worker secret rather than the per-user extension token or broad
   agent-service credentials. The worker is an internal Chippi service, not a
   paired user device.
+- **Protected staging origin**: keep the existing browser origin/worker-bearer
+  secret unchanged. If Vercel Deployment Protection is enabled, configure
+  `CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME` only for that browser-app deploy;
+  it attaches a separate one-value Modal secret. When present, the worker
+  sends it as `x-vercel-protection-bypass` on every poll and completion while
+  retaining `Authorization: Bearer <CHIPPI_BROWSER_WORKER_SECRET>`.
 - **Kill switch is local-first**: the extension's kill switch detaches
   `chrome.debugger` and hides its UI **immediately and locally**, independent
   of network state, then separately reports `killed: true` on its next poll
