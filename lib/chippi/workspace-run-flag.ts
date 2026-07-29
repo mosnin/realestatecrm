@@ -4,3 +4,14 @@ export function isWorkspaceRunsEnabledForSpace(spaceId: string): boolean {
   if (!isWorkspaceRunsEnabled() || !isWorkspaceRunsClientEnabled()) return false;
   return (process.env.CHIPPI_WORKSPACE_RUNS_SPACE_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean).includes(spaceId);
 }
+
+/** Follow-up terminal work is a second, narrower rollout on top of Workspace
+ * Runs. Keeping its own server + public switches means a space can use the
+ * established packet flow without being offered continuation work. */
+export function isWorkspaceRunFollowUpsEnabledForSpace(spaceId: string): boolean {
+  if (!isWorkspaceRunsEnabledForSpace(spaceId)) return false;
+  if (process.env.CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED !== 'true') return false;
+  if (process.env.NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED !== 'true') return false;
+  return (process.env.CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS ?? '')
+    .split(',').map((id) => id.trim()).filter(Boolean).includes(spaceId);
+}

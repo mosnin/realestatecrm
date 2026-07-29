@@ -27,6 +27,7 @@ import {
   planSession as planWorkSession,
   executeSession as executeWorkSession,
 } from '@/lib/work-sessions/engine';
+import { dispatchWorkspaceRunTask } from '@/lib/workspace-runs/server';
 import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
@@ -498,5 +499,15 @@ export const workSessionExecute = inngest.createFunction(
     if (!sessionId) return { skipped: true };
     await step.run('execute', () => executeWorkSession(sessionId));
     return { sessionId };
+  },
+);
+
+export const workspaceRunTaskExecute = inngest.createFunction(
+  { id: 'workspace-run-task-execute', triggers: [{ event: 'workspace-run-task/execute' }] },
+  async ({ event, step }) => {
+    const data = event.data as { taskId?: unknown; runId?: unknown; spaceId?: unknown };
+    if (typeof data.taskId !== 'string' || typeof data.runId !== 'string' || typeof data.spaceId !== 'string') return { skipped: true };
+    await step.run('dispatch-isolated-workspace-task', () => dispatchWorkspaceRunTask({ taskId: data.taskId as string, runId: data.runId as string, spaceId: data.spaceId as string }));
+    return { taskId: data.taskId };
   },
 );

@@ -48,6 +48,7 @@ interface RightPanelProps {
   /** Server-computed per-space entitlement; never inferred client-side. */
   researchEnabled?: boolean;
   workspaceRunsEnabled?: boolean;
+  workspaceRunFollowUpsEnabled?: boolean;
   workspaceRunId?: string | null;
   onContinueWorkspace?: () => void;
 }
@@ -74,6 +75,7 @@ export function RightPanel({
   researchSources,
   researchEnabled = false,
   workspaceRunsEnabled = false,
+  workspaceRunFollowUpsEnabled = false,
   workspaceRunId = null,
   onContinueWorkspace,
 }: RightPanelProps) {
@@ -200,7 +202,7 @@ export function RightPanel({
             <BrowserControlPanel actions={researchActions} sources={researchSources} />
           </div>
         )}
-        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} />}
+        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} followUpsEnabled={workspaceRunFollowUpsEnabled} />}
       </div>
     </motion.div>
   );

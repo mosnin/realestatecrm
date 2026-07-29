@@ -99,6 +99,8 @@ interface ChippiWorkspaceProps {
   researchEnabled?: boolean;
   /** Server-authorized, per-space entitlement for isolated Workspace Runs. */
   workspaceRunsEnabled?: boolean;
+  /** Separate per-space rollout for continuation tasks in the terminal panel. */
+  workspaceRunFollowUpsEnabled?: boolean;
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -254,6 +256,7 @@ export function ChippiWorkspace({
   realtimeVoiceEnabled = false,
   researchEnabled = false,
   workspaceRunsEnabled = false,
+  workspaceRunFollowUpsEnabled = false,
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
@@ -2147,6 +2150,7 @@ export function ChippiWorkspace({
               researchSources={researchSources}
               researchEnabled={researchEnabled}
               workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
               onContinueWorkspace={() => { setRightTab('activity'); }}
               activeTab={rightTab}
@@ -2187,6 +2191,7 @@ export function ChippiWorkspace({
               researchSources={researchSources}
               researchEnabled={researchEnabled}
               workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
               onContinueWorkspace={() => { setRightTab('activity'); closeMobileOverlay(); }}
               activeTab={rightTab}

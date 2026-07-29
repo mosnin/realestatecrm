@@ -11,6 +11,7 @@ import {
   handleComposioTrigger,
   workSessionPlan,
   workSessionExecute,
+  workspaceRunTaskExecute,
 } from '@/lib/inngest/functions';
 import { cronFunctions } from '@/lib/inngest/cron-functions';
 
@@ -24,6 +25,7 @@ export const { GET, POST, PUT } = serve({
     handleComposioTrigger,
     workSessionPlan,
     workSessionExecute,
+    workspaceRunTaskExecute,
     // Scheduled ticks (formerly vercel.json crons) — see lib/inngest/cron-functions.ts.
     ...cronFunctions,
   ],

@@ -43,6 +43,27 @@ packet = json.loads((p / "input.json").read_text())["packet"]
 for name, content in packet.items(): (p / {"brief":"brief.md","checklist":"launch-checklist.md","comps":"comps.csv","handoff":"handoff.md"}[name]).write_text(content)
 print("Created brief.md, launch-checklist.md, comps.csv, handoff.md")
 '''
+TASK_SCRIPT = '''import argparse, json, pathlib, re
+p = pathlib.Path("/workspace"); payload = json.loads((p / "task-input.json").read_text())
+safe = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md)$")
+for item in payload["files"]:
+    name = item["name"]
+    if not safe.fullmatch(name) or "/" in name or "\\\\" in name: raise SystemExit("unsafe workspace filename")
+    (p / name).write_text(item["content"], encoding="utf-8")
+parser = argparse.ArgumentParser(); parser.add_argument("action", choices=("--inspect", "--apply", "--validate")); action = parser.parse_args().action
+output_name = "workspace-follow-up-%d.md" % payload["task_sequence"]
+if action == "--inspect":
+    print("Hydrated: " + ", ".join(sorted(item["name"] for item in payload["files"])))
+elif action == "--apply":
+    instruction = payload["instruction"].replace("\\x00", " ").strip()
+    source_names = "\\n".join("- " + item["name"] for item in payload["files"])
+    (p / output_name).write_text("# Workspace continuation\\n\\n## Request\\n" + instruction + "\\n\\n## Private workspace files reviewed\\n" + source_names + "\\n\\n## Result\\nThe requested continuation was executed in this isolated workspace. Review this private follow-up alongside the original packet before any external action.\\n", encoding="utf-8")
+    print("Created " + output_name)
+else:
+    target = p / output_name
+    if not target.is_file() or target.stat().st_size > 32000: raise SystemExit("follow-up artifact is invalid")
+    print("Validated " + output_name)
+'''
 
 def _callback_headers(signature: str) -> dict[str, str]:
     headers = {
@@ -72,6 +93,21 @@ def _claim_launch(item: dict) -> bool:
     response = httpx.post(url, content=raw, headers=_callback_headers(signature), timeout=10)
     response.raise_for_status()
     return response.json().get("won") is True
+
+def _task_callback(payload: dict) -> dict:
+    url, secret = os.environ.get("CHIPPI_WORKSPACE_TASK_CALLBACK_URL", ""), os.environ.get("CHIPPI_WORKSPACE_CALLBACK_SECRET", "")
+    if not url or not secret: raise RuntimeError("workspace task callback is not configured")
+    raw = json.dumps(payload, separators=(",", ":")); signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    response = httpx.post(url, content=raw, headers=_callback_headers(signature), timeout=20)
+    response.raise_for_status(); return response.json()
+
+def _claim_task_launch(item: dict) -> bool:
+    url, secret = os.environ.get("CHIPPI_WORKSPACE_TASK_LAUNCH_CLAIM_URL", ""), os.environ.get("CHIPPI_WORKSPACE_CALLBACK_SECRET", "")
+    if not url or not secret: raise RuntimeError("workspace task launch claim is not configured")
+    payload = {"task_id": item.get("task_id"), "space_id": item.get("space_id"), "launch_token": item.get("launch_token")}
+    raw = json.dumps(payload, separators=(",", ":")); signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
+    response = httpx.post(url, content=raw, headers=_callback_headers(signature), timeout=10)
+    response.raise_for_status(); return response.json().get("won") is True
 
 @app.function(image=image, secrets=secrets, timeout=180, max_containers=10)
 async def run_workspace(item: dict):
@@ -142,3 +178,67 @@ async def launch_workspace(item: dict):
         return JSONResponse({"error":"launch claim unavailable"}, status_code=503)
     await run_workspace.spawn.aio(item)
     return JSONResponse({"accepted": True, "run_id": run_id}, status_code=202)
+
+@app.function(image=image, secrets=secrets, timeout=180, max_containers=10)
+async def run_workspace_task(item: dict):
+    """A follow-up gets a fresh VM; persisted files/tasks, never a warm VM,
+    are the source of truth. The Sandbox only receives bounded text inputs."""
+    expected = os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET", "")
+    if not expected or not hmac.compare_digest(str(item.get("secret", "")), expected): return {"error": "unauthorized"}
+    task_id, run_id, space_id = str(item.get("task_id", "")), str(item.get("run_id", "")), str(item.get("space_id", ""))
+    try: uuid.UUID(task_id); uuid.UUID(run_id)
+    except ValueError: return {"error": "invalid id"}
+    instruction, files, task_sequence = str(item.get("instruction", "")).strip()[:MAX_GOAL], item.get("files"), item.get("task_sequence")
+    if not space_id or len(instruction) < 3 or not isinstance(files, list) or not isinstance(task_sequence, int) or task_sequence < 1 or len(files) > 16: return {"error": "invalid workspace task"}
+    safe_name = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md)$")
+    for file in files:
+        if not isinstance(file, dict) or not isinstance(file.get("name"), str) or not isinstance(file.get("content"), str) or not safe_name.fullmatch(file["name"]) or len(file["content"].encode()) > 32000: return {"error": "unsafe workspace manifest"}
+    seq = 1
+    def event(kind: str, message: str, **extra):
+        nonlocal seq
+        current_sequence, seq = reserve_sequence(seq)
+        reply = _task_callback({"task_id": task_id, "run_id": run_id, "space_id": space_id, "sequence": current_sequence, "type": kind, "message": message, **extra})
+        return reply.get("cancellationRequested", False)
+    sandbox = None
+    try:
+        event("workspace_started", "Opened a fresh isolated workspace for this continuation.")
+        sandbox = await modal.Sandbox.create.aio("sleep", "120", app=app, image=image, timeout=120, cpu=1, memory=1024, block_network=True, experimental_options={"vm_runtime": True})
+        mkdir = await sandbox.exec.aio("mkdir", "-p", "/workspace", timeout=5); await mkdir.wait.aio()
+        payload = {"instruction": instruction, "files": files, "task_sequence": task_sequence}
+        await sandbox.filesystem.write_text.aio(json.dumps(payload), "/workspace/task-input.json")
+        await sandbox.filesystem.write_text.aio(TASK_SCRIPT, "/workspace/continue_workspace.py")
+        for command, label in ((["python", "/workspace/continue_workspace.py", "--inspect"], "Inspecting the current private workspace."), (["python", "/workspace/continue_workspace.py", "--apply"], "Applying the requested continuation."), (["python", "/workspace/continue_workspace.py", "--validate"], "Validating the private follow-up file.")):
+            shown = " ".join(command)
+            if event("command_started", label, command=shown): event("cancelled", "Workspace continuation cancelled."); return {"cancelled": True}
+            process = await sandbox.exec.aio(*command, timeout=45); stdout = await process.stdout.read.aio(); stderr = await process.stderr.read.aio(); await process.wait.aio()
+            if process.returncode != 0: raise RuntimeError((stderr or stdout or "workspace task failed")[:1000])
+            if event("command_finished", label, command=shown, output=stdout[:2000]): event("cancelled", "Workspace continuation cancelled."); return {"cancelled": True}
+        name = f"workspace-follow-up-{task_sequence}.md"; content = await sandbox.filesystem.read_bytes.aio(f"/workspace/{name}")
+        if len(content) > 32000: raise RuntimeError("workspace task file exceeded limit")
+        event("file_created", f"Created {name}.")
+        event("completed", "Workspace continuation is ready.", output="\n".join(step.get("description", "") for step in item.get("command_plan", []) if isinstance(step, dict))[:2000], files=[{"name": name, "content": base64.b64encode(content).decode()}])
+        return {"accepted": True, "task_id": task_id}
+    except Exception as exc:
+        try: event("failed", "Workspace continuation could not finish.", output=re.sub(r"[^ -~]", "", str(exc))[:1000])
+        except Exception: pass
+        return {"error": "workspace task failed"}
+    finally:
+        if sandbox is not None:
+            try: await sandbox.terminate.aio()
+            except Exception: pass
+
+@app.function(image=image, secrets=secrets, timeout=20, max_containers=10)
+@modal.fastapi_endpoint(method="POST")
+async def launch_workspace_task(item: dict):
+    from fastapi.responses import JSONResponse
+    expected = os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET", "")
+    if not expected or not hmac.compare_digest(str(item.get("secret", "")), expected): return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    task_id = str(item.get("task_id", ""))
+    try: uuid.UUID(task_id)
+    except ValueError: return JSONResponse({"error": "invalid task id"}, status_code=400)
+    if not isinstance(item.get("launch_token"), str) or not item["launch_token"]: return JSONResponse({"error": "invalid launch token"}, status_code=400)
+    try:
+        if not _claim_task_launch(item): return JSONResponse({"accepted": True, "duplicate": True, "task_id": task_id}, status_code=202)
+    except Exception: return JSONResponse({"error": "launch claim unavailable"}, status_code=503)
+    await run_workspace_task.spawn.aio(item)
+    return JSONResponse({"accepted": True, "task_id": task_id}, status_code=202)

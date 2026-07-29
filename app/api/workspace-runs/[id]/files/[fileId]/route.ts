@@ -11,7 +11,11 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { data: run } = await supabase.from('WorkspaceRun').select('status').eq('id', id).eq('spaceId', auth.space.id).maybeSingle();
   // Artifact URLs are a completion capability, not a partial-progress view.
   if (run?.status !== 'completed') return NextResponse.json({ error: 'Workspace files are available after completion.' }, { status: 404 });
-  const { data: membership } = await supabase.from('WorkspaceRunFile').select('fileId').eq('runId', id).eq('id', fileId).eq('spaceId', auth.space.id).maybeSingle();
+  const { data: rootMembership } = await supabase.from('WorkspaceRunFile').select('fileId').eq('runId', id).eq('id', fileId).eq('spaceId', auth.space.id).maybeSingle();
+  const { data: candidateTaskMembership } = rootMembership ? { data: null } : await supabase.from('WorkspaceRunTaskFile').select('fileId,taskId').eq('id', fileId).eq('spaceId', auth.space.id).maybeSingle();
+  const { data: task } = candidateTaskMembership ? await supabase.from('WorkspaceRunTask').select('id').eq('id', candidateTaskMembership.taskId).eq('runId', id).eq('spaceId', auth.space.id).eq('status', 'completed').maybeSingle() : { data: null };
+  const taskMembership = task ? candidateTaskMembership : null;
+  const membership = rootMembership ?? taskMembership;
   if (!membership?.fileId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const { data: file } = await supabase.from('File').select('storageKey').eq('id', membership.fileId).eq('spaceId', auth.space.id).maybeSingle();
   if (!file?.storageKey) return NextResponse.json({ error: 'File unavailable' }, { status: 404 });
