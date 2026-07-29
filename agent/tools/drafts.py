@@ -409,7 +409,7 @@ async def _dispatch_send_now(
     proxy = _send_now_proxy()
     if proxy is None:
         return {
-            "error": "Send-now proxy is not configured. Reconnect your account in Settings or use draft mode instead.",
+            "error": "Send-now proxy is not configured. Reconnect your account in Settings or save the message for approval instead.",
             "code": "PROXY_UNCONFIGURED",
             "retryable": False,
         }

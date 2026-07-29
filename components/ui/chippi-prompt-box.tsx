@@ -112,8 +112,6 @@ export const BUILTIN_COMMANDS: SkillItem[] = [
   },
 ];
 
-type Mode = 'draft' | null;
-
 /**
  * Chat vs Agent — the per-message runtime the realtor picks in the composer.
  *   - 'chat'  → fast, cheap answer. One model call + read-only search over
@@ -227,23 +225,6 @@ const ACCEPT_ATTR =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
   'text/plain,text/csv,application/json,text/markdown';
 
-const MODE_META: Record<Exclude<Mode, null>, {
-  label: string;
-  Icon: typeof FileText;
-  activeClasses: string;
-  placeholder: string;
-  prefix: string;
-}> = {
-  draft: {
-    label: 'Draft',
-    Icon: FileText,
-    activeClasses:
-      'bg-foreground/[0.06] border-border/60 text-foreground',
-    placeholder: 'Draft a longer message…',
-    prefix: 'Draft',
-  },
-};
-
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
   const s = Math.floor(seconds % 60).toString().padStart(2, '0');
@@ -332,7 +313,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     // "/" token is cleared, so it doesn't reopen on the next keystroke.
     const slashDismissedRef = useRef(false);
 
-    const [mode, setMode] = useState<Mode>(null);
     // Chat (default) vs Agent. STICKY per conversation — the realtor's pick
     // stays for the thread across sends, restored from sessionStorage on
     // mount and whenever the conversation changes.
@@ -407,7 +387,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     // OS file picker pre-filters. Re-uses uploadFiles for handling.
     const imageInputRef = useRef<HTMLInputElement>(null);
     // Plus-menu (the "+" button to the left of the textarea that opens
-    // contact-mention / file / image / draft-mode / search options).
+    // contact-mention / file / image / search options).
     const plusMenuRef = useRef<HTMLDivElement>(null);
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const recordTimerRef = useRef<number | null>(null);
@@ -445,11 +425,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const activePlaceholder =
       isRecording
         ? ''
-        : mode
-          ? MODE_META[mode].placeholder
-          : chatMode === 'agent'
-            ? 'Tell Chippi what to do…'
-            : placeholder;
+        : chatMode === 'agent'
+          ? 'Tell Chippi what to do…'
+          : placeholder;
 
     // Auto-resize
     useEffect(() => {
@@ -755,13 +733,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       // Block submit while uploads are still in flight — readiness is the
       // entire point of the upload-on-select model.
       if (hasUploadingAttachments) return;
-      const base = message.trim();
-      const wrapped = mode && base
-        ? `[${MODE_META[mode].prefix}: ${base}]`
-        : base;
+      const finalText = message.trim();
       const readyAttachments = attachments.filter((a) => a.uploadStatus === 'ready');
       const readyAttachmentIds = readyAttachments.map((a) => a.id);
-      const finalText = wrapped;
       if (!finalText && readyAttachmentIds.length === 0) return;
       // Metadata for the optimistic user bubble. The object URL is handed off
       // to the transcript for an instant image thumbnail — so we must NOT
@@ -783,7 +757,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       );
       setMessage('');
       setMentions([]);
-      setMode(null);
       // Chat/Agent is sticky per conversation now — the realtor's choice
       // stays for the thread (persisted in selectChatMode), so we do NOT snap
       // back to Chat after a send. Agent stays Agent until they switch it.
@@ -816,12 +789,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       setMentionOpen(true);
       setMentionQuery('');
       void searchMentions('');
-    }
-
-    function toggleMode(next: Exclude<Mode, null>) {
-      if (disabled || isLoading) return;
-      setMode((prev) => (prev === next ? null : next));
-      textareaRef.current?.focus();
     }
 
     function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -1374,9 +1341,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             )}
 
             {/* Action row — Plus menu on the left, send/stop/voice on the
-                right. The previous trio of @ / paperclip / draft was visually
-                loud for daily use; the Plus pattern matches Slack / iMessage /
-                ChatGPT and lets us add affordances later without crowding. */}
+                right. The Plus pattern matches Slack / iMessage / ChatGPT and
+                lets us add affordances later without crowding. */}
             <div className="flex items-center justify-between gap-2 px-2 py-2">
               <div className="flex items-center gap-1.5">
               <div className="relative" ref={plusMenuRef}>
@@ -1401,7 +1367,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={6}>
-                    Add — contacts, files, modes
+                    Add — contacts, files, and search
                   </TooltipContent>
                 </Tooltip>
 
@@ -1507,38 +1473,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                       <span className="flex-1">Search</span>
                     </button>
 
-                    {/* Draft mode toggle — keeps the existing prefix-hint
-                        contract with the agent. Active state stays
-                        accessible from the menu so the user can flip it
-                        without remembering the keystroke. */}
-                    <button
-                      type="button"
-                      role="menuitemcheckbox"
-                      aria-checked={mode === 'draft'}
-                      onClick={() => {
-                        setPlusMenuOpen(false);
-                        toggleMode('draft');
-                      }}
-                      className={cn(
-                        'w-full flex items-center gap-2.5 px-3 py-2 text-left',
-                        'text-[13px] text-foreground hover:bg-foreground/[0.04]',
-                        'transition-colors duration-100',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'inline-flex items-center justify-center w-7 h-7 rounded-md',
-                          mode === 'draft'
-                            ? 'bg-foreground/[0.06] text-foreground'
-                            : 'bg-foreground/[0.05] text-muted-foreground',
-                        )}
-                      >
-                        <FileText size={13} strokeWidth={1.85} />
-                      </span>
-                      <span className="flex-1">
-                        {mode === 'draft' ? 'Draft mode: on' : 'Draft mode'}
-                      </span>
-                    </button>
                   </div>
                 )}
               </div>
