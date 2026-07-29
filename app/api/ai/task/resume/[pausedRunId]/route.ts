@@ -42,6 +42,7 @@ interface PostBody {
   approved: boolean;
   message?: string;
   callId?: string;
+  editedArgs?: unknown;
 }
 
 interface PausedRunRow {
@@ -52,8 +53,58 @@ interface PausedRunRow {
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
   attachmentManifest: Array<{ id: string; filename?: string }>;
+  activeWorkbookContext?: unknown;
   status: 'pending' | 'resumed' | 'cancelled' | 'expired';
   expiresAt: string | null;
+}
+
+interface PersistedActiveWorkbookContext {
+  artifactId: string;
+  versionNumber: number;
+  title: string;
+}
+
+function parseActiveWorkbookContext(value: unknown): PersistedActiveWorkbookContext | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const context = value as Record<string, unknown>;
+  if (Object.keys(context).some((key) => key !== 'artifactId' && key !== 'versionNumber' && key !== 'title')) return null;
+  if (typeof context.artifactId !== 'string' || context.artifactId.length < 1 || context.artifactId.length > 200) return null;
+  if (!Number.isInteger(context.versionNumber) || (context.versionNumber as number) < 1) return null;
+  if (typeof context.title !== 'string' || context.title.length < 1 || context.title.length > 200) return null;
+  return { artifactId: context.artifactId, versionNumber: context.versionNumber as number, title: context.title };
+}
+
+/** Rehydrates only an identity that was server-derived at pause time. The
+ * approval arguments must agree but can never introduce workbook authority. */
+async function restoreApprovedWorkbookContext(
+  paused: PausedRunRow,
+  approvedArguments: unknown,
+  spaceId: string,
+): Promise<PersistedActiveWorkbookContext | null> {
+  const persisted = parseActiveWorkbookContext(paused.activeWorkbookContext);
+  if (!persisted || !approvedArguments || typeof approvedArguments !== 'object' || Array.isArray(approvedArguments)) return null;
+  const args = approvedArguments as Record<string, unknown>;
+  if (args.artifactId !== persisted.artifactId || args.sourceVersionNumber !== persisted.versionNumber || args.workbookTitle !== persisted.title) return null;
+  try {
+    const { data: artifact } = await supabase
+      .from('Artifact')
+      .select('id, title, artifactType, currentVersionId')
+      .eq('id', persisted.artifactId)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!artifact || artifact.artifactType !== 'workbook' || artifact.title !== persisted.title) return null;
+    const { data: version } = await supabase
+      .from('ArtifactVersion')
+      .select('id, versionNumber')
+      .eq('artifactId', persisted.artifactId)
+      .eq('spaceId', spaceId)
+      .eq('versionNumber', persisted.versionNumber)
+      .maybeSingle();
+    if (!version || version.versionNumber !== persisted.versionNumber) return null;
+    return persisted;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(
@@ -86,9 +137,15 @@ export async function POST(
   }
 
   // Load + scope check. The userId stored on the row is the Clerk userId.
+  // Keep old, feature-off deployments compatible until the additive Slice C
+  // migration is applied. Once Workbench is enabled, the field is mandatory
+  // for an approved transform and validation below fails closed if absent.
+  const pausedColumns = isWorkbenchEnabled()
+    ? 'id, spaceId, userId, conversationId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt'
+    : 'id, spaceId, userId, conversationId, runState, approvals, attachmentManifest, status, expiresAt';
   const { data: row, error } = await supabase
     .from('AgentPausedRun')
-    .select('id, spaceId, userId, conversationId, runState, approvals, attachmentManifest, status, expiresAt')
+    .select(pausedColumns)
     .eq('id', pausedRunId)
     .maybeSingle();
   if (error) {
@@ -96,7 +153,7 @@ export async function POST(
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const paused = row as PausedRunRow;
+  const paused = row as unknown as PausedRunRow;
   if (paused.userId !== auth.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -152,9 +209,16 @@ export async function POST(
   }
   const approvedCall = paused.approvals.find((approval) => approval.callId === callId);
   if (!approvedCall) return NextResponse.json({ error: 'Approval not found' }, { status: 400 });
-  if (chatRuntime() !== 'ts' && approvedCall?.toolName !== 'open_spreadsheet_in_workbench') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const workbenchTool = approvedCall?.toolName === 'open_spreadsheet_in_workbench'
+    || approvedCall?.toolName === 'apply_workbook_transformation';
+  // A transform approval is an exact compare-and-swap over the inspected
+  // source id/hash and named operations. It is never an editable template.
+  if (approvedCall?.toolName === 'apply_workbook_transformation' && body.editedArgs !== undefined) {
+    return NextResponse.json({ error: 'Exact workbook approvals cannot be edited.' }, { status: 400 });
+  }
+  if (chatRuntime() !== 'ts' && !workbenchTool) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (workbenchTool && !isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (approvedCall?.toolName === 'open_spreadsheet_in_workbench') {
-    if (!isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const args = approvedCall.arguments as { attachmentId?: unknown; attachmentFilename?: unknown } | null;
     const attachmentId = args?.attachmentId;
     const attachment = typeof attachmentId === 'string'
@@ -169,6 +233,14 @@ export async function POST(
     }
   }
   try { await assertSpaceEnabled(paused.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
+
+  if (approvedCall?.toolName === 'apply_workbook_transformation' && body.approved) {
+    const activeWorkbook = await restoreApprovedWorkbookContext(paused, approvedCall.arguments, paused.spaceId);
+    if (!activeWorkbook) {
+      return NextResponse.json({ error: 'That workbook is no longer available for this approval. Reopen and inspect it again.' }, { status: 409 });
+    }
+    ctx.activeWorkbook = activeWorkbook;
+  }
 
   // Mark the row resumed before we kick off the stream. If the model's
   // continuation lands a NEW pause, the stream pump will write a NEW

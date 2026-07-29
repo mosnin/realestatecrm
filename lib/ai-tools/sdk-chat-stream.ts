@@ -742,6 +742,19 @@ interface PersistPausedInput {
   interruptions: ReadonlyArray<unknown>;
 }
 
+/** The only pause-time workbook data retained across approval. Keeping this
+ * pure makes the feature-off omission testable without a database write. */
+export function pausedRunActiveWorkbookFields(ctx: ToolContext): Record<string, unknown> {
+  if (!ctx.activeWorkbook) return {};
+  return {
+    activeWorkbookContext: {
+      artifactId: ctx.activeWorkbook.artifactId,
+      versionNumber: ctx.activeWorkbook.versionNumber,
+      title: ctx.activeWorkbook.title,
+    },
+  };
+}
+
 /**
  * Insert one AgentPausedRun row carrying the SDK's serialized state plus
  * the realtor-facing approval prompts. Returns the new row id, or null
@@ -763,7 +776,7 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
       },
       ALL_TOOLS,
     );
-    const { error } = await supabase.from('AgentPausedRun').insert({
+    const pausedRun: Record<string, unknown> = {
       id,
       spaceId: input.ctx.space.id,
       userId: input.ctx.userId,
@@ -777,7 +790,11 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
         ?? (input.ctx.attachmentIds ?? []).map((id) => ({ id, filename: '' })),
       status: 'pending',
       expiresAt: expires,
-    });
+    };
+    // Do not mention the additive column for ordinary/feature-off pauses: old
+    // schemas and non-Workbench approvals retain their existing insert shape.
+    Object.assign(pausedRun, pausedRunActiveWorkbookFields(input.ctx));
+    const { error } = await supabase.from('AgentPausedRun').insert(pausedRun);
     if (error) {
       logger.error('[ai/task ts] persistPausedRun failed', { conversationId: input.conversationId }, error);
       return null;

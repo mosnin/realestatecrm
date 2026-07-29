@@ -7,6 +7,17 @@ import { workbookContentHash } from '@/lib/chippi/workbench-store';
 import { validateStoredWorkbookContent, validateWorkbookVersionMetadata } from '@/lib/chippi/workbench-format';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { parseWorkbookTransformReceipt } from '@/lib/chippi/workbook-transform';
+
+/** Never forward arbitrary ArtifactVersion.metadata to the browser. The only
+ * transform metadata surfaced is the bounded, server-authored receipt. */
+function versionWithSafeReceipt<T extends { metadata?: unknown; createdByAgent?: unknown }>(version: T): Omit<T, 'metadata'> & { transformReceipt?: NonNullable<ReturnType<typeof parseWorkbookTransformReceipt>> } {
+  const { metadata, ...rest } = version;
+  const receipt = version.createdByAgent === 'chippi_transform'
+    ? parseWorkbookTransformReceipt(metadata)
+    : null;
+  return receipt ? { ...rest, transformReceipt: receipt } : rest;
+}
 
 // GET /api/agent/artifacts/[artifactId]
 export async function GET(
@@ -48,7 +59,7 @@ export async function GET(
 
   try { await assertSpaceEnabled(artifact.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
 
-  // The history endpoint deliberately returns metadata only. Current and
+  // The history endpoint deliberately returns no metadata or content. Current and
   // immutable source contents are fetched separately and a selected historic
   // version is loaded with ?version=N below.
   const requestedVersion = _req.nextUrl.searchParams.get('version');
@@ -56,11 +67,11 @@ export async function GET(
     const versionNumber = Number.parseInt(requestedVersion, 10);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) return NextResponse.json({ error: 'Invalid version number' }, { status: 400 });
     const { data: version, error: versionError } = await supabase
-      .from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content')
+      .from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata')
       .eq('artifactId', artifactId).eq('spaceId', space.id).eq('versionNumber', versionNumber).maybeSingle();
     if (versionError) return NextResponse.json({ error: 'Failed to fetch artifact version' }, { status: 500 });
     if (!version) return NextResponse.json({ error: 'Version not found' }, { status: 404 });
-    return NextResponse.json({ version });
+    return NextResponse.json({ version: versionWithSafeReceipt(version) });
   }
 
   const { data: versions, error: versionsError } = await supabase
@@ -77,15 +88,21 @@ export async function GET(
   }
 
   const [{ data: source, error: sourceError }, { data: current, error: currentError }] = await Promise.all([
-    supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content').eq('artifactId', artifactId).eq('spaceId', space.id).eq('versionNumber', 1).maybeSingle(),
+    supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).eq('spaceId', space.id).eq('versionNumber', 1).maybeSingle(),
     artifact.currentVersionId
-      ? supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content').eq('id', artifact.currentVersionId).eq('artifactId', artifactId).eq('spaceId', space.id).maybeSingle()
-      : supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content').eq('artifactId', artifactId).eq('spaceId', space.id).order('versionNumber', { ascending: false }).limit(1).maybeSingle(),
+      ? supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('id', artifact.currentVersionId).eq('artifactId', artifactId).eq('spaceId', space.id).maybeSingle()
+      : supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).eq('spaceId', space.id).order('versionNumber', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (sourceError || currentError || !source || !current) return NextResponse.json({ error: 'Failed to fetch workbook content' }, { status: 500 });
   const incomplete = (versions?.length ?? 0) > 20;
   const boundedVersions = [...(versions ?? [])].slice(0, 20).sort((a: { versionNumber: number }, b: { versionNumber: number }) => a.versionNumber - b.versionNumber);
-  return NextResponse.json({ artifact: { ...artifact, versions: boundedVersions, sourceVersion: source, currentVersion: current, history: { limit: 20, incomplete } } });
+  return NextResponse.json({ artifact: {
+    ...artifact,
+    versions: boundedVersions,
+    sourceVersion: versionWithSafeReceipt(source),
+    currentVersion: versionWithSafeReceipt(current),
+    history: { limit: 20, incomplete },
+  } });
 }
 
 // PATCH /api/agent/artifacts/[artifactId]

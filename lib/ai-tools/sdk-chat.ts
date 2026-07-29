@@ -130,7 +130,7 @@ export function buildChatAgent(
 ): Agent {
   const selectedDomain =
     opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
-  const domainTools = selectedDomain.filter((t) => t.name !== 'open_spreadsheet_in_workbench' || isWorkbenchEnabled()).map((t: ToolDefinition) =>
+  const domainTools = selectedDomain.filter((t) => !['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()).map((t: ToolDefinition) =>
     toSdkTool(t, ctx, opts.resultSink),
   );
 

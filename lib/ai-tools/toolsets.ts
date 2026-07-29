@@ -96,7 +96,7 @@ export const TOOLSETS: Record<string, readonly string[]> = {
   comms: ['send_email', 'send_sms', 'send_property_packet', 'log_email_sent', 'log_sms_sent'],
   pipeline: ['workspace_stats', 'find_quiet_hot_persons', 'find_overdue_followups'],
   brokerage: ['summarize_realtor', 'analyze_realtor', 'assign_lead_to_realtor', 'request_deal_review'],
-  files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document', 'open_spreadsheet_in_workbench'],
+  files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document', 'open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'],
   planning: ['create_plan'],
 
   // `control_browser` (single action) + `browser_task` (bounded multi-step
@@ -130,7 +130,7 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['comms', /\b(send|email|sms|text|message|packet|reply|forward|reach|outreach|blast)\b/i],
   ['pipeline', /\b(pipeline|quiet|overdue|stuck|stalled|at[\s-]?risk|priority|leak|stats|statistics|numbers|metrics|kpis?|dashboard|snapshot|how am i doing|how'?s business)\b/i],
   ['brokerage', /\b(broker|team|realtor|agent|roster|assign|review|performance|production)\b/i],
-  ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|workbench|summarize)\b/i],
+  ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|workbench|summarize|normaliz(?:e|ing|ation)|deduplicat(?:e|ing|ion)|remove\s+duplicate\s+rows?|trim(?:ming)?\s+whitespace|rename\s+(?:a\s+)?column|add\s+(?:a\s+)?(?:[a-z][\w -]{0,48}\s+)?column|tag\s+(?:every\s+)?(?:row|sheet)|phone\s+numbers?)\b/i],
   ['planning', /\b(plan|sweep|everyone|all (?:my|hot|the)|prepare me|batch)\b/i],
   [
     'browser',
@@ -164,5 +164,5 @@ export function getChatTools(message: string): ToolDefinition[] {
   for (const ts of selectToolsets(message)) {
     for (const n of TOOLSETS[ts] ?? []) wanted.add(n);
   }
-  return ALL_TOOLS.filter((t) => wanted.has(t.name) && (t.name !== 'open_spreadsheet_in_workbench' || isWorkbenchEnabled()));
+  return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));
 }

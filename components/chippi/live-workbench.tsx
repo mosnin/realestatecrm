@@ -14,6 +14,7 @@ import {
   type WorkbenchArtifact,
   type WorkbenchCellValue,
   type WorkbenchRow,
+  type WorkbenchTransformationReceipt,
   type WorkbenchVersion,
 } from '@/lib/chippi/workbench';
 import { parseStoredWorkbook, stringifyWorkbook, type StoredWorkbook } from '@/lib/chippi/workbench-format';
@@ -25,6 +26,8 @@ type WorkbenchState = 'ready' | 'empty' | 'error';
 interface LiveWorkbenchProps {
   artifact?: WorkbenchArtifact;
   artifactId?: string | null;
+  /** Bumps only after an approved agent transform, forcing a current-version refetch. */
+  refreshVersionNumber?: number | null;
   state?: WorkbenchState;
   className?: string;
 }
@@ -42,6 +45,7 @@ interface PersistedVersionMeta {
   versionNumber: number;
   createdAt: string;
   createdByAgent?: string;
+  transformReceipt?: unknown;
 }
 
 function formatSavedAt(value: string): string {
@@ -74,6 +78,30 @@ function persistVersions(artifact: WorkbenchArtifact, versions: WorkbenchVersion
   }
 }
 
+function isTransformationReceipt(value: unknown): value is WorkbenchTransformationReceipt {
+  if (!value || typeof value !== 'object') return false;
+  const receipt = value as Partial<WorkbenchTransformationReceipt>;
+  return receipt.kind === 'chippi.workbook.transform.v1'
+    && typeof receipt.changedCells === 'number'
+    && typeof receipt.removedRows === 'number'
+    && Array.isArray(receipt.operations)
+    && Array.isArray(receipt.addedColumns)
+    && typeof receipt.savedAt === 'string'
+    && typeof receipt.sourceVersionNumber === 'number';
+}
+
+function describeTransformationOperation(operation: WorkbenchTransformationReceipt['operations'][number]): string {
+  switch (operation.type) {
+    case 'trim_whitespace': return `trim ${operation.columns?.join(', ')}`;
+    case 'rename_column': return `rename ${operation.from} → ${operation.to}`;
+    case 'normalize_email': return `normalize email in ${operation.column}`;
+    case 'normalize_phone': return `normalize phone in ${operation.column}`;
+    case 'deduplicate_rows': return `deduplicate by ${operation.columns?.join(' + ')}`;
+    case 'add_constant_column': return `add ${operation.column}${operation.valuePreview ? ` = “${operation.valuePreview}”` : ''}`;
+    default: return operation.type;
+  }
+}
+
 function Receipt({ version }: { version: WorkbenchVersion }) {
   if (!version.receipt) {
     if (version.author === 'You') {
@@ -88,6 +116,16 @@ function Receipt({ version }: { version: WorkbenchVersion }) {
       <div className="mt-3 flex items-start gap-2 rounded-lg border border-border/50 bg-muted/25 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-foreground/65" />
         <span>Source snapshot created by Chippi. Your edits are saved as a new version.</span>
+      </div>
+    );
+  }
+
+  if (isTransformationReceipt(version.receipt)) {
+    const operationCount = version.receipt.operations.length;
+    return (
+      <div aria-live="polite" className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5 text-[11px] leading-relaxed text-foreground/75">
+        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <span>Chippi applied {operationCount} approved {operationCount === 1 ? 'transformation' : 'transformations'} to version {version.receipt.sourceVersionNumber}: {describeTransformationOperation(version.receipt.operations[0])}{operationCount > 1 ? `; ${version.receipt.operations.slice(1).map(describeTransformationOperation).join('; ')}` : ''}. {version.receipt.changedCells} cell changes{version.receipt.removedRows ? `, ${version.receipt.removedRows} duplicate rows removed` : ''}. The source version remains unchanged.</span>
       </div>
     );
   }
@@ -138,16 +176,16 @@ function ErrorState() {
  * Feature-off Workbench. Fixture previews remain browser-local; an artifact id
  * uses the tenant-scoped durable API and appends immutable versions.
  */
-export function LiveWorkbench({ artifact, artifactId, state = 'ready', className }: LiveWorkbenchProps) {
+export function LiveWorkbench({ artifact, artifactId, refreshVersionNumber, state = 'ready', className }: LiveWorkbenchProps) {
   if (state === 'empty') return <EmptyState />;
   if (state === 'error') return <ErrorState />;
-  if (artifactId) return <PersistedWorkbench artifactId={artifactId} className={className} />;
+  if (artifactId) return <PersistedWorkbench artifactId={artifactId} refreshVersionNumber={refreshVersionNumber} className={className} />;
   if (!artifact) return <EmptyState />;
 
   return <WorkbenchEditor artifact={artifact} className={className} />;
 }
 
-function PersistedWorkbench({ artifactId, className }: { artifactId: string; className?: string }) {
+function PersistedWorkbench({ artifactId, refreshVersionNumber, className }: { artifactId: string; refreshVersionNumber?: number | null; className?: string }) {
   const [view, setView] = useState<PersistedWorkbookView | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -158,7 +196,7 @@ function PersistedWorkbench({ artifactId, className }: { artifactId: string; cla
       .then((payload) => active && setView(fromPersistedArtifact(payload.artifact)))
       .catch(() => active && setError(true));
     return () => { active = false; };
-  }, [artifactId]);
+  }, [artifactId, refreshVersionNumber]);
   if (error) return <ErrorState />;
   if (!view) return <div className="p-5 text-xs text-muted-foreground">Loading workbook…</div>;
   const loadVersion = async (versionNumber: number) => {
@@ -170,7 +208,7 @@ function PersistedWorkbench({ artifactId, className }: { artifactId: string; cla
     if (!workbook) throw new Error('invalid workbook');
     return toVersion(artifactId, payload.version as PersistedVersionMeta & { content: string }, workbook);
   };
-  return <WorkbenchEditor artifact={view.artifact} versions={view.versions} sourceWorkbook={view.sourceWorkbook} history={view.history} historyIncomplete={view.historyIncomplete} loadVersion={loadVersion} className={className} persist />;
+  return <WorkbenchEditor key={`${artifactId}:${refreshVersionNumber ?? view.versions.at(-1)?.id ?? 'current'}`} artifact={view.artifact} versions={view.versions} sourceWorkbook={view.sourceWorkbook} history={view.history} historyIncomplete={view.historyIncomplete} loadVersion={loadVersion} className={className} persist />;
 }
 
 function fromPersistedArtifact(value: { id: string; title: string; versions?: PersistedVersionMeta[]; sourceVersion?: PersistedVersionMeta & { content: string }; currentVersion?: PersistedVersionMeta & { content: string }; history?: { incomplete?: boolean } }): PersistedWorkbookView {
@@ -182,7 +220,7 @@ function fromPersistedArtifact(value: { id: string; title: string; versions?: Pe
   const current = toVersion(value.id, value.currentVersion, currentWorkbook);
   const versions = source.id === current.id ? [source] : [source, current];
   const history: PersistedVersionMeta[] = [...(value.versions ?? []), value.sourceVersion, value.currentVersion]
-    .map(({ id, versionNumber, createdAt, createdByAgent }) => ({ id, versionNumber: Number(versionNumber), createdAt, createdByAgent }))
+    .map(({ id, versionNumber, createdAt, createdByAgent, transformReceipt }) => ({ id, versionNumber: Number(versionNumber), createdAt, createdByAgent, transformReceipt }))
     .filter((version, index, all) => all.findIndex((candidate) => candidate.id === version.id) === index)
     .sort((a, b) => a.versionNumber - b.versionNumber);
   const sheetScope = workbook.importedFirstSheetOnly && (workbook.sourceSheetCount ?? 1) > 1
@@ -194,10 +232,12 @@ function fromPersistedArtifact(value: { id: string; title: string; versions?: Pe
   }, versions, sourceWorkbook: workbook, history, historyIncomplete: value.history?.incomplete === true };
 }
 
-function toVersion(artifactId: string, version: { id: string; versionNumber: number; createdAt: string; createdByAgent?: string; content: string }, workbook: StoredWorkbook): WorkbenchVersion {
+function toVersion(artifactId: string, version: { id: string; versionNumber: number; createdAt: string; createdByAgent?: string; content: string; transformReceipt?: unknown }, workbook: StoredWorkbook): WorkbenchVersion {
   return { id: version.id, versionNumber: version.versionNumber, label: version.versionNumber === 1 ? 'Source' : `Version ${version.versionNumber}`, createdAt: version.createdAt,
-    author: version.versionNumber === 1 || version.createdByAgent === 'chippi' ? 'Chippi' : 'You',
-    rows: workbook.rows.map((row, rowIndex) => Object.fromEntries([['id', String(rowIndex)], ...row.map((cell, index) => [`c${index}`, cell])]) as WorkbenchRow), };
+    author: version.versionNumber === 1 || version.createdByAgent === 'chippi' || version.createdByAgent === 'chippi_transform' ? 'Chippi' : 'You',
+    rows: workbook.rows.map((row, rowIndex) => Object.fromEntries([['id', String(rowIndex)], ...row.map((cell, index) => [`c${index}`, cell])]) as WorkbenchRow),
+    receipt: isTransformationReceipt(version.transformReceipt) ? version.transformReceipt : undefined,
+  };
 }
 
 function WorkbenchEditor({ artifact, versions: initialVersions, sourceWorkbook, history = [], historyIncomplete = false, loadVersion, className, persist = false }: { artifact: WorkbenchArtifact; versions?: WorkbenchVersion[]; sourceWorkbook?: StoredWorkbook; history?: PersistedVersionMeta[]; historyIncomplete?: boolean; loadVersion?: (versionNumber: number) => Promise<WorkbenchVersion>; className?: string; persist?: boolean }) {

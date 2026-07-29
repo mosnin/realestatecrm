@@ -5,7 +5,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { workbookContentHash } from '@/lib/chippi/workbench-store';
-import { validateStoredWorkbookContent } from '@/lib/chippi/workbench-format';
+import { validateStoredWorkbookContent, validateWorkbookVersionMetadata } from '@/lib/chippi/workbench-format';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 // GET /api/agent/artifacts?spaceId=xxx[&taskId=yyy][&type=zzz]
@@ -98,6 +98,13 @@ export async function POST(req: NextRequest) {
     if (!validation.workbook) {
       return NextResponse.json({ error: validation.error ?? 'Invalid workbook content' }, { status: 400 });
     }
+    const metadataValidation = validateWorkbookVersionMetadata(metadata);
+    if (!metadataValidation.metadata) {
+      return NextResponse.json({ error: metadataValidation.error ?? 'Invalid workbook metadata' }, { status: 400 });
+    }
+    // Keep this local so the generic creator can never smuggle a transform
+    // receipt that the specialised, locked RPC alone is allowed to author.
+    body.metadata = metadataValidation.metadata;
   }
 
   const space = await getSpaceForUser(userId);
@@ -113,7 +120,7 @@ export async function POST(req: NextRequest) {
 
   if (type === 'workbook') {
     const { data: created, error: createError } = await supabase.rpc('create_workbook_artifact', {
-      p_space_id: spaceId, p_title: title, p_content: content, p_content_hash: workbookContentHash(content), p_metadata: metadata ?? {},
+      p_space_id: spaceId, p_title: title, p_content: content, p_content_hash: workbookContentHash(content), p_metadata: body.metadata ?? {},
     });
     const row = Array.isArray(created) ? created[0] : created;
     if (createError || !row?.artifact_id) return NextResponse.json({ error: 'Failed to create artifact' }, { status: 500 });

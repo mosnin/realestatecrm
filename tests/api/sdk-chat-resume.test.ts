@@ -118,6 +118,7 @@ interface PausedRow {
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
   attachmentManifest: Array<{ id: string; filename: string }>;
+  activeWorkbookContext?: unknown;
   status: string;
   expiresAt: string;
 }
@@ -135,12 +136,26 @@ const ROW: PausedRow = {
   expiresAt: new Date(Date.now() + 3600_000).toISOString(),
 };
 const SPACE = { id: 's_1', slug: 'jane', name: 'Jane Realty', ownerId: 'u_1' };
+const ACTIVE_WORKBOOK = { artifactId: 'artifact-1', versionNumber: 1, title: 'buyers.csv' };
+const TRANSFORM_APPROVAL = {
+  callId: 'transform-call',
+  toolName: 'apply_workbook_transformation',
+  arguments: {
+    artifactId: 'artifact-1', workbookTitle: 'buyers.csv', sourceVersionId: 'version-1', sourceVersionNumber: 1,
+    expectedContentHash: 'a'.repeat(64), operations: [{ type: 'normalize_email', column: 'Email' },],
+  },
+  summary: 'Create a new version of buyers.csv',
+};
 
 function queueRow(row: PausedRow | null) {
   tableQueue.AgentPausedRun = [{ data: row }];
 }
 function queueSpace(space: typeof SPACE | null) {
   tableQueue.Space = [{ data: space }];
+}
+function queueWorkbook(artifact: unknown = { id: 'artifact-1', title: 'buyers.csv', artifactType: 'workbook', currentVersionId: 'version-1' }, version: unknown = { id: 'version-1', versionNumber: 1 }) {
+  tableQueue.Artifact = [{ data: artifact }];
+  tableQueue.ArtifactVersion = [{ data: version }];
 }
 
 describe('POST /api/ai/task/resume/[pausedRunId] — flag gate', () => {
@@ -321,5 +336,48 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
     );
     const call = streamResumeMock.mock.calls[0]?.[0] as unknown as { callId: string };
     expect(call.callId).toBe('call_second');
+  });
+
+  it('restores the server-derived active workbook identity for an approved transform', async () => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    queueWorkbook();
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { ctx: { activeWorkbook?: unknown } };
+    expect(call.ctx.activeWorkbook).toEqual(ACTIVE_WORKBOOK);
+  });
+
+  it.each([
+    undefined,
+    { artifactId: 'artifact-1', versionNumber: 1 },
+    { artifactId: 'artifact-1', versionNumber: '1', title: 'buyers.csv' },
+    { artifactId: 'artifact-1', versionNumber: 1, title: 'buyers.csv', injected: true },
+  ])('fails closed before resuming an approved transform without a valid persisted context', async (activeWorkbookContext) => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects same-tenant substitution when approval args disagree with the persisted workbook', async () => {
+    queueRow({ ...ROW, approvals: [{ ...TRANSFORM_APPROVAL, arguments: { ...TRANSFORM_APPROVAL.arguments, artifactId: 'artifact-2', workbookTitle: 'other.csv' } }], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a persisted context whose tenant-scoped workbook or version no longer matches', async () => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    queueWorkbook({ id: 'artifact-1', title: 'renamed.csv', artifactType: 'workbook', currentVersionId: 'version-1' });
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

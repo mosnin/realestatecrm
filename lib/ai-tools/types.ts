@@ -61,6 +61,16 @@ export interface ToolContext {
   /** Exact Attachment ids hydrated for this turn; not a workspace-wide grant. */
   attachmentIds?: readonly string[];
   attachmentManifest?: readonly { id: string; filename: string }[];
+  /** Server-validated active Workbench context for this turn. Never taken
+   * directly from a browser id without tenant lookup. */
+  activeWorkbook?: {
+    artifactId: string;
+    versionNumber: number;
+    title: string;
+  };
+  /** Server-derived intent marker. It carries no artifact authority and lets
+   * the prompt ask for an open workbook rather than inventing an id. */
+  workbookTransformRequested?: boolean;
 }
 
 // ── Tool result ───────────────────────────────────────────────────────────
@@ -73,6 +83,9 @@ export interface ToolContext {
  */
 export interface ToolResult<TData = unknown> {
   summary: string;
+  /** Bounded, tool-authored context for the model only. UI data stays out of
+   * the model transcript unless a tool deliberately supplies this field. */
+  modelContext?: string;
   data?: TData;
   /**
    * How the block renderer should tint this result.

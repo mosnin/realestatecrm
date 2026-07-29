@@ -217,6 +217,7 @@ export function PermissionPromptView({
   const isSendEmail = prompt.name === 'send_email';
   const isSendSms = prompt.name === 'send_sms';
   const isSendTool = isSendEmail || isSendSms;
+  const requiresExactApproval = prompt.name === 'apply_workbook_transformation';
 
   const [editing, setEditing] = useState(false);
   const [argsText, setArgsText] = useState(() => {
@@ -224,6 +225,14 @@ export function PermissionPromptView({
   });
   const [parseError, setParseError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<null | 'approve' | 'deny' | 'always'>(null);
+
+  // A card instance can be reused for the next paused call. Never carry an
+  // editable JSON state into an exact workbook approval.
+  useEffect(() => {
+    setEditing(false);
+    setParseError(null);
+    try { setArgsText(JSON.stringify(prompt.args, null, 2)); } catch { setArgsText('{}'); }
+  }, [prompt.requestId, prompt.args]);
 
   // Inline compose state for send_email / send_sms. The draft fields are
   // editable in place — no JSON-pencil step — and ride through to the
@@ -248,6 +257,7 @@ export function PermissionPromptView({
 
   /** Shared pre-parse for the approve paths — keeps the JSON editor DRY. */
   function resolveEditedArgs(): { ok: true; edited?: Record<string, unknown> } | { ok: false } {
+    if (requiresExactApproval) return { ok: true };
     // Send tools: merge the inline compose state into the original args.
     // Even when not dirty we send the explicit values so the server's
     // schema is satisfied regardless of editor history.
@@ -332,7 +342,7 @@ export function PermissionPromptView({
               onBodyChange={(v) => setCompose((p) => ({ ...p, body: v }))}
               disabled={disabled}
             />
-          ) : editing ? (
+          ) : editing && !requiresExactApproval ? (
             <div className="mt-2.5">
               <textarea
                 value={argsText}
@@ -398,7 +408,7 @@ export function PermissionPromptView({
               )}
               {isSendTool ? 'Send' : editing ? 'Approve edited' : 'Approve'}
             </button>
-            {onAlwaysAllow && (
+            {onAlwaysAllow && !requiresExactApproval && (
               <button
                 type="button"
                 onClick={doAlwaysAllow}
@@ -427,7 +437,7 @@ export function PermissionPromptView({
               )}
               {isSendTool ? 'Discard' : 'Deny'}
             </button>
-            {!isSendTool && (
+            {!isSendTool && !requiresExactApproval && (
               <button
                 type="button"
                 onClick={() => setEditing((v) => !v)}

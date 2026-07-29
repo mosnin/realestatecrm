@@ -71,6 +71,7 @@ const taskBodySchema = z.object({
   conversationId: z.string().max(200).nullish(),
   message: z.string().max(20000),
   attachmentIds: z.array(z.string().max(200)).max(20).optional(),
+  activeWorkbookArtifactId: z.string().max(200).optional(),
   mode: z.string().max(50).optional(),
 });
 
@@ -81,7 +82,8 @@ const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 import { isWorkbookAttachment } from '@/lib/chippi/workbench-store';
-import { isExplicitWorkbenchIntent } from '@/lib/chippi/workbench-intent';
+import { isExplicitWorkbenchIntent, isWorkbookTransformIntent } from '@/lib/chippi/workbench-intent';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -137,6 +139,47 @@ interface PostBody {
    * Absent (older client) → fall back to the heuristic router.
    */
   mode?: 'chat' | 'agent' | string;
+  activeWorkbookArtifactId?: string;
+}
+
+/** A generic chat must not pay Workbench latency/tokens merely because its
+ * panel is open. Only this narrow follow-up intent may trigger resolution. */
+export function shouldResolveActiveWorkbookContext(message: string): boolean {
+  return isWorkbookTransformIntent(message);
+}
+
+/** Resolves only the active artifact's current version identity. The agent
+ * must call inspect_workbook for bounded schema/sample/hash data before it can
+ * propose a transform. Missing and foreign ids intentionally look identical. */
+async function resolveActiveWorkbookContext(
+  artifactId: string | undefined,
+  spaceId: string,
+): Promise<ToolContext['activeWorkbook'] | undefined> {
+  if (!artifactId || !isWorkbenchEnabled()) return undefined;
+  try {
+    const { data: artifact } = await supabase
+      .from('Artifact')
+      .select('id, title, artifactType, currentVersionId')
+      .eq('id', artifactId)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!artifact || artifact.artifactType !== 'workbook' || !artifact.currentVersionId || typeof artifact.title !== 'string' || artifact.title.length < 1 || artifact.title.length > 200) return undefined;
+    const { data: version } = await supabase
+      .from('ArtifactVersion')
+      .select('id, versionNumber')
+      .eq('id', artifact.currentVersionId)
+      .eq('artifactId', artifact.id)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!version || !Number.isInteger(version.versionNumber) || version.versionNumber < 1) return undefined;
+    return {
+      artifactId: artifact.id,
+      versionNumber: version.versionNumber,
+      title: artifact.title,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
@@ -603,12 +646,15 @@ export async function POST(req: NextRequest) {
     );
   }
   const message = sanitized.sanitized;
+  const requestedWorkbookTransform = isWorkbenchEnabled() && shouldResolveActiveWorkbookContext(message);
 
   const abortController = new AbortController();
 
   const ctxOrResponse = await resolveToolContext(spaceSlug, abortController.signal);
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
+  let activeWorkbook: ToolContext['activeWorkbook'] | undefined;
+  let toolCtx: ToolContext = ctx;
 
   // The three rate-limit counters are independent — fire them together
   // instead of paying three sequential Redis round-trips on the critical
@@ -735,6 +781,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // This is intentionally after auth, rate, subscription, budget, and credit
+  // gates. A normal chat with an open Workbench stays on its original path;
+  // only a narrow transform request pays these two scoped identity reads.
+  if (requestedWorkbookTransform) {
+    activeWorkbook = await resolveActiveWorkbookContext(body.activeWorkbookArtifactId, ctx.space.id);
+    toolCtx = { ...ctx, workbookTransformRequested: true, ...(activeWorkbook ? { activeWorkbook } : {}) };
+  }
+
   let conversationId: string;
   try {
     conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);
@@ -829,8 +883,12 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true'
     && hydratedAttachments.some((attachment) => isWorkbookAttachment({ mimeType: attachment.mime_type, filename: attachment.filename }))
     && isExplicitWorkbenchIntent(message);
+  // A natural follow-up stays in the Workbench TS lane even if the selected
+  // id is missing or foreign. In that case the prompt asks the user to reopen
+  // a workbook rather than silently falling back to legacy Modal tools.
+  const workbookTransformRequested = requestedWorkbookTransform;
   const route =
-    workbenchRequested || explicitMode === 'agent'
+    workbenchRequested || workbookTransformRequested || explicitMode === 'agent'
       ? 'agent'
       : explicitMode === 'chat' && heuristicRoute === 'direct'
         ? 'direct'
@@ -884,7 +942,7 @@ export async function POST(req: NextRequest) {
       onEscalate: async () => {
         logger.info('[ai/task] direct → agent escalation', { spaceSlug, model: turnModel });
         return streamTsChatTurn({
-          ctx: { ...ctx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
+          ctx: { ...toolCtx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
           conversationId,
           userMessage: message,
           history,
@@ -912,7 +970,7 @@ export async function POST(req: NextRequest) {
   // this one request to the legacy Modal catalog, where that contract does not
   // exist. This is feature-gated and only narrows requests that explicitly ask
   // to open this turn's uploaded spreadsheet.
-  const requiresTsWorkbenchTool = workbenchRequested;
+  const requiresTsWorkbenchTool = workbenchRequested || workbookTransformRequested;
   if (route === 'agent' && !requiresTsWorkbenchTool && (forcedModal || perMessageModal)) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
@@ -934,7 +992,7 @@ export async function POST(req: NextRequest) {
   // streamed back inline.
   logger.info('[ai/task] router → agent (in-process TS)', { spaceSlug, model: turnModel });
   return streamTsChatTurn({
-    ctx: { ...ctx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
+    ctx: { ...toolCtx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
     conversationId,
     userMessage: message,
     history,

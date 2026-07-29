@@ -126,6 +126,7 @@ import { summarizeDocumentTool } from './summarize-document';
 // Planning
 import { createPlanTool } from './plan';
 import { openSpreadsheetInWorkbenchTool } from './open-spreadsheet-in-workbench';
+import { inspectWorkbookTool, applyWorkbookTransformationTool } from './workbook-transform';
 
 // Browser control (paired Chrome extension driving the realtor's own browser)
 import { controlBrowserTool } from './control-browser';
@@ -229,6 +230,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
   openSpreadsheetInWorkbenchTool as ToolDefinition,
+  inspectWorkbookTool as ToolDefinition,
+  applyWorkbookTransformationTool as ToolDefinition,
   listFilesTool as ToolDefinition,
   readFileTool as ToolDefinition,
   attachFileToPropertyTool as ToolDefinition,

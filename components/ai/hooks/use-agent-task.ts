@@ -104,6 +104,9 @@ export interface UseAgentTaskOptions {
   conversationCreatePayload?: Record<string, unknown>;
   /** Receives typed rich tool results that drive workspace-level UI state. */
   onToolResult?: (input: { name: string; data: unknown; ok: boolean }) => void;
+  /** A Workbench the user has actively opened. The server re-resolves it in
+   * the caller's tenant before putting any workbook state in the tool context. */
+  activeWorkbookArtifactId?: string | null;
 }
 
 export interface UseAgentTaskResult {
@@ -204,6 +207,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     resumeEndpointBase = '/api/ai/task/resume',
     conversationCreatePayload,
     onToolResult,
+    activeWorkbookArtifactId,
   } = options;
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -972,12 +976,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           message: trimmed,
           mode,
           ...(hasAttachments ? { attachmentIds } : {}),
+          ...(activeWorkbookArtifactId ? { activeWorkbookArtifactId } : {}),
         },
         convId,
         { text: trimmed, attachmentBlocks },
       );
     },
-    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
+    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint, activeWorkbookArtifactId],
   );
   // Late-bind for the queue drain (see consumeStream's finally).
   sendRef.current = send;
@@ -1073,6 +1078,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       // Capture the tool name from the CURRENT pending prompt at click time —
       // by the time approve() returns the prompt will have been cleared.
       const toolName = pendingApproval?.name;
+      // Exact workbook transforms are intentionally one-time approvals: their
+      // source version, hash, and every target are what the user reviewed.
+      if (toolName === 'apply_workbook_transformation') {
+        await approve(requestId);
+        return;
+      }
       if (toolName) commitAllow(toolName);
       await approve(requestId, editedArgs);
     },
@@ -1112,6 +1123,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       return;
     }
     if (isStreaming) return;
+    if (pendingApproval.name === 'apply_workbook_transformation') return;
     if (!allowedTools.has(pendingApproval.name)) return;
     if (autoApprovedRef.current === pendingApproval.requestId) return;
     autoApprovedRef.current = pendingApproval.requestId;

@@ -24,13 +24,34 @@ export interface WorkbenchVersion {
   createdAt: string;
   author: 'Chippi' | 'You';
   rows: WorkbenchRow[];
-  receipt?: WorkbenchChangeReceipt;
+  receipt?: WorkbenchChangeReceipt | WorkbenchTransformationReceipt;
 }
 
 export interface WorkbenchChangeReceipt {
   sourceVersionId: string;
   savedAt: string;
   changedCells: Array<{ rowId: string; column: string; before: WorkbenchCellValue; after: WorkbenchCellValue }>;
+}
+
+export interface WorkbenchTransformationReceipt {
+  kind: 'chippi.workbook.transform.v1';
+  sourceVersionId: string;
+  sourceVersionNumber: number;
+  sourceContentHash: string;
+  operations: Array<{
+    type: string;
+    column?: string;
+    columns?: string[];
+    from?: string;
+    to?: string;
+    valuePreview?: string;
+    valueHash?: string;
+    valueLength?: number;
+  }>;
+  changedCells: number;
+  removedRows: number;
+  addedColumns: string[];
+  savedAt: string;
 }
 
 export interface WorkbenchArtifact {
@@ -61,7 +82,7 @@ export function mergeWorkbenchVersionOptions(
       id: version.id,
       versionNumber: version.versionNumber,
       label: version.versionNumber === 1 ? 'Source' : `Version ${version.versionNumber}`,
-      author: version.versionNumber === 1 || version.createdByAgent === 'chippi' ? 'Chippi' : 'You',
+      author: version.versionNumber === 1 || version.createdByAgent === 'chippi' || version.createdByAgent === 'chippi_transform' ? 'Chippi' : 'You',
     });
   }
   for (const version of loaded) {

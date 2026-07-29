@@ -310,9 +310,19 @@ function readDescription(field: z.ZodTypeAny): string | undefined {
   return (field as unknown as { _def?: { description?: string } })._def?.description;
 }
 
-function serialiseResult(result: ToolResult): string {
+/** Every inner agent step can replay tool output. This is a hard boundary for
+ * model-only context across the entire registry, not only Workbench. */
+export const MAX_TOOL_MODEL_CONTEXT_BYTES = 12 * 1024;
+
+export function serialiseResult(result: ToolResult): string {
   if (result.display === 'error') return `Error: ${result.summary}`;
-  return result.summary;
+  if (!result.modelContext) return result.summary;
+  if (new TextEncoder().encode(result.modelContext).byteLength > MAX_TOOL_MODEL_CONTEXT_BYTES) {
+    // Deliberately omit rather than truncate: a partial JSON/data payload can
+    // change meaning, and tool output must never reopen transcript blowups.
+    return result.summary;
+  }
+  return `${result.summary}\n\n${result.modelContext}`;
 }
 
 interface RunAgentInput {

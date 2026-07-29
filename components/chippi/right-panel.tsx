@@ -38,6 +38,7 @@ interface RightPanelProps {
    */
   onClose?: () => void;
   workbenchArtifactId?: string | null;
+  workbenchRefreshVersion?: number | null;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -57,6 +58,7 @@ export function RightPanel({
   variant = 'realtor',
   onClose,
   workbenchArtifactId,
+  workbenchRefreshVersion,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -158,7 +160,7 @@ export function RightPanel({
             <BrowserView slug={slug} isResizing={isResizing} />
           </div>
         )}
-        {isWorkbench && <LiveWorkbench artifactId={workbenchArtifactId} />}
+        {isWorkbench && <LiveWorkbench artifactId={workbenchArtifactId} refreshVersionNumber={workbenchRefreshVersion} />}
       </div>
     </motion.div>
   );

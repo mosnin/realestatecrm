@@ -308,12 +308,18 @@ export function ChippiWorkspace({
   // the handle's listener effect doesn't tear down/re-add on every drag frame.
   const [isResizingSplit, setIsResizingSplit] = useState(false);
   const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
+  const [workbenchRefreshVersion, setWorkbenchRefreshVersion] = useState<number | null>(null);
   const openedWorkbenchUrlRef = useRef<string | null>(null);
   const handleSplitDragStart = useCallback(() => setIsResizingSplit(true), []);
   const handleSplitDragEnd = useCallback(() => setIsResizingSplit(false), []);
-  const openWorkbenchArtifact = useCallback((artifactId: string) => {
+  const openWorkbenchArtifact = useCallback((artifactId: string, refreshVersion?: number) => {
     openedWorkbenchUrlRef.current = artifactId;
     setWorkbenchArtifactId(artifactId);
+    if (typeof refreshVersion === 'number' && Number.isInteger(refreshVersion) && refreshVersion > 0) {
+      setWorkbenchRefreshVersion(refreshVersion);
+    } else {
+      setWorkbenchRefreshVersion(null);
+    }
     setRightTab('workbench');
     if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
     if (typeof window !== 'undefined') {
@@ -323,9 +329,9 @@ export function ChippiWorkspace({
     }
   }, [effectiveIsSplit, endpoints.routeBase, isMobileOverlay, router, setRightTab, toggleSplit]);
   const handleWorkbenchToolResult = useCallback(({ name, data, ok }: { name: string; data: unknown; ok: boolean }) => {
-    if (!ok || name !== 'open_spreadsheet_in_workbench' || !data || typeof data !== 'object') return;
-    const artifactId = (data as { artifactId?: unknown }).artifactId;
-    if (typeof artifactId === 'string') openWorkbenchArtifact(artifactId);
+    if (!ok || (name !== 'open_spreadsheet_in_workbench' && name !== 'apply_workbook_transformation') || !data || typeof data !== 'object') return;
+    const { artifactId, versionNumber } = data as { artifactId?: unknown; versionNumber?: unknown };
+    if (typeof artifactId === 'string') openWorkbenchArtifact(artifactId, name === 'apply_workbook_transformation' && typeof versionNumber === 'number' ? versionNumber : undefined);
   }, [openWorkbenchArtifact]);
 
   // (no per-plan animation state needed — isAnimating is derived from the
@@ -358,6 +364,7 @@ export function ChippiWorkspace({
     conversationsEndpoint: endpoints.conversationsEndpoint,
     resumeEndpointBase: endpoints.resumeEndpointBase,
     conversationCreatePayload: endpoints.conversationCreatePayload,
+    activeWorkbookArtifactId: workbenchArtifactId,
     onConversationCreated: (id) => {
       setActiveConversationId(id);
       // Mark as loaded so the conversation-loading effect won't try to
@@ -2050,6 +2057,7 @@ export function ChippiWorkspace({
               slug={slug}
               variant={variant}
               workbenchArtifactId={workbenchArtifactId}
+              workbenchRefreshVersion={workbenchRefreshVersion}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
@@ -2083,6 +2091,7 @@ export function ChippiWorkspace({
               slug={slug}
               variant={variant}
               workbenchArtifactId={workbenchArtifactId}
+              workbenchRefreshVersion={workbenchRefreshVersion}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="h-full"

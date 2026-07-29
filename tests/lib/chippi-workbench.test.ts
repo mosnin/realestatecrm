@@ -111,4 +111,12 @@ describe('Chippi Workbench versioning', () => {
     expect(oldSelection?.label).toBe('Source');
     expect(reselectedSave?.label).toBe('Version 2');
   });
+
+  it('attributes historical deterministic transformations to Chippi before they are loaded', () => {
+    const options = mergeWorkbenchVersionOptions([
+      { id: 'v1', versionNumber: 1, createdByAgent: 'user' },
+      { id: 'v2', versionNumber: 2, createdByAgent: 'chippi_transform' },
+    ], []);
+    expect(options.find((option) => option.id === 'v2')?.author).toBe('Chippi');
+  });
 });
