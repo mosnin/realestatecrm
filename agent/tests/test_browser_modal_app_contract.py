@@ -75,9 +75,14 @@ def test_browser_modal_entrypoint_has_only_browser_configuration_and_surface():
     assert ".add_local_dir(" not in source
     assert "x-vercel-protection-bypass" in source
     assert "vercel_bypass_secret=vercel_bypass_secret" in source
-    assert "if bypass_secret_name:" in source
-    assert "worker_secrets = list(browser_secrets)" in source
-    assert "worker_secrets.append(modal.Secret.from_name(bypass_secret_name))" in source
+    assert "if modal.is_local():" in source
+    assert "browser_secret = modal.Secret.from_dict({})" in source
+    assert "bypass_secret = modal.Secret.from_dict({})" in source
+    assert "browser_secrets = [browser_secret]" in source
+    assert "worker_secrets = [browser_secret, bypass_secret]" in source
+    assert "worker_secrets.append(" not in source
+    assert 'BROWSER_SECRET_NAME = "chippi-browser-secrets"' not in source
+    assert 'BROWSER_BYPASS_SECRET_NAME = "chippi-browser-bypass-secrets"' not in source
     assert _function_secret_binding(tree, "run_headless_browser_session") == "worker_secrets"
     assert _function_secret_binding(tree, "start_headless_browser_workspace") == "browser_secrets"
     for forbidden in (

@@ -27,18 +27,27 @@ app = modal.App(
     os.environ.get("CHIPPI_BROWSER_MODAL_APP_NAME", "chippi-browser"), image=browser_image
 )
 
-# The public launch endpoint receives only this required two-key secret.
-# The optional Vercel bypass is worker-only; never add it here or rotate this
-# existing secret.
-browser_secrets = [
-    modal.Secret.from_name(
+# Modal evaluates this module both locally (to construct the deployment) and
+# remotely (to load it). Use the documented placeholder pattern so the two
+# functions always have fixed dependency counts while staging may select its
+# own named secrets. The public launch endpoint gets only browser_secret; the
+# worker gets browser_secret plus bypass_secret in every environment.
+if modal.is_local():
+    browser_secret = modal.Secret.from_name(
         os.environ.get("CHIPPI_BROWSER_MODAL_SECRET_NAME", "chippi-browser-secrets")
     )
-]
-worker_secrets = list(browser_secrets)
-bypass_secret_name = os.environ.get("CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME", "").strip()
-if bypass_secret_name:
-    worker_secrets.append(modal.Secret.from_name(bypass_secret_name))
+    bypass_secret_name = os.environ.get("CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME", "").strip()
+    bypass_secret = (
+        modal.Secret.from_name(bypass_secret_name)
+        if bypass_secret_name
+        else modal.Secret.from_dict({})
+    )
+else:
+    browser_secret = modal.Secret.from_dict({})
+    bypass_secret = modal.Secret.from_dict({})
+
+browser_secrets = [browser_secret]
+worker_secrets = [browser_secret, bypass_secret]
 
 
 @app.function(image=browser_image, secrets=worker_secrets, timeout=900, max_containers=20)
