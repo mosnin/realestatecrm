@@ -1,6 +1,6 @@
 # Chippi Live Workbench — Product Intelligence
 
-Date: 2026-07-29  
+Date: 2026-07-29
 Program evidence type: intelligence
 
 ## Customer job
@@ -58,4 +58,3 @@ The mission should assemble its deliverables in the Live Workbench.
 Commit Live Workbench as the primary vertical slice. Computer Use and larger
 real-estate missions become sequenced follow-on capabilities after the artifact
 contract and work surface exist.
-

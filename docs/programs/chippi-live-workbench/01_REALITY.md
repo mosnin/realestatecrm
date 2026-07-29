@@ -1,6 +1,6 @@
 # Chippi Live Workbench — Product Reality
 
-Date: 2026-07-29  
+Date: 2026-07-29
 Program evidence type: reality
 
 ## Verified current state
@@ -46,4 +46,3 @@ now Chippi Live Workbench.
 - `app/api/browser-control/headless/start/route.ts`
 - `agent/browser_headless.py`
 - `docs/audits/draft-mode-removal/DRAFT_MODE_REMOVAL_AUDIT.md`
-

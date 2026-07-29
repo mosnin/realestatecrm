@@ -1,6 +1,6 @@
 # Chippi Live Workbench — Product Direction
 
-Date: 2026-07-29  
+Date: 2026-07-29
 Program evidence type: direction
 
 ## Program outcome
@@ -70,4 +70,3 @@ schedule the next cycle.
 The loop itself may adapt only through a reversible proposal with independent
 review. It cannot broaden production authority, approval scope, spending, or
 the number of simultaneous product lanes.
-

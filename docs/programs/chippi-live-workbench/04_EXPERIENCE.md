@@ -1,6 +1,6 @@
 # Chippi Live Workbench — Inspectable Experience Contract
 
-Date: 2026-07-29  
+Date: 2026-07-29
 Program evidence type: experience
 
 ## Existing visual language
@@ -74,4 +74,3 @@ The root reviewer accepts the cycle only with:
 - no regression to Realtime Voice Delegation;
 - an evidence report that distinguishes local proof from staging/production;
 - no drift into unrelated hardening.
-
