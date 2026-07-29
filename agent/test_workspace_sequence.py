@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Keep this dependency-free contract runnable from the repository root.
 sys.path.insert(0, os.path.dirname(__file__))
-from workspace_sequence import reserve_sequence
+from workspace_sequence import is_safe_workspace_filename, reserve_sequence
 
 
 class WorkspaceSequenceTests(unittest.TestCase):
@@ -14,6 +14,26 @@ class WorkspaceSequenceTests(unittest.TestCase):
         failed_sequence, _ = reserve_sequence(next_sequence)
         self.assertEqual(committed_sequence, 1)
         self.assertEqual(failed_sequence, 2)
+
+    def test_workspace_file_vocabulary_accepts_real_files_and_rejects_paths(self):
+        for name in (
+            "brief.md",
+            "launch-checklist.md",
+            "comps.csv",
+            "handoff.md",
+            "workspace-follow-up-1.md",
+            "workspace-follow-up-42.md",
+        ):
+            self.assertTrue(is_safe_workspace_filename(name), name)
+        for name in (
+            "../brief.md",
+            "/workspace/brief.md",
+            "workspace-follow-up-0.md",
+            "workspace-follow-up-01.md",
+            "notes.txt",
+            None,
+        ):
+            self.assertFalse(is_safe_workspace_filename(name), name)
 
     def test_staging_callbacks_can_cross_vercel_protection(self):
         source = (Path(__file__).parent / "workspace_modal_app.py").read_text()

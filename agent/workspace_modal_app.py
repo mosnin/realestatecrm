@@ -9,7 +9,7 @@ import base64, hashlib, hmac, json, os, re, uuid
 from pathlib import Path
 
 import httpx, modal
-from workspace_sequence import reserve_sequence
+from workspace_sequence import is_safe_workspace_filename, reserve_sequence
 
 _AGENT_DIR = Path(__file__).resolve().parent
 app = modal.App(os.environ.get("CHIPPI_WORKSPACE_MODAL_APP_NAME", "chippi-workspace"))
@@ -214,9 +214,8 @@ async def run_workspace_task(item: dict):
     except ValueError: return {"error": "invalid id"}
     instruction, files, task_sequence, execution_plan = str(item.get("instruction", "")).strip()[:MAX_GOAL], item.get("files"), item.get("task_sequence"), item.get("execution_plan")
     if not space_id or len(instruction) < 3 or not isinstance(files, list) or not isinstance(task_sequence, int) or task_sequence < 1 or len(files) > 16 or not isinstance(execution_plan, dict): return {"error": "invalid workspace task"}
-    safe_name = re.compile(r"^(brief\\.md|launch-checklist\\.md|comps\\.csv|handoff\\.md|workspace-follow-up-[1-9][0-9]*\\.md)$")
     for file in files:
-        if not isinstance(file, dict) or not isinstance(file.get("name"), str) or not isinstance(file.get("content"), str) or not safe_name.fullmatch(file["name"]) or len(file["content"].encode()) > 32000: return {"error": "unsafe workspace manifest"}
+        if not isinstance(file, dict) or not is_safe_workspace_filename(file.get("name")) or not isinstance(file.get("content"), str) or len(file["content"].encode()) > 32000: return {"error": "unsafe workspace manifest"}
     seq = 1
     def event(kind: str, message: str, **extra):
         nonlocal seq
