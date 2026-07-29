@@ -110,13 +110,13 @@ export const BrowserActionResult = z.object({
   /** Human/agent-facing summary of what happened ("Clicked 'Search'"). */
   summary: z.string().max(2_000).optional(),
   /** Present for read_dom: a bounded text/aria snapshot of the page. */
-  dom: z.string().optional(),
+  dom: z.string().max(40_000).optional(),
   /** Present for screenshot (and optionally other actions): storage key or
    *  data URL of the captured frame. */
-  screenshot: z.string().optional(),
+  screenshot: z.string().max(1_400_000).optional(),
   /** Current page after the action, so the agent keeps its bearings. */
-  pageUrl: z.string().optional(),
-  pageTitle: z.string().optional(),
+  pageUrl: z.string().max(2_048).optional(),
+  pageTitle: z.string().max(512).optional(),
   error: z.string().max(2_000).optional(),
 });
 export type BrowserActionResult = z.infer<typeof BrowserActionResult>;
@@ -134,9 +134,9 @@ export const RedeemPairingBody = z.object({
  *  Chippi side panel can show the user what the agent sees. `image` is a
  *  data: URL (jpeg, low quality — a monitoring feed, not an asset). */
 export const LiveFrame = z.object({
-  image: z.string(),
-  pageUrl: z.string().optional(),
-  pageTitle: z.string().optional(),
+  image: z.string().max(400_000),
+  pageUrl: z.string().max(2_048).optional(),
+  pageTitle: z.string().max(512).optional(),
 });
 export type LiveFrame = z.infer<typeof LiveFrame>;
 
@@ -145,6 +145,10 @@ export type LiveFrame = z.infer<typeof LiveFrame>;
  *  It may also pigg-back a live viewport frame and a user-kill signal. */
 export const PollBody = z.object({
   sessionId: z.string().optional(),
+  /** Fencing token required by the feature-on cloud worker. The extension
+   * never sends one; headless /poll validates it when Research Workspace is
+   * enabled. */
+  workerLeaseToken: z.string().uuid().optional(),
   /** Result of the previously-dispatched action, if any. */
   completed: z
     .object({ actionId: z.string(), result: BrowserActionResult })

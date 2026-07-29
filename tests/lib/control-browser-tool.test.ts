@@ -25,11 +25,13 @@ const { enqueueActionMock, awaitActionResultMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/browser-control/session', () => ({
   enqueueAction: (...a: unknown[]) => enqueueActionMock(...a),
+  enqueueActionForSession: (...a: unknown[]) => enqueueActionMock(...a),
   awaitActionResult: (...a: unknown[]) => awaitActionResultMock(...a),
   // resolveBrowserRuntime (real, from the index barrel) calls these; default
   // to an active EXTENSION session so these tool tests exercise the normal
   // enqueue path (headless routing has its own tests in browser-routing.test.ts).
   getActiveSession: async () => ({ id: 'sess_ext', source: 'extension', status: 'active', spaceId: 'space_1', userId: 'user_1' }),
+  getActiveExtensionSession: async () => ({ id: 'sess_ext', source: 'extension', status: 'active', spaceId: 'space_1', userId: 'user_1' }),
   startHeadlessSession: async () => ({ id: 'sess_hl', source: 'headless', status: 'active', spaceId: 'space_1', userId: 'user_1' }),
   endHeadlessSession: async () => undefined,
 }));
@@ -113,6 +115,7 @@ describe('controlBrowserTool', () => {
     expect(enqueueActionMock).toHaveBeenCalledWith({
       spaceId: 'space_1',
       userId: 'user_1',
+      sessionId: 'sess_ext',
       input: { type: 'navigate', url: 'https://example.com' },
     });
     expect(awaitActionResultMock).not.toHaveBeenCalled();

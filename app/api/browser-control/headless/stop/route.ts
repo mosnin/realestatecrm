@@ -8,12 +8,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { getCurrentDbUser } from '@/lib/permissions';
-import { getActiveSession, endHeadlessSession } from '@/lib/browser-control/session';
+import { getHeadlessSessionForUser, endHeadlessSession } from '@/lib/browser-control/session';
+import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
 
-export async function POST(_req: NextRequest) {
+const stopBody = z.object({ sessionId: z.string().uuid() });
+
+export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
@@ -22,10 +26,12 @@ export async function POST(_req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
   if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const active = await getActiveSession(space.id, dbUser.id);
-  if (!active || active.source !== 'headless') {
-    // Nothing to stop (or the active session is an extension one, which the
-    // in-page kill switch / link revoke owns) — honest, not an error.
+  const parsed = stopBody.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
+  const active = await getHeadlessSessionForUser(parsed.data.sessionId, { spaceId: space.id, userId: dbUser.id });
+  if (!active) {
+    // Nothing to stop — extension sessions are deliberately irrelevant to
+    // this exact cloud-workspace control.
     return NextResponse.json({ stopped: false });
   }
 

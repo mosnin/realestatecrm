@@ -23,15 +23,15 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { PollBody, BrowserActionResult } from '@/lib/browser-control/protocol';
 import {
   getHeadlessSessionById,
-  expireStaleQueuedActions,
-  dispatchNextAction,
-  recordHeadlessActionResult,
-  recordPollHeartbeat,
   endHeadlessSession,
+  pollHeadlessWorker,
 } from '@/lib/browser-control/session';
+import { isResearchWorkspaceEnabled, isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
+
+const MAX_POLL_BODY_BYTES = 1_000_000;
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.AGENT_INTERNAL_SECRET;
+  const secret = process.env.CHIPPI_BROWSER_WORKER_SECRET;
   if (!secret) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
@@ -41,7 +41,14 @@ export async function POST(req: NextRequest) {
 
   let body: unknown = {};
   try {
+    const contentLength = Number(req.headers.get('content-length') ?? 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_POLL_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    }
     const text = await req.text();
+    if (Buffer.byteLength(text, 'utf8') > MAX_POLL_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    }
     if (text) body = JSON.parse(text);
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
@@ -52,6 +59,11 @@ export async function POST(req: NextRequest) {
   }
   const { sessionId } = parsed.data;
 
+  // The Modal worker is fenced by a per-session lease token. A late worker
+  // stops before it can write a result, heartbeat, or receive another action.
+  if (!parsed.data.workerLeaseToken) {
+    return NextResponse.json({ action: null, stop: true });
+  }
   // Heartbeat cadence guard, same shape as the extension poll route's
   // per-link limit — keyed by sessionId since a shared internal secret has
   // no per-worker identity to key on.
@@ -67,19 +79,9 @@ export async function POST(req: NextRequest) {
     // "reported session has already ended" handling).
     return NextResponse.json({ action: null, stop: true });
   }
-
-  if (parsed.data.completed) {
-    const resultCheck = BrowserActionResult.safeParse(parsed.data.completed.result);
-    if (resultCheck.success) {
-      await recordHeadlessActionResult(
-        parsed.data.completed.actionId,
-        { spaceId: session.spaceId, sessionId: session.id },
-        resultCheck.data,
-      );
-    }
-    // A malformed result is silently dropped, same tolerance as the
-    // extension path — the action stays queued/running and expires via TTL
-    // rather than the worker getting stuck retrying or the heartbeat 500ing.
+  if (!isResearchWorkspaceEnabled() || !isResearchWorkspaceEnabledForSpace(session.spaceId)) {
+    await endHeadlessSession(session.id, { spaceId: session.spaceId });
+    return NextResponse.json({ action: null, stop: true });
   }
 
   // The user hit the in-page kill switch (oversight panel) — end the
@@ -89,9 +91,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ action: null, stop: true });
   }
 
-  await recordPollHeartbeat(session.id, { spaceId: session.spaceId }, parsed.data.frame);
-  await expireStaleQueuedActions(session.id, { spaceId: session.spaceId });
-  const action = await dispatchNextAction(session.id, { spaceId: session.spaceId });
-
-  return NextResponse.json({ action, stop: false, sessionId: session.id });
+  const resultCheck = parsed.data.completed
+    ? BrowserActionResult.safeParse(parsed.data.completed.result)
+    : null;
+  const polled = await pollHeadlessWorker({
+    sessionId: session.id,
+    leaseToken: parsed.data.workerLeaseToken,
+    completed: parsed.data.completed && resultCheck?.success
+      ? { actionId: parsed.data.completed.actionId, result: resultCheck.data }
+      : undefined,
+    frame: parsed.data.frame,
+  });
+  return NextResponse.json({ ...polled, sessionId: session.id });
 }

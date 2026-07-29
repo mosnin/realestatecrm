@@ -61,8 +61,9 @@
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { BrowserActionInput } from '@/lib/browser-control/protocol';
-import { enqueueAction, awaitActionResult } from '@/lib/browser-control/session';
-import { resolveBrowserRuntime } from '@/lib/browser-control';
+import { enqueueActionForSession, awaitActionResult, endHeadlessSession } from '@/lib/browser-control/session';
+import { isHeadlessResearchActionAllowed, resolveBrowserRuntime } from '@/lib/browser-control';
+import { ensureHeadlessResearchWorker } from '@/lib/browser-control/headless-worker';
 import { classifyActionSafety } from './browser-task';
 import { defineTool } from '../types';
 
@@ -196,10 +197,32 @@ export const controlBrowserTool = defineTool<typeof parameters, ControlBrowserRe
         display: 'warning',
       };
     }
+    if ('researchWorkspaceDisabled' in runtime) {
+      return { summary: runtime.reason, data: { ok: false, actionType: args.action.type }, display: 'warning' };
+    }
+    if (runtime.source === 'headless') {
+      if (!isHeadlessResearchActionAllowed(args.action)) {
+        return {
+          summary: 'The cloud research browser only supports public-web research actions. That action was not queued.',
+          data: { ok: false, actionType: args.action.type, source: 'headless' },
+          display: 'warning',
+        };
+      }
+      const launch = await ensureHeadlessResearchWorker(runtime.session.id);
+      if (!launch.ok) {
+        await endHeadlessSession(runtime.session.id, { spaceId: ctx.space.id }).catch(() => {});
+        return {
+          summary: 'Cloud research browser is unavailable right now, so this action was not queued.',
+          data: { ok: false, actionType: args.action.type, source: 'headless' },
+          display: 'warning',
+        };
+      }
+    }
 
-    const enqueued = await enqueueAction({
+    const enqueued = await enqueueActionForSession({
       spaceId: ctx.space.id,
       userId,
+      sessionId: runtime.session.id,
       input: args.action,
     });
 

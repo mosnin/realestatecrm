@@ -30,19 +30,12 @@ Two independent pieces:
      Takes `http_post` and `browser_factory` as injected dependencies so the
      whole loop is unit-testable with NO real network and NO real browser.
 
-── Deploy dependency (FLAG for the integrator) ──────────────────────────────
-`agent/pyproject.toml` does NOT currently list `playwright` (checked:
-2026-07-19 — only `openai-agents`, `openai`, `httpx`, etc.). The
-`execute_action` pure function has no import-time dependency on it (the page
-object is always injected), so THIS FILE imports fine either way. But the
-DEFAULT `browser_factory` used by `poll_and_execute` when none is injected
-lazy-imports `playwright.async_api` at call time and raises a clear
-`RuntimeError` if it's missing. Running real headless sessions requires:
-  - adding `"playwright>=1.45,<2"` to `agent/pyproject.toml` dependencies
-  - running `playwright install --with-deps chromium` on the Modal image
-    (extend the `image` in `agent/modal_app.py` — NOT done by this change)
-See the "Modal wiring (NOT wired in)" comment block at the bottom of this
-file for the shape of that integration.
+── Deploy dependency ─────────────────────────────────────────────────────────
+`execute_action` remains import-time independent of Playwright so its policy
+and action semantics stay unit-testable with a plain fake page. The dedicated
+least-privilege browser image in `agent/modal_app.py` installs Playwright and
+Chromium for the real worker without adding those packages or the broad chat
+agent secret set to ordinary Python test/runtime paths.
 
 ── Server contract this module assumes (Track B builds it) ─────────────────
   POST {base_url}/api/browser-control/headless/poll
@@ -66,6 +59,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import ipaddress
+import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -79,14 +73,24 @@ import httpx
 # in protocol.ts exactly. A closed allow-list independent of the schema
 # validation upstream (defense in depth): even if a malformed action slipped
 # past protocol validation, this module still refuses anything outside it.
-ALLOWED_KEYS = frozenset(
-    {"Enter", "Tab", "Escape", "Backspace", "ArrowDown", "ArrowUp"}
-)
+ALLOWED_KEYS = frozenset({"Enter", "Tab", "Escape", "Backspace", "ArrowDown", "ArrowUp"})
 
 DEFAULT_SCROLL_DY = 400
 NAVIGATE_TIMEOUT_MS = 15_000
 SELECTOR_TIMEOUT_MS = 5_000
 SCREENSHOT_QUALITY = 40
+MAX_LIVE_FRAME_CHARS = 400_000
+
+# Public research may search, follow ordinary listing links, and apply benign
+# filters. It must never use the anonymous worker as a submission, contact,
+# credential, or deletion channel. The server performs a first-pass policy
+# check; this worker repeats it after inspecting the actual target element.
+_SENSITIVE_TARGET_RE = re.compile(
+    r"\b(?:submit|buy|purchase|checkout|pay|payment|order|book|confirm|send|reply|"
+    r"post|publish|subscribe|sign[ -]?up|register|apply|donate|delete|remove|"
+    r"cancel|contact|request|inquire|wire|transfer)\b",
+    re.IGNORECASE,
+)
 
 # document.querySelectorAll target for read_dom's interactive-element scan —
 # identical to extension/lib/executor.js's READ_DOM_SELECTOR.
@@ -115,7 +119,7 @@ _READ_DOM_JS = (
     'const hasHref = isLink && el.hasAttribute("href"); '
     "const kind = explicitRole || "
     '(isLink && !hasHref ? "link (no href — interactive)" : el.tagName.toLowerCase()); '
-    "const name = (labelFor(el) || el.getAttribute(\"aria-label\") || "
+    'const name = (labelFor(el) || el.getAttribute("aria-label") || '
     '(el.innerText || "").trim() || el.getAttribute("placeholder") || '
     'el.getAttribute("value") || "").trim().slice(0, 60); '
     "return name ? `${kind}: ${name}` : kind; "
@@ -360,6 +364,62 @@ async def _do_wait(
     return {"ok": True, "summary": f"Waited {ms}ms"}
 
 
+async def _headless_action_allowed(action: dict[str, Any], page: Any) -> tuple[bool, str]:
+    """Defence-in-depth policy for the anonymous public-web worker.
+
+    Selector text is not enough: inspect the rendered target before a click
+    or type. This intentionally permits search/filter interactions while
+    refusing submission/contact/payment/credential targets.
+    """
+    action_type = action.get("type")
+    if action_type in {"press", "type"}:
+        return False, "Typing and key presses are not available in the cloud research browser."
+    if action_type == "click" and not action.get("selector"):
+        return False, "Coordinate clicks are not available in the cloud research browser."
+    if action_type != "click":
+        return True, ""
+
+    try:
+        target = await page.locator(action["selector"]).evaluate(
+            """el => ({
+              tag: el.tagName.toLowerCase(),
+              type: (el.getAttribute('type') || '').toLowerCase(),
+              text: [el.innerText, el.getAttribute('aria-label'), el.getAttribute('name'),
+                el.getAttribute('placeholder'), el.getAttribute('value'), el.id, el.className,
+                el.getAttribute('role')].filter(Boolean).join(' '),
+              hasForm: Boolean(el.closest('form')),
+              formAction: el.closest('form')?.getAttribute('action') || '',
+              href: el.getAttribute('href') || '',
+              download: el.hasAttribute('download')
+            })"""
+        )
+    except Exception:
+        return False, "The target could not be inspected safely. Read the page and try again."
+    if not isinstance(target, dict):
+        return False, "The target could not be inspected safely."
+    descriptor = (
+        f"{action.get('selector', '')} "
+        + " ".join(str(target.get(k, "")) for k in ("type", "text", "formAction", "href"))
+    ).lower()
+    if _SENSITIVE_TARGET_RE.search(descriptor):
+        return False, "That target could submit, contact, pay, publish, or change data."
+    if target.get("type") in {"password", "file", "hidden", "submit", "image", "reset", "button"}:
+        return False, "That target is not a public-research control."
+    if target.get("tag") != "a" or target.get("hasForm") or target.get("download"):
+        return False, "Form controls are not available in the cloud research browser."
+    href = str(target.get("href") or "")
+    if not href.startswith(("http://", "https://")):
+        return (
+            False,
+            "Only ordinary public http(s) links are available in the cloud research browser.",
+        )
+    # Do not dispatch page click handlers. Convert the inspected ordinary link
+    # into a navigation, which is revalidated against the public URL policy.
+    action.clear()
+    action.update({"type": "navigate", "url": href})
+    return True, ""
+
+
 # ── entrypoint ───────────────────────────────────────────────────────────
 
 
@@ -420,6 +480,17 @@ HttpPost = Callable[[str, dict[str, Any], dict[str, str]], Awaitable[dict[str, A
 
 IDLE_POLL_DELAY_S = 1.5
 ERROR_POLL_DELAY_S = 4.0
+IDLE_AUTO_STOP_SECONDS = 60.0
+# A worker lease is deliberately short.  An action may be a 15 second
+# navigation, so do not leave Stop/lease revocation queued behind it: while an
+# action is running we send an empty, fenced poll at this cadence.  The server
+# refuses to dispatch a second action for the same running lease, preserving
+# FIFO; it may only renew the lease or return stop=true.
+ACTIVE_ACTION_POLL_INTERVAL_S = 2.0
+# A broken control plane must not burn the Modal function's 15 minute wall
+# clock.  Three consecutive failures is long enough for one transient blip but
+# short enough to let the database lease expire and a later worker recover.
+MAX_CONSECUTIVE_POLL_ERRORS = 3
 
 
 async def _default_http_post(
@@ -453,11 +524,36 @@ async def _default_browser_factory():
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         try:
-            page = await browser.new_page()
+            # New context per worker: no persisted cookies, storage, or
+            # cross-customer session material ever enters this browser.
+            context = await browser.new_context(accept_downloads=False, service_workers="block")
+            page = await context.new_page()
+
+            async def route_public_requests(route: Any) -> None:
+                url = route.request.url
+                if route.request.method not in {"GET", "HEAD", "OPTIONS"}:
+                    await route.abort()
+                    return
+                parsed = urlparse(url)
+                if parsed.scheme in ("data", "blob", "about"):
+                    await route.continue_()
+                    return
+                try:
+                    await _assert_public_http_url(url, _default_resolve_addr)
+                except ValueError:
+                    await route.abort()
+                    return
+                await route.continue_()
+
+            # Guard every document, redirect, script, image, and XHR request;
+            # checking only the initial goto leaves redirect/subresource SSRF
+            # and DNS-rebinding paths open.
+            await context.route("**/*", route_public_requests)
             try:
                 yield page
             finally:
                 await page.close()
+                await context.close()
         finally:
             await browser.close()
 
@@ -467,6 +563,10 @@ async def _capture_frame(page: Any) -> dict[str, Any] | None:
     raises; a failed capture just means this poll rides without one."""
     result = await _do_screenshot({}, page)
     if not result.get("ok"):
+        return None
+    if len(result["screenshot"]) > MAX_LIVE_FRAME_CHARS:
+        # Monitoring must never make the heartbeat fail schema validation.
+        # Omit an oversized frame; the next compressed capture can recover.
         return None
     frame: dict[str, Any] = {"image": result["screenshot"]}
     info = await _safe_page_info(page)
@@ -481,6 +581,7 @@ async def poll_and_execute(
     base_url: str,
     internal_secret: str,
     session_id: str,
+    worker_lease_token: str = "",
     *,
     http_post: HttpPost | None = None,
     browser_factory: Callable[[], Any] | None = None,
@@ -488,6 +589,8 @@ async def poll_and_execute(
     resolve_addr: ResolveAddr | None = None,
     idle_delay_s: float = IDLE_POLL_DELAY_S,
     error_delay_s: float = ERROR_POLL_DELAY_S,
+    active_action_poll_interval_s: float = ACTIVE_ACTION_POLL_INTERVAL_S,
+    max_consecutive_poll_errors: int = MAX_CONSECUTIVE_POLL_ERRORS,
     max_iterations: int | None = None,
 ) -> dict[str, Any]:
     """Long-poll `{base_url}/api/browser-control/headless/poll` for the next
@@ -504,15 +607,23 @@ async def poll_and_execute(
     and rely on the server's `stop` signal.
 
     Never raises out of the polling body: a poll transport error is treated
-    like a transient hiccup (bounded retry via `error_delay_s` /
-    `max_iterations`, never a crash) and always reported in the return
-    value's `stopped_reason` rather than propagating.
+    like a transient hiccup, but a short consecutive-error threshold ends the
+    worker instead of burning its 15-minute Modal wall clock.  While an action
+    is running, the same fenced endpoint is polled at most two seconds apart;
+    `stop=true`, a revoked lease, a protocol violation, or that error threshold
+    cancels the in-flight task and deliberately does not emit a late
+    completion.
 
     Returns `{"stopped_reason": str, "actions_executed": int}`.
     """
     post = http_post or _default_http_post
     factory = browser_factory or _default_browser_factory
     sleep_fn = sleep or _default_sleep
+
+    if active_action_poll_interval_s <= 0:
+        raise ValueError("active_action_poll_interval_s must be positive")
+    if max_consecutive_poll_errors < 1:
+        raise ValueError("max_consecutive_poll_errors must be at least 1")
 
     poll_url = f"{base_url.rstrip('/')}/api/browser-control/headless/poll"
     headers = {
@@ -525,6 +636,35 @@ async def poll_and_execute(
     completed: dict[str, Any] | None = None
     frame: dict[str, Any] | None = None
     iterations = 0
+    idle_seconds = 0.0
+    consecutive_poll_errors = 0
+
+    async def run_action(action_input: dict[str, Any]) -> dict[str, Any]:
+        """Keep policy evaluation and execution in the cancellable task.
+
+        A Stop that arrives during either phase wins.  `execute_action` turns
+        ordinary browser exceptions into a result; this wrapper is only here
+        to keep the cancellation boundary exact and to contain an unexpected
+        policy-check exception as an ordinary failed action.
+        """
+        try:
+            allowed, reason = await _headless_action_allowed(action_input, page)
+            if not allowed:
+                return {"ok": False, "error": reason}
+            return await execute_action(
+                action_input, page, sleep=sleep_fn, resolve_addr=resolve_addr
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            return {"ok": False, "error": str(exc) or repr(exc)}
+
+    async def cancel_action(task: asyncio.Task[dict[str, Any]]) -> None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     async with factory() as page:
         while True:
@@ -534,6 +674,8 @@ async def poll_and_execute(
                 break
 
             body: dict[str, Any] = {"sessionId": session_id}
+            if worker_lease_token:
+                body["workerLeaseToken"] = worker_lease_token
             if completed is not None:
                 body["completed"] = completed
             if frame is not None:
@@ -544,9 +686,15 @@ async def poll_and_execute(
             try:
                 poll = await post(poll_url, body, headers)
             except Exception as exc:
+                consecutive_poll_errors += 1
+                if consecutive_poll_errors >= max_consecutive_poll_errors:
+                    stop_reason = "poll_error_threshold"
+                    break
                 stop_reason = f"poll_error: {exc}"
                 await sleep_fn(error_delay_s)
                 continue
+
+            consecutive_poll_errors = 0
 
             if poll.get("stop"):
                 stop_reason = "stop"
@@ -554,14 +702,66 @@ async def poll_and_execute(
 
             action = poll.get("action")
             if not action:
+                idle_seconds += idle_delay_s
+                if idle_seconds >= IDLE_AUTO_STOP_SECONDS:
+                    stop_reason = "idle_timeout"
+                    break
                 stop_reason = "idle"
                 await sleep_fn(idle_delay_s)
                 continue
 
+            idle_seconds = 0.0
+
             action_input = action.get("input") or {}
-            result = await execute_action(
-                action_input, page, sleep=sleep_fn, resolve_addr=resolve_addr
-            )
+            action_task = asyncio.create_task(run_action(action_input))
+            action_cancelled = False
+
+            # Keep the durable lease alive while a navigation or selector
+            # action is in progress.  The SQL poll guard will return no new
+            # action for this lease, so this cannot break FIFO or dispatch two
+            # browser operations at once.
+            while not action_task.done():
+                await asyncio.wait({action_task}, timeout=active_action_poll_interval_s)
+                if action_task.done():
+                    break
+
+                active_body: dict[str, Any] = {"sessionId": session_id}
+                if worker_lease_token:
+                    active_body["workerLeaseToken"] = worker_lease_token
+                try:
+                    active_poll = await post(poll_url, active_body, headers)
+                except Exception:
+                    consecutive_poll_errors += 1
+                    if consecutive_poll_errors >= max_consecutive_poll_errors:
+                        await cancel_action(action_task)
+                        stop_reason = "poll_error_threshold"
+                        action_cancelled = True
+                        break
+                    continue
+
+                consecutive_poll_errors = 0
+                if active_poll.get("stop"):
+                    await cancel_action(action_task)
+                    stop_reason = "stop"
+                    action_cancelled = True
+                    break
+
+                # The database function must never hand a second action to an
+                # active lease.  Treat it as a control-plane violation rather
+                # than risking concurrent browser side effects.
+                if active_poll.get("action"):
+                    await cancel_action(action_task)
+                    stop_reason = "unexpected_action_while_running"
+                    action_cancelled = True
+                    break
+
+            if action_cancelled:
+                # Do NOT report `completed`: cancellation/revocation is
+                # authoritative, and a late result could resurrect a stopped
+                # action or corrupt the next owner's lease state.
+                break
+
+            result = await action_task
             actions_executed += 1
             completed = {"actionId": action.get("id"), "result": result}
             frame = await _capture_frame(page)
@@ -569,34 +769,5 @@ async def poll_and_execute(
     return {"stopped_reason": stop_reason, "actions_executed": actions_executed}
 
 
-# ── Modal wiring (NOT wired in — deploy/integrator step) ───────────────────
-#
-# This module is deliberately NOT imported by agent/modal_app.py. Wiring a
-# headless session into Modal needs, at minimum:
-#
-#   1. Extending `image` in modal_app.py with the playwright dependency and
-#      browser install:
-#
-#        headless_image = image.pip_install("playwright>=1.45,<2").run_commands(
-#            "playwright install --with-deps chromium"
-#        )
-#
-#   2. An @app.function bound to that image that runs one session to
-#      completion (or until `stop`):
-#
-#        @app.function(image=headless_image, timeout=900, secrets=[...])
-#        async def run_headless_browser_session(session_id: str) -> dict:
-#            from browser_headless import poll_and_execute
-#            from config import settings
-#            return await poll_and_execute(
-#                base_url=settings.app_url,
-#                internal_secret=settings.agent_internal_secret,
-#                session_id=session_id,
-#            )
-#
-#   3. Something on the Chippi side (Track B / integrator) that spawns it —
-#      e.g. `run_headless_browser_session.spawn(session_id)` — when a
-#      BrowserSession is created with `source = 'headless'`.
-#
-# None of the above is implemented here; this file only provides the pure
-# executor + the injectable worker loop that such a function would call.
+# Modal wiring lives in agent/modal_app.py. This module remains independently
+# testable because poll_and_execute accepts injected transport/browser fakes.

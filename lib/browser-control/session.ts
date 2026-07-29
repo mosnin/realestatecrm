@@ -31,9 +31,14 @@ export interface BrowserSessionRow {
   startedAt: string;
   endedAt: string | null;
   lastPolledAt?: string | null;
+  /** Present only for a feature-on cloud research worker. Never exposed to clients. */
+  workerLeaseExpiresAt?: string | null;
+  workerStartedAt?: string | null;
+  workerFinishedAt?: string | null;
+  workerLastError?: string | null;
 }
 
-const SESSION_COLUMNS = 'id, spaceId, userId, linkId, status, source, startedAt, endedAt, lastPolledAt';
+const SESSION_COLUMNS = 'id, spaceId, userId, linkId, status, source, startedAt, endedAt, lastPolledAt, workerLeaseExpiresAt, workerStartedAt, workerFinishedAt, workerLastError';
 
 /** What GET /frame returns for a live session's latest pushed viewport frame. */
 export interface LatestFrame {
@@ -101,6 +106,32 @@ export async function getActiveSession(
   const row = (data as BrowserSessionRow) ?? null;
   if (!row) return null;
 
+  if (isSessionStale(row)) {
+    await endSession(row.id, { spaceId });
+    return null;
+  }
+  return row;
+}
+
+/** Exact personal-browser lookup. A cloud research session must never mask a
+ * usable paired extension for login-required or explicit browser control. */
+export async function getActiveExtensionSession(
+  spaceId: string,
+  userId: string,
+): Promise<BrowserSessionRow | null> {
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select(SESSION_COLUMNS)
+    .eq('spaceId', spaceId)
+    .eq('userId', userId)
+    .eq('source', 'extension')
+    .eq('status', 'active')
+    .order('startedAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const row = (data as BrowserSessionRow) ?? null;
+  if (!row) return null;
   if (isSessionStale(row)) {
     await endSession(row.id, { spaceId });
     return null;
@@ -253,41 +284,116 @@ export async function startHeadlessSession(opts: {
     await endSession(existing.id, { spaceId: opts.spaceId });
   }
 
-  const id = crypto.randomUUID();
+  // The partial unique index introduced with the Research Workspace prevents
+  // duplicate active cloud sessions.  Do the create-or-reuse decision in the
+  // database so simultaneous tool calls cannot each launch a Chromium worker.
+  const requestedId = crypto.randomUUID();
   const startedAt = new Date().toISOString();
-  const { error: insertErr } = await supabase.from('BrowserSession').insert({
-    id,
-    spaceId: opts.spaceId,
-    userId: opts.userId,
-    linkId: null,
-    status: 'active',
-    source: 'headless',
-    startedAt,
+  const { data: sessionId, error: startError } = await supabase.rpc('start_headless_browser_session', {
+    p_space_id: opts.spaceId,
+    p_user_id: opts.userId,
+    p_session_id: requestedId,
+    p_started_at: startedAt,
   });
-  if (insertErr) throw insertErr;
+  if (startError) throw startError;
+  if (typeof sessionId !== 'string' || !sessionId) {
+    throw new Error('Unable to start the cloud research session.');
+  }
 
-  return {
-    id,
-    spaceId: opts.spaceId,
-    userId: opts.userId,
-    linkId: null,
-    status: 'active',
-    source: 'headless',
-    startedAt,
-    endedAt: null,
-  };
+  const { data: created, error: lookupError } = await supabase
+    .from('BrowserSession')
+    .select(SESSION_COLUMNS)
+    .eq('id', sessionId)
+    .eq('spaceId', opts.spaceId)
+    .eq('userId', opts.userId)
+    .eq('source', 'headless')
+    .eq('status', 'active')
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!created) {
+    throw new Error('The cloud research session was not available after it started.');
+  }
+  return created as BrowserSessionRow;
 }
 
 /** End a headless session. Scoped by source='headless' too, so this can never
  *  accidentally tear down an extension-driven session by id collision. */
 export async function endHeadlessSession(sessionId: string, opts: { spaceId: string }): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabase.rpc('stop_headless_browser_session', {
+    p_session_id: sessionId,
+    p_space_id: opts.spaceId,
+    p_reason: 'Cloud research session stopped.',
+  });
+  if (error) throw error;
+}
+
+/** Exact lookup for the cloud workspace Stop control. Unlike getActiveSession,
+ * this is not masked when the user reconnects their personal extension. */
+export async function getActiveHeadlessSession(
+  spaceId: string,
+  userId: string,
+): Promise<BrowserSessionRow | null> {
+  const { data, error } = await supabase
     .from('BrowserSession')
-    .update({ status: 'ended', endedAt: new Date().toISOString() })
+    .select(SESSION_COLUMNS)
+    .eq('spaceId', spaceId)
+    .eq('userId', userId)
+    .eq('source', 'headless')
+    .eq('status', 'active')
+    .order('startedAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as BrowserSessionRow) ?? null;
+}
+
+/** Latest exact cloud workspace row, including a terminal result, for the
+ * Research panel's honest lifecycle state. */
+export async function getLatestHeadlessSession(
+  spaceId: string,
+  userId: string,
+): Promise<BrowserSessionRow | null> {
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select(SESSION_COLUMNS)
+    .eq('spaceId', spaceId)
+    .eq('userId', userId)
+    .eq('source', 'headless')
+    .order('startedAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as BrowserSessionRow) ?? null;
+}
+
+export async function getLatestHeadlessFrame(spaceId: string, userId: string): Promise<{ sessionId: string; frame: LatestFrame } | null> {
+  const session = await getActiveHeadlessSession(spaceId, userId);
+  if (!session) return null;
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select('lastFrame, lastFrameAt')
+    .eq('id', session.id)
+    .eq('spaceId', spaceId)
+    .eq('source', 'headless')
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as { lastFrame: LiveFrame | null; lastFrameAt: string | null } | null;
+  if (!row?.lastFrame || !row.lastFrameAt) return null;
+  return { sessionId: session.id, frame: { image: row.lastFrame.image, pageUrl: row.lastFrame.pageUrl, pageTitle: row.lastFrame.pageTitle, at: row.lastFrameAt } };
+}
+
+export async function getHeadlessSessionForUser(sessionId: string, opts: { spaceId: string; userId: string }): Promise<BrowserSessionRow | null> {
+  const { data, error } = await supabase
+    .from('BrowserSession')
+    .select(SESSION_COLUMNS)
     .eq('id', sessionId)
     .eq('spaceId', opts.spaceId)
-    .eq('source', 'headless');
+    .eq('userId', opts.userId)
+    .eq('source', 'headless')
+    .eq('status', 'active')
+    .maybeSingle();
   if (error) throw error;
+  return (data as BrowserSessionRow) ?? null;
 }
 
 /**
@@ -314,6 +420,82 @@ export async function getHeadlessSessionById(sessionId: string): Promise<Browser
 }
 
 /**
+ * Atomically take the right to launch the one cloud worker for a headless
+ * session. A caller that loses the claim must not start a second Chromium
+ * process. The migration backs this with a fenced RPC rather than a racy
+ * read-then-write sequence.
+ */
+export async function claimHeadlessWorkerLaunch(opts: {
+  sessionId: string;
+  leaseToken: string;
+  leaseSeconds?: number;
+}): Promise<boolean> {
+  const { data, error } = await supabase.rpc('claim_headless_browser_worker', {
+    p_session_id: opts.sessionId,
+    p_lease_token: opts.leaseToken,
+    p_lease_seconds: opts.leaseSeconds ?? 30,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/** Renew a fenced lease; false means a stop, expiry, or newer worker won. */
+export async function renewHeadlessWorkerLease(opts: {
+  sessionId: string;
+  leaseToken: string;
+  leaseSeconds?: number;
+}): Promise<boolean> {
+  const { data, error } = await supabase.rpc('renew_headless_browser_worker_lease', {
+    p_session_id: opts.sessionId,
+    p_lease_token: opts.leaseToken,
+    p_lease_seconds: opts.leaseSeconds ?? 30,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/** Best-effort terminal bookkeeping. A timeout/crash is recovered by expiry. */
+export async function finishHeadlessWorker(opts: {
+  sessionId: string;
+  leaseToken: string;
+  error?: string;
+}): Promise<boolean> {
+  const { data, error } = await supabase.rpc('finish_headless_browser_worker', {
+    p_session_id: opts.sessionId,
+    p_lease_token: opts.leaseToken,
+    p_error: opts.error ?? null,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+/** Atomic fenced poll: only the current lease can complete prior work, record
+ * a frame, expire stale entries, and claim the next FIFO action. */
+export async function pollHeadlessWorker(opts: {
+  sessionId: string;
+  leaseToken: string;
+  completed?: { actionId: string; result: BrowserActionResult };
+  frame?: LiveFrame;
+}): Promise<{ stop: boolean; action: { id: string; sessionId: string; input: BrowserActionInput } | null }> {
+  const { data, error } = await supabase.rpc('poll_headless_browser_worker', {
+    p_session_id: opts.sessionId,
+    p_lease_token: opts.leaseToken,
+    p_completed_action_id: opts.completed?.actionId ?? null,
+    p_completed_result: opts.completed?.result ?? null,
+    p_frame: opts.frame ?? null,
+  });
+  if (error) throw error;
+  const result = data as { stop?: unknown; action?: unknown } | null;
+  if (!result || typeof result.stop !== 'boolean') throw new Error('Invalid cloud research worker poll response.');
+  return {
+    stop: result.stop,
+    action: result.action && typeof result.action === 'object'
+      ? result.action as { id: string; sessionId: string; input: BrowserActionInput }
+      : null,
+  };
+}
+
+/**
  * Record the result the headless worker posted for an action it just
  * finished. Verifies the action actually belongs to THIS headless session
  * before writing — mirrors recordActionResult's link check, just without a
@@ -337,7 +519,7 @@ export async function recordHeadlessActionResult(
   const row = action as { id: string; sessionId: string };
   if (row.sessionId !== opts.sessionId) return; // belongs to a different session — ignore
 
-  const { error: updateErr } = await supabase
+  const { data: updated, error: updateErr } = await supabase
     .from('BrowserAction')
     .update({
       status: result.ok ? 'done' : 'error',
@@ -345,8 +527,12 @@ export async function recordHeadlessActionResult(
       completedAt: new Date().toISOString(),
     })
     .eq('id', row.id)
-    .eq('spaceId', opts.spaceId);
+    .eq('spaceId', opts.spaceId)
+    .eq('status', 'running')
+    .select('id')
+    .maybeSingle();
   if (updateErr) throw updateErr;
+  if (!updated) return;
 }
 
 // ── Screencast frame + liveness heartbeat ───────────────────────────────────
@@ -372,7 +558,8 @@ export async function recordPollHeartbeat(
     .from('BrowserSession')
     .update(update)
     .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId);
+    .eq('spaceId', opts.spaceId)
+    .eq('status', 'active');
   if (error) throw error;
 }
 
@@ -422,6 +609,40 @@ export async function enqueueAction(opts: {
   const session = await getActiveSession(opts.spaceId, opts.userId);
   if (!session) return { error: 'no_session' };
 
+  return enqueueActionForSession({ ...opts, sessionId: session.id });
+}
+
+/**
+ * Queue work against the exact runtime session chosen by resolveBrowserRuntime.
+ * This closes the resolve→enqueue race where an extension could reconnect
+ * between calls and silently receive a cloud-research action (or vice versa).
+ */
+export async function enqueueActionForSession(opts: {
+  spaceId: string;
+  userId: string;
+  sessionId: string;
+  input: BrowserActionInput;
+}): Promise<{ actionId: string } | { error: string }> {
+  const { data: session, error: sessionError } = await supabase
+    .from('BrowserSession')
+    .select('id, source')
+    .eq('id', opts.sessionId)
+    .eq('spaceId', opts.spaceId)
+    .eq('userId', opts.userId)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (sessionError) throw sessionError;
+  if (!session) return { error: 'no_session' };
+  const sessionRow = session as { id: string; source: BrowserSessionSource };
+  // Durable defense-in-depth: tool callers are not the authority. The
+  // anonymous headless queue never accepts typing, key presses, or blind
+  // coordinate clicks; the worker applies the stricter inspected-link policy.
+  if (sessionRow.source === 'headless' && (
+    opts.input.type === 'type'
+    || opts.input.type === 'press'
+    || (opts.input.type === 'click' && opts.input.selector == null)
+  )) return { error: 'headless_action_blocked' };
+
   if (opts.input.type === 'navigate') {
     try {
       await assertPublicHttpUrl(opts.input.url);
@@ -434,7 +655,7 @@ export async function enqueueAction(opts: {
   const { error } = await supabase.from('BrowserAction').insert({
     id,
     spaceId: opts.spaceId,
-    sessionId: session.id,
+    sessionId: opts.sessionId,
     type: opts.input.type,
     params: opts.input,
     status: 'queued',
@@ -520,13 +741,16 @@ export async function dispatchNextAction(
   if (!data) return null;
 
   const row = data as { id: string; sessionId: string; type: string; params: BrowserActionInput };
-  const { error: updateErr } = await supabase
+  const { data: claimed, error: updateErr } = await supabase
     .from('BrowserAction')
     .update({ status: 'running', dispatchedAt: new Date().toISOString() })
     .eq('id', row.id)
     .eq('spaceId', opts.spaceId)
-    .eq('status', 'queued'); // only claim it if still queued (guards a racing second poll)
+    .eq('status', 'queued') // only claim it if still queued (guards a racing second poll)
+    .select('id')
+    .maybeSingle();
   if (updateErr) throw updateErr;
+  if (!claimed) return null;
 
   return { id: row.id, sessionId: row.sessionId, input: row.params };
 }

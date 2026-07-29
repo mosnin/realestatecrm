@@ -84,6 +84,8 @@ import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
 import { isWorkbookAttachment } from '@/lib/chippi/workbench-store';
 import { isExplicitWorkbenchIntent, isWorkbookTransformIntent } from '@/lib/chippi/workbench-intent';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
+import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -887,8 +889,10 @@ export async function POST(req: NextRequest) {
   // id is missing or foreign. In that case the prompt asks the user to reopen
   // a workbook rather than silently falling back to legacy Modal tools.
   const workbookTransformRequested = requestedWorkbookTransform;
+  const researchWorkspaceRequested =
+    isResearchWorkspaceEnabledForSpace(ctx.space.id) && isResearchWorkspaceIntent(message);
   const route =
-    workbenchRequested || workbookTransformRequested || explicitMode === 'agent'
+    workbenchRequested || workbookTransformRequested || researchWorkspaceRequested || explicitMode === 'agent'
       ? 'agent'
       : explicitMode === 'chat' && heuristicRoute === 'direct'
         ? 'direct'
@@ -971,7 +975,8 @@ export async function POST(req: NextRequest) {
   // exist. This is feature-gated and only narrows requests that explicitly ask
   // to open this turn's uploaded spreadsheet.
   const requiresTsWorkbenchTool = workbenchRequested || workbookTransformRequested;
-  if (route === 'agent' && !requiresTsWorkbenchTool && (forcedModal || perMessageModal)) {
+  const requiresTsNativeTool = requiresTsWorkbenchTool || researchWorkspaceRequested;
+  if (route === 'agent' && !requiresTsNativeTool && (forcedModal || perMessageModal)) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
       ctx,
