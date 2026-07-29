@@ -16,7 +16,7 @@ from agents import Agent, ModelSettings, Runner
 from openai import AsyncOpenAI
 
 from config import settings
-from db import supabase as get_supabase
+from db import get_pool, supabase as get_supabase
 from ledger import record_chat_usage
 from llm import (
     CostTrackingClient,
@@ -39,6 +39,25 @@ logger = structlog.get_logger(__name__)
 # before planning is enough — a swarm that can't afford to plan can't afford
 # to run.
 _SWARM_DAILY_TOKEN_BUDGET = 50_000
+
+# Hard execution bounds. These are enforced on planner output before any
+# SwarmMember row or model call is created; the planner prompt is not trusted
+# as a capability boundary. Worker Agents receive no tools and therefore
+# cannot delegate again: the maximum child depth is exactly one.
+SWARM_MIN_MEMBERS = 2
+SWARM_MAX_MEMBERS = 6
+SWARM_MAX_CONCURRENT_MEMBERS = 6
+SWARM_MAX_CHILD_DEPTH = 1
+_ACTIVE_RUN_STATUSES = ("queued", "planning", "running", "auditing")
+
+
+def validate_swarm_runtime() -> None:
+    """Fail before planning or model spend when atomic DB transitions are unavailable."""
+    if not settings.database_url:
+        raise RuntimeError(
+            "Swarm runtime unavailable: DATABASE_URL is required for atomic specialist "
+            "transitions. No specialist was started."
+        )
 
 
 def _usage_from_completion(response: object) -> tuple[int, int, int, float | None]:
@@ -84,6 +103,216 @@ async def emit_event(db, swarm_run_id: str, event_type: str, data: dict, member_
     if member_id:
         row["memberId"] = member_id
     await db.table("SwarmEvent").insert(row).execute()
+
+
+def normalize_swarm_plan(plan: dict, goal: str) -> dict:
+    """Clamp untrusted planner output to the product's deterministic bounds."""
+    raw_tasks = plan.get("tasks") if isinstance(plan, dict) else None
+    tasks = [task for task in (raw_tasks or []) if isinstance(task, dict)]
+    tasks = tasks[:SWARM_MAX_MEMBERS]
+
+    while len(tasks) < SWARM_MIN_MEMBERS:
+        index = len(tasks) + 1
+        tasks.append(
+            {
+                "name": f"Specialist {index}",
+                "role": "Independent specialist",
+                "task": (
+                    "Investigate a distinct part of this goal and return concise, "
+                    f"actionable findings: {goal}"
+                ),
+                "agentIndex": -1,
+                "wave": 1,
+            }
+        )
+
+    normalized_tasks = []
+    for index, task in enumerate(tasks):
+        raw_wave = task.get("wave", 1)
+        try:
+            wave = int(raw_wave)
+        except (TypeError, ValueError):
+            wave = 1
+        normalized_tasks.append(
+            {
+                **task,
+                "name": str(task.get("name") or f"Specialist {index + 1}"),
+                "role": str(task.get("role") or "Independent specialist"),
+                "task": str(task.get("task") or goal),
+                "wave": 2 if wave == 2 else 1,
+            }
+        )
+
+    return {
+        "tasks": normalized_tasks,
+        "rationale": str(plan.get("rationale") or "") if isinstance(plan, dict) else "",
+        "executionBounds": {
+            "maxConcurrentMembers": SWARM_MAX_CONCURRENT_MEMBERS,
+            "maxChildDepth": SWARM_MAX_CHILD_DEPTH,
+        },
+    }
+
+
+async def _run_status(db, swarm_run_id: str) -> str | None:
+    result = await (
+        db.table("SwarmRun")
+        .select("status")
+        .eq("id", swarm_run_id)
+        .maybe_single()
+        .execute()
+    )
+    if not isinstance(result.data, dict):
+        return None
+    status = result.data.get("status")
+    return status if isinstance(status, str) else None
+
+
+async def _run_is_cancelled(db, swarm_run_id: str) -> bool:
+    return await _run_status(db, swarm_run_id) == "cancelled"
+
+
+async def _publish_member_transition_if_parent_active(
+    swarm_run_id: str,
+    member_id: str,
+    *,
+    member_status: str,
+    allowed_member_statuses: tuple[str, ...],
+    event_type: str,
+    event_data: dict,
+    started_at: datetime | None = None,
+    completed_at: datetime | None = None,
+    output: str | None = None,
+    set_output: bool = False,
+) -> bool:
+    """Atomically transition a member and publish its event under a parent lock.
+
+    The parent row is locked and required to still be ``running`` in the same
+    SQL statement as the member update and event insert. Cancellation either
+    wins first (no member/event write) or waits for this transition to commit,
+    after which the transition is truthfully ordered before cancellation.
+    """
+    pool = await get_pool()
+    sql = """
+        WITH active_run AS MATERIALIZED (
+          SELECT "id"
+          FROM "SwarmRun"
+          WHERE "id" = $1
+            AND "status" = ANY($2::text[])
+          FOR UPDATE
+        ),
+        updated_member AS (
+          UPDATE "SwarmMember" AS member
+          SET "status" = $4,
+              "startedAt" = COALESCE($6::timestamptz, member."startedAt"),
+              "completedAt" = COALESCE($7::timestamptz, member."completedAt"),
+              "output" = CASE WHEN $8 THEN $9 ELSE member."output" END
+          FROM active_run
+          WHERE member."id" = $3
+            AND member."swarmRunId" = active_run."id"
+            AND member."status" = ANY($5::text[])
+          RETURNING member."id"
+        )
+        INSERT INTO "SwarmEvent" ("swarmRunId", "memberId", "type", "data")
+        SELECT $1, updated_member."id", $10, $11::jsonb
+        FROM updated_member
+        RETURNING "id"
+    """
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            sql,
+            swarm_run_id,
+            ("running",),
+            member_id,
+            member_status,
+            list(allowed_member_statuses),
+            started_at,
+            completed_at,
+            set_output,
+            output,
+            event_type,
+            event_data,
+        )
+    return row is not None
+
+
+async def _transition_active_run(
+    db,
+    swarm_run_id: str,
+    payload: dict,
+    allowed_statuses: tuple[str, ...] = _ACTIVE_RUN_STATUSES,
+) -> bool:
+    """Conditionally update a live run without overwriting cancellation."""
+    result = await (
+        db.table("SwarmRun")
+        .update(payload)
+        .eq("id", swarm_run_id)
+        .in_("status", allowed_statuses)
+        .execute()
+    )
+    return bool(result.data)
+
+
+async def _run_members_bounded(db, swarm_run_id: str, members: list[dict], space_id: str) -> None:
+    """Execute one wave with an explicit, deterministic concurrency ceiling."""
+    semaphore = asyncio.Semaphore(SWARM_MAX_CONCURRENT_MEMBERS)
+
+    async def run_bounded(member: dict) -> None:
+        async with semaphore:
+            await run_member(db, swarm_run_id, member, space_id)
+
+    results = await asyncio.gather(
+        *[run_bounded(member) for member in members],
+        return_exceptions=True,
+    )
+    errors = [result for result in results if isinstance(result, BaseException)]
+    if errors:
+        raise RuntimeError(
+            f"{len(errors)} specialist execution(s) failed before publishing a terminal state"
+        )
+
+
+async def _persist_members_then_emit_plan(
+    db,
+    swarm_run_id: str,
+    plan: dict,
+    custom_agents: list[dict],
+    goal: str,
+) -> list[dict]:
+    """Persist the complete planned tree before announcing it to live clients."""
+    members = []
+    for task_def in plan.get("tasks", []):
+        if not isinstance(task_def, dict):
+            continue
+        raw_index = task_def.get("agentIndex", -1)
+        try:
+            agent_index = int(raw_index)
+        except (TypeError, ValueError):
+            agent_index = -1
+        agent_config = (
+            custom_agents[agent_index]
+            if 0 <= agent_index < len(custom_agents)
+            else None
+        )
+        member_row = {
+            "swarmRunId": swarm_run_id,
+            "customAgentId": agent_config["id"] if agent_config else None,
+            "name": task_def.get("name", "Specialist"),
+            "role": task_def.get("role", ""),
+            "systemPrompt": agent_config["systemPrompt"] if agent_config else "",
+            "task": task_def.get("task", goal),
+            "wave": task_def.get("wave", 1),
+            "status": "queued",
+        }
+        result = await db.table("SwarmMember").insert(member_row).execute()
+        members.append(result.data[0])
+
+    await emit_event(
+        db,
+        swarm_run_id,
+        "plan_created",
+        {"plan": plan, "taskCount": len(members), "membersReady": True},
+    )
+    return members
 
 
 async def plan_swarm(
@@ -153,37 +382,45 @@ Rules:
         plan = json.loads(plan_text)
         if not isinstance(plan, dict) or not isinstance(plan.get("tasks"), list) or not plan["tasks"]:
             raise ValueError("planner returned no tasks")
-        return plan
+        return normalize_swarm_plan(plan, goal)
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("swarm_plan_parse_failed", error=str(exc)[:200])
-        return {
-            "tasks": [
-                {
-                    "name": "Complete goal",
-                    "role": "General-purpose agent",
-                    "task": goal,
-                    "agentIndex": -1,
-                    "wave": 1,
-                }
-            ],
-            "rationale": "Planner output was unparseable; running goal as a single task.",
-        }
+        return normalize_swarm_plan(
+            {
+                "tasks": [
+                    {
+                        "name": "Complete goal",
+                        "role": "General-purpose agent",
+                        "task": goal,
+                        "agentIndex": -1,
+                        "wave": 1,
+                    }
+                ],
+                "rationale": "Planner output was unparseable; running goal as a single task.",
+            },
+            goal,
+        )
 
 
 async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None:
     """Run a single sub-agent and persist its output."""
     member_id = member["id"]
 
-    await db.table("SwarmMember").update({
-        "status": "running",
-        "startedAt": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", member_id).execute()
-
-    await emit_event(db, swarm_run_id, "agent_started", {
-        "name": member["name"],
-        "role": member.get("role", ""),
-        "task": member["task"],
-    }, member_id)
+    started = await _publish_member_transition_if_parent_active(
+        swarm_run_id,
+        member_id,
+        member_status="running",
+        allowed_member_statuses=("queued",),
+        event_type="agent_started",
+        event_data={
+            "name": member["name"],
+            "role": member.get("role", ""),
+            "task": member["task"],
+        },
+        started_at=datetime.now(timezone.utc),
+    )
+    if not started:
+        return
 
     try:
         system_prompt = member.get("systemPrompt") or (
@@ -202,11 +439,6 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
             model_settings=ModelSettings(max_tokens=2048),
         )
 
-        # Emit thinking event
-        await emit_event(db, swarm_run_id, "agent_thinking", {
-            "message": f"{member['name']} is working on: {member['task'][:100]}..."
-        }, member_id)
-
         result = await Runner.run(agent, member["task"], max_turns=8)
         output = result.final_output or "No output produced."
 
@@ -224,28 +456,31 @@ async def run_member(db, swarm_run_id: str, member: dict, space_id: str) -> None
             route="agent",
         )
 
-        await db.table("SwarmMember").update({
-            "status": "completed",
-            "output": output,
-            "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", member_id).execute()
-
-        await emit_event(db, swarm_run_id, "agent_completed", {
-            "name": member["name"],
-            "output": output,
-        }, member_id)
+        await _publish_member_transition_if_parent_active(
+            swarm_run_id,
+            member_id,
+            member_status="completed",
+            allowed_member_statuses=("running",),
+            event_type="agent_completed",
+            event_data={"name": member["name"], "output": output},
+            completed_at=datetime.now(timezone.utc),
+            output=output,
+            set_output=True,
+        )
 
     except Exception as exc:
         logger.error("swarm_member_failed", member_id=member_id, error=str(exc))
-        await db.table("SwarmMember").update({
-            "status": "failed",
-            "output": f"Error: {exc}",
-            "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", member_id).execute()
-        await emit_event(db, swarm_run_id, "agent_failed", {
-            "name": member["name"],
-            "error": str(exc),
-        }, member_id)
+        await _publish_member_transition_if_parent_active(
+            swarm_run_id,
+            member_id,
+            member_status="failed",
+            allowed_member_statuses=("running",),
+            event_type="agent_failed",
+            event_data={"name": member["name"], "error": str(exc)},
+            completed_at=datetime.now(timezone.utc),
+            output=f"Error: {exc}",
+            set_output=True,
+        )
 
 
 async def audit_results(goal: str, members: list[dict], client: AsyncOpenAI, space_id: str) -> str:
@@ -293,13 +528,17 @@ Format with markdown headers for readability."""
 
 async def run_swarm(payload: dict) -> None:
     """Main entry point called by the Modal endpoint."""
-    configure_agents_sdk()
+    validate_swarm_runtime()
     swarm_run_id: str = payload["swarmRunId"]
     goal: str = payload["goal"]
     space_id: str = payload["spaceId"]
     custom_agents: list[dict] = payload.get("customAgents", [])
 
+    # supabase() eagerly initializes the same DATABASE_URL-backed asyncpg pool
+    # used by atomic member transitions. Fail here before SDK setup, planning,
+    # member creation, or any billable model work.
     db = await get_supabase()
+    configure_agents_sdk()
     client = get_llm_client()
 
     # One swarm per space at a time. A double-submit to /api/swarm creates two
@@ -309,11 +548,13 @@ async def run_swarm(payload: dict) -> None:
     # each other. Fails open if Redis is unavailable.
     if not await acquire_swarm_lock(space_id, swarm_run_id):
         logger.warning("swarm_skipped_concurrent", swarm_run_id=swarm_run_id, space_id=space_id)
-        await db.table("SwarmRun").update({
+        changed = await _transition_active_run(db, swarm_run_id, {
             "status": "failed",
             "errorMessage": "Another swarm is already running for this workspace.",
             "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", swarm_run_id).execute()
+        })
+        if not changed:
+            return
         await emit_event(
             db, swarm_run_id, "swarm_failed",
             {"error": "Another swarm is already running for this workspace."},
@@ -335,11 +576,13 @@ async def run_swarm(payload: dict) -> None:
                 swarm_run_id=swarm_run_id,
                 space_id=space_id,
             )
-            await db.table("SwarmRun").update({
+            changed = await _transition_active_run(db, swarm_run_id, {
                 "status": "failed",
                 "errorMessage": "Daily token budget exhausted — swarm skipped.",
                 "completedAt": datetime.now(timezone.utc).isoformat(),
-            }).eq("id", swarm_run_id).execute()
+            })
+            if not changed:
+                return
             await emit_event(
                 db, swarm_run_id, "swarm_failed", {"error": "Daily token budget exhausted."}
             )
@@ -349,69 +592,46 @@ async def run_swarm(payload: dict) -> None:
             return
 
         # Planning phase
-        await db.table("SwarmRun").update({"status": "planning"}).eq("id", swarm_run_id).execute()
+        if not await _transition_active_run(
+            db, swarm_run_id, {"status": "planning"}, ("queued",)
+        ):
+            return
         await emit_event(db, swarm_run_id, "swarm_planning", {"message": "Analyzing goal and creating execution plan..."})
 
         plan = await plan_swarm(goal, custom_agents, client, space_id)
 
-        await db.table("SwarmRun").update({
+        if not await _transition_active_run(db, swarm_run_id, {
             "plan": plan,
             "status": "running",
-        }).eq("id", swarm_run_id).execute()
-        await emit_event(db, swarm_run_id, "plan_created", {"plan": plan, "taskCount": len(plan.get("tasks", []))})
-
-        # Create SwarmMember rows
-        members = []
-        for task_def in plan.get("tasks", []):
-            if not isinstance(task_def, dict):
-                continue
-            # The planning LLM (gpt-5-mini) routinely returns
-            # `agentIndex` as a string or null even though the prompt asks for
-            # an int — a comparison against len() then raises TypeError and
-            # the entire swarm run flips to 'failed'. Coerce defensively.
-            raw_index = task_def.get("agentIndex", -1)
-            try:
-                agent_index = int(raw_index)
-            except (TypeError, ValueError):
-                agent_index = -1
-            agent_config = (
-                custom_agents[agent_index]
-                if 0 <= agent_index < len(custom_agents)
-                else None
-            )
-            member_row = {
-                "swarmRunId": swarm_run_id,
-                "customAgentId": agent_config["id"] if agent_config else None,
-                "name": task_def.get("name", "Agent"),
-                "role": task_def.get("role", ""),
-                "systemPrompt": agent_config["systemPrompt"] if agent_config else "",
-                "task": task_def.get("task", goal),
-                "wave": task_def.get("wave", 1),
-                "status": "queued",
-            }
-            result = await db.table("SwarmMember").insert(member_row).execute()
-            members.append(result.data[0])
+        }, ("planning",)):
+            return
+        members = await _persist_members_then_emit_plan(
+            db, swarm_run_id, plan, custom_agents, goal
+        )
 
         # Run wave 1 in parallel. return_exceptions=True so one member whose
         # DB write escapes run_member's own handler can't cancel its siblings
         # mid-flight — each sub-agent stands or falls on its own.
         wave_1 = [m for m in members if m.get("wave", 1) == 1]
-        await asyncio.gather(
-            *[run_member(db, swarm_run_id, m, space_id) for m in wave_1],
-            return_exceptions=True,
-        )
+        await _run_members_bounded(db, swarm_run_id, wave_1, space_id)
+
+        if await _run_is_cancelled(db, swarm_run_id):
+            return
 
         # Run wave 2 if any (sequential after wave 1)
         wave_2 = [m for m in members if m.get("wave", 1) == 2]
         if wave_2:
             await emit_event(db, swarm_run_id, "wave_2_starting", {"agentCount": len(wave_2)})
-            await asyncio.gather(
-                *[run_member(db, swarm_run_id, m, space_id) for m in wave_2],
-                return_exceptions=True,
-            )
+            await _run_members_bounded(db, swarm_run_id, wave_2, space_id)
+
+        if await _run_is_cancelled(db, swarm_run_id):
+            return
 
         # Audit phase
-        await db.table("SwarmRun").update({"status": "auditing"}).eq("id", swarm_run_id).execute()
+        if not await _transition_active_run(
+            db, swarm_run_id, {"status": "auditing"}, ("running",)
+        ):
+            return
         await emit_event(db, swarm_run_id, "audit_started", {"message": "Synthesizing results..."})
 
         # Reload members with outputs
@@ -419,21 +639,26 @@ async def run_swarm(payload: dict) -> None:
         final_result = await audit_results(goal, members_result.data or [], client, space_id)
 
         # Complete
-        await db.table("SwarmRun").update({
+        if not await _transition_active_run(db, swarm_run_id, {
             "status": "completed",
             "result": final_result,
             "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", swarm_run_id).execute()
+        }, ("auditing",)):
+            return
         await emit_event(db, swarm_run_id, "swarm_completed", {"result": final_result})
         await _notify_run_outcome(space_id, goal, "completed")
 
     except Exception as exc:
+        if await _run_is_cancelled(db, swarm_run_id):
+            return
         logger.error("swarm_failed", swarm_run_id=swarm_run_id, error=str(exc))
-        await db.table("SwarmRun").update({
+        changed = await _transition_active_run(db, swarm_run_id, {
             "status": "failed",
             "errorMessage": str(exc),
             "completedAt": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", swarm_run_id).execute()
+        })
+        if not changed:
+            return
         await emit_event(db, swarm_run_id, "swarm_failed", {"error": str(exc)})
         await _notify_run_outcome(space_id, goal, "failed")
 

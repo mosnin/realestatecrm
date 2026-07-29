@@ -60,7 +60,8 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     const delegation = readFileSync('lib/ai-tools/tools/delegate-task.ts', 'utf8');
     const taskStatus = readFileSync('app/api/agent/tasks/[taskId]/status/route.ts', 'utf8');
 
-    expect(delegation).toContain('const triggerTask = fetch(modalSwarmUrl');
+    expect(delegation).toContain('const triggerTask = observeDelegateTaskLaunch(');
+    expect(delegation).toContain('fetch(modalSwarmUrl');
     expect(delegation).toContain('after(() => triggerTask)');
     expect(taskStatus).toContain('const activityTask = Promise.resolve(');
     expect(taskStatus).toContain('after(() => activityTask)');

@@ -7,6 +7,7 @@ import { getSpaceForUser } from '@/lib/space';
 // Cancel a swarm run that is currently queued, planning, running, or auditing.
 
 const CANCELLABLE_STATUSES = new Set(['queued', 'planning', 'running', 'auditing']);
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
 export async function POST(
   _req: NextRequest,
@@ -40,21 +41,42 @@ export async function POST(
   }
 
   if (!CANCELLABLE_STATUSES.has(run.status as string)) {
+    if (TERMINAL_STATUSES.has(run.status as string)) {
+      return NextResponse.json(
+        {
+          error: 'Run already finished before cancellation could be applied',
+          status: run.status,
+          rehydrate: true,
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: 'Run cannot be cancelled in its current state' },
       { status: 400 },
     );
   }
 
-  // Mark the run as cancelled.
-  const { error: updateError } = await supabase
+  // Mark the run as cancelled only if it is still cancellable. The status
+  // predicate closes the fetch/update race with a terminal worker write.
+  const { data: cancelledRun, error: updateError } = await supabase
     .from('SwarmRun')
     .update({ status: 'cancelled', completedAt: new Date().toISOString() })
-    .eq('id', runId);
+    .eq('id', runId)
+    .eq('spaceId', space.id)
+    .in('status', Array.from(CANCELLABLE_STATUSES))
+    .select('id')
+    .maybeSingle();
 
   if (updateError) {
     console.error('[swarm/[runId]/cancel/POST] update error:', updateError);
     return NextResponse.json({ error: 'Failed to cancel run' }, { status: 500 });
+  }
+  if (!cancelledRun) {
+    return NextResponse.json(
+      { error: 'Run finished before cancellation could be applied' },
+      { status: 409 },
+    );
   }
 
   // Append a cancellation event to the event log.
@@ -67,5 +89,10 @@ export async function POST(
     // Run is already cancelled — don't fail the request over a missing event row.
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    status: 'cancelled',
+    message:
+      'Cancellation recorded. A specialist already inside a model call may finish that call, but its result will not replace the cancelled run.',
+  });
 }

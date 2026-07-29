@@ -32,6 +32,10 @@ export interface SwarmRun {
 export interface SwarmPlan {
   tasks: SwarmPlanTask[];
   rationale?: string;
+  executionBounds?: {
+    maxConcurrentMembers: number;
+    maxChildDepth: number;
+  };
 }
 
 export interface SwarmPlanTask {

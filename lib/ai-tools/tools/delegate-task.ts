@@ -82,6 +82,95 @@ export function stripSubagentMarker(summary: string): string {
   return summary.replace(RUN_ID_MARKER, '').replace(/\s+$/, '');
 }
 
+const ACTIVE_SWARM_STATUSES = ['queued', 'planning', 'running', 'auditing'];
+
+async function terminalFailDelegatedLaunch(
+  runId: string,
+  spaceId: string,
+  reason: string,
+): Promise<boolean> {
+  const message = reason.slice(0, 500);
+  const { data: failedRun, error: updateError } = await supabase
+    .from('SwarmRun')
+    .update({
+      status: 'failed',
+      errorMessage: message,
+      completedAt: new Date().toISOString(),
+    })
+    .eq('id', runId)
+    .eq('spaceId', spaceId)
+    .in('status', ACTIVE_SWARM_STATUSES)
+    .select('id')
+    .maybeSingle();
+
+  if (updateError) {
+    logger.error('[delegate_task] failed to record Modal launch failure', {
+      spaceId,
+      runId,
+      error: updateError.message,
+    });
+    return false;
+  }
+  if (!failedRun) return false;
+
+  const { error: eventError } = await supabase.from('SwarmEvent').insert({
+    swarmRunId: runId,
+    type: 'swarm_failed',
+    data: { error: message, phase: 'launch' },
+  });
+  if (eventError) {
+    logger.error('[delegate_task] failed to append launch failure event', {
+      spaceId,
+      runId,
+      error: eventError.message,
+    });
+  }
+  return true;
+}
+
+async function safelyTerminalFailDelegatedLaunch(
+  runId: string,
+  spaceId: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await terminalFailDelegatedLaunch(runId, spaceId, reason);
+  } catch (error) {
+    logger.error(
+      '[delegate_task] launch failure sink unavailable',
+      { spaceId, runId },
+      error,
+    );
+  }
+}
+
+export async function observeDelegateTaskLaunch(
+  launch: Promise<Response>,
+  runId: string,
+  spaceId: string,
+): Promise<void> {
+  try {
+    const response = await launch;
+    const body = (await response.json().catch(() => ({}))) as {
+      status?: unknown;
+      error?: unknown;
+    };
+    if (response.ok && body.status !== 'failed') return;
+
+    const reason =
+      typeof body.error === 'string' && body.error.trim()
+        ? `Deep-task runtime rejected the launch: ${body.error.trim()}`
+        : `Deep-task runtime rejected the launch (HTTP ${response.status}).`;
+    await safelyTerminalFailDelegatedLaunch(runId, spaceId, reason);
+  } catch (error) {
+    logger.error(
+      '[delegate_task] Modal launch outcome unknown; leaving run active for reconciliation',
+      { spaceId, runId },
+      error,
+    );
+  }
+}
+
 /**
  * Built as a factory so it has no hidden module-level state and so tests can
  * construct it in isolation. Returns a read-only ToolDefinition.
@@ -148,20 +237,22 @@ export function buildDelegateTaskTool() {
 
       // Fire-and-forget to Modal. Do NOT await — the chat turn must not block
       // on the sub-agent. The UI's stream subscription carries progress.
-      const triggerTask = fetch(modalSwarmUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          secret: process.env.AGENT_INTERNAL_SECRET ?? '',
-          swarmRunId: runId,
-          goal,
-          spaceId: ctx.space.id,
-          // The orchestrator decomposes the goal itself; no preset custom agents.
-          customAgents: [],
+      const triggerTask = observeDelegateTaskLaunch(
+        fetch(modalSwarmUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: process.env.AGENT_INTERNAL_SECRET ?? '',
+            swarmRunId: runId,
+            goal,
+            spaceId: ctx.space.id,
+            // The orchestrator decomposes the goal itself; no preset custom agents.
+            customAgents: [],
+          }),
         }),
-      }).catch((err) => {
-        logger.error('[delegate_task] Modal swarm trigger failed', { spaceId: ctx.space.id, runId }, err);
-      });
+        runId,
+        ctx.space.id,
+      );
       try {
         after(() => triggerTask);
       } catch {
