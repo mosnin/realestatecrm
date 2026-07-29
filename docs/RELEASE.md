@@ -219,12 +219,14 @@ present rather than assuming.
 
 ### 3. Stage the Research Workspace worker in Modal
 
-The code path is implemented but feature-off. `agent/modal_app.py` now owns a
-separate minimal Playwright image, a bounded worker, and a launch endpoint;
-the web app claims a fenced lease and starts or reuses that worker. Do not
-reuse the production agent app or its broad secret bundle for staging.
+The code path is implemented but feature-off. `agent/browser_modal_app.py`
+is a separate Modal app with a minimal Playwright image, bounded worker, and
+launch endpoint; the web app claims a fenced lease and starts or reuses that
+worker. Do not deploy `agent/modal_app.py` or reuse its broad secret bundle
+when staging this browser-only surface.
 
-1. Deploy with `CHIPPI_MODAL_APP_NAME` set to an isolated staging app name.
+1. Deploy with `CHIPPI_BROWSER_MODAL_APP_NAME` set to an isolated staging app
+   name (the default is `chippi-browser`).
 2. Set `CHIPPI_BROWSER_MODAL_SECRET_NAME` to a staging-only Modal secret
    containing only `CHIPPI_BROWSER_APP_URL` and
    `CHIPPI_BROWSER_WORKER_SECRET`.
@@ -241,8 +243,8 @@ None of steps 1–4 are implemented as of this doc; they are scoped to the
 
 ### 4. Redeploy Modal
 
-After step 3 lands: `cd agent && modal deploy modal_app.py` (or your CI's
-equivalent Modal deploy step). Confirm the new headless-worker function
+After step 3 lands: `cd agent && modal deploy browser_modal_app.py` (or your
+CI's equivalent browser-only Modal deploy step). Confirm the new headless-worker function
 shows up in `modal app list` / the Modal dashboard before relying on it.
 
 ### 5. Load and submit the Chrome extension

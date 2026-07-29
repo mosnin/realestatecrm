@@ -224,8 +224,8 @@ ascending order of "how badly this blocks the feature":**
    any of this can run against production. See the "Activation checklist"
    in `docs/RELEASE.md`.
 2. **The Research Workspace worker is wired but not activated.**
-   `agent/modal_app.py` now defines a separate least-privilege Playwright
-   image, a bounded worker function, and a launch endpoint. The web app
+   `agent/browser_modal_app.py` is a dedicated least-privilege Modal app with
+   a Playwright image, bounded worker function, and launch endpoint. The web app
    obtains a fenced lease before launch, and
    `POST /api/browser-control/headless/start` starts or reuses that worker.
    This remains feature-off until the new lease migration, an isolated Modal
