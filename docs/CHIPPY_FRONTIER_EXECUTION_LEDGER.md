@@ -150,11 +150,13 @@ Core additive records:
 | V016 | 2026-07-29 | Workspace continuation focused acceptance | 49 focused tests, direct `tsc --noEmit`, and `git diff --check` pass; independent reviewer accepted server-derived run selection, tenant/reserved denial, conditional chat/voice schemas, dual-event dedupe, transcript continuity, same-run refresh, and accepted-work truthfulness |
 | V017 | 2026-07-29 | disposable socket-only PostgreSQL conflict test | one winning enqueue created one task; an equivalent normalized retry reused it; a changed-instruction retry raised the stable idempotency conflict; final task count remained one; temporary cluster was stopped and removed |
 | V018 | 2026-07-29 | full local regression after Loop 3 | 568 Vitest files passed: 5,136 tests passed and 1 skipped; expected negative-fixture warnings only |
+| V019 | 2026-07-29 | staging-only Supabase migration and idempotency canary | applied `workspace_run_task_idempotency_conflict` to project `xaumaqkwswkxnlecbypt`; an equivalent normalized retry reused completed task `66d53f1b-4bbd-498b-9d50-ee19af27ddeb`, a changed-instruction retry was rejected, and the key still owns exactly one unchanged task |
+| V020 | 2026-07-29 | single cached Vercel staging deployment | deployment `dpl_59dz3PCUz45zia2bSkV5BL1uHNRj` reached `READY` and stable staging alias `chippistaging-mosnins-projects.vercel.app`; root/session requests met the existing authentication boundary and no runtime error cluster was reported. An authenticated microphone/chat interaction remains unverified because no authenticated staging browser session was used. |
 
 ## Deployment and rollback notes
 
-- No deployment is authorized.
-- Migration is additive and must be reviewed/dry-run before preview.
+- The accepted Loop 3 commit is deployed to the dedicated Chippi staging project only. Production/customer deployment remains unauthorized.
+- The additive Workspace continuation migration is applied to staging only; the production database is untouched.
 - New lifecycle must dual-write while legacy readers remain functional.
 - Enforce run policy only after every trusted caller propagates a signed grant and shadow telemetry is clean.
 - Keep old Modal path behind a kill switch until 202/callback parity and crash recovery pass.
@@ -165,7 +167,7 @@ Core additive records:
 
 - Modal secret presence is inferred from configuration references; live secret contents were not accessed. Runtime availability is **RU**.
 - OpenAI Realtime gateway and current API behavior require official-doc conformance and synthetic runtime validation.
-- New migration has not been applied or executed against a database.
+- The Workspace continuation task/idempotency migrations have been executed against the dedicated staging database. The separate durable schedule-occurrence migration remains unexecuted outside disposable local PostgreSQL.
 - Existing customer UI has not yet been interaction-audited in this implementation phase.
 - Python autonomous callers mint/forward per-call grants for dispatcher, curated, tour-calendar, and team-message routes. Runtime Modal secret availability and end-to-end callback verification remain **RU**; `enforce` is still blocked on runtime validation and complete shadow telemetry.
 - The Python reviewed-read list mirrors `lib/integrations/action-policy.ts`; it is a deliberate temporary duplicate. Add a parity/generation check before `enforce`, and treat any drift as a release gate failure.
@@ -205,3 +207,5 @@ Do not add these as disconnected features. The durable task graph, proposal boun
 - 2026-07-29: Removed the customer-facing Draft Mode label and shipped the feature-off Chippi Workspace path: a completed private Workspace Run can be continued from its right panel in a fresh no-network Modal VM with fixed inspect/apply/validate phases and private artifacts.
 - 2026-07-29: Added the feature-off chat and OpenAI Realtime Voice control adapters for that same durable Workspace. The server derives the completed run from the authenticated tenant conversation; the model and browser never choose a run ID. Accepted voice work is persisted to the conversation and immediately refreshes the existing Workspace panel.
 - 2026-07-29: The feedback loop rejected and repaired eight concrete defects before acceptance, including a database-level concurrent idempotency race. No production deployment, customer-data mutation, or outbound action occurred.
+- 2026-07-29: Applied the atomic Workspace continuation idempotency replacement to the dedicated staging database, proved equivalent retry reuse and changed-instruction rejection without creating a second task, and deployed accepted commit `abf30a2f` once to the cached Vercel staging target. Production and customer data remain untouched.
+- 2026-07-29: Replaced the paused, wrong-checkout recurring review with an active 25-minute Chippi product loop. A cycle only counts substantial visible agent/chat capability as progress, requires independent rejection/acceptance and controller inspection, and is forbidden from triggering Vercel builds or production/customer changes.
