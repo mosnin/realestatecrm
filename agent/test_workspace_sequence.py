@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from pathlib import Path
 
 # Keep this dependency-free contract runnable from the repository root.
 sys.path.insert(0, os.path.dirname(__file__))
@@ -13,6 +14,12 @@ class WorkspaceSequenceTests(unittest.TestCase):
         failed_sequence, _ = reserve_sequence(next_sequence)
         self.assertEqual(committed_sequence, 1)
         self.assertEqual(failed_sequence, 2)
+
+    def test_staging_callbacks_can_cross_vercel_protection(self):
+        source = (Path(__file__).parent / "workspace_modal_app.py").read_text()
+        self.assertIn('"x-vercel-protection-bypass"', source)
+        self.assertIn('"CHIPPI_WORKSPACE_MODAL_BYPASS_SECRET_NAME"', source)
+        self.assertEqual(source.count("headers=_callback_headers(signature)"), 2)
 
 
 if __name__ == '__main__':

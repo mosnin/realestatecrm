@@ -12,7 +12,22 @@ from workspace_sequence import reserve_sequence
 
 app = modal.App(os.environ.get("CHIPPI_WORKSPACE_MODAL_APP_NAME", "chippi-workspace"))
 image = modal.Image.debian_slim(python_version="3.12")
-secrets = [modal.Secret.from_name(os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET_NAME", "chippi-workspace-secrets"))]
+if modal.is_local():
+    workspace_secret = modal.Secret.from_name(
+        os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET_NAME", "chippi-workspace-secrets")
+    )
+    bypass_secret_name = os.environ.get(
+        "CHIPPI_WORKSPACE_MODAL_BYPASS_SECRET_NAME", ""
+    ).strip()
+    bypass_secret = (
+        modal.Secret.from_name(bypass_secret_name)
+        if bypass_secret_name
+        else modal.Secret.from_dict({})
+    )
+else:
+    workspace_secret = modal.Secret.from_dict({})
+    bypass_secret = modal.Secret.from_dict({})
+secrets = [workspace_secret, bypass_secret]
 MAX_GOAL = 1000
 PACKET_SCRIPT = '''import json, pathlib
 p = pathlib.Path("/workspace"); p.mkdir(parents=True, exist_ok=True)
@@ -21,12 +36,22 @@ for name, content in packet.items(): (p / {"brief":"brief.md","checklist":"launc
 print("Created brief.md, launch-checklist.md, comps.csv, handoff.md")
 '''
 
+def _callback_headers(signature: str) -> dict[str, str]:
+    headers = {
+        "content-type": "application/json",
+        "x-chippy-workspace-signature": signature,
+    }
+    bypass = os.environ.get("CHIPPI_BROWSER_VERCEL_BYPASS_SECRET", "")
+    if bypass:
+        headers["x-vercel-protection-bypass"] = bypass
+    return headers
+
 def _callback(payload: dict) -> dict:
     url, secret = os.environ.get("CHIPPI_WORKSPACE_CALLBACK_URL", ""), os.environ.get("CHIPPI_WORKSPACE_CALLBACK_SECRET", "")
     if not url or not secret: raise RuntimeError("workspace callback is not configured")
     raw = json.dumps(payload, separators=(",", ":"))
     signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
-    response = httpx.post(url, content=raw, headers={"content-type":"application/json", "x-chippy-workspace-signature":signature}, timeout=20)
+    response = httpx.post(url, content=raw, headers=_callback_headers(signature), timeout=20)
     response.raise_for_status(); return response.json()
 
 def _claim_launch(item: dict) -> bool:
@@ -36,7 +61,7 @@ def _claim_launch(item: dict) -> bool:
     payload = {"run_id": item.get("run_id"), "space_id": item.get("space_id"), "launch_token": item.get("launch_token")}
     raw = json.dumps(payload, separators=(",", ":"))
     signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
-    response = httpx.post(url, content=raw, headers={"content-type":"application/json", "x-chippy-workspace-signature":signature}, timeout=10)
+    response = httpx.post(url, content=raw, headers=_callback_headers(signature), timeout=10)
     response.raise_for_status()
     return response.json().get("won") is True
 
