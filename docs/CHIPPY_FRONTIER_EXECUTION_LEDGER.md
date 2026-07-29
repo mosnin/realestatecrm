@@ -2,9 +2,10 @@
 
 Canonical handoff for the durable-agent/workspace initiative. Update after every material decision or milestone. Never add secrets, credential values, customer data, or production-derived payloads.
 
-**Status:** capability A typed managed-workspace interpreter accepted locally; feature-off and not deployed
+**Status:** capability A typed managed-workspace interpreter and capability B durable in-conversation specialist tree accepted locally; activation NO-GO and not deployed
 **Branch:** `codex/chippi-research-workspace`
-**Cycle baseline:** `48d0468a1fede2b0caaf2f6abbea54170ee900a2`
+**Latest accepted product commit:** `14ff36a2b25d7c825275f54ef7a5bc3e94baa703`
+**Cycle baseline for capability B:** `a00bb4999bfd1c4c5637bb43c869da7d87600d38`
 **Detailed audit:** `Chippy_Autonomy_Durability_Audit_2026-07-27.md` in the audit task outputs
 **Quality matrix:** [CHIPPY_FRONTIER_QUALITY_GATE.md](./CHIPPY_FRONTIER_QUALITY_GATE.md)
 **Requirements/tests:** [CHIPPY_FRONTIER_TRACEABILITY.md](./CHIPPY_FRONTIER_TRACEABILITY.md)
@@ -65,6 +66,7 @@ Evidence labels: **SR** source review, **LT** local test, **UI** captured intera
 | D015 | Add schedule occurrences and step records as a disabled seam, not a cron rewrite | A durable occurrence/lease/fencing contract must be proven before it owns legacy schedule advancement | implemented locally; migration unrun and no executor wiring |
 | D016 | Reject expired leases and changed step idempotency keys | An expired worker may not renew or complete work; a stable step key must not silently point at a changed effect | independently reviewed and implemented locally |
 | D017 | Managed Workspace continuation plans may select only closed typed operations whose commands, paths, artifacts, and limits are derived and revalidated by the server and fixed interpreter | Broadens useful Chippi work without granting arbitrary shell, host, network, or production authority | independently accepted locally; feature-off and runtime-unverified |
+| D018 | Persist a bounded specialist task tree in the existing Chippi conversation, with 2–6 planner-normalized children, concurrency ceiling 6, maximum child depth 1, monotonic terminal hydration, tenant-scoped reload, cooperative cancellation, and one combined outcome | Gives the user a visible, controllable parallel work surface without granting children tools or treating a request timeout as execution truth | independently accepted locally in `14ff36a2`; activation NO-GO pending durable launch acknowledgement/reconciliation and live runtime proof |
 
 ## Current architecture target
 
@@ -97,21 +99,20 @@ Core additive records:
 | Trust boundary implementation | Sol lead | active | focused tests + independent Terra review |
 | Durable SQL protocol | Sol lead | draft | disposable Postgres validation |
 | Realtime/voice gateway | unassigned until foundation gate | designed | official-doc protocol review |
-| Workspace UX | unassigned until durable read API | discovery | captured existing UI baseline |
+| Workspace UX | Sol controller + bounded Terra lane | capability B accepted locally | authenticated non-customer demo only after activation gates |
 | Prompt caching/provider audit | unassigned | pending | measured harness, not config inspection |
 
 ## Exact next safe actions
 
-1. Start a disposable local Supabase/Postgres service and execute the additive migrations; prove role, tenant, unique-occurrence, lease-fencing, heartbeat, stale-worker, cancellation, retry, and step-idempotency invariants. Do not use remote data as a substitute.
-2. Propagate the stable occurrence/step idempotency key into a small, explicitly selected provider-effect adapter and prove duplicate/replay behavior before enabling any occurrence executor.
-3. Complete the Python/Modal caller inventory with runtime shadow telemetry and negative-path callback tests; keep policy enforcement disabled until the inventory and telemetry gates pass.
-4. Add feature-flagged durable run read/control services without changing existing conversation responses.
-5. Build a measured OpenRouter/Agents SDK/prompt-cache compatibility harness before any SDK or cache-composition migration.
-6. Capture the current Chippy workspace UI only if an authenticated non-production/local surface is safely available; re-audit without advancing any critical score below 9.
+1. Keep capability B local and inactive. Do not deploy the application or Modal runtime while the current Modal endpoint holds the request open for the full specialist run and no durable reconciliation path exists.
+2. In a separately authorized non-customer environment, replace the long launch response with a short durable accepted/queued acknowledgement, then reconcile unknown client/network outcomes by run ID. A timeout or disconnect must never terminal-fail an active run.
+3. Verify `DATABASE_URL` activation before run creation or prove a truthful persisted terminal failure without model spend. Exercise the raw parent-lock/member/event SQL against a disposable database under cancellation/completion races.
+4. Only after 1–3 pass, run the persisted-conversation demo: start a task that plans 2–6 specialists, observe truthful live status/results, reload and recover the full tree, cancel an active task, resolve a cancel/completion race, and read the combined outcome.
+5. The next capability expansion after this gate is versioned editable deliverables over the existing report/CSV/JSON artifacts, followed by Realtime Voice floor-manager controls over the same durable tree.
 
 ## Anti-loop control
 
-- **Last verified state:** Python/Modal grant propagation and disabled occurrence/step-idempotency seams passed focused and full local suites; TypeScript compilation and diff whitespace validation passed. Disposable database validation is blocked by unavailable local Docker/Postgres.
+- **Last verified state:** accepted product commit `14ff36a2` adds the local persisted specialist tree. Full Vitest, full Python, focused lifecycle suites, TypeScript compilation, diff hygiene, and independent Sol acceptance passed. No database, Modal, deployment, customer, or provider runtime was touched.
 - **Duplicate-work check:** before each work item, inspect this ledger, `git diff`, current tests, and prior reviewer findings; do not reopen a closed lane without new evidence.
 - **Autonomous loop stop conditions:** cancellation requested; terminal state; wall/cycle/token budget exhausted; tool or child quota exhausted; repeated observation; repeated no-progress; verification failure requiring input; approval required.
 - **Retry rule:** retry only a persisted occurrence/job with remaining budget, explicit backoff, and idempotent completed steps. Never retry an entire side-effecting workflow merely because a watermark stayed due.
@@ -154,11 +155,14 @@ Core additive records:
 | V019 | 2026-07-29 | staging-only Supabase migration and idempotency canary | applied `workspace_run_task_idempotency_conflict` to project `xaumaqkwswkxnlecbypt`; an equivalent normalized retry reused completed task `66d53f1b-4bbd-498b-9d50-ee19af27ddeb`, a changed-instruction retry was rejected, and the key still owns exactly one unchanged task |
 | V020 | 2026-07-29 | single cached Vercel staging deployment | deployment `dpl_59dz3PCUz45zia2bSkV5BL1uHNRj` reached `READY` and stable staging alias `chippistaging-mosnins-projects.vercel.app`; root/session requests met the existing authentication boundary and no runtime error cluster was reported. An authenticated microphone/chat interaction remains unverified because no authenticated staging browser session was used. |
 | V021 | 2026-07-29 | corrected 100× Product Loop cycle 1: typed managed-workspace interpreter | accepted after the independent reviewer rejected and the implementation lane repaired five material issues: migration/rollback compatibility, atomic enqueue regression, legacy in-flight completion, repeated-continuation validation, and pre-upload manifest validation. Controller verification passed 13 focused tests, 50 Workspace/chat/voice tests, 3 Python interpreter-demo tests, 222 agent tests, direct TypeScript compilation, diff hygiene, and the full 568-file Vitest suite (5,139 passed; 1 skipped). Markdown, numerically sorted CSV, and structured JSON artifacts are visible through the existing task/panel contract. No database, Modal runtime, deployment, customer data, or external system was touched. |
+| V022 | 2026-07-29 | corrected 100× Product Loop cycle 2: durable specialist task tree | the independent reviewer first rejected non-absorbing terminal hydration, worker cancellation races, terminal cancel response mismatch, partial plan visibility, and swallowed child exceptions. Follow-up review also caught partial-snapshot member loss, missing `DATABASE_URL` activation truth, synchronous timeout-as-ack, and a GET/SSE terminal-result race. The implementation lane repaired all findings; final independent Sol review accepted with no remaining acceptance blocker. Focused acceptance passed 18 Vitest tests and 8 pytest tests. Controller regression passed the full 572-file Vitest suite (5,157 passed; 1 skipped), all 230 agent Python tests, direct `tsc --noEmit`, and `git diff --check`. No database, Modal, deployment, Vercel build, customer data, communication, or external provider runtime was touched. |
+| V023 | 2026-07-29 | capability-B evidence scan | local corpus evidence supported shared state, progress, termination, and verification for reliable multi-agent work. Official OpenAI product evidence supported parallel agents, visible progress/direction, stop controls, and editable artifacts. The required local Neon packet lookup was attempted and blocked because no authorized `DATABASE_URL` or runtime descriptor was available; no external acquisition was repeated and no database was contacted. |
 
 ## Deployment and rollback notes
 
 - The accepted Loop 3 commit is deployed to the dedicated Chippi staging project only. Production/customer deployment remains unauthorized.
 - The capability A typed interpreter added after Loop 3 is local and feature-off only; its migration and Modal/callback runtime have not been applied or invoked.
+- Capability B commit `14ff36a2` is local-only and not deployed. It has no new activation flag of its own, so application/Modal deployment is prohibited until the explicit NO-GO gates below are closed.
 - The additive Workspace continuation migration is applied to staging only; the production database is untouched.
 - New lifecycle must dual-write while legacy readers remain functional.
 - Enforce run policy only after every trusted caller propagates a signed grant and shadow telemetry is clean.
@@ -169,6 +173,7 @@ Core additive records:
 ## Blockers and assumptions
 
 - Modal secret presence is inferred from configuration references; live secret contents were not accessed. Runtime availability is **RU**.
+- Capability B activation is **NO-GO**: the Modal endpoint still returns only after the full run rather than a short durable 202/queued acknowledgement; unknown network outcomes have no reconciler; live `DATABASE_URL` presence, asyncpg pool activation, raw atomic transition SQL, Modal execution, cancellation races, and persisted reload behavior are all **RU**.
 - OpenAI Realtime gateway and current API behavior require official-doc conformance and synthetic runtime validation.
 - The Workspace continuation task/idempotency migrations have been executed against the dedicated staging database. The separate durable schedule-occurrence migration remains unexecuted outside disposable local PostgreSQL.
 - Existing customer UI has not yet been interaction-audited in this implementation phase.
@@ -215,7 +220,8 @@ Do not add these as disconnected features. The durable task graph, proposal boun
 - 2026-07-29: Applied the atomic Workspace continuation idempotency replacement to the dedicated staging database, proved equivalent retry reuse and changed-instruction rejection without creating a second task, and deployed accepted commit `abf30a2f` once to the cached Vercel staging target. Production and customer data remain untouched.
 - 2026-07-29: Replaced the paused, wrong-checkout recurring review with an active 25-minute Chippi product loop. A cycle only counts substantial visible agent/chat capability as progress, requires independent rejection/acceptance and controller inspection, and is forbidden from triggering Vercel builds or production/customer changes.
 - 2026-07-29: Completed corrected 100× Product Loop cycle 1 locally. The feature-off Workspace continuation now executes 2–3 server-validated typed operations in the existing fresh, bounded, no-network Modal VM and can return a grounded Markdown report, bounded/sorted comps CSV, and structured JSON action register. The existing Workspace panel shows operation types, fixed commands, live status/events, cancellation, reload-persisted state, and artifact links. An independent Sol review rejected five defects; the same bounded Terra implementation lane repaired them, the controller added a fail-closed legacy discriminator and exact typed-operation count, and Sol accepted the final diff.
+- 2026-07-29: Completed corrected 100× Product Loop cycle 2 in accepted product commit `14ff36a2`. From the existing conversation, a persisted specialist-task block can represent 2–6 bounded depth-1 specialists, show truthful member progress and results, recover the tree and combined outcome after reload, and cooperatively stop active work. The independent review rejected four successive classes of lifecycle/race defects before final acceptance; all were repaired and covered by executable reducer, route, launch-observer, planner-bound, and Python transition tests. Activation remains NO-GO; no deployment or external runtime was invoked.
 
 ## Corrected 100× Product Loop — exact next action
 
-After separate staging authorization, apply only `20260915000004_workspace_run_typed_artifacts.sql` to the dedicated non-customer staging database, deploy the matching isolated Modal task runtime and application bytes with `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED` still off by default, then run one authenticated synthetic demo for this prompt: “Create a seller report, price-sorted comps CSV, and action register.” Verify the three artifacts, visible fixed command/event sequence, reload continuity, mid-operation cancellation, legacy task completion, and absence of network egress. Gate off and stop on any mismatch; do not advance to production.
+Do not activate or deploy capability B. In a separately authorized non-customer runtime, first implement and prove a short durable accepted/queued launch acknowledgement plus run-ID reconciliation for unknown outcomes; verify `DATABASE_URL` and the raw atomic transition SQL before any model spend. Then run one authenticated persisted-conversation demo: ask Chippi to compare pricing and launch strategy, observe the complete 2–6-specialist tree, reload without losing it, cancel an active run, exercise a cancel/completion race, and read the combined outcome. Stop on any mismatch and do not advance to production.
