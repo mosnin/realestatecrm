@@ -32,10 +32,19 @@ if modal.is_local():
         if bypass_secret_name
         else modal.Secret.from_dict({})
     )
+    endpoint_secret_name = os.environ.get(
+        "CHIPPI_WORKSPACE_MODAL_ENDPOINT_SECRET_NAME", ""
+    ).strip()
+    endpoint_secret = (
+        modal.Secret.from_name(endpoint_secret_name)
+        if endpoint_secret_name
+        else modal.Secret.from_dict({})
+    )
 else:
     workspace_secret = modal.Secret.from_dict({})
     bypass_secret = modal.Secret.from_dict({})
-secrets = [workspace_secret, bypass_secret]
+    endpoint_secret = modal.Secret.from_dict({})
+secrets = [workspace_secret, bypass_secret, endpoint_secret]
 MAX_GOAL = 1000
 PACKET_SCRIPT = '''import json, pathlib
 p = pathlib.Path("/workspace"); p.mkdir(parents=True, exist_ok=True)

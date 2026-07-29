@@ -19,6 +19,18 @@ class WorkspaceSequenceTests(unittest.TestCase):
         source = (Path(__file__).parent / "workspace_modal_app.py").read_text()
         self.assertIn('"x-vercel-protection-bypass"', source)
         self.assertIn('"CHIPPI_WORKSPACE_MODAL_BYPASS_SECRET_NAME"', source)
+        self.assertIn('"CHIPPI_WORKSPACE_MODAL_ENDPOINT_SECRET_NAME"', source)
+        self.assertIn(
+            "secrets = [workspace_secret, bypass_secret, endpoint_secret]", source
+        )
+        self.assertIn("else modal.Secret.from_dict({})", source)
+        self.assertIn(
+            "else:\n"
+            "    workspace_secret = modal.Secret.from_dict({})\n"
+            "    bypass_secret = modal.Secret.from_dict({})\n"
+            "    endpoint_secret = modal.Secret.from_dict({})",
+            source,
+        )
         self.assertIn('"fastapi[standard]>=0.115.0,<1"', source)
         self.assertIn('remote_path="/root/workspace_sequence.py"', source)
         self.assertNotIn("from fastapi.responses import JSONResponse\nfrom workspace_sequence", source)
