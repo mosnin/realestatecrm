@@ -6,12 +6,20 @@ cloud credentials, no callback token, no network, no inbound ports.
 """
 from __future__ import annotations
 import base64, hashlib, hmac, json, os, re, uuid
+from pathlib import Path
+
 import httpx, modal
-from fastapi.responses import JSONResponse
 from workspace_sequence import reserve_sequence
 
+_AGENT_DIR = Path(__file__).resolve().parent
 app = modal.App(os.environ.get("CHIPPI_WORKSPACE_MODAL_APP_NAME", "chippi-workspace"))
-image = modal.Image.debian_slim(python_version="3.12")
+image = modal.Image.debian_slim(python_version="3.12").pip_install(
+    "fastapi[standard]>=0.115.0,<1",
+    "httpx>=0.28.0,<1",
+).add_local_file(
+    _AGENT_DIR / "workspace_sequence.py",
+    remote_path="/root/workspace_sequence.py",
+)
 if modal.is_local():
     workspace_secret = modal.Secret.from_name(
         os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET_NAME", "chippi-workspace-secrets")
@@ -67,6 +75,8 @@ def _claim_launch(item: dict) -> bool:
 
 @app.function(image=image, secrets=secrets, timeout=180, max_containers=10)
 async def run_workspace(item: dict):
+    from fastapi.responses import JSONResponse
+
     expected = os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET", "")
     if not expected or not hmac.compare_digest(str(item.get("secret", "")), expected): return JSONResponse({"error":"Unauthorized"}, status_code=401)
     run_id, space_id, goal, packet = str(item.get("run_id", "")), str(item.get("space_id", "")), str(item.get("goal", "")).strip()[:MAX_GOAL], item.get("packet")
@@ -115,6 +125,8 @@ async def run_workspace(item: dict):
 @modal.fastapi_endpoint(method="POST")
 async def launch_workspace(item: dict):
     """Authenticated fast acceptor: the durable runner owns the VM lifecycle."""
+    from fastapi.responses import JSONResponse
+
     expected = os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET", "")
     if not expected or not hmac.compare_digest(str(item.get("secret", "")), expected): return JSONResponse({"error":"Unauthorized"}, status_code=401)
     run_id = str(item.get("run_id", ""))
