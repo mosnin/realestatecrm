@@ -83,9 +83,9 @@ export function validateWorkspaceTaskPlan(value: unknown, files: Array<{ name: s
   return { summary, title, evidence, nextSteps };
 }
 
-export async function findWorkspaceRunTaskByIdempotency(runId: string, spaceId: string, idempotencyKey: string): Promise<{ id: string; status: string } | null> {
-  const { data } = await supabase.from('WorkspaceRunTask').select('id,status').eq('runId', runId).eq('spaceId', spaceId).eq('idempotencyKey', idempotencyKey).maybeSingle();
-  return data as { id: string; status: string } | null;
+export async function findWorkspaceRunTaskByIdempotency(runId: string, spaceId: string, idempotencyKey: string): Promise<{ id: string; status: string; instruction: string } | null> {
+  const { data } = await supabase.from('WorkspaceRunTask').select('id,status,instruction').eq('runId', runId).eq('spaceId', spaceId).eq('idempotencyKey', idempotencyKey).maybeSingle();
+  return data as { id: string; status: string; instruction: string } | null;
 }
 
 export async function planWorkspaceRunTask(input: { instruction: string; files: Array<{ name: string; content: string }> }): Promise<{ commandPlan: WorkspaceRunTaskPlanStep[]; executionPlan: WorkspaceTaskExecutionPlan }> {

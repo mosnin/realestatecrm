@@ -2,6 +2,19 @@ import crypto from 'crypto';
 
 const UUID_NAMESPACE_BYTES = 16;
 
+/** Optional Workspace capability reads must never take down legacy voice. */
+export async function failClosedVoiceWorkspaceContinuationEligibility(
+  resolve: () => Promise<boolean>,
+  onFailure: (error: unknown) => void,
+): Promise<boolean> {
+  try {
+    return await resolve();
+  } catch (error) {
+    onFailure(error);
+    return false;
+  }
+}
+
 /** Stable UUID-shaped ids for idempotent Realtime function-call retries. */
 export function stableVoiceId(
   spaceId: string,
@@ -45,7 +58,7 @@ export interface VoiceRealtimeSessionConfig {
   };
   tools: Array<{
     type: 'function';
-    name: 'start_work_session';
+    name: 'start_work_session' | 'continue_workspace_run';
     description: string;
     parameters: Record<string, unknown>;
   }>;
@@ -55,6 +68,7 @@ export interface VoiceRealtimeSessionConfig {
 export function buildVoiceRealtimeSessionConfig(args: {
   workspaceName: string;
   conversationAttached: boolean;
+  workspaceContinuationEligible?: boolean;
 }): VoiceRealtimeSessionConfig {
   const conversationLine = args.conversationAttached
     ? 'This voice session is attached to the open Chippi conversation.'
@@ -69,6 +83,7 @@ export function buildVoiceRealtimeSessionConfig(args: {
       'Speak naturally, warmly, and concisely. Default to one or two short sentences.',
       'You can discuss the request and you can start one durable background Work Session.',
       'Call start_work_session only when the user explicitly asks you to delegate, research, prepare, analyze, or work on a substantial goal in the background.',
+      ...(args.workspaceContinuationEligible ? ['When the user explicitly asks to continue the completed Workspace in this conversation, call continue_workspace_run. Never ask for or provide a Workspace run id.'] : []),
       'Never claim the work started until the function returns ok=true.',
       'Use plan_first unless the user clearly says to proceed without waiting for plan approval.',
       'This voice capability cannot send messages or change CRM records. Say so plainly if asked.',
@@ -115,6 +130,24 @@ export function buildVoiceRealtimeSessionConfig(args: {
           required: ['goal', 'autonomy', 'allow_questions'],
         },
       },
+      ...(args.workspaceContinuationEligible ? [{
+        type: 'function' as const,
+        name: 'continue_workspace_run' as const,
+        description: 'Continue the completed private Workspace linked to the current conversation. The server resolves the Workspace; no run id is accepted.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            instruction: {
+              type: 'string',
+              minLength: 3,
+              maxLength: 1000,
+              description: 'The grounded follow-up to create from the completed Workspace.',
+            },
+          },
+          required: ['instruction'],
+        },
+      }] : []),
     ],
     tool_choice: 'auto',
   };

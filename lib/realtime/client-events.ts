@@ -47,3 +47,28 @@ export function extractStartWorkSessionCalls(
       arguments: output.arguments ?? '{}',
     }));
 }
+
+/** Same dual-event normalization for an eligible Workspace continuation. */
+export function extractContinueWorkspaceRunCalls(
+  event: RealtimeEvent,
+): RealtimeFunctionCall[] {
+  if (
+    event.type === 'response.function_call_arguments.done' &&
+    event.name === 'continue_workspace_run' &&
+    event.call_id
+  ) {
+    return [{ callId: event.call_id, arguments: event.arguments ?? '{}' }];
+  }
+  if (event.type !== 'response.done') return [];
+  return (event.response?.output ?? [])
+    .filter(
+      (output) =>
+        output.type === 'function_call' &&
+        output.name === 'continue_workspace_run' &&
+        Boolean(output.call_id),
+    )
+    .map((output) => ({
+      callId: output.call_id!,
+      arguments: output.arguments ?? '{}',
+    }));
+}

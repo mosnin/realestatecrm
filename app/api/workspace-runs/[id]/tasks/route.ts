@@ -1,9 +1,9 @@
-import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { isWorkspaceRunFollowUpsEnabledForSpace } from '@/lib/chippi/workspace-run-flag';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
-import { cancelWorkspaceRunTask, enqueueWorkspaceRunTask, findWorkspaceRunTaskByIdempotency, getWorkspaceRun, kickWorkspaceRunTask, planWorkspaceRunTask, workspaceTaskFiles } from '@/lib/workspace-runs/server';
+import { cancelWorkspaceRunTask, getWorkspaceRun } from '@/lib/workspace-runs/server';
+import { continueCompletedWorkspaceRun } from '@/lib/workspace-runs/conversation-continuation';
 
 export const runtime = 'nodejs';
 type Params = { params: Promise<{ id: string }> };
@@ -38,28 +38,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   if (instruction.length < 3) return NextResponse.json({ error: 'Describe what to continue in a few words.' }, { status: 400 });
   const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim().slice(0, 128) : '';
   if (!/^[a-zA-Z0-9_-]{16,128}$/.test(idempotencyKey)) return NextResponse.json({ error: 'A valid continuation key is required.' }, { status: 400 });
-  const taskId = crypto.randomUUID();
-  try {
-    const existing = await findWorkspaceRunTaskByIdempotency(checked.id, checked.auth.space.id, idempotencyKey);
-    if (existing) {
-      if (existing.status === 'queued') await kickWorkspaceRunTask({ taskId: existing.id, runId: checked.id, spaceId: checked.auth.space.id });
-      const refreshed = await getWorkspaceRun(checked.id, checked.auth.space.id);
-      return NextResponse.json({ task: refreshed?.tasks.find((item) => item.id === existing.id) ?? { id: existing.id, status: existing.status } });
-    }
-    if (checked.run.tasks.some((task) => ['queued','launching','running'].includes(task.status))) return NextResponse.json({ error: 'A workspace continuation is already running.' }, { status: 409 });
-    const files = await workspaceTaskFiles(checked.id, checked.auth.space.id);
-    const planned = await planWorkspaceRunTask({ instruction, files });
-    const task = await enqueueWorkspaceRunTask({ runId: checked.id, spaceId: checked.auth.space.id, taskId, idempotencyKey, instruction, commandPlan: planned.commandPlan, executionPlan: planned.executionPlan });
-    if (task.created || task.status === 'queued') await kickWorkspaceRunTask({ taskId: task.taskId, runId: checked.id, spaceId: checked.auth.space.id });
-    const refreshed = await getWorkspaceRun(checked.id, checked.auth.space.id);
-    const view = refreshed?.tasks.find((item) => item.id === task.taskId);
-    return NextResponse.json({ task: view ?? { id: task.taskId, status: task.status } }, { status: task.created ? 201 : 200 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.includes('already active')) return NextResponse.json({ error: 'A workspace continuation is already running.' }, { status: 409 });
-    if (message.includes('No LLM key') || message.includes('planning')) return NextResponse.json({ error: 'Workspace continuation planning is unavailable. Try again shortly.' }, { status: 503 });
-    return NextResponse.json({ error: 'Could not start the workspace continuation.' }, { status: 500 });
+  const result = await continueCompletedWorkspaceRun({ spaceId: checked.auth.space.id, runId: checked.id, instruction, idempotencyKey });
+  if (!result.ok) {
+    const status = result.code === 'planning_unavailable' ? 503 : ['active', 'conflict', 'not_completed'].includes(result.code) ? 409 : result.code === 'not_found' ? 404 : 500;
+    return NextResponse.json({ error: result.error }, { status });
   }
+  const refreshed = await getWorkspaceRun(checked.id, checked.auth.space.id);
+  return NextResponse.json({ task: refreshed?.tasks.find((item) => item.id === result.taskId) ?? { id: result.taskId, status: result.status } }, { status: result.reused ? 200 : 201 });
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {

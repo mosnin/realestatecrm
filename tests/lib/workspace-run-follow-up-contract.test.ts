@@ -52,6 +52,10 @@ describe('Workspace Run continuation contract', () => {
     expect(corrective).toContain('cancel_workspace_run_task');
     expect(declarative).toContain('executionPlan');
     expect(read('lib/chippi/workspace-run-flag.ts')).toContain('CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS');
+    const atomicConflict = read('supabase/migrations/20260915000003_workspace_run_task_idempotency_conflict.sql');
+    expect(atomicConflict).toContain('FOR UPDATE');
+    expect(atomicConflict).toContain("MESSAGE = 'workspace continuation idempotency conflict'");
+    expect(atomicConflict).toContain("regexp_replace(btrim(v_existing.instruction), '\\s+', ' ', 'g') <> v_instruction");
   });
 
   it('uses a fresh no-network Modal VM and fixed declarative interpreter', () => {
@@ -70,8 +74,40 @@ describe('Workspace Run continuation contract', () => {
     expect(panel).toContain('Continue this workspace');
     expect(panel).toContain('continuationKeyRef');
     expect(panel).toContain('cancelTask');
-    expect(read('app/api/workspace-runs/[id]/tasks/route.ts')).toContain('findWorkspaceRunTaskByIdempotency');
-    expect(read('app/api/workspace-runs/[id]/tasks/route.ts')).toContain("task.created || task.status === 'queued'");
+    expect(read('app/api/workspace-runs/[id]/tasks/route.ts')).toContain('continueCompletedWorkspaceRun');
+    const continuation = read('lib/workspace-runs/conversation-continuation.ts');
+    expect(continuation).toContain('normalizedInstruction(existing.instruction) !== instruction');
+    expect(continuation).toContain("code: 'conflict'");
     expect(read('app/api/internal/workspace-runs/tasks/callback/route.ts')).toContain('cancelledBeforePublish');
+  });
+
+  it('keeps model and voice run selection server-side and opens the existing panel only from structured results', () => {
+    const continuation = read('lib/workspace-runs/conversation-continuation.ts');
+    expect(continuation).toContain(".eq('conversationId', conversationId)");
+    expect(continuation).toContain(".eq('spaceId', spaceId)");
+    expect(read('lib/ai-tools/tools/continue-workspace-run.ts')).not.toContain('runId:');
+    expect(read('app/api/ai/realtime-delegate/route.ts')).toContain("z.literal('continue_workspace_run')");
+    expect(read('components/chippi/chippi-workspace.tsx')).toContain("input.name === 'continue_workspace_run'");
+    expect(read('components/chippi/chippi-workspace.tsx')).toContain("setRightTab('workspace')");
+  });
+
+  it('persists an idempotent voice continuation transcript with its durable task binding', () => {
+    const delegate = read('app/api/ai/realtime-delegate/route.ts');
+    expect(delegate).toContain('persistWorkspaceContinuationTurn');
+    expect(delegate).toContain("name: 'continue_workspace_run'");
+    expect(delegate).toContain('stableVoiceId(args.spaceId, args.conversationId, args.callId, \'user-message\')');
+    expect(delegate).toContain('stableVoiceId(args.spaceId, args.conversationId, args.callId, \'assistant-message\')');
+    expect(delegate).toContain('data: { runId: args.runId, taskId: args.taskId, status: args.status, openWorkspacePanel: true }');
+    expect(delegate).toContain("ignoreDuplicates: true");
+    expect(delegate).toContain('conversationRecorded');
+    expect(delegate).not.toContain('accepted but its conversation record could not be saved');
+  });
+
+  it('immediately refreshes an already-open Workspace after chat or voice enqueues the same run', () => {
+    const workspace = read('components/chippi/chippi-workspace.tsx');
+    expect(workspace).toContain('setWorkspaceRunRefreshToken((value) => value + 1)');
+    expect(workspace).toContain('workspaceRunRefreshToken={workspaceRunRefreshToken}');
+    expect(read('components/chippi/right-panel.tsx')).toContain('refreshToken={workspaceRunRefreshToken}');
+    expect(read('components/chippi/workspace-run-panel.tsx')).toContain('}, [load, refreshToken]);');
   });
 });

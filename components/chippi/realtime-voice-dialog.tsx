@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { extractStartWorkSessionCalls } from '@/lib/realtime/client-events';
+import { extractContinueWorkspaceRunCalls, extractStartWorkSessionCalls } from '@/lib/realtime/client-events';
 
 type VoiceState =
   | 'connecting'
@@ -69,12 +69,14 @@ export function RealtimeVoiceDialog({
   open,
   onOpenChange,
   onDelegated,
+  onWorkspaceContinued,
 }: {
   slug: string;
   conversationId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDelegated: (work: DelegatedWork) => void;
+  onWorkspaceContinued: (work: { conversationId: string; callId: string; instruction: string; runId: string; taskId: string; status: string }) => void;
 }) {
   const [voiceState, setVoiceState] = useState<VoiceState>('connecting');
   const [caption, setCaption] = useState('');
@@ -87,6 +89,8 @@ export function RealtimeVoiceDialog({
   const sessionConversationIdRef = useRef<string | null>(conversationId);
   const delegatedRef = useRef(onDelegated);
   delegatedRef.current = onDelegated;
+  const workspaceContinuedRef = useRef(onWorkspaceContinued);
+  workspaceContinuedRef.current = onWorkspaceContinued;
 
   const stop = useCallback(() => {
     channelRef.current?.close();
@@ -199,6 +203,48 @@ export function RealtimeVoiceDialog({
     [sendEvent, slug],
   );
 
+  const runWorkspaceContinuation = useCallback(
+    async (event: RealtimeEvent) => {
+      const callId = event.call_id?.trim();
+      const activeConversationId = sessionConversationIdRef.current;
+      if (!callId || !activeConversationId || handledCallsRef.current.has(callId)) return;
+      handledCallsRef.current.add(callId);
+      let args: { instruction?: unknown };
+      try { args = JSON.parse(event.arguments ?? '{}') as typeof args; } catch { args = {}; }
+      const instruction = typeof args.instruction === 'string' ? args.instruction.trim() : '';
+      if (instruction.length < 3) {
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify({ ok: false, error: 'Describe what to continue in a few words.' }) } });
+        sendEvent({ type: 'response.create' });
+        return;
+      }
+      setVoiceState('delegating');
+      setCaption(instruction);
+      try {
+        const res = await fetch('/api/ai/realtime-delegate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'continue_workspace_run', slug, conversationId: activeConversationId, callId, instruction }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; workspaceRunId?: string; taskId?: string; status?: string; conversationRecorded?: boolean };
+        if (!res.ok || !data.ok || !data.workspaceRunId || !data.taskId || !data.status) throw new Error(data.error || 'The Workspace continuation could not be started.');
+        workspaceContinuedRef.current({ conversationId: activeConversationId, callId, instruction, runId: data.workspaceRunId, taskId: data.taskId, status: data.status });
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify({ ok: true, workspaceRunId: data.workspaceRunId, taskId: data.taskId, status: data.status, openWorkspacePanel: true, conversationRecorded: data.conversationRecorded !== false }) } });
+        sendEvent({ type: 'response.create' });
+        setVoiceState('thinking');
+        if (data.conversationRecorded === false) {
+          setError('Workspace started, but this voice confirmation may not appear after a reload. Please retry the request to repair it.');
+        }
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'The Workspace continuation could not be started.';
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify({ ok: false, error: message }) } });
+        sendEvent({ type: 'response.create' });
+        setVoiceState('listening');
+        setError(message);
+      }
+    },
+    [sendEvent, slug],
+  );
+
   useEffect(() => {
     if (!open) {
       stop();
@@ -269,6 +315,14 @@ export function RealtimeVoiceDialog({
               arguments: call.arguments,
             });
           }
+          for (const call of extractContinueWorkspaceRunCalls(event)) {
+            void runWorkspaceContinuation({
+              type: 'response.function_call_arguments.done',
+              name: 'continue_workspace_run',
+              call_id: call.callId,
+              arguments: call.arguments,
+            });
+          }
           if (event.type === 'error') {
             setError(event.error?.message || 'Voice mode ran into a problem.');
             setVoiceState('error');
@@ -314,7 +368,7 @@ export function RealtimeVoiceDialog({
     // voice session is still speaking; restarting WebRTC at that moment would
     // cut off the confirmation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, runDelegation, slug, stop]);
+  }, [open, runDelegation, runWorkspaceContinuation, slug, stop]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -6,7 +6,7 @@ import type { WorkspaceRunView } from '@/lib/workspace-runs/types';
 
 const active = (status: string) => ['queued', 'launching', 'running'].includes(status);
 
-export function WorkspaceRunPanel({ runId, slug, onContinue, followUpsEnabled = false }: { runId: string | null; slug: string; onContinue?: () => void; followUpsEnabled?: boolean }) {
+export function WorkspaceRunPanel({ runId, slug, onContinue, followUpsEnabled = false, refreshToken = 0 }: { runId: string | null; slug: string; onContinue?: () => void; followUpsEnabled?: boolean; refreshToken?: number }) {
   const [run, setRun] = useState<WorkspaceRunView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [instruction, setInstruction] = useState('');
@@ -19,7 +19,10 @@ export function WorkspaceRunPanel({ runId, slug, onContinue, followUpsEnabled = 
     if (!res.ok) { setError('Workspace state is unavailable.'); return; }
     setRun((await res.json() as { run: WorkspaceRunView }).run); setError(null);
   }, [runId, slug]);
-  useEffect(() => { void load(); }, [load]);
+  // A continuation can be enqueued for the run already shown here. Reload
+  // immediately on that bounded parent signal; polling only follows once the
+  // refreshed state reveals an active task.
+  useEffect(() => { void load(); }, [load, refreshToken]);
   useEffect(() => {
     if (!run || (!active(run.status) && !run.tasks.some((task) => active(task.status)))) return;
     const timer = window.setInterval(() => void load(), 2500);

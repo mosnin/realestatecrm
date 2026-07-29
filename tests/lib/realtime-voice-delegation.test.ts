@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildVoiceRealtimeSessionConfig,
+  failClosedVoiceWorkspaceContinuationEligibility,
   stableVoiceId,
 } from '@/lib/realtime/voice-delegation';
 import {
@@ -27,7 +28,7 @@ describe('Realtime voice delegation contract', () => {
     expect(otherKind).not.toBe(first);
   });
 
-  it('uses the current Realtime model and exposes one narrow durable-work tool', () => {
+  it('uses the current Realtime model and only exposes continuation after server eligibility', () => {
     const config = buildVoiceRealtimeSessionConfig({
       workspaceName: 'P&W Properties',
       conversationAttached: true,
@@ -44,6 +45,18 @@ describe('Realtime voice delegation contract', () => {
     expect(config.instructions).toContain('Never claim the work started until');
     expect(config.instructions).toContain('cannot send messages or change CRM records');
     expect(JSON.stringify(config)).not.toContain('OPENAI_API_KEY');
+
+    const eligible = buildVoiceRealtimeSessionConfig({
+      workspaceName: 'P&W Properties',
+      conversationAttached: true,
+      workspaceContinuationEligible: true,
+    });
+    expect(eligible.tools.map((tool) => tool.name)).toEqual(['start_work_session', 'continue_workspace_run']);
+    expect(eligible.tools[1].parameters).toMatchObject({
+      additionalProperties: false,
+      required: ['instruction'],
+    });
+    expect(eligible.instructions).toContain('Never ask for or provide a Workspace run id');
   });
 
   it('advertises voice only when feature, provider, and durable dispatcher are ready', () => {
@@ -59,5 +72,20 @@ describe('Realtime voice delegation contract', () => {
 
     process.env.INNGEST_EVENT_KEY = 'test-only';
     expect(realtimeVoiceGatewayReady()).toBe(true);
+  });
+
+  it('fails closed to the legacy voice tool when optional Workspace eligibility is unavailable', async () => {
+    const warning = vi.fn();
+    await expect(failClosedVoiceWorkspaceContinuationEligibility(
+      async () => { throw new Error('temporary database read failure'); },
+      warning,
+    )).resolves.toBe(false);
+    expect(warning).toHaveBeenCalledOnce();
+    const config = buildVoiceRealtimeSessionConfig({
+      workspaceName: 'P&W Properties',
+      conversationAttached: true,
+      workspaceContinuationEligible: false,
+    });
+    expect(config.tools.map((tool) => tool.name)).toEqual(['start_work_session']);
   });
 });

@@ -54,7 +54,7 @@ Evidence labels: **SR** source review, **LT** local test, **UI** captured intera
 | D004 | Signed run-policy claims at internal action boundaries | Worker bearer secret authenticates a process, not a run’s authority | shadow integration implemented locally |
 | D005 | Additive `AgentJobRun` protocol and related tables | Backward-compatible path from existing conversations/Work Sessions | migration drafted locally |
 | D006 | Child capability subset + inherited denials + depth 4 | Prevents arbitrary self-spawn and privilege escalation | DB guard drafted locally |
-| D007 | Realtime voice via Modal server gateway | Runtime-managed credential stays server-side; voice becomes control plane | design accepted; not implemented |
+| D007 | Realtime voice through the server gateway | The provider credential stays server-side; voice becomes a tenant-scoped control surface for durable work | implemented locally; continuation capability remains feature-gated and staging-unverified |
 | D008 | Default policy rollout is shadow until all trusted callers sign grants | Avoids breaking established paid-user flows; enforcement is a release gate | accepted |
 | D009 | Current OpenRouter routing remains during foundation work | Avoid provider collapse and unrelated behavioral regression | accepted |
 | D010 | Do not remove workflow watermark-on-returned-failure until occurrences and step idempotency ship together | Immediate whole-workflow retry can duplicate earlier successful actions | accepted compatibility hold |
@@ -125,6 +125,7 @@ Core additive records:
 | `DURABLE_AGENT_RUNS_ENABLED` | unset/off (planned) | dual-write new run protocol | disable new writer/reader, retain rows |
 | `DURABLE_AGENT_WORKSPACE_ENABLED` | unset/off (planned) | new task workspace UI | return to legacy conversation/Work Session UI |
 | `REALTIME_VOICE_GATEWAY_ENABLED` | unset/off (planned) | server-managed Realtime control plane | hide voice control, preserve text/task state |
+| `CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED` | unset/off | let eligible chat and Realtime turns continue the completed private Workspace linked to their conversation | unset; existing Workspace Runs and chat/voice behavior remain intact |
 | `DURABLE_SCHEDULE_OCCURRENCES_ENABLED` | unset/off | permit a future occurrence executor only after DB/provider fault gates | unset; legacy schedule behavior is untouched |
 
 ## Verification record — append only
@@ -145,6 +146,10 @@ Core additive records:
 | V012 | 2026-07-28 | Python/Modal grant and TypeScript endpoint seam regression | 15 targeted Vitest tests, 11 focused Python tests, `tsc --noEmit`, and `git diff --check` pass; Python-issued grant verifies in TypeScript and tenant/subject mismatch is denied. |
 | V013 | 2026-07-28 | full local regression after grant + occurrence seam | full Vitest suite and `agent/.venv/bin/python -m pytest -q agent/tests` pass (211 Python tests); expected fixture warnings only. |
 | V014 | 2026-07-28 | durable occurrence/step pure-contract suite | 5 tests pass: tenant-scoped occurrence key, version drift refusal, completed-step replay skip, retry/dead-letter/cancel states, stale lease-generation refusal, and feature-off default. SQL RPC execution remains unverified. |
+| V015 | 2026-07-29 | Loop 3 independent product/control review | rejected three drafts for unconditional capability exposure, incorrect chat retry identity, reload continuity, same-run panel staleness, false failure after durable acceptance, Realtime fail-closed regression, non-atomic retry conflict, and insufficient executable evidence; all findings were reworked before final acceptance |
+| V016 | 2026-07-29 | Workspace continuation focused acceptance | 49 focused tests, direct `tsc --noEmit`, and `git diff --check` pass; independent reviewer accepted server-derived run selection, tenant/reserved denial, conditional chat/voice schemas, dual-event dedupe, transcript continuity, same-run refresh, and accepted-work truthfulness |
+| V017 | 2026-07-29 | disposable socket-only PostgreSQL conflict test | one winning enqueue created one task; an equivalent normalized retry reused it; a changed-instruction retry raised the stable idempotency conflict; final task count remained one; temporary cluster was stopped and removed |
+| V018 | 2026-07-29 | full local regression after Loop 3 | 568 Vitest files passed: 5,136 tests passed and 1 skipped; expected negative-fixture warnings only |
 
 ## Deployment and rollback notes
 
@@ -197,3 +202,6 @@ Do not add these as disconnected features. The durable task graph, proposal boun
 - 2026-07-28: Published the full Frontier Quality Gate and current execution-control checkpoint to the dedicated Notion workspace; overview, evidence, and roadmap pages were substantively updated and verified.
 - 2026-07-28: Propagated narrow signed grants through Python/Modal internal integration and team-message callers; autonomous write attempts now stop locally before an HTTP call, while run-policy endpoint rollout remains shadow. Added 11 focused Python grant/correlation tests and compile validation.
 - 2026-07-28: Independently hardened Python-issued grants with TypeScript compatibility and subject-binding checks at integration/message endpoints. Added a feature-off `ScheduleOccurrence`/step-idempotency seam with tenant-scoped occurrence keys, expiry/fencing checks, definition-version refusal, and stale-worker protection; legacy cron and watermark behavior remain unchanged. Disposable DB validation is blocked by unavailable local Docker/Postgres; full local regression and 211 Python tests pass.
+- 2026-07-29: Removed the customer-facing Draft Mode label and shipped the feature-off Chippi Workspace path: a completed private Workspace Run can be continued from its right panel in a fresh no-network Modal VM with fixed inspect/apply/validate phases and private artifacts.
+- 2026-07-29: Added the feature-off chat and OpenAI Realtime Voice control adapters for that same durable Workspace. The server derives the completed run from the authenticated tenant conversation; the model and browser never choose a run ID. Accepted voice work is persisted to the conversation and immediately refreshes the existing Workspace panel.
+- 2026-07-29: The feedback loop rejected and repaired eight concrete defects before acceptance, including a database-level concurrent idempotency race. No production deployment, customer-data mutation, or outbound action occurred.

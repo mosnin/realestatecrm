@@ -11,10 +11,12 @@ import { realtimeVoiceGatewayReady } from '@/lib/realtime/voice-feature';
 import { stableVoiceId } from '@/lib/realtime/voice-delegation';
 import { startWorkSession } from '@/lib/work-sessions/start';
 import type { WorkSessionRow } from '@/lib/work-sessions/types';
+import { continueWorkspaceForConversation } from '@/lib/workspace-runs/conversation-continuation';
 
 export const runtime = 'nodejs';
 
-const bodySchema = z.object({
+const startBodySchema = z.object({
+  action: z.literal('start_work_session'),
   slug: z.string().trim().min(1).max(200),
   conversationId: z.string().trim().min(1).max(200).nullish(),
   callId: z.string().trim().min(1).max(200),
@@ -22,6 +24,16 @@ const bodySchema = z.object({
   autonomy: z.enum(['plan_first', 'just_go']).default('plan_first'),
   allowQuestions: z.boolean().default(true),
 }).strict();
+
+const continueBodySchema = z.object({
+  action: z.literal('continue_workspace_run'),
+  slug: z.string().trim().min(1).max(200),
+  conversationId: z.string().trim().min(1).max(200),
+  callId: z.string().trim().min(1).max(200),
+  instruction: z.string().trim().min(3).max(1000),
+}).strict();
+
+const bodySchema = z.discriminatedUnion('action', [startBodySchema, continueBodySchema]);
 
 async function ensureConversation(args: {
   spaceId: string;
@@ -134,6 +146,65 @@ async function persistVoiceTurn(args: {
   if (touchError) throw touchError;
 }
 
+/** Persist the voice continuation itself so a reload retains its run/task binding. */
+async function persistWorkspaceContinuationTurn(args: {
+  spaceId: string;
+  conversationId: string;
+  callId: string;
+  instruction: string;
+  runId: string;
+  taskId: string;
+  status: string;
+}): Promise<void> {
+  const userMessageId = stableVoiceId(args.spaceId, args.conversationId, args.callId, 'user-message');
+  const assistantMessageId = stableVoiceId(args.spaceId, args.conversationId, args.callId, 'assistant-message');
+  const userContent = `Continue the workspace: ${args.instruction}`;
+  const assistantContent = 'I started a private workspace continuation.';
+  const blocks: MessageBlock[] = [
+    { type: 'text', content: assistantContent },
+    {
+      type: 'tool_call',
+      callId: args.callId,
+      name: 'continue_workspace_run',
+      args: { instruction: args.instruction },
+      result: {
+        ok: true,
+        summary: assistantContent,
+        data: { runId: args.runId, taskId: args.taskId, status: args.status, openWorkspacePanel: true },
+      },
+      status: 'complete',
+      display: 'success',
+    },
+  ];
+  const now = new Date().toISOString();
+  const { error: userError } = await supabase.from('Message').upsert({
+    id: userMessageId,
+    spaceId: args.spaceId,
+    conversationId: args.conversationId,
+    role: 'user',
+    content: userContent,
+    blocks: [{ type: 'text', content: userContent }],
+    createdAt: now,
+  }, { onConflict: 'id', ignoreDuplicates: true });
+  if (userError) throw userError;
+  const { error: assistantError } = await supabase.from('Message').upsert({
+    id: assistantMessageId,
+    spaceId: args.spaceId,
+    conversationId: args.conversationId,
+    role: 'assistant',
+    content: assistantContent,
+    blocks: blocks as unknown as Record<string, unknown>[],
+    createdAt: new Date(Date.now() + 1).toISOString(),
+  }, { onConflict: 'id', ignoreDuplicates: true });
+  if (assistantError) throw assistantError;
+  const { error: touchError } = await supabase
+    .from('Conversation')
+    .update({ updatedAt: new Date().toISOString() })
+    .eq('id', args.conversationId)
+    .eq('spaceId', args.spaceId);
+  if (touchError) throw touchError;
+}
+
 export async function POST(req: Request) {
   if (!realtimeVoiceGatewayReady()) {
     return NextResponse.json({ error: 'Voice delegation is unavailable.' }, { status: 503 });
@@ -141,7 +212,10 @@ export async function POST(req: Request) {
 
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
-  const parsed = bodySchema.safeParse(read.data);
+  const rawBody = read.data && typeof read.data === 'object' && !Array.isArray(read.data)
+    ? { ...(read.data as Record<string, unknown>), action: (read.data as Record<string, unknown>).action ?? 'start_work_session' }
+    : read.data;
+  const parsed = bodySchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid voice delegation request.' }, { status: 400 });
   }
@@ -149,6 +223,57 @@ export async function POST(req: Request) {
 
   const auth = await requireSpaceOwner(body.slug);
   if (auth instanceof NextResponse) return auth;
+
+  if (body.action === 'continue_workspace_run') {
+    try {
+      await ensureConversation({
+        spaceId: auth.space.id,
+        requestedId: body.conversationId,
+        callId: body.callId,
+        goal: body.instruction,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'conversation_not_found') {
+        return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Could not verify the conversation.' }, { status: 500 });
+    }
+    const result = await continueWorkspaceForConversation({
+      spaceId: auth.space.id,
+      conversationId: body.conversationId,
+      instruction: body.instruction,
+      idempotencySeed: `voice:${body.callId}`,
+    });
+    if (!result.ok) {
+      const status = result.code === 'planning_unavailable' ? 503 : ['active', 'conflict', 'not_completed'].includes(result.code) ? 409 : result.code === 'disabled' || result.code === 'not_found' ? 404 : 500;
+      return NextResponse.json({ error: result.error }, { status });
+    }
+    let conversationRecorded = true;
+    try {
+      await persistWorkspaceContinuationTurn({
+        spaceId: auth.space.id,
+        conversationId: body.conversationId,
+        callId: body.callId,
+        instruction: body.instruction,
+        runId: result.runId,
+        taskId: result.taskId,
+        status: result.status,
+      });
+    } catch {
+      // The queue acceptance is already durable; never report that it failed.
+      // A provider retry with this call id will idempotently repair the record.
+      conversationRecorded = false;
+    }
+    return NextResponse.json({
+      ok: true,
+      conversationId: body.conversationId,
+      workspaceRunId: result.runId,
+      taskId: result.taskId,
+      status: result.status,
+      reused: result.reused,
+      conversationRecorded,
+    }, { status: result.reused ? 200 : 201 });
+  }
 
   const anticipatedConversationId =
     body.conversationId ??

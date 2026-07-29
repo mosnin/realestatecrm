@@ -50,6 +50,7 @@ interface RightPanelProps {
   workspaceRunsEnabled?: boolean;
   workspaceRunFollowUpsEnabled?: boolean;
   workspaceRunId?: string | null;
+  workspaceRunRefreshToken?: number;
   onContinueWorkspace?: () => void;
 }
 
@@ -77,6 +78,7 @@ export function RightPanel({
   workspaceRunsEnabled = false,
   workspaceRunFollowUpsEnabled = false,
   workspaceRunId = null,
+  workspaceRunRefreshToken = 0,
   onContinueWorkspace,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
@@ -202,7 +204,7 @@ export function RightPanel({
             <BrowserControlPanel actions={researchActions} sources={researchSources} />
           </div>
         )}
-        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} followUpsEnabled={workspaceRunFollowUpsEnabled} />}
+        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} followUpsEnabled={workspaceRunFollowUpsEnabled} refreshToken={workspaceRunRefreshToken} />}
       </div>
     </motion.div>
   );

@@ -86,6 +86,8 @@ import { isExplicitWorkbenchIntent, isWorkbookTransformIntent } from '@/lib/chip
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
+import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
+import { chatContinuationIdempotencySeed, isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -799,17 +801,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
+  let userMessageId: string;
   try {
-    await saveUserMessage({
+    ({ messageId: userMessageId } = await saveUserMessage({
       spaceId: ctx.space.id,
       conversationId,
       content: message,
       attachmentIds: body.attachmentIds,
-    });
+    }));
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
+
+  // This is the only chat-side capability lookup. It is deliberately
+  // fail-closed: a transient read failure must not interrupt normal chat or
+  // advertise a continuation capability we cannot prove is tenant-scoped.
+  let workspaceContinuationEligible = false;
+  if (isWorkspaceRunContinuationIntent(message)) {
+    try {
+      workspaceContinuationEligible = await isConversationWorkspaceContinuationEligible(ctx.space.id, conversationId);
+    } catch (err) {
+      logger.warn('[ai/task] workspace continuation eligibility unavailable', { spaceSlug, conversationId }, err);
+    }
+  }
+  toolCtx = {
+    ...toolCtx,
+    conversationId,
+    continuationIdempotencySeed: chatContinuationIdempotencySeed(userMessageId),
+    workspaceContinuationEligible,
+  };
 
   // The turn's credit charge is applied by the model-aware ChatUsage trigger
   // (meter_chat_usage_credits) when usage is recorded — not here. A second flat
@@ -975,7 +996,7 @@ export async function POST(req: NextRequest) {
   // exist. This is feature-gated and only narrows requests that explicitly ask
   // to open this turn's uploaded spreadsheet.
   const requiresTsWorkbenchTool = workbenchRequested || workbookTransformRequested;
-  const requiresTsNativeTool = requiresTsWorkbenchTool || researchWorkspaceRequested;
+  const requiresTsNativeTool = requiresTsWorkbenchTool || researchWorkspaceRequested || workspaceContinuationEligible;
   if (route === 'agent' && !requiresTsNativeTool && (forcedModal || perMessageModal)) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({

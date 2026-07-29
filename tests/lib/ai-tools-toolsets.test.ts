@@ -37,8 +37,8 @@ describe('toolsets — per-turn selection', () => {
     // A message that trips every pattern + core + orphans must surface the
     // whole catalog. Guards against a tool silently becoming uncallable.
     const everyKeyword =
-      'person deal tour property calendar send pipeline broker file plan browser';
-    const reachable = new Set(getChatTools(everyKeyword).map((t) => t.name));
+      'person deal tour property calendar send pipeline broker file plan browser continue workspace';
+    const reachable = new Set(getChatTools(everyKeyword, { workspaceContinuationEligible: true }).map((t) => t.name));
     const unreachable = [...ALL_NAMES].filter((n) => !reachable.has(n));
     expect(unreachable).toEqual([]);
   });
@@ -50,6 +50,13 @@ describe('toolsets — per-turn selection', () => {
     expect(names).toContain('find_person');
     // The whole point: a simple read does NOT ship the full catalog.
     expect(tools.length).toBeLessThan(ALL_TOOLS.length);
+  });
+
+  it('does not expose continuation schema without server-verified eligibility', () => {
+    const request = 'continue the completed workspace with the seller review';
+    expect(getChatTools(request).map((tool) => tool.name)).not.toContain('continue_workspace_run');
+    expect(getChatTools(request, { workspaceContinuationEligible: false }).map((tool) => tool.name)).not.toContain('continue_workspace_run');
+    expect(getChatTools(request, { workspaceContinuationEligible: true }).map((tool) => tool.name)).toContain('continue_workspace_run');
   });
 
   it('a tour request pulls in the tours toolset', () => {

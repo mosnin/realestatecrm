@@ -27,6 +27,7 @@
  */
 
 import { ALL_TOOLS } from './tools';
+import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import type { ToolDefinition } from './types';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
@@ -143,7 +144,8 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 function orphanNames(): string[] {
   const assigned = new Set<string>([...CORE_TOOL_NAMES]);
   for (const names of Object.values(TOOLSETS)) for (const n of names) assigned.add(n);
-  return ALL_TOOLS.map((t) => t.name).filter((n) => !assigned.has(n));
+  // Capability-gated tools must never become unconditional catalog orphans.
+  return ALL_TOOLS.map((t) => t.name).filter((n) => !assigned.has(n) && n !== 'continue_workspace_run');
 }
 
 /** Toolset names a message implies. Empty when only core is needed. */
@@ -164,10 +166,11 @@ export function selectToolsets(message: string): string[] {
  * The domain tools to hand the chat agent for THIS message: CORE + any
  * implied toolsets + orphans. A subset of ALL_TOOLS, deduped, order-preserved.
  */
-export function getChatTools(message: string): ToolDefinition[] {
+export function getChatTools(message: string, capabilities: { workspaceContinuationEligible?: boolean } = {}): ToolDefinition[] {
   const wanted = new Set<string>([...CORE_TOOL_NAMES, ...orphanNames()]);
   for (const ts of selectToolsets(message)) {
     for (const n of TOOLSETS[ts] ?? []) wanted.add(n);
   }
+  if (capabilities.workspaceContinuationEligible && isWorkspaceRunContinuationIntent(message)) wanted.add('continue_workspace_run');
   return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));
 }

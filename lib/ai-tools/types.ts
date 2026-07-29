@@ -58,6 +58,12 @@ export interface ToolContext {
   };
   /** The AbortSignal for the current turn — handlers should respect it. */
   signal: AbortSignal;
+  /** Server-resolved conversation binding for tools that continue durable work. */
+  conversationId?: string;
+  /** Deterministic turn/call seed; never supplied by the model. */
+  continuationIdempotencySeed?: string;
+  /** Server-resolved capability: this conversation has a completed Workspace. */
+  workspaceContinuationEligible?: boolean;
   /** Exact Attachment ids hydrated for this turn; not a workspace-wide grant. */
   attachmentIds?: readonly string[];
   attachmentManifest?: readonly { id: string; filename: string }[];

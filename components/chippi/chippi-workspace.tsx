@@ -328,6 +328,7 @@ export function ChippiWorkspace({
   const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
   const [workbenchRefreshVersion, setWorkbenchRefreshVersion] = useState<number | null>(null);
   const [workspaceRunId, setWorkspaceRunId] = useState<string | null>(null);
+  const [workspaceRunRefreshToken, setWorkspaceRunRefreshToken] = useState(0);
   // Durable re-entry: a page reload does not discard the latest workspace
   // attached to this conversation; the Workspace tab can reopen it.
   useEffect(() => {
@@ -410,9 +411,18 @@ export function ChippiWorkspace({
     if (activity.shouldOpen) openResearchWorkspace();
   }, [openResearchWorkspace]);
   const handleWorkspaceToolResult = useCallback((input: { name: string; data: unknown; ok: boolean }) => {
+    if (input.name === 'continue_workspace_run' && input.ok && input.data && typeof input.data === 'object') {
+      const runId = (input.data as { runId?: unknown; openWorkspacePanel?: unknown }).runId;
+      if (typeof runId === 'string' && (input.data as { openWorkspacePanel?: unknown }).openWorkspacePanel === true) {
+        setWorkspaceRunId(runId);
+        setWorkspaceRunRefreshToken((value) => value + 1);
+        setRightTab('workspace');
+        if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+      }
+    }
     handleWorkbenchToolResult(input);
     handleResearchToolResult(input);
-  }, [handleResearchToolResult, handleWorkbenchToolResult]);
+  }, [effectiveIsSplit, handleResearchToolResult, handleWorkbenchToolResult, isMobileOverlay, toggleSplit]);
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -1174,6 +1184,23 @@ export function ChippiWorkspace({
     [chippiBaseUrl, router, setMessages],
   );
 
+  const handleVoiceWorkspaceContinuation = useCallback((work: { conversationId: string; callId: string; instruction: string; runId: string; taskId: string; status: string }) => {
+    setWorkspaceRunId(work.runId);
+    setWorkspaceRunRefreshToken((value) => value + 1);
+    setRightTab('workspace');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+    setMessages((previous) => {
+      if (previous.some((message) => message.blocks.some((block) => block.type === 'tool_call' && block.callId === work.callId))) return previous;
+      return [...previous,
+        { id: `voice-user-${work.callId}`, role: 'user', blocks: [{ type: 'text', content: `Continue the workspace: ${work.instruction}` }] },
+        { id: `voice-assistant-${work.callId}`, role: 'assistant', blocks: [
+          { type: 'text', content: 'I started a private workspace continuation.' },
+          { type: 'tool_call', callId: work.callId, name: 'continue_workspace_run', args: { instruction: work.instruction }, result: { ok: true, summary: 'I started a private workspace continuation.', data: { runId: work.runId, taskId: work.taskId, status: work.status, openWorkspacePanel: true } }, status: 'complete', display: 'success' },
+        ] },
+      ];
+    });
+  }, [effectiveIsSplit, isMobileOverlay, toggleSplit]);
+
   // Counts for the header status sentence. Fetch only when we're rendering
   // the today view — no point pinging while in an active conversation. The
   // child sections still self-fetch their own data; this is a lightweight
@@ -1563,6 +1590,7 @@ export function ChippiWorkspace({
           open={voiceDialogOpen}
           onOpenChange={setVoiceDialogOpen}
           onDelegated={handleVoiceDelegated}
+          onWorkspaceContinued={handleVoiceWorkspaceContinuation}
         />
       )}
       {/* Rate-limit countdown — shown below the composer when the API is
@@ -2152,6 +2180,7 @@ export function ChippiWorkspace({
               workspaceRunsEnabled={workspaceRunsEnabled}
               workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
+              workspaceRunRefreshToken={workspaceRunRefreshToken}
               onContinueWorkspace={() => { setRightTab('activity'); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
@@ -2193,6 +2222,7 @@ export function ChippiWorkspace({
               workspaceRunsEnabled={workspaceRunsEnabled}
               workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
+              workspaceRunRefreshToken={workspaceRunRefreshToken}
               onContinueWorkspace={() => { setRightTab('activity'); closeMobileOverlay(); }}
               activeTab={rightTab}
               onTabChange={setRightTab}

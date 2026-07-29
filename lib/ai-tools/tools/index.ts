@@ -122,6 +122,7 @@ import { readFileTool } from './read-file';
 import { attachFileToPropertyTool } from './attach-file-to-property';
 import { readSpreadsheetTool } from './read-spreadsheet';
 import { summarizeDocumentTool } from './summarize-document';
+import { continueWorkspaceRunTool } from './continue-workspace-run';
 
 // Planning
 import { createPlanTool } from './plan';
@@ -144,6 +145,7 @@ import { askRealtorTool } from './ask-realtor';
  * allowed to use (sub-agents calling sub-agents isn't a feature we want).
  */
 export const ALL_TOOLS: ToolDefinition[] = [
+  continueWorkspaceRunTool as ToolDefinition,
   // ── People ─────────────────────────────────────────────────────────────
   findPersonTool as ToolDefinition,
   listContactsTool as ToolDefinition,

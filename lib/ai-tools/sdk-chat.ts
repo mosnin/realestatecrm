@@ -129,7 +129,9 @@ export function buildChatAgent(
   } = {},
 ): Agent {
   const selectedDomain =
-    opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
+    opts.userMessage != null
+      ? getChatTools(opts.userMessage, { workspaceContinuationEligible: ctx.workspaceContinuationEligible })
+      : ALL_TOOLS.filter((tool) => tool.name !== 'continue_workspace_run' || ctx.workspaceContinuationEligible);
   const domainTools = selectedDomain.filter((t) => !['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()).map((t: ToolDefinition) =>
     toSdkTool(t, ctx, opts.resultSink),
   );

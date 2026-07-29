@@ -6,7 +6,11 @@ import {
   realtimeVoiceGatewayEnabled,
   realtimeVoiceGatewayReady,
 } from '@/lib/realtime/voice-feature';
-import { buildVoiceRealtimeSessionConfig } from '@/lib/realtime/voice-delegation';
+import { buildVoiceRealtimeSessionConfig, failClosedVoiceWorkspaceContinuationEligibility } from '@/lib/realtime/voice-delegation';
+import { supabase } from '@/lib/supabase';
+import { isRealtorConversation } from '@/lib/chat/conversation-access';
+import { isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +40,28 @@ export async function POST(req: Request) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
+  let attachedConversationId: string | null = null;
+  if (conversationId) {
+    const { data, error } = await supabase
+      .from('Conversation')
+      .select('id, spaceId, title')
+      .eq('id', conversationId)
+      .eq('spaceId', auth.space.id)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: 'Could not verify conversation.' }, { status: 500 });
+    if (!isRealtorConversation(data, auth.space.id)) {
+      return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+    }
+    attachedConversationId = conversationId;
+  }
+  const workspaceContinuationEligible = await failClosedVoiceWorkspaceContinuationEligibility(
+    () => isConversationWorkspaceContinuationEligible(auth.space.id, attachedConversationId),
+    (error) => logger.warn('[realtime-session] workspace continuation eligibility unavailable', {
+      spaceId: auth.space.id,
+      conversationId: attachedConversationId,
+    }, error),
+  );
+
   const { allowed } = await checkRateLimit(`realtime:session:${auth.userId}`, 6, 60);
   if (!allowed) {
     return NextResponse.json(
@@ -61,7 +87,8 @@ export async function POST(req: Request) {
     JSON.stringify(
       buildVoiceRealtimeSessionConfig({
         workspaceName: auth.space.name,
-        conversationAttached: Boolean(conversationId),
+        conversationAttached: Boolean(attachedConversationId),
+        workspaceContinuationEligible,
       }),
     ),
   );
