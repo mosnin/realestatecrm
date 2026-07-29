@@ -26,6 +26,48 @@ function fromTable(table: ParsedTable, sourceAttachmentId: string, sourceFilenam
   return { kind: 'chippi.workbook.v1', sourceAttachmentId, sourceFilename, sheetName, sourceSheetCount, importedFirstSheetOnly: sourceSheetCount > 1, columns: table.columns, rows: table.rows };
 }
 
+export function workbookFromWorkspaceCsvBytes(input: ({
+  sourceKind: 'root';
+  taskId?: never;
+} | {
+  sourceKind: 'task';
+  taskId: string;
+}) & {
+  runId: string;
+  membershipId: string;
+  fileId: string;
+  filename: string;
+  bytes: Buffer;
+}): { workbook: StoredWorkbook } | { error: string } {
+  if (input.bytes.length === 0) return { error: 'The spreadsheet is empty.' };
+  if (input.bytes.length > MAX_WORKBOOK_SOURCE_BYTES) {
+    return { error: `Workbench currently supports spreadsheets up to ${MAX_WORKBOOK_SOURCE_BYTES / 1024 / 1024} MB.` };
+  }
+  if (!/\.csv$/i.test(input.filename)) return { error: 'Only completed CSV workspace files can be opened in Workbench.' };
+  const table = parseDelimitedText(input.bytes.toString('utf8'));
+  if (table.rowsTruncated || table.rows.length > MAX_WORKBOOK_ROWS) return { error: `The spreadsheet exceeds the ${MAX_WORKBOOK_ROWS}-row Workbench limit.` };
+  if (table.columns.length > MAX_WORKBOOK_COLUMNS) return { error: `The spreadsheet exceeds the ${MAX_WORKBOOK_COLUMNS}-column Workbench limit.` };
+  return {
+    workbook: {
+      kind: 'chippi.workbook.v1',
+      source: {
+        kind: 'workspace_file',
+        membershipKind: input.sourceKind,
+        runId: input.runId,
+        ...(input.taskId ? { taskId: input.taskId } : {}),
+        membershipId: input.membershipId,
+        fileId: input.fileId,
+      },
+      sourceFilename: input.filename,
+      sheetName: 'Sheet1',
+      sourceSheetCount: 1,
+      importedFirstSheetOnly: false,
+      columns: table.columns,
+      rows: table.rows,
+    },
+  };
+}
+
 export async function workbookFromAttachmentBytes(input: {
   attachmentId: string;
   filename: string;

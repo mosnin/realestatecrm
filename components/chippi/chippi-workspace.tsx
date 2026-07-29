@@ -2181,6 +2181,7 @@ export function ChippiWorkspace({
               workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
               workspaceRunRefreshToken={workspaceRunRefreshToken}
+              onOpenWorkbench={openWorkbenchArtifact}
               onContinueWorkspace={() => { setRightTab('activity'); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
@@ -2223,6 +2224,7 @@ export function ChippiWorkspace({
               workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
               workspaceRunId={workspaceRunId}
               workspaceRunRefreshToken={workspaceRunRefreshToken}
+              onOpenWorkbench={openWorkbenchArtifact}
               onContinueWorkspace={() => { setRightTab('activity'); closeMobileOverlay(); }}
               activeTab={rightTab}
               onTabChange={setRightTab}

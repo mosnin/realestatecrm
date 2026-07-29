@@ -23,7 +23,7 @@ function installDb() {
     let operation = 'read';
     const resolved = () => {
       if (table === 'Artifact' && operation === 'read') return { data: artifact, error: null };
-      if (table === 'ArtifactVersion' && operation === 'read') return { data: { versionNumber: 4 }, error: null };
+      if (table === 'ArtifactVersion' && operation === 'read') return { data: { versionNumber: 1, content: validContent }, error: null };
       if (table === 'ArtifactVersion' && operation === 'insert') return { data: { id: 'server-version-5', versionNumber: 5, createdByAgent: 'user' }, error: null };
       if (table === 'Artifact' && operation === 'update') return { data: { ...artifact, currentVersionId: 'server-version-5' }, error: null };
       return { data: null, error: null };
@@ -65,6 +65,21 @@ describe('workbook artifact PATCH', () => {
     const body = await response.json();
     expect(body.artifact.newVersion).toEqual({ id: 'server-version-5', versionNumber: 5, createdAt: '2026-09-11T12:00:00.000Z', createdByAgent: 'user' });
     expect(mock.rpc).toHaveBeenCalledWith('append_workbook_artifact_version', expect.objectContaining({ p_space_id: 'space-1', p_artifact_id: artifact.id }));
+  });
+
+  it('rejects a new version that rewrites the immutable source provenance', async () => {
+    const changedSource = stringifyWorkbook({
+      kind: 'chippi.workbook.v1',
+      source: { kind: 'workspace_file', membershipKind: 'root', runId: 'run-1', membershipId: 'membership-1', fileId: 'file-1' },
+      sourceFilename: 'workspace-comps-1.csv',
+      sheetName: 'Sheet1',
+      columns: ['Name', 'Price'],
+      rows: [['Ada', '750000']],
+    });
+    const response = await PATCH({ json: async () => ({ content: changedSource }) } as never, { params: Promise.resolve({ artifactId: artifact.id }) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Workbook source provenance cannot be changed.' });
+    expect(mock.rpc).not.toHaveBeenCalled();
   });
 
   it('fails closed for a disabled space before invoking the append RPC', async () => {

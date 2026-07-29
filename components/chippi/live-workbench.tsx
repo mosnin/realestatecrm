@@ -108,7 +108,7 @@ function Receipt({ version }: { version: WorkbenchVersion }) {
       return (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5 text-[11px] leading-relaxed text-foreground/75">
           <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <span>Your saved version from {formatSavedAt(version.createdAt)}. The source attachment remains unchanged.</span>
+          <span>Your saved version from {formatSavedAt(version.createdAt)}. The imported source remains unchanged.</span>
         </div>
       );
     }

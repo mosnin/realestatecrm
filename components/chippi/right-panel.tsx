@@ -52,6 +52,7 @@ interface RightPanelProps {
   workspaceRunId?: string | null;
   workspaceRunRefreshToken?: number;
   onContinueWorkspace?: () => void;
+  onOpenWorkbench?: (artifactId: string, versionNumber?: number) => void;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -80,6 +81,7 @@ export function RightPanel({
   workspaceRunId = null,
   workspaceRunRefreshToken = 0,
   onContinueWorkspace,
+  onOpenWorkbench,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -204,7 +206,7 @@ export function RightPanel({
             <BrowserControlPanel actions={researchActions} sources={researchSources} />
           </div>
         )}
-        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} followUpsEnabled={workspaceRunFollowUpsEnabled} refreshToken={workspaceRunRefreshToken} />}
+        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} onOpenWorkbench={onOpenWorkbench} followUpsEnabled={workspaceRunFollowUpsEnabled} workbenchEnabled={workbenchEnabled} refreshToken={workspaceRunRefreshToken} />}
       </div>
     </motion.div>
   );

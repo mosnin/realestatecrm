@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { workbookContentHash } from '@/lib/chippi/workbench-store';
-import { validateStoredWorkbookContent, validateWorkbookVersionMetadata } from '@/lib/chippi/workbench-format';
+import { hasSameWorkbookSource, parseStoredWorkbook, validateStoredWorkbookContent, validateWorkbookVersionMetadata } from '@/lib/chippi/workbench-format';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 import { parseWorkbookTransformReceipt } from '@/lib/chippi/workbook-transform';
@@ -162,6 +162,18 @@ export async function PATCH(
     if (!validation.workbook) return NextResponse.json({ error: validation.error ?? 'Invalid workbook content' }, { status: 400 });
     const metadataValidation = validateWorkbookVersionMetadata(metadata);
     if (!metadataValidation.metadata) return NextResponse.json({ error: metadataValidation.error ?? 'Invalid workbook metadata' }, { status: 400 });
+    const { data: sourceVersion, error: sourceError } = await supabase
+      .from('ArtifactVersion')
+      .select('content')
+      .eq('artifactId', artifactId)
+      .eq('spaceId', artifact.spaceId)
+      .eq('versionNumber', 1)
+      .maybeSingle();
+    const sourceWorkbook = sourceVersion?.content ? parseStoredWorkbook(sourceVersion.content) : null;
+    if (sourceError || !sourceWorkbook) return NextResponse.json({ error: 'Failed to validate workbook source' }, { status: 500 });
+    if (!hasSameWorkbookSource(sourceWorkbook, validation.workbook)) {
+      return NextResponse.json({ error: 'Workbook source provenance cannot be changed.' }, { status: 400 });
+    }
     const { data: appended, error: appendError } = await supabase.rpc('append_workbook_artifact_version', {
       p_artifact_id: artifactId, p_space_id: artifact.spaceId, p_content: content, p_content_hash: workbookContentHash(content), p_metadata: metadataValidation.metadata,
     });
