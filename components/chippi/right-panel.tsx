@@ -12,6 +12,7 @@ import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 import { RightPanelTabs, type RightPanelTab } from './right-panel-tabs';
 import { BrowserView } from './browser-view';
 import { embedSrcFor, type EmbedTab, type RightPanelVariant } from './right-panel-embeds';
+import { LiveWorkbench } from './live-workbench';
 
 interface RightPanelProps {
   slug: string;
@@ -62,12 +63,18 @@ export function RightPanel({
   // remount-per-switch behavior.
   const [browserMounted, setBrowserMounted] = useState(false);
   const isBrowser = activeTab === 'browser';
+  // Slice A is off unless a deployment explicitly provides this public flag.
+  // The panel is therefore safe to merge without exposing a partial local-only
+  // artifact workflow to paying customers.
+  const workbenchEnabled = process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true';
+  const isWorkbench = activeTab === 'workbench' && workbenchEnabled;
+  const isEmbedded = !isBrowser && !isWorkbench;
   // Broker has no surface for some realtor tabs (Documents). If a stale
   // persisted tab (the split-panel state is shared across variants) lands on
   // one, self-correct to the always-present live-work activity feed rather
   // than render a broken iframe.
-  const embedTab = isBrowser ? 'activity' : (activeTab as EmbedTab);
-  const embedSrc = embedSrcFor(variant, embedTab, slug);
+  const embedTab: EmbedTab = isEmbedded ? (activeTab as EmbedTab) : 'activity';
+  const embedSrc = isEmbedded ? embedSrcFor(variant, embedTab, slug) : null;
 
   useEffect(() => {
     setIsLoading(true);
@@ -75,10 +82,12 @@ export function RightPanel({
   }, [activeTab]);
 
   useEffect(() => {
-    if (variant === 'broker' && !isBrowser && embedSrc === null) {
+    if (activeTab === 'workbench' && !workbenchEnabled) {
+      onTabChange('activity');
+    } else if (variant === 'broker' && isEmbedded && embedSrc === null) {
       onTabChange('activity');
     }
-  }, [variant, isBrowser, embedSrc, onTabChange]);
+  }, [activeTab, embedSrc, isEmbedded, onTabChange, variant, workbenchEnabled]);
 
   return (
     <motion.div
@@ -96,7 +105,12 @@ export function RightPanel({
       transition={{ duration: DURATION_BASE, ease: EASE_IN_OUT }}
     >
       <div className="relative">
-        <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} variant={variant} />
+        <RightPanelTabs
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          variant={variant}
+          workbenchEnabled={workbenchEnabled}
+        />
         {onClose && (
           <button
             type="button"
@@ -110,7 +124,7 @@ export function RightPanel({
       </div>
 
       <div className="flex-1 relative min-h-0">
-        {!isBrowser && (
+        {isEmbedded && (
           <>
             {isLoading && (
               <div className="absolute inset-0 bg-background">
@@ -142,6 +156,7 @@ export function RightPanel({
             <BrowserView slug={slug} isResizing={isResizing} />
           </div>
         )}
+        {isWorkbench && <LiveWorkbench />}
       </div>
     </motion.div>
   );

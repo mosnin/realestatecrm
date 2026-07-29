@@ -6,7 +6,7 @@ import type { RightPanelTab } from './right-panel-tabs';
 export type RightPanelVariant = 'realtor' | 'broker';
 
 // Every tab except 'browser' embeds an internal dashboard page.
-export type EmbedTab = Exclude<RightPanelTab, 'browser'>;
+export type EmbedTab = Exclude<RightPanelTab, 'browser' | 'workbench'>;
 
 // `?embed=1` flips the dashboard layout into chrome-stripped mode so the iframe
 // shows ONLY the page content (the People list, Deals kanban, Properties grid,
