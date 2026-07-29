@@ -29,4 +29,18 @@ describe('Realtime voice product wiring', () => {
     expect(dialog).toContain("sendEvent({ type: 'response.create' })");
     expect(dialog).toContain("fetch('/api/ai/realtime-delegate'");
   });
+
+  it('dedupes floor-manager calls, keeps run selection server-side, and refreshes the existing specialist card', () => {
+    const dialog = read('components/chippi/realtime-voice-dialog.tsx');
+    const workspace = read('components/chippi/chippi-workspace.tsx');
+    const card = read('components/ai/blocks/subagent-task-block-view.tsx');
+    expect(dialog).toContain('extractSpecialistControlCalls(event)');
+    expect(dialog).toContain('handledCallsRef.current.has(callId)');
+    expect(dialog).toContain("action: event.name, slug, conversationId: activeConversationId, callId");
+    expect(dialog).not.toContain("action: event.name, slug, conversationId: activeConversationId, callId, runId");
+    expect(dialog).toContain('buildSpecialistControlVoiceOutput(event.name, data)');
+    expect(dialog).not.toContain('runId: data.runId');
+    expect(workspace).toContain("new CustomEvent('chippi:swarm-refresh'");
+    expect(card).toContain("window.addEventListener('chippi:swarm-refresh'");
+  });
 });

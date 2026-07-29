@@ -58,7 +58,7 @@ export interface VoiceRealtimeSessionConfig {
   };
   tools: Array<{
     type: 'function';
-    name: 'start_work_session' | 'continue_workspace_run';
+    name: 'start_work_session' | 'continue_workspace_run' | 'get_specialist_status' | 'cancel_specialist_task';
     description: string;
     parameters: Record<string, unknown>;
   }>;
@@ -69,6 +69,7 @@ export function buildVoiceRealtimeSessionConfig(args: {
   workspaceName: string;
   conversationAttached: boolean;
   workspaceContinuationEligible?: boolean;
+  floorManagerEligible?: boolean;
 }): VoiceRealtimeSessionConfig {
   const conversationLine = args.conversationAttached
     ? 'This voice session is attached to the open Chippi conversation.'
@@ -84,10 +85,20 @@ export function buildVoiceRealtimeSessionConfig(args: {
       'You can discuss the request and you can start one durable background Work Session.',
       'Call start_work_session only when the user explicitly asks you to delegate, research, prepare, analyze, or work on a substantial goal in the background.',
       ...(args.workspaceContinuationEligible ? ['When the user explicitly asks to continue the completed Workspace in this conversation, call continue_workspace_run. Never ask for or provide a Workspace run id.'] : []),
-      'Never claim the work started until the function returns ok=true.',
+      ...(args.floorManagerEligible ? [
+        'When the user asks how the latest specialist task in this conversation is doing, call get_specialist_status.',
+        'Only when the user explicitly asks to stop the current specialist task, call cancel_specialist_task.',
+        'Never ask for, accept, or provide a specialist run id. The server resolves the exact conversation-linked task.',
+      ] : []),
+      'For start_work_session, say a new background session started only when that call returns ok=true.',
+      ...(args.workspaceContinuationEligible ? ['For continue_workspace_run, say the Workspace continuation started only when that call returns ok=true.'] : []),
+      ...(args.floorManagerEligible ? [
+        'For get_specialist_status, report only the returned coarse status facts. Never call the task running unless active=true.',
+        'For cancel_specialist_task, say it stopped only when outcome=cancelled; describe already_terminal or no_run truthfully.',
+      ] : []),
       'Use plan_first unless the user clearly says to proceed without waiting for plan approval.',
       'This voice capability cannot send messages or change CRM records. Say so plainly if asked.',
-      'After a successful function call, tell the user the work is running in the conversation and that they can close voice mode.',
+      'After starting or continuing work successfully, tell the user they can close voice mode while that work continues.',
     ].join('\n'),
     audio: {
       input: {
@@ -148,6 +159,30 @@ export function buildVoiceRealtimeSessionConfig(args: {
           required: ['instruction'],
         },
       }] : []),
+      ...(args.floorManagerEligible ? [
+        {
+          type: 'function' as const,
+          name: 'get_specialist_status' as const,
+          description: 'Get the latest conversation-bound specialist task status. The server resolves the task; no run id is accepted.',
+          parameters: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          type: 'function' as const,
+          name: 'cancel_specialist_task' as const,
+          description: 'Stop the current active conversation-bound specialist task after an explicit user request. The server resolves the task; no run id is accepted.',
+          parameters: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {},
+            required: [],
+          },
+        },
+      ] : []),
     ],
     tool_choice: 'auto',
   };

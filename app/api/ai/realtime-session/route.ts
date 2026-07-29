@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { isRealtorConversation } from '@/lib/chat/conversation-access';
 import { isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
 import { logger } from '@/lib/logger';
+import { isRealtimeVoiceFloorManagerEnabled } from '@/lib/realtime/floor-manager-flag';
 
 export const runtime = 'nodejs';
 
@@ -89,6 +90,7 @@ export async function POST(req: Request) {
         workspaceName: auth.space.name,
         conversationAttached: Boolean(attachedConversationId),
         workspaceContinuationEligible,
+        floorManagerEligible: Boolean(attachedConversationId) && isRealtimeVoiceFloorManagerEnabled(),
       }),
     ),
   );

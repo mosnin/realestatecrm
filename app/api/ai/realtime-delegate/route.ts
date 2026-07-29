@@ -12,6 +12,7 @@ import { stableVoiceId } from '@/lib/realtime/voice-delegation';
 import { startWorkSession } from '@/lib/work-sessions/start';
 import type { WorkSessionRow } from '@/lib/work-sessions/types';
 import { continueWorkspaceForConversation } from '@/lib/workspace-runs/conversation-continuation';
+import { isRealtimeVoiceFloorManagerEnabled } from '@/lib/realtime/floor-manager-flag';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +34,30 @@ const continueBodySchema = z.object({
   instruction: z.string().trim().min(3).max(1000),
 }).strict();
 
-const bodySchema = z.discriminatedUnion('action', [startBodySchema, continueBodySchema]);
+const specialistStatusBodySchema = z.object({
+  action: z.literal('get_specialist_status'),
+  slug: z.string().trim().min(1).max(200),
+  conversationId: z.string().trim().min(1).max(200),
+  callId: z.string().trim().min(1).max(200),
+}).strict();
+const specialistCancelBodySchema = specialistStatusBodySchema.extend({
+  action: z.literal('cancel_specialist_task'),
+}).strict();
+
+const bodySchema = z.discriminatedUnion('action', [startBodySchema, continueBodySchema, specialistStatusBodySchema, specialistCancelBodySchema]);
+const ACTIVE_SWARM_STATUSES = new Set(['queued', 'planning', 'running', 'auditing']);
+
+function memberCounts(rows: Array<{ status?: unknown }> | null): {
+  total: number; queued: number; running: number; completed: number; failed: number;
+} {
+  const counts = { total: 0, queued: 0, running: 0, completed: 0, failed: 0 };
+  for (const row of rows ?? []) {
+    if (!['queued', 'running', 'completed', 'failed'].includes(String(row.status))) continue;
+    counts.total += 1;
+    counts[row.status as 'queued' | 'running' | 'completed' | 'failed'] += 1;
+  }
+  return counts;
+}
 
 async function ensureConversation(args: {
   spaceId: string;
@@ -206,10 +230,6 @@ async function persistWorkspaceContinuationTurn(args: {
 }
 
 export async function POST(req: Request) {
-  if (!realtimeVoiceGatewayReady()) {
-    return NextResponse.json({ error: 'Voice delegation is unavailable.' }, { status: 503 });
-  }
-
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
   const rawBody = read.data && typeof read.data === 'object' && !Array.isArray(read.data)
@@ -220,9 +240,132 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid voice delegation request.' }, { status: 400 });
   }
   const body = parsed.data;
+  const specialistControl = body.action === 'get_specialist_status' || body.action === 'cancel_specialist_task';
+  if (specialistControl && !isRealtimeVoiceFloorManagerEnabled()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (!realtimeVoiceGatewayReady()) {
+    return NextResponse.json({ error: 'Voice delegation is unavailable.' }, { status: 503 });
+  }
 
   const auth = await requireSpaceOwner(body.slug);
   if (auth instanceof NextResponse) return auth;
+
+  if (specialistControl) {
+    try {
+      await ensureConversation({
+        spaceId: auth.space.id,
+        requestedId: body.conversationId,
+        callId: body.callId,
+        goal: body.action,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'conversation_not_found') {
+        return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Could not verify the conversation.' }, { status: 500 });
+    }
+
+    // A repeated cancellation call must reach the durable receipt even when
+    // the caller has since exhausted the quota. Otherwise a provider retry
+    // could be rejected after the first call already changed state.
+    let existingCancelReceipt = false;
+    if (body.action === 'cancel_specialist_task') {
+      const { data: receipt, error: receiptError } = await supabase
+        .from('RealtimeSwarmControlReceipt')
+        .select('id')
+        .eq('spaceId', auth.space.id)
+        .eq('conversationId', body.conversationId)
+        .eq('callId', body.callId)
+        .eq('action', 'cancel_specialist_task')
+        .maybeSingle();
+      if (receiptError) {
+        return NextResponse.json({ error: 'Could not verify the specialist control request.' }, { status: 500 });
+      }
+      existingCancelReceipt = Boolean(receipt);
+    }
+    if (!existingCancelReceipt) {
+      const rl = await checkRateLimit(`realtime:floor-manager:${auth.space.id}`, 30, 60);
+      if (!rl.allowed) {
+        return NextResponse.json({ error: 'Too many voice control requests. Try again shortly.' }, { status: 429 });
+      }
+    }
+
+    if (body.action === 'get_specialist_status') {
+      const { data: run, error: runError } = await supabase
+        .from('SwarmRun')
+        .select('id,status')
+        .eq('spaceId', auth.space.id)
+        .eq('conversationId', body.conversationId)
+        .order('createdAt', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (runError) return NextResponse.json({ error: 'Could not read specialist status.' }, { status: 500 });
+      if (!run) {
+        return NextResponse.json({
+          ok: true,
+          action: body.action,
+          found: false,
+          status: 'none',
+          active: false,
+          terminal: false,
+          failed: false,
+          members: memberCounts(null),
+          resultAvailable: false,
+        });
+      }
+      const { data: members, error: membersError } = await supabase
+        .from('SwarmMember')
+        .select('status')
+        .eq('swarmRunId', run.id)
+        .limit(50);
+      if (membersError) return NextResponse.json({ error: 'Could not read specialist status.' }, { status: 500 });
+      let resultAvailable = false;
+      if (run.status === 'completed') {
+        const { count, error: resultError } = await supabase
+          .from('SwarmRun')
+          .select('id', { count: 'exact', head: true })
+          .eq('id', run.id)
+          .eq('spaceId', auth.space.id)
+          .not('result', 'is', null);
+        if (resultError) return NextResponse.json({ error: 'Could not read specialist status.' }, { status: 500 });
+        resultAvailable = (count ?? 0) > 0;
+      }
+      const active = ACTIVE_SWARM_STATUSES.has(run.status);
+      return NextResponse.json({
+        ok: true,
+        action: body.action,
+        found: true,
+        // Browser-only hydration handle; function_call_output omits it.
+        runId: run.id,
+        status: run.status,
+        active,
+        terminal: !active,
+        failed: run.status === 'failed',
+        members: memberCounts(members),
+        resultAvailable,
+      });
+    }
+
+    const { data: cancelled, error: cancelError } = await supabase.rpc('cancel_conversation_swarm_run', {
+      p_space_id: auth.space.id,
+      p_conversation_id: body.conversationId,
+      p_call_id: body.callId,
+    });
+    if (cancelError) return NextResponse.json({ error: 'Could not stop the specialist task.' }, { status: 500 });
+    const row = Array.isArray(cancelled) ? cancelled[0] : cancelled;
+    if (!row) return NextResponse.json({ error: 'Could not stop the specialist task.' }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      action: body.action,
+      found: Boolean(row.run_id),
+      // Browser-only hydration handle; function_call_output omits it.
+      runId: row.run_id ?? null,
+      status: row.status ?? 'none',
+      outcome: row.outcome,
+      reused: row.reused === true,
+    });
+  }
 
   if (body.action === 'continue_workspace_run') {
     try {
@@ -273,6 +416,9 @@ export async function POST(req: Request) {
       reused: result.reused,
       conversationRecorded,
     }, { status: result.reused ? 200 : 201 });
+  }
+  if (body.action !== 'start_work_session') {
+    return NextResponse.json({ error: 'Invalid voice delegation request.' }, { status: 400 });
   }
 
   const anticipatedConversationId =

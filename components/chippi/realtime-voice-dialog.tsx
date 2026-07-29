@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { extractContinueWorkspaceRunCalls, extractStartWorkSessionCalls } from '@/lib/realtime/client-events';
+import {
+  buildSpecialistControlVoiceOutput,
+  extractContinueWorkspaceRunCalls,
+  extractSpecialistControlCalls,
+  extractStartWorkSessionCalls,
+  type SpecialistControlBrowserResult,
+} from '@/lib/realtime/client-events';
 
 type VoiceState =
   | 'connecting'
@@ -70,6 +76,7 @@ export function RealtimeVoiceDialog({
   onOpenChange,
   onDelegated,
   onWorkspaceContinued,
+  onSpecialistControlled,
 }: {
   slug: string;
   conversationId: string | null;
@@ -77,6 +84,7 @@ export function RealtimeVoiceDialog({
   onOpenChange: (open: boolean) => void;
   onDelegated: (work: DelegatedWork) => void;
   onWorkspaceContinued: (work: { conversationId: string; callId: string; instruction: string; runId: string; taskId: string; status: string }) => void;
+  onSpecialistControlled?: (runId: string) => void;
 }) {
   const [voiceState, setVoiceState] = useState<VoiceState>('connecting');
   const [caption, setCaption] = useState('');
@@ -91,6 +99,8 @@ export function RealtimeVoiceDialog({
   delegatedRef.current = onDelegated;
   const workspaceContinuedRef = useRef(onWorkspaceContinued);
   workspaceContinuedRef.current = onWorkspaceContinued;
+  const specialistControlledRef = useRef(onSpecialistControlled);
+  specialistControlledRef.current = onSpecialistControlled;
 
   const stop = useCallback(() => {
     channelRef.current?.close();
@@ -245,6 +255,50 @@ export function RealtimeVoiceDialog({
     [sendEvent, slug],
   );
 
+  const runSpecialistControl = useCallback(
+    async (event: RealtimeEvent & { name: 'get_specialist_status' | 'cancel_specialist_task' }) => {
+      const callId = event.call_id?.trim();
+      const activeConversationId = sessionConversationIdRef.current;
+      if (!callId || !activeConversationId || handledCallsRef.current.has(callId)) return;
+      handledCallsRef.current.add(callId);
+      let args: unknown;
+      try { args = JSON.parse(event.arguments ?? '{}'); } catch { args = null; }
+      if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length > 0) {
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify({ ok: false, error: 'This voice control does not accept task identifiers.' }) } });
+        sendEvent({ type: 'response.create' });
+        return;
+      }
+      setVoiceState('thinking');
+      setCaption(event.name === 'get_specialist_status' ? 'Checking specialist progress…' : 'Stopping the current specialist task…');
+      try {
+        const res = await fetch('/api/ai/realtime-delegate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: event.name, slug, conversationId: activeConversationId, callId }),
+        });
+        const data = (await res.json().catch(() => ({}))) as SpecialistControlBrowserResult & {
+          ok?: boolean;
+          error?: string;
+        };
+        if (!res.ok || !data.ok) throw new Error(data.error || 'The specialist control could not be completed.');
+        if (event.name === 'cancel_specialist_task' && typeof data.runId === 'string') {
+          specialistControlledRef.current?.(data.runId);
+        }
+        const voiceOutput = buildSpecialistControlVoiceOutput(event.name, data);
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(voiceOutput) } });
+        sendEvent({ type: 'response.create' });
+        setVoiceState('thinking');
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'The specialist control could not be completed.';
+        sendEvent({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output: JSON.stringify({ ok: false, error: message }) } });
+        sendEvent({ type: 'response.create' });
+        setVoiceState('listening');
+        setError(message);
+      }
+    },
+    [sendEvent, slug],
+  );
+
   useEffect(() => {
     if (!open) {
       stop();
@@ -323,6 +377,14 @@ export function RealtimeVoiceDialog({
               arguments: call.arguments,
             });
           }
+          for (const call of extractSpecialistControlCalls(event)) {
+            void runSpecialistControl({
+              type: 'response.function_call_arguments.done',
+              name: call.name,
+              call_id: call.callId,
+              arguments: call.arguments,
+            });
+          }
           if (event.type === 'error') {
             setError(event.error?.message || 'Voice mode ran into a problem.');
             setVoiceState('error');
@@ -368,7 +430,7 @@ export function RealtimeVoiceDialog({
     // voice session is still speaking; restarting WebRTC at that moment would
     // cut off the confirmation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, runDelegation, runWorkspaceContinuation, slug, stop]);
+  }, [open, runDelegation, runSpecialistControl, runWorkspaceContinuation, slug, stop]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

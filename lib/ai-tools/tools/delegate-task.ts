@@ -221,7 +221,12 @@ export function buildDelegateTaskTool() {
       // Create the SwarmRun the UI will watch. Same shape /api/swarm uses.
       const { data: run, error: insertError } = await supabase
         .from('SwarmRun')
-        .insert({ spaceId: ctx.space.id, goal, status: 'queued' })
+        .insert({
+          spaceId: ctx.space.id,
+          goal,
+          status: 'queued',
+          ...(ctx.conversationId ? { conversationId: ctx.conversationId } : {}),
+        })
         .select('id')
         .single();
 

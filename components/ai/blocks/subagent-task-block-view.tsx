@@ -352,6 +352,15 @@ export function SubagentTaskBlockView({ block }: SubagentTaskBlockViewProps) {
   }, [block.runId]);
 
   useEffect(() => {
+    const refresh = (event: Event) => {
+      const runId = (event as CustomEvent<{ runId?: unknown }>).detail?.runId;
+      if (runId === block.runId) void hydrate().catch(() => {});
+    };
+    window.addEventListener('chippi:swarm-refresh', refresh);
+    return () => window.removeEventListener('chippi:swarm-refresh', refresh);
+  }, [block.runId, hydrate]);
+
+  useEffect(() => {
     const controller = new AbortController();
     let disposed = false;
 

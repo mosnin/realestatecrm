@@ -19,6 +19,7 @@ export interface CustomAgent {
 export interface SwarmRun {
   id: string;
   spaceId: string;
+  conversationId?: string | null;
   goal: string;
   status: SwarmStatus;
   plan: SwarmPlan | null;

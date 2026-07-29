@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { extractContinueWorkspaceRunCalls, extractStartWorkSessionCalls } from '@/lib/realtime/client-events';
+import {
+  buildSpecialistControlVoiceOutput,
+  extractContinueWorkspaceRunCalls,
+  extractSpecialistControlCalls,
+  extractStartWorkSessionCalls,
+} from '@/lib/realtime/client-events';
 
 describe('Realtime client event normalization', () => {
   it('extracts the dedicated completed-arguments event', () => {
@@ -75,5 +80,56 @@ describe('Realtime client event normalization', () => {
         { type: 'function_call', name: 'continue_workspace_run', call_id: 'continue_done', arguments: '{"instruction":"Extend it"}' },
       ] },
     })).toEqual([{ callId: 'continue_done', arguments: '{"instruction":"Extend it"}' }]);
+  });
+
+  it('normalizes both specialist controls from both event shapes for browser dedupe', () => {
+    expect(extractSpecialistControlCalls({
+      type: 'response.function_call_arguments.done',
+      name: 'get_specialist_status',
+      call_id: 'status-direct',
+      arguments: '{}',
+    })).toEqual([{ name: 'get_specialist_status', callId: 'status-direct', arguments: '{}' }]);
+    expect(extractSpecialistControlCalls({
+      type: 'response.done',
+      response: { output: [
+        { type: 'function_call', name: 'cancel_specialist_task', call_id: 'cancel-done', arguments: '{}' },
+        { type: 'function_call', name: 'start_work_session', call_id: 'not-control', arguments: '{}' },
+      ] },
+    })).toEqual([{ name: 'cancel_specialist_task', callId: 'cancel-done', arguments: '{}' }]);
+  });
+
+  it('forwards only coarse specialist facts to the Realtime model', () => {
+    const privateBrowserResponse = {
+      runId: 'browser-only-run',
+      goal: 'private goal',
+      resultSummary: 'private result',
+      errorSummary: 'private provider error',
+      found: true,
+      status: 'completed',
+      active: false,
+      terminal: true,
+      failed: false,
+      members: { total: 2, queued: 0, running: 0, completed: 2, failed: 0 },
+      resultAvailable: true,
+      outcome: 'already_terminal',
+      reused: true,
+    };
+    expect(buildSpecialistControlVoiceOutput('get_specialist_status', privateBrowserResponse)).toEqual({
+      ok: true,
+      found: true,
+      status: 'completed',
+      active: false,
+      terminal: true,
+      failed: false,
+      members: { total: 2, queued: 0, running: 0, completed: 2, failed: 0 },
+      resultAvailable: true,
+    });
+    expect(buildSpecialistControlVoiceOutput('cancel_specialist_task', privateBrowserResponse)).toEqual({
+      ok: true,
+      found: true,
+      status: 'completed',
+      outcome: 'already_terminal',
+      reused: true,
+    });
   });
 });

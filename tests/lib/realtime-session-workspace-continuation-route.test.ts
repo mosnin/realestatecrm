@@ -10,7 +10,7 @@ vi.mock('@/lib/workspace-runs/conversation-continuation', () => ({ isConversatio
 import { POST } from '@/app/api/ai/realtime-session/route';
 
 const originalFetch = global.fetch;
-afterEach(() => { global.fetch = originalFetch; delete process.env.OPENAI_API_KEY; });
+afterEach(() => { global.fetch = originalFetch; delete process.env.OPENAI_API_KEY; delete process.env.CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED; });
 describe('Realtime session Workspace continuation capability', () => {
   beforeEach(() => {
     vi.clearAllMocks(); process.env.OPENAI_API_KEY = 'test-key';
@@ -39,5 +39,15 @@ describe('Realtime session Workspace continuation capability', () => {
     const { response, config } = await sessionFor(new Error('temporary read failure'));
     expect(response.status).toBe(200);
     expect(config.tools.map((tool: { name: string }) => tool.name)).toEqual(['start_work_session']);
+  });
+  it('adds floor-manager tools only under the independent server flag', async () => {
+    process.env.CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED = 'true';
+    const { response, config } = await sessionFor(false);
+    expect(response.status).toBe(200);
+    expect(config.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      'start_work_session',
+      'get_specialist_status',
+      'cancel_specialist_task',
+    ]);
   });
 });

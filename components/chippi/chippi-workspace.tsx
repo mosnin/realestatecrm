@@ -1201,6 +1201,10 @@ export function ChippiWorkspace({
     });
   }, [effectiveIsSplit, isMobileOverlay, toggleSplit]);
 
+  const handleVoiceSpecialistControlled = useCallback((runId: string) => {
+    window.dispatchEvent(new CustomEvent('chippi:swarm-refresh', { detail: { runId } }));
+  }, []);
+
   // Counts for the header status sentence. Fetch only when we're rendering
   // the today view — no point pinging while in an active conversation. The
   // child sections still self-fetch their own data; this is a lightweight
@@ -1591,6 +1595,7 @@ export function ChippiWorkspace({
           onOpenChange={setVoiceDialogOpen}
           onDelegated={handleVoiceDelegated}
           onWorkspaceContinued={handleVoiceWorkspaceContinuation}
+          onSpecialistControlled={handleVoiceSpecialistControlled}
         />
       )}
       {/* Rate-limit countdown — shown below the composer when the API is
