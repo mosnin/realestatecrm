@@ -1,0 +1,116 @@
+{
+  "title": "Chippi Frontier Program Scorecard",
+  "as_of": "2026-07-30",
+  "decision_rule": "No production or stage activation while a critical applicable dimension is below 9 or lacks fresh evidence.",
+  "metrics": [
+    {
+      "id": "accepted_capabilities",
+      "panel": "product_program_alignment",
+      "source": "docs/CHIPPY_FRONTIER_EXECUTION_LEDGER.md and accepted product commits",
+      "owner": "Sol controller",
+      "baseline": 4,
+      "target": 5,
+      "threshold": "one accepted user-visible capability per successful bounded cycle",
+      "cadence": "each cycle",
+      "reliability": "high",
+      "decision": "Two consecutive cycles without capability or learning pauses the program."
+    },
+    {
+      "id": "customer_runtime_proof",
+      "panel": "customer",
+      "source": "authenticated non-customer demo receipts before any customer rollout",
+      "owner": "release controller",
+      "baseline": 0,
+      "target": 1,
+      "threshold": "all critical journeys demonstrated before activation",
+      "cadence": "release gate",
+      "reliability": "absent",
+      "decision": "Absent proof is NO-GO, never green."
+    },
+    {
+      "id": "automation_system_error_rate",
+      "panel": "agent_system",
+      "source": "Codex automation task statuses",
+      "owner": "Company OS controller",
+      "baseline": 0.1818,
+      "target": 0,
+      "threshold": "greater than 0.05 triggers pause and adaptation review",
+      "cadence": "daily",
+      "reliability": "medium",
+      "decision": "Pause new wakes and diagnose launcher/ownership failure."
+    },
+    {
+      "id": "checkout_ownership_collisions",
+      "panel": "operations",
+      "source": ".company-os events, leases, and automation memory",
+      "owner": "Company OS controller",
+      "baseline": 2,
+      "target": 0,
+      "threshold": "any collision blocks the later cycle",
+      "cadence": "each wake",
+      "reliability": "medium",
+      "decision": "Reject duplicate ownership and open a bounded adaptation after recurrence."
+    },
+    {
+      "id": "cost_per_accepted_capability_usd",
+      "panel": "agent_system",
+      "source": "cycle finish receipts",
+      "owner": "operations",
+      "baseline": null,
+      "target": 25,
+      "threshold": "unknown or above budget requires explicit review",
+      "cadence": "each accepted cycle",
+      "reliability": "absent",
+      "decision": "Do not call the loop efficient until measured."
+    },
+    {
+      "id": "tokens_per_accepted_capability",
+      "panel": "agent_system",
+      "source": "cycle finish receipts",
+      "owner": "operations",
+      "baseline": null,
+      "target": 500000,
+      "threshold": "trend must decline without lowering acceptance quality",
+      "cadence": "each accepted cycle",
+      "reliability": "absent",
+      "decision": "Route mechanical work down-model and reduce repeated full-suite runs."
+    },
+    {
+      "id": "cycle_lead_time_minutes",
+      "panel": "delivery",
+      "source": "cycle begin/finish timestamps",
+      "owner": "program management",
+      "baseline": null,
+      "target": 90,
+      "threshold": "over 180 minutes requires scope review",
+      "cadence": "each cycle",
+      "reliability": "absent",
+      "decision": "Split oversized slices without losing the vertical demo."
+    },
+    {
+      "id": "review_rework_ratio",
+      "panel": "delivery",
+      "source": "independent review findings and repaired revisions",
+      "owner": "quality",
+      "baseline": null,
+      "target": 0.3,
+      "threshold": "greater than 0.5 for two cycles triggers planning adaptation",
+      "cadence": "each cycle",
+      "reliability": "medium",
+      "decision": "Improve pre-review invariants and executable negative-path tests."
+    },
+    {
+      "id": "primary_enabler_share",
+      "panel": "product_program_alignment",
+      "source": "cycle work type and elapsed cost",
+      "owner": "portfolio controller",
+      "baseline": null,
+      "target": 0.1,
+      "threshold": "enabler plus maintenance may not exceed 0.15 without P0",
+      "cadence": "weekly",
+      "reliability": "absent",
+      "decision": "Stop-and-replan if technical enablers displace user-visible capability."
+    }
+  ]
+}
+

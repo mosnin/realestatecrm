@@ -62,3 +62,4 @@ __pycache__/
 
 # Throwaway probe scripts (agent runs)
 _diagnostic*
+.company-os/control.lock

@@ -1,0 +1,29 @@
+{"at": "2026-07-30T01:24:02.594456+00:00", "core_version": "2.2.0", "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "instance_initialized"}
+{"at": "2026-07-30T01:28:38.694727+00:00", "old_program_version": 1, "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "reason": "Install the project-scoped program contract after the loose cron produced overlapping tasks, system errors, and unmeasured cost", "type": "program_replaced"}
+{"at": "2026-07-30T01:29:04.840332+00:00", "evidence_id": "reality-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:29:05.129493+00:00", "evidence_id": "intelligence-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:29:05.549247+00:00", "evidence_id": "direction-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:29:05.725966+00:00", "evidence_id": "experience-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:29:05.915960+00:00", "from_phase": "reality_audit", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "to_phase": "intelligence", "type": "phase_advanced"}
+{"at": "2026-07-30T01:29:06.130795+00:00", "from_phase": "intelligence", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "to_phase": "direction", "type": "phase_advanced"}
+{"at": "2026-07-30T01:29:06.372512+00:00", "from_phase": "direction", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "to_phase": "experience", "type": "phase_advanced"}
+{"at": "2026-07-30T01:29:33.139109+00:00", "outcome_id": "durable-background-specialist-launch-v1", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "outcome_committed"}
+{"at": "2026-07-30T01:29:33.325013+00:00", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "work_queued", "work_id": "work-durable-background-launch-v1"}
+{"adaptation_id": "adaptation-single-controller-v1", "at": "2026-07-30T01:29:33.525130+00:00", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "adaptation_proposed"}
+{"at": "2026-07-30T01:30:39.951368+00:00", "evidence_id": "scorecard-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:30:39.991731+00:00", "evidence_id": "operating-learning-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"adaptation_id": "adaptation-single-controller-v1", "at": "2026-07-30T01:37:07.623650+00:00", "decision": "accepted", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "adaptation_reviewed"}
+{"at": "2026-07-30T01:37:18.393419+00:00", "evidence_id": "experience-independent-review-2026-07-30", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "evidence_recorded"}
+{"at": "2026-07-30T01:38:15.849775+00:00", "dimension": "accessibility", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 1.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.026215+00:00", "dimension": "brand_cohesion", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 2.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.251794+00:00", "dimension": "differentiation", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 7.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.409628+00:00", "dimension": "domain_fit", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 5.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.553855+00:00", "dimension": "evidence_integrity", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 7.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.701597+00:00", "dimension": "information_architecture", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 5.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.842807+00:00", "dimension": "innovation", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 6.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:16.962619+00:00", "dimension": "interaction_quality", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 4.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:17.079130+00:00", "dimension": "north_star_alignment", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 8.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:17.216999+00:00", "dimension": "product_coherence", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 7.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:17.331190+00:00", "dimension": "usability", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 4.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:17.458554+00:00", "dimension": "user_value", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 6.0, "type": "quality_scored"}
+{"at": "2026-07-30T01:38:17.618473+00:00", "dimension": "visual_quality", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 1.0, "type": "quality_scored"}
