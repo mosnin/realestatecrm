@@ -49,7 +49,7 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
-import { createStopPoller } from '@/lib/chat/stop-signal';
+import { createStopPoller, clearChatStop } from '@/lib/chat/stop-signal';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { z } from 'zod';
@@ -624,6 +624,11 @@ export async function POST(req: NextRequest) {
     logger.error('[ai/broker-task] conversation resolve failed', { brokerageId }, err);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
+
+  // A Stop belongs to the turn it was requested during — see the same call in
+  // app/api/ai/task. Without this a stop flag that outlived its own turn
+  // aborts the NEXT one before a token reaches the browser.
+  await clearChatStop(conversationId);
 
   try {
     await saveBrokerUserMessage({ brokerageId, conversationId, content: message });

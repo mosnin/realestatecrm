@@ -181,6 +181,7 @@ export type ChippiErrorCode =
   | 'rate_limited'
   | 'auth'
   | 'persistence'
+  | 'empty_reply'
   | 'internal';
 
 /**
@@ -206,6 +207,8 @@ export function chippiErrorMessage(code: ChippiErrorCode): string {
       return "I lost track of who you are — refresh the page and I'll be right here.";
     case 'persistence':
       return "I said that out loud but I couldn't write it down. Copy anything important before refreshing.";
+    case 'empty_reply':
+      return "I came up empty on that one — ask me again and I'll take another run at it.";
     case 'internal':
     default:
       return 'Something tripped me up. Try again — I usually do better the second time.';

@@ -242,13 +242,22 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           },
         );
 
+        // Settle the stop state once, awaited, now that generation is over.
+        // `stopped` is flipped from inside the delta callback, so on a turn
+        // that produced few or no deltas it can still be false here even
+        // though the realtor hit Stop. Everything downstream — whether to
+        // escalate, whether to fabricate a "came up empty" line, which reason
+        // the turn closes with — keys off this, so it has to be accurate.
+        // The poller returns its latched value immediately once tripped.
+        const stoppedTurn = stopped || (await shouldStop());
+
         // Escalation check — if the model said something that smells like
         // "I'd need to actually...", hand off to the agent path with the
         // same user message. Streamed replies were vetted by the hold-back
         // window; short replies (never opened the gate) get the full-text
         // check the pre-streaming implementation ran. A stopped turn never
         // escalates — the user asked it to end.
-        if (!stopped && input.onEscalate && (escalationLatched || (!gateOpen && shouldEscalate(result.text)))) {
+        if (!stoppedTurn && input.onEscalate && (escalationLatched || (!gateOpen && shouldEscalate(result.text)))) {
           // Tag this attempt with the escalation route. The agent path
           // will write its OWN ChatUsage row tagged 'agent' so the
           // breakdown shows both: a 'direct→agent' direct attempt that
@@ -303,17 +312,31 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           push({ type: 'fallback_note', message: result.fallbackNote });
         }
 
-        // A reply short enough that the hold-back window never cleared was
-        // fully buffered — flush it now. Anything longer already streamed.
-        if (!gateOpen && result.text) {
-          push({ type: 'text_delta', delta: result.text });
+        // What the realtor should end up with. Normally the model's reply;
+        // when the provider returned NO visible text (thinking consumed the
+        // whole completion budget, a content filter fired, an empty choice
+        // came back) we say so instead of completing the turn silently —
+        // that silence is indistinguishable from "Chippi ignored me", and
+        // because nothing gets persisted the turn also vanishes on reload.
+        let finalText = result.text;
+        if (!stoppedTurn && !finalText.trim()) {
+          finalText = chippiErrorMessage('empty_reply');
+          logger.warn('[direct-stream] provider returned no visible text', {
+            spaceId: input.spaceId,
+            conversationId: input.conversationId,
+          });
+          push({ type: 'text_delta', delta: finalText });
+        } else if (!gateOpen && finalText) {
+          // A reply short enough that the hold-back window never cleared was
+          // fully buffered — flush it now. Anything longer already streamed.
+          push({ type: 'text_delta', delta: finalText });
         }
-        push({ type: 'turn_complete', reason: stopped ? 'aborted' : 'complete' });
+        push({ type: 'turn_complete', reason: stoppedTurn ? 'aborted' : 'complete' });
 
         // Persist the assistant message + telemetry. The reasoning trace
         // goes first (Claude / o1 pattern — same ordering the client uses
         // live) so the "Thought for Xs" disclosure survives reload.
-        if (result.text.trim()) {
+        if (finalText.trim()) {
           const blocks: MessageBlock[] = [
             ...(result.reasoningText.trim()
               ? [
@@ -324,7 +347,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
                   } as MessageBlock,
                 ]
               : []),
-            { type: 'text', content: result.text },
+            { type: 'text', content: finalText },
           ];
           try {
             await saveAssistantMessage({

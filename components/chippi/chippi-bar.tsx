@@ -251,15 +251,19 @@ export function ChippiBar({ slug }: Props) {
 
   // The trailing assistant message — used to detect the "thinking" state.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
+  // A turn is live from the moment the optimistic assistant bubble lands, not
+  // from the moment the SSE connection opens — those differ by a conversation-
+  // creation round-trip on a fresh thread. Same derivation as the workspace.
+  const turnActive = isStreaming || Boolean(tailMessage?.streaming);
 
   // Orb avatar state from what the mini-chat is doing (mirrors chippi-workspace).
   const orbState: OrbState = useMemo(() => {
     if (liveCallIds && liveCallIds.size > 0) return 'solving';
-    if (isStreaming) return 'working';
+    if (turnActive) return 'working';
     return 'listening';
-  }, [liveCallIds, isStreaming]);
+  }, [liveCallIds, turnActive]);
   const showThinking =
-    isStreaming && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
+    turnActive && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
   // Only render the bar inside a workspace, and not on /chippi itself.
   // `hidingForChippiNav` covers the pre-commit window during a soft nav
@@ -333,7 +337,7 @@ export function ChippiBar({ slug }: Props) {
 
               {visibleMessages.map((msg, i) => {
                 const isTail = i === visibleMessages.length - 1;
-                if (isTail && msg.role === 'assistant' && msg.blocks.length === 0 && isStreaming) {
+                if (isTail && msg.role === 'assistant' && msg.blocks.length === 0 && turnActive) {
                   return null;
                 }
                 if (msg.role === 'assistant') {
@@ -342,8 +346,8 @@ export function ChippiBar({ slug }: Props) {
                       {/* mt-[3px] centers the 20px orb on the first text line
                           (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
                       <ThinkingOrb
-                        state={msg.streaming && isStreaming ? orbState : 'listening'}
-                        paused={!(msg.streaming && isStreaming)}
+                        state={msg.streaming && turnActive ? orbState : 'listening'}
+                        paused={!(msg.streaming && turnActive)}
                         size={20}
                         className="mt-[3px]"
                       />
@@ -352,7 +356,7 @@ export function ChippiBar({ slug }: Props) {
                           blocks={msg.blocks}
                           messageId={msg.id}
                           role={msg.role}
-                          streaming={msg.streaming && isStreaming}
+                          streaming={msg.streaming && turnActive}
                           liveCallIds={liveCallIds}
                           pendingApproval={
                             isTail && pendingApproval && !isStreaming
@@ -376,7 +380,7 @@ export function ChippiBar({ slug }: Props) {
                     blocks={msg.blocks}
                     messageId={msg.id}
                     role={msg.role}
-                    streaming={msg.streaming && isStreaming}
+                    streaming={msg.streaming && turnActive}
                     liveCallIds={liveCallIds}
                   />
                 );

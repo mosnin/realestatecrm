@@ -81,6 +81,16 @@ export interface UseAgentTaskOptions {
    */
   onConversationCreated?: (conversationId: string) => void;
   /**
+   * Called when a turn this hook was DRIVING reaches its terminal state, with
+   * the conversation it belonged to. The surface uses this to record that its
+   * in-memory transcript already contains that turn's answer, so the history
+   * loader doesn't treat the runner's finished-turn tombstone as "a turn
+   * completed while you weren't looking" and blank + re-fetch the thread it
+   * just streamed. Fires for successful, errored, and stopped turns alike —
+   * in every case the transcript on screen is the freshest thing we have.
+   */
+  onTurnSettled?: (conversationId: string) => void;
+  /**
    * Backing API endpoints. Defaults route to the realtor surface; the
    * broker variant (`/broker/chippi`) overrides both to hit the broker-
    * gated routes (`resolveBrokerContext()` gates layer 2 of the
@@ -197,6 +207,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     spaceSlug,
     conversationId: initialConversationId,
     onConversationCreated,
+    onTurnSettled,
     taskEndpoint = '/api/ai/task',
     conversationsEndpoint = '/api/ai/conversations',
     resumeEndpointBase = '/api/ai/task/resume',
@@ -242,6 +253,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   useEffect(() => {
     conversationIdRef.current = initialConversationId;
   }, [initialConversationId]);
+
+  // Held in a ref so a parent passing an inline closure doesn't re-create
+  // runTurn → consumeStream → send on every render.
+  const onTurnSettledRef = useRef(onTurnSettled);
+  useEffect(() => {
+    onTurnSettledRef.current = onTurnSettled;
+  }, [onTurnSettled]);
 
   // ── Phase 4c: always-allow for this chat ──────────────────────────────────
   // Auto-approvals are keyed by BOTH surface endpoint and conversationId so
@@ -392,12 +410,30 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     });
   }, []);
 
+  /**
+   * Drop whatever stream this hook is currently driving, CLIENT-SIDE ONLY.
+   *
+   * Deliberately does not signal the server. Starting a turn supersedes any
+   * previous one locally, but telling the server to stop generating on this
+   * conversation while we're opening a new turn on it is self-sabotage: the
+   * stop flag has a 10-minute TTL and is consumed by whichever stream polls
+   * next, which is the turn we're about to start. That race is why messages
+   * sometimes came back with no answer at all.
+   */
+  const abortLocal = useCallback(() => {
+    if (activeKeyRef.current) {
+      abortTurn(activeKeyRef.current);
+      activeKeyRef.current = null;
+    }
+  }, []);
+
   const abort = useCallback(() => {
     // Tell the SERVER to stop generating. Since the disconnect-survival
     // work, dropping the fetch alone doesn't end the turn (a closed tab
     // must not kill it) — without this signal, Stop only stopped the
     // rendering while the turn kept generating, spending, and persisting.
     // keepalive lets the request survive a quick navigation; best-effort.
+    // ONLY the user-facing Stop reaches this; see abortLocal above.
     const cid = conversationIdRef.current;
     if (cid) {
       void fetch('/api/ai/stop', {
@@ -407,12 +443,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         keepalive: true,
       }).catch(() => {});
     }
-    if (activeKeyRef.current) {
-      abortTurn(activeKeyRef.current);
-      activeKeyRef.current = null;
-    }
+    abortLocal();
     setCurrentAction(null);
-  }, []);
+  }, [abortLocal]);
 
   /**
    * Apply one AgentEvent to the transcript state. The targeted assistant
@@ -743,6 +776,16 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // it here would let a stale props branch clobber the streamed
         // answer right after the turn lands. TTL-swept if nobody consumes.
         activeKeyRef.current = null;
+        // Nothing is streaming into this bubble any more. Every terminal
+        // path above already clears the flag; doing it once here covers the
+        // ones that can't (a record that ended without a target message) so
+        // a bubble can never be left permanently marked live.
+        const settledMsgId = streamingMsgIdRef.current;
+        if (settledMsgId) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === settledMsgId && m.streaming ? { ...m, streaming: false } : m)),
+          );
+        }
         streamingMsgIdRef.current = null;
         setIsStreaming(false);
         isStreamingRef.current = false;
@@ -754,6 +797,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // "Thought for Xs" duration into the next answer.
         reasoningBufferRef.current = '';
         turnStartedAtRef.current = null;
+        // Tell the surface its transcript now contains this turn's outcome —
+        // synchronously, BEFORE React commits the isStreaming flip that wakes
+        // the history loader, so the loader sees the flag already set and
+        // doesn't blank the thread it just watched stream in.
+        onTurnSettledRef.current?.(rec.conversationId);
         // Drain the queue: one message per completed turn, in order. Deferred
         // a tick so this turn's teardown state settles before the next send's
         // optimistic UI lands.
@@ -785,7 +833,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         attachmentBlocks: [],
       },
     ) => {
-      abort();
+      // Local teardown only — see abortLocal. Signalling the server here
+      // would stop the very turn this call is starting.
+      abortLocal();
       const rec = startTurn({
         url,
         // Keyed under the surface's task endpoint (not the POST url) so a
@@ -797,7 +847,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       });
       await runTurn(rec);
     },
-    [abort, runTurn, taskEndpoint],
+    [abortLocal, runTurn, taskEndpoint],
   );
 
   /**

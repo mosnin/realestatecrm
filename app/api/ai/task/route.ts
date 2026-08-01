@@ -53,6 +53,7 @@ import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { markTurnStarted, markTurnEnded } from '@/lib/chat/turn-presence';
+import { clearChatStop } from '@/lib/chat/stop-signal';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
 import {
   type MultimodalAttachment,
@@ -379,6 +380,24 @@ function proxyModalStream({
         }
       }
 
+      /**
+       * Terminal `done` handling, shared by the in-loop branch and the
+       * trailing-buffer flush. A turn that reaches `done` having produced
+       * NOTHING visible — no tokens, no tool cards, no final_text — reads to
+       * the realtor exactly like Chippi ignoring them, and persistOnce would
+       * save nothing, so it wouldn't even survive a reload. Say so instead.
+       */
+      async function completeTurn(rawFinalText: string): Promise<void> {
+        let finalText = rawFinalText;
+        if (blocks.length === 0 && !finalText.trim()) {
+          logger.warn('[ai/task] modal turn produced no visible output', { spaceId });
+          finalText = chippiErrorMessage('empty_reply');
+          push(controller, { type: 'text_delta', delta: finalText });
+        }
+        await persistOnce(finalText);
+        push(controller, { type: 'turn_complete', reason: 'complete' });
+      }
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -485,12 +504,11 @@ function proxyModalStream({
               push(controller, { ...frame });
 
             } else if (type === 'done') {
-              const finalText =
+              await completeTurn(
                 typeof evt.final_text === 'string' && evt.final_text.trim()
                   ? evt.final_text
-                  : textChunks.join('');
-              await persistOnce(finalText);
-              push(controller, { type: 'turn_complete', reason: 'complete' });
+                  : textChunks.join(''),
+              );
               sentTerminal = true;
 
             } else if (type === 'error') {
@@ -510,12 +528,11 @@ function proxyModalStream({
             try {
               const evt = JSON.parse(raw) as Record<string, unknown>;
               if (evt.type === 'done') {
-                const finalText =
+                await completeTurn(
                   typeof evt.final_text === 'string' && evt.final_text.trim()
                     ? evt.final_text
-                    : textChunks.join('');
-                await persistOnce(finalText);
-                push(controller, { type: 'turn_complete', reason: 'complete' });
+                    : textChunks.join(''),
+                );
                 sentTerminal = true;
               }
             } catch {
@@ -802,6 +819,13 @@ export async function POST(req: NextRequest) {
   //      (kept as a fallback / for running heavy turns entirely in Modal).
   // Router errors → 'agent' (its safe default), so a router bug can't silently
   // drop a real action.
+  // A Stop belongs to the turn it was requested during. The flag lives for
+  // 10 minutes and is only consumed by a polling stream, so one that landed
+  // after its own turn ended would be picked up by THIS turn and abort it
+  // before a single token reached the realtor. Cleared (awaited, so it can't
+  // race the first poll) before any path starts streaming.
+  await clearChatStop(conversationId);
+
   // Turn presence — mark this conversation busy BEFORE any path starts
   // streaming, so a client that reopens (even after a full browser close)
   // can see the turn is in flight via /api/ai/turn-status and wait for the

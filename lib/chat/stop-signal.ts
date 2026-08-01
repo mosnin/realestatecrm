@@ -40,6 +40,27 @@ export async function requestChatStop(conversationId: string): Promise<boolean> 
 }
 
 /**
+ * Drop any stop flag left over from an EARLIER turn on this conversation.
+ *
+ * The flag carries a 10-minute TTL and is only consumed by a polling stream,
+ * so a Stop that lands after its turn already ended (the common case — the
+ * user taps Stop as the last tokens arrive) stays in Redis and the NEXT turn
+ * on that conversation consumes it and aborts itself. The realtor sees a
+ * message go out and no answer come back.
+ *
+ * Called once per turn, before any path starts streaming, so a stop can only
+ * ever apply to the turn it was requested during.
+ */
+export async function clearChatStop(conversationId: string): Promise<void> {
+  if (!isRedisConfigured()) return;
+  try {
+    await redis.del(stopKey(conversationId));
+  } catch {
+    /* best-effort — a stale flag is a UX bug, not a correctness one */
+  }
+}
+
+/**
  * True when a stop was requested for this conversation. Consumes the flag
  * so it can't bleed into the NEXT turn on the same conversation.
  */
