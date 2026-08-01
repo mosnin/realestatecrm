@@ -174,11 +174,22 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
           signal: input.abortController.signal,
         });
 
-        if (result.text) push({ type: 'text_delta', delta: result.text });
+        // An empty completion (thinking ate the budget, filtered choice) would
+        // otherwise complete the turn with no text AND persist nothing — the
+        // broker sees silence and a reload shows the question unanswered.
+        let finalText = result.text;
+        if (!finalText.trim()) {
+          logger.warn('[broker-direct] provider returned no visible text', {
+            brokerageId: input.brokerage.id,
+            conversationId: input.conversationId,
+          });
+          finalText = chippiErrorMessage('empty_reply');
+        }
+        push({ type: 'text_delta', delta: finalText });
         push({ type: 'turn_complete', reason: 'complete' });
 
-        if (result.text.trim()) {
-          const blocks: MessageBlock[] = [{ type: 'text', content: result.text }];
+        if (finalText.trim()) {
+          const blocks: MessageBlock[] = [{ type: 'text', content: finalText }];
           try {
             await saveBrokerAssistantMessage({ brokerageId: input.brokerage.id, conversationId: input.conversationId, blocks });
           } catch (err) {

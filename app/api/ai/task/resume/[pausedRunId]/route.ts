@@ -34,6 +34,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import { streamTsResumeTurn } from '@/lib/ai-tools/sdk-chat-stream';
+import { clearChatStop } from '@/lib/chat/stop-signal';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
 
 interface PostBody {
@@ -174,6 +175,11 @@ export async function POST(
   if (!marked || marked.length === 0) {
     return NextResponse.json({ error: 'Run is already resumed' }, { status: 409 });
   }
+
+  // A resume is a new streaming turn on the same conversation, so it needs the
+  // same stale-Stop clear the initial turn gets in app/api/ai/task — otherwise
+  // an old flag aborts the continuation the moment the realtor approves.
+  if (paused.conversationId) await clearChatStop(paused.conversationId);
 
   return streamTsResumeTurn({
     ctx,

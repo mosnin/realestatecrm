@@ -615,6 +615,19 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           }
           pushEvent({ type: 'turn_complete', reason: 'paused' });
         } else {
+          // A completed turn that produced NOTHING visible — no prose, no
+          // tool cards, no delegated task — is indistinguishable from
+          // "Chippi ignored me", and since the finally below only persists
+          // when one of those buffers is non-empty it also leaves no trace
+          // on reload. Say so instead. (Thinking-only turns land here when a
+          // model spends its whole budget reasoning.)
+          if (!textBuffer.trim() && toolBlocks.length === 0 && subagentBlocks.length === 0) {
+            logger.warn('[ai/task ts] turn completed with no visible output', {
+              conversationId: input.conversationId,
+            });
+            textBuffer = chippiErrorMessage('empty_reply');
+            pushEvent({ type: 'text_delta', delta: textBuffer });
+          }
           pushEvent({ type: 'turn_complete', reason: 'complete' });
         }
       } catch (err) {

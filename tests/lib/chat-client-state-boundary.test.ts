@@ -5,6 +5,7 @@ import {
   embedSrcFor,
   isTabAvailable,
 } from '@/components/chippi/right-panel-embeds';
+import { planHistoryLoad } from '@/components/chippi/chippi-workspace';
 
 const ROOT = process.cwd();
 const hookSource = readFileSync(
@@ -23,10 +24,35 @@ describe('chat client-side boundary state', () => {
     expect(hookSource).toContain('STORAGE_PREFIX + cid');
   });
 
+  // Was a source-grep for the setState calls; converted to a behavioural check
+  // of the decision those calls implement (see planHistoryLoad). The boundary
+  // that matters is one conversation's transcript never showing under another
+  // conversation's id — NOT that a re-load of the SAME thread blanks first,
+  // which is a visible glitch (the composer glides to the greeting hero and
+  // back) and can drop a just-streamed answer. tests/lib/chat-history-load-plan
+  // covers the full decision table.
   it('clears stale transcript state before loading a different conversation', () => {
-    expect(workspaceSource).toContain('setActiveConversationId(targetId);');
-    expect(workspaceSource).toContain('setMessages([]);');
-    expect(workspaceSource).toContain('loadedConvIdRef.current = targetId;');
+    expect(
+      planHistoryLoad({
+        targetId: 'conv-2',
+        loadedConvId: 'conv-1',
+        initialConversationId: 'conv-1',
+        hasServerMessages: true,
+        turnFinishedElsewhere: false,
+      }),
+    ).toMatchObject({ clearFirst: true });
+  });
+
+  it('does not blank the transcript when re-loading the conversation on screen', () => {
+    expect(
+      planHistoryLoad({
+        targetId: 'conv-1',
+        loadedConvId: 'conv-1',
+        initialConversationId: 'conv-1',
+        hasServerMessages: true,
+        turnFinishedElsewhere: true,
+      }),
+    ).toEqual({ action: 'fetch', clearFirst: false });
   });
 
   it('removes inaccessible conversation ids instead of showing stale history', () => {

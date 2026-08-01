@@ -129,6 +129,57 @@ export function warmupPhraseFor(coldStart: boolean, elapsedMs: number): string {
 }
 
 /**
+ * What the history loader should do for the conversation the URL is asking
+ * for. Pure so the decision — which is where the "input shoots up and back
+ * down" glitch lived — is testable without a renderer.
+ *
+ *   - `idle`            nothing to do; the surface already shows this thread.
+ *   - `reset`           no conversation at all → empty surface.
+ *   - `useServerProps`  the server render already carries the right messages.
+ *   - `fetch`           go get history from the messages endpoint.
+ *
+ * `clearFirst` is the important one. It is true ONLY when the transcript
+ * currently on screen belongs to a DIFFERENT conversation, so a plain refresh
+ * of the thread already displayed keeps its messages until the replacement is
+ * in hand. Blanking first flips `isEmpty`, which swaps the surface back to the
+ * greeting hero and FLIP-glides the composer to centre and back — and if the
+ * re-fetch races the server's persistence, the answer that just streamed is
+ * replaced by history that doesn't contain it yet.
+ */
+export type HistoryLoadPlan =
+  | { action: 'idle' }
+  | { action: 'reset' }
+  | { action: 'useServerProps'; clearFirst: boolean }
+  | { action: 'fetch'; clearFirst: boolean };
+
+export function planHistoryLoad(input: {
+  /** Conversation the URL (or the server props) is asking for. */
+  targetId: string | null;
+  /** Conversation whose messages are on screen. `null` = never loaded, `''` = deliberately empty. */
+  loadedConvId: string | null;
+  initialConversationId: string | null;
+  hasServerMessages: boolean;
+  /**
+   * A turn finished for this conversation somewhere this surface wasn't
+   * watching (another page, the bar, a closed tab). Turns this surface
+   * streamed itself do NOT count — its transcript is already current, and
+   * richer than history: it carries the error and cut-off lines the server
+   * never persists.
+   */
+  turnFinishedElsewhere: boolean;
+}): HistoryLoadPlan {
+  const { targetId, loadedConvId, initialConversationId, hasServerMessages, turnFinishedElsewhere } =
+    input;
+  if (!targetId) return loadedConvId === '' ? { action: 'idle' } : { action: 'reset' };
+  if (!turnFinishedElsewhere && targetId === loadedConvId) return { action: 'idle' };
+  const clearFirst = loadedConvId !== null && loadedConvId !== targetId;
+  if (!turnFinishedElsewhere && targetId === initialConversationId && hasServerMessages) {
+    return { action: 'useServerProps', clearFirst };
+  }
+  return { action: 'fetch', clearFirst };
+}
+
+/**
  * Whether the composer's Chat/Agent mode switch should render for a given
  * chat surface variant. Both the realtor surface (`/api/ai/task`) and the
  * broker surface (`/api/ai/broker-task`) now honor the `mode` field the
@@ -357,6 +408,16 @@ export function ChippiWorkspace({
       // grow a step for every new chat.
       router.replace(`${endpoints.routeBase}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
     },
+    // The turn we just watched is now settled IN THIS transcript. Claim it so
+    // the history loader (which wakes on the isStreaming flip) treats the
+    // runner's finished-turn tombstone as already handled instead of blanking
+    // and re-fetching the thread — the blank is what made the composer shoot
+    // up to the hero and back, and it dropped any answer the server hadn't
+    // finished persisting.
+    onTurnSettled: (id) => {
+      locallyStreamedConvIdRef.current = id;
+      loadedConvIdRef.current = id;
+    },
   });
 
   // ── Retry support ────────────────────────────────────────────────────────
@@ -419,6 +480,15 @@ export function ChippiWorkspace({
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
   const loadedConvIdRef = useRef<string | null>(null);
+  // The conversation whose latest turn THIS surface watched stream to the end
+  // (set by useAgentTask's onTurnSettled). Distinguishes "a turn finished
+  // while you were elsewhere — go fetch it" from "the turn finished right
+  // here, your transcript is already correct".
+  const locallyStreamedConvIdRef = useRef<string | null>(null);
+  // True while a history re-fetch is in flight. Suppresses the greeting hero
+  // so a momentarily-empty transcript can never bounce the composer up to
+  // centre and back down.
+  const [historyReloading, setHistoryReloading] = useState(false);
 
   // Deep-link to history: ?view=history (used by the collapsed sidebar's
   // Chats icon) opens the conversation-history drawer on mount, then
@@ -487,15 +557,6 @@ export function ChippiWorkspace({
     // Determine which conversation the user should see right now.
     // URL is authoritative; fall back to what the server pre-loaded.
     const targetId = urlConversationId ?? initialConversationId ?? null;
-    if (!targetId) {
-      // No conversation at all — ensure empty state.
-      if (loadedConvIdRef.current !== '') {
-        loadedConvIdRef.current = '';
-        setActiveConversationId(null);
-        setMessages([]);
-      }
-      return;
-    }
 
     // A turn for this conversation is LIVE at module scope (turn-runner —
     // started on this page or before navigating here). The hook's re-attach
@@ -504,29 +565,40 @@ export function ChippiWorkspace({
     // (isStreaming dependency) and loads the full, settled history then.
     // Checked via the runner (not the isStreaming closure) because on the
     // mount that re-attaches, this effect still sees the pre-attach false.
-    if (getTurn(turnKey(endpoints.taskEndpoint, targetId))?.status === 'streaming') {
+    if (targetId && getTurn(turnKey(endpoints.taskEndpoint, targetId))?.status === 'streaming') {
       return;
     }
 
-    // A turn FINISHED since this surface last looked (completed in the
-    // background while the user was on another page, or the turn this very
-    // instance just streamed). Server props predate that answer — fall
-    // through to the fresh client fetch and never trust initialMessages.
-    const finishedInBackground = Boolean(
-      consumeFinishedTurn(turnKey(endpoints.taskEndpoint, targetId)),
-    );
-    if (finishedInBackground) loadedConvIdRef.current = '';
+    // Consume the finished-turn tombstone either way (it's ours to clear), but
+    // only ACT on it when the turn finished somewhere this surface wasn't
+    // watching. `onTurnSettled` records the ones we streamed ourselves.
+    const finished = targetId
+      ? Boolean(consumeFinishedTurn(turnKey(endpoints.taskEndpoint, targetId)))
+      : false;
+    const plan = planHistoryLoad({
+      targetId,
+      loadedConvId: loadedConvIdRef.current,
+      initialConversationId,
+      hasServerMessages: initialMessages.length > 0,
+      turnFinishedElsewhere: finished && locallyStreamedConvIdRef.current !== targetId,
+    });
 
-    // Already showing this conversation — nothing to do.
-    if (targetId === loadedConvIdRef.current) return;
+    if (plan.action === 'idle') return;
+    if (plan.action === 'reset') {
+      loadedConvIdRef.current = '';
+      setActiveConversationId(null);
+      setMessages([]);
+      return;
+    }
 
-    setActiveConversationId(targetId);
-    setMessages([]);
+    const convId = targetId as string;
+    setActiveConversationId(convId);
+    if (plan.clearFirst) setMessages([]);
 
     // Server already fetched the right messages for this exact conversation —
     // use them immediately (zero extra round-trip).
-    if (!finishedInBackground && targetId === initialConversationId && initialMessages.length > 0) {
-      loadedConvIdRef.current = targetId;
+    if (plan.action === 'useServerProps') {
+      loadedConvIdRef.current = convId;
       const history = legacyToUi(initialMessages);
       // Pre-warm the seen-set: history arrives settled, never animated.
       for (const m of history) seenMessageIdsRef.current.add(m.id);
@@ -537,10 +609,12 @@ export function ChippiWorkspace({
     // Server props are empty or stale (e.g. router-cache served an old render,
     // or this is a conversation outside the server's top-50 list). Fetch fresh.
     let cancelled = false;
-    void loadConversation(targetId).then((data) => {
+    setHistoryReloading(true);
+    void loadConversation(convId).then((data) => {
       if (cancelled) return;
+      setHistoryReloading(false);
       if (data) {
-        loadedConvIdRef.current = targetId;
+        loadedConvIdRef.current = convId;
         const history = legacyToUi(data);
         // Pre-warm the seen-set: history arrives settled, never animated.
         for (const m of history) seenMessageIdsRef.current.add(m.id);
@@ -548,9 +622,17 @@ export function ChippiWorkspace({
         return;
       }
 
-      // A failed load must not leave the previous transcript visible under the
-      // newly requested id. Reset back to an empty surface state and remove the
-      // invalid conversation id from the URL.
+      // Load failed (loadConversation already toasted).
+      if (!plan.clearFirst) {
+        // We're refreshing the thread already on screen — keep it. Wiping a
+        // perfectly good transcript because a re-fetch blipped is strictly
+        // worse than showing slightly stale history. Claim the id so this
+        // effect doesn't immediately retry in a loop.
+        loadedConvIdRef.current = convId;
+        return;
+      }
+      // We had already blanked for a switch, so there is nothing to preserve:
+      // fall back to the empty surface and drop the bad id from the URL.
       loadedConvIdRef.current = '';
       setActiveConversationId(null);
       setMessages([]);
@@ -562,6 +644,7 @@ export function ChippiWorkspace({
 
     return () => {
       cancelled = true;
+      setHistoryReloading(false);
     };
   }, [
     urlConversationId,
@@ -952,7 +1035,12 @@ export function ChippiWorkspace({
   }, []);
 
   const atLimit = messages.length >= MESSAGE_LIMIT;
-  const isEmpty = messages.length === 0 && !isLoadingConversation;
+  // The greeting hero. Gated on BOTH loading signals: an empty `messages` in
+  // the middle of a conversation switch or a history re-fetch is a transient,
+  // not "this realtor has no conversation" — and treating it as the latter
+  // swaps the surface to the hero and FLIP-glides the composer to centre and
+  // back, the "input shoots up and then back down" glitch.
+  const isEmpty = messages.length === 0 && !isLoadingConversation && !historyReloading;
   // Prefer the Chippi profile name (chosen at onboarding) over the Clerk
   // identity, which Google OAuth seeds from the user's Gmail account.
   const firstName = (accountName ?? '').trim().split(/\s+/)[0] || (user?.firstName ?? '');
@@ -1051,6 +1139,13 @@ export function ChippiWorkspace({
   // The trailing assistant message — used to detect the "thinking" state
   // and to pin the permission prompt at the end of the transcript.
   const tailMessage = useMemo(() => messages[messages.length - 1] ?? null, [messages]);
+  // A turn is live from the moment `send` pushes the optimistic assistant
+  // bubble, not from the moment the SSE connection opens. Those differ by a
+  // whole `POST /api/ai/conversations` round-trip on a fresh chat; keying the
+  // indicator on `isStreaming` alone left that window showing a hollow
+  // orb-and-nothing bubble with no thinking line — dead air on the very first
+  // message, which is exactly where confidence is won or lost.
+  const turnActive = isStreaming || Boolean(tailMessage?.streaming);
   // The indicator block (avatar + shimmer line + optional plan card) only
   // renders when there's actually something to show. `currentAction` is
   // computed below and falls back to "Thinking…" during the dead air
@@ -1179,7 +1274,7 @@ export function ChippiWorkspace({
   // Warming up = streaming, assistant bubble open, nothing concrete yet (no
   // streamed text, no live tool call, no reasoning tokens).
   const isWarmingUp =
-    isStreaming &&
+    turnActive &&
     tailMessage?.role === 'assistant' &&
     (!liveCallIds || liveCallIds.size === 0) &&
     !streamingReasoning?.trim() &&
@@ -1206,7 +1301,7 @@ export function ChippiWorkspace({
   }, [isWarmingUp]);
 
   const currentAction = useMemo<string | null>(() => {
-    if (!isStreaming || !tailMessage) return null;
+    if (!turnActive || !tailMessage) return null;
     // Live tool call → its action verb wins.
     if (liveCallIds && liveCallIds.size > 0) {
       for (const block of tailMessage.blocks) {
@@ -1255,7 +1350,7 @@ export function ChippiWorkspace({
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    isStreaming,
+    turnActive,
     tailMessage,
     liveCallIds,
     serverAction,
@@ -1269,7 +1364,7 @@ export function ChippiWorkspace({
   // communicate, otherwise the row would render hollow once real text starts
   // flowing into the assistant bubble below.
   const showThinking =
-    (isStreaming &&
+    (turnActive &&
       tailMessage?.role === 'assistant' &&
       (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan))) ||
     recoveringTurn;
@@ -1281,9 +1376,9 @@ export function ChippiWorkspace({
   // orb via `paused`.
   const orbState: OrbState = useMemo(() => {
     if ((liveCallIds && liveCallIds.size > 0) || activePlan) return 'solving';
-    if (isStreaming || recoveringTurn) return 'working';
+    if (turnActive || recoveringTurn) return 'working';
     return 'listening';
-  }, [liveCallIds, activePlan, isStreaming, recoveringTurn]);
+  }, [liveCallIds, activePlan, turnActive, recoveringTurn]);
 
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. The `/` skills menu lives
@@ -1325,7 +1420,7 @@ export function ChippiWorkspace({
         // queue button) holds the message for the next turn (useAgentTask
         // owns the queue). Approval waits + rate limits still lock it.
         disabled={pendingApproval !== null || rateLimitSeconds > 0}
-        isLoading={isStreaming}
+        isLoading={turnActive}
         prefill={prefill ?? undefined}
         skills={skills}
         showModeSwitch={shouldShowModeSwitch(variant)}
@@ -1535,7 +1630,7 @@ export function ChippiWorkspace({
       </div>
 
       {/* ── Today view (no active conversation) ───────────────────── */}
-      {isLoadingConversation ? (
+      {isLoadingConversation || (historyReloading && messages.length === 0) ? (
         /* Skeleton mirrors the empty-state hero shape below — a centered
            greeting-sized placeholder + a composer-sized rectangle pinned to
            the bottom. Same shapes as app/s/[slug]/chippi/loading.tsx so the
@@ -1632,7 +1727,7 @@ export function ChippiWorkspace({
                       isTail &&
                       msg.role === 'assistant' &&
                       msg.blocks.length === 0 &&
-                      isStreaming
+                      turnActive
                     ) {
                       return null;
                     }
@@ -1673,8 +1768,8 @@ export function ChippiWorkspace({
                           {/* mt-[3px] centers the 20px orb on the first text
                               line (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
                           <ThinkingOrb
-                            state={msg.streaming && isStreaming ? orbState : 'listening'}
-                            paused={!(msg.streaming && isStreaming)}
+                            state={msg.streaming && turnActive ? orbState : 'listening'}
+                            paused={!(msg.streaming && turnActive)}
                             size={20}
                             className="mt-[3px]"
                           />
@@ -1689,7 +1784,7 @@ export function ChippiWorkspace({
                               if (!plan) return null;
                               // Animate steps in while the message is still
                               // streaming; show settled state for history.
-                              const isAnimating = !!(msg.streaming && isStreaming);
+                              const isAnimating = !!(msg.streaming && turnActive);
                               return (
                                 <PlanCard
                                   key={planBlock.callId}
@@ -1704,7 +1799,7 @@ export function ChippiWorkspace({
                               blocks={msg.blocks}
                               messageId={msg.id}
                               role={msg.role}
-                              streaming={msg.streaming && isStreaming}
+                              streaming={msg.streaming && turnActive}
                               liveCallIds={liveCallIds}
                               onUserIntent={(text) => {
                                 void handleSend(text, [], undefined);
@@ -1757,7 +1852,7 @@ export function ChippiWorkspace({
                           blocks={msg.blocks}
                           messageId={msg.id}
                           role={msg.role}
-                          streaming={msg.streaming && isStreaming}
+                          streaming={msg.streaming && turnActive}
                           liveCallIds={liveCallIds}
                           localUrls={attachmentPreviewUrls}
                           onUserIntent={(text) => {
@@ -1813,7 +1908,7 @@ export function ChippiWorkspace({
                       content. Click → fires the chip text as the next user
                       message. Removes the typing step for the obvious next
                       move (Claude / ChatGPT pattern). */}
-                  {!showThinking && !isStreaming && !agentError && (() => {
+                  {!showThinking && !turnActive && !agentError && (() => {
                     const last = messages[messages.length - 1];
                     if (!last || last.role !== 'assistant' || !last.blocks) return null;
                     const suggestions = getSuggestionsForTurn(last.blocks);
