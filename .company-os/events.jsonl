@@ -27,3 +27,4 @@
 {"at": "2026-07-30T01:38:17.331190+00:00", "dimension": "usability", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 4.0, "type": "quality_scored"}
 {"at": "2026-07-30T01:38:17.458554+00:00", "dimension": "user_value", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 6.0, "type": "quality_scored"}
 {"at": "2026-07-30T01:38:17.618473+00:00", "dimension": "visual_quality", "program_version": 2, "project_id": "chippi-frontier-agent-program-3124451b39e0", "score": 1.0, "type": "quality_scored"}
+{"at": "2026-08-01T16:30:07.865524+00:00", "core_version": "2.5.0", "program_version": 3, "project_id": "chippi-frontier-agent-program-3124451b39e0", "type": "instance_upgraded"}

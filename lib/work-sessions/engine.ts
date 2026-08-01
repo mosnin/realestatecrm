@@ -108,9 +108,16 @@ Return ONLY JSON:
  * Returns the status the session landed in so the caller knows whether to
  * proceed straight to execution.
  */
-export async function planSession(sessionId: string): Promise<WorkSessionRow['status'] | null> {
+export async function planSession(
+  sessionId: string,
+  expectedWorkspaceRunId?: string,
+): Promise<WorkSessionRow['status'] | null> {
   const session = await getSession(sessionId);
   if (!session || session.status !== 'planning') return session?.status ?? null;
+  if (
+    expectedWorkspaceRunId
+    && (session.kind !== 'workspace' || session.workspaceRunId !== expectedWorkspaceRunId)
+  ) return null;
 
   // Workspace Runs use an honest fixed packet plan; unlike research, the VM
   // will execute exactly these four visible deliverable steps.
@@ -202,9 +209,16 @@ export async function planSession(sessionId: string): Promise<WorkSessionRow['st
  * realtime subscription renders live progress. Idempotent: re-entry skips
  * steps already done (Inngest retries land here safely).
  */
-export async function executeSession(sessionId: string): Promise<void> {
+export async function executeSession(
+  sessionId: string,
+  expectedWorkspaceRunId?: string,
+): Promise<void> {
   const session = await getSession(sessionId);
   if (!session || session.status !== 'running') return;
+  if (
+    expectedWorkspaceRunId
+    && (session.kind !== 'workspace' || session.workspaceRunId !== expectedWorkspaceRunId)
+  ) return;
 
   // A Workspace Run is a separate VM substrate, not a broader permission set
   // for the background research agent. Planning remains deliberately shared.

@@ -23,12 +23,16 @@ export async function POST(req: NextRequest) {
   let body: any; try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const runId = typeof body.run_id === 'string' ? body.run_id : '';
   const spaceId = typeof body.space_id === 'string' ? body.space_id : '';
+  const launchToken = typeof body.launch_token === 'string' ? body.launch_token : '';
   const sequence = Number(body.sequence);
   const type = typeof body.type === 'string' ? body.type : '';
-  if (!runId || !spaceId || !Number.isInteger(sequence) || sequence < 1 || !allowedTypes.has(type)) return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
-  const { data: run } = await supabase.from('WorkspaceRun').select('id,workSessionId,status,cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  if (!runId || !spaceId || !launchToken || !Number.isInteger(sequence) || sequence < 1 || !allowedTypes.has(type)) return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
+  const { data: run, error: runError } = await supabase.from('WorkspaceRun').select('id,workSessionId,status,launchToken,cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  if (runError) return NextResponse.json({ error: 'Could not verify launch' }, { status: 500 });
   if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (run.launchToken !== launchToken) return NextResponse.json({ ok: true, ignored: 'stale_launch', cancellationRequested: true });
   if (['completed','failed','cancelled'].includes(run.status)) return NextResponse.json({ ok: true, ignored: 'terminal', cancellationRequested: run.status === 'cancelled' || Boolean(run.cancellationRequestedAt) });
+  if (type !== 'workspace_started' && run.status !== 'running') return NextResponse.json({ error: 'Workspace launch is not active', cancellationRequested: true }, { status: 409 });
   const event = { runId, sequence, type, message: String(body.message ?? '').slice(0, 500), command: typeof body.command === 'string' ? body.command.slice(0, 240) : null, output: typeof body.output === 'string' ? body.output.slice(0, MAX_OUTPUT) : null };
   const publicationFailed = async (message: string) => {
     await supabase.rpc('finish_workspace_run_and_session', { p_run_id: runId, p_space_id: spaceId, p_outcome: 'failed', p_error: message, p_sequence: sequence, p_message: message });
@@ -44,9 +48,12 @@ export async function POST(req: NextRequest) {
   }
   // The initial read can be stale while the VM is uploading files. Re-read
   // immediately before publication so a cancellation always wins completion.
-  const { data: current } = type === 'completed'
-    ? await supabase.from('WorkspaceRun').select('cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle()
-    : { data: run };
+  const currentResult = type === 'completed'
+    ? await supabase.from('WorkspaceRun').select('launchToken,cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle()
+    : { data: run, error: null };
+  if (currentResult.error) return NextResponse.json({ error: 'Could not verify publication state' }, { status: 500 });
+  const current = currentResult.data;
+  if (current?.launchToken !== launchToken) return NextResponse.json({ ok: true, ignored: 'stale_launch', cancellationRequested: true });
   const cancelledBeforePublish = Boolean(current?.cancellationRequestedAt);
   const publishedFiles: Array<{ id: string; storageKey: string; name: string; mimeType: string; sizeBytes: number }> = [];
   if (type === 'completed' && !cancelledBeforePublish) {
@@ -73,6 +80,9 @@ export async function POST(req: NextRequest) {
     if (finishError) return NextResponse.json({ error: terminal === 'completed' ? 'Workspace publication could not finish.' : 'Workspace terminal update failed.' }, { status: 409 });
     return NextResponse.json({ ok: true, finished, cancellationRequested: terminal === 'cancelled' });
   }
-  if (terminal === 'running') await supabase.from('WorkspaceRun').update({ status: 'running', updatedAt: new Date().toISOString() }).eq('id', runId).eq('spaceId', spaceId).eq('status', 'launching');
+  if (terminal === 'running') {
+    const { data: started, error: startError } = await supabase.from('WorkspaceRun').update({ status: 'running', updatedAt: new Date().toISOString() }).eq('id', runId).eq('spaceId', spaceId).eq('launchToken', launchToken).eq('status', 'launching').select('id').maybeSingle();
+    if (startError || !started) return NextResponse.json({ error: 'Workspace launch is no longer current', cancellationRequested: true }, { status: 409 });
+  }
   return NextResponse.json({ ok: true, cancellationRequested: Boolean(run.cancellationRequestedAt) });
 }

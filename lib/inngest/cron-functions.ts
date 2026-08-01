@@ -98,6 +98,12 @@ export const CRON_MANIFEST: readonly CronManifestEntry[] = [
     load: () => import('@/app/api/cron/agent-tasks/route'),
   },
   {
+    id: 'cron-workspace-run-recovery',
+    path: '/api/cron/workspace-run-recovery',
+    cron: '*/5 * * * *',
+    load: () => import('@/app/api/cron/workspace-run-recovery/route'),
+  },
+  {
     id: 'cron-routines',
     path: '/api/cron/routines',
     cron: '0 * * * *',

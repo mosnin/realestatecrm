@@ -8,6 +8,10 @@ import { getObjectText } from '@/lib/storage';
 import { getLLMClient } from '@/lib/llm';
 import { rankWorkspaceComparisons, selectWorkspaceTarget, type WorkspaceProperty } from './packet';
 import { commandPlanForPersistedWorkspaceTask, commandPlanForWorkspaceTask, isSafeWorkspaceInputName, type WorkspaceTaskExecutionPlan, validatePersistedWorkspaceTaskPlan, validateWorkspaceTaskPlan } from './typed-plan';
+import {
+  isWorkspaceRunRecoveryEnabled,
+  isWorkspaceRunsEnabledForSpace,
+} from '@/lib/chippi/workspace-run-flag';
 
 const MAX_GOAL = 1_000;
 const LAUNCH_LEASE_MS = 120_000;
@@ -41,12 +45,28 @@ export async function createWorkspaceRun(input: { id: string; workSessionId: str
   if (!existing) throw lookupError ?? new Error('workspace run was not persisted'); return existing;
 }
 export async function getWorkspaceRun(runId: string, spaceId: string): Promise<WorkspaceRunView | null> {
-  const { data: run } = await supabase.from('WorkspaceRun').select('*').eq('id', runId).eq('spaceId', spaceId).maybeSingle(); if (!run) return null;
-  const [{ data: events }, { data: files }, { data: taskRows }] = await Promise.all([supabase.from('WorkspaceRunEvent').select('*').eq('runId', runId).order('sequence').limit(100), supabase.from('WorkspaceRunFile').select('*').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(16), supabase.from('WorkspaceRunTask').select('id,sequence,instruction,commandPlan,executionPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('sequence', { ascending: false }).limit(12)]);
+  const { data: run, error: runError } = await supabase.from('WorkspaceRun').select('*').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  if (runError) throw runError;
+  if (!run) return null;
+  const receiptQuery = isWorkspaceRunRecoveryEnabled() && isWorkspaceRunsEnabledForSpace(spaceId)
+    ? supabase.from('WorkspaceRunLaunchReceipt').select('attempt,state,reason,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(3)
+    : Promise.resolve({ data: [], error: null });
+  const [eventResult, fileResult, taskResult, receiptResult] = await Promise.all([
+    supabase.from('WorkspaceRunEvent').select('*').eq('runId', runId).order('sequence').limit(100),
+    supabase.from('WorkspaceRunFile').select('*').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(16),
+    supabase.from('WorkspaceRunTask').select('id,sequence,instruction,commandPlan,executionPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('sequence', { ascending: false }).limit(12),
+    receiptQuery,
+  ]);
+  const dependencyError = eventResult.error ?? fileResult.error ?? taskResult.error ?? receiptResult.error;
+  if (dependencyError) throw dependencyError;
+  const events = eventResult.data;
+  const files = fileResult.data;
+  const taskRows = taskResult.data;
+  const launchReceipts = receiptResult.data;
   const tasks = await hydrateWorkspaceTasks(taskRows ?? [], spaceId);
   // A partially published packet is never a deliverable. The terminal RPC is
   // the only authority allowed to expose the manifest.
-  return { ...run, events: events ?? [], files: run.status === 'completed' ? files ?? [] : [], tasks } as WorkspaceRunView;
+  return { ...run, events: events ?? [], files: run.status === 'completed' ? files ?? [] : [], tasks, launchReceipts: launchReceipts ?? [] } as WorkspaceRunView;
 }
 
 async function hydrateWorkspaceTasks(rows: any[], spaceId: string): Promise<WorkspaceRunTaskView[]> {
@@ -215,15 +235,42 @@ export async function dispatchWorkspaceRun(input: { runId: string; spaceId: stri
   let url: URL; try { url = new URL(endpoint); } catch { await markWorkspaceTerminal(input, 'failed', 'Workspace runtime URL is invalid.'); return; }
   if (url.protocol !== 'https:' || !url.hostname.endsWith('.modal.run')) { await markWorkspaceTerminal(input, 'failed', 'Workspace runtime URL is invalid.'); return; }
   const requestId = crypto.createHash('sha256').update(input.runId).digest('hex');
+  const recordReceipt = async (state: 'accepted' | 'recovering' | 'failed', reason: string | null): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('record_workspace_launch_receipt', {
+      p_run_id: input.runId,
+      p_space_id: input.spaceId,
+      p_token: launchToken,
+      p_state: state,
+      p_reason: reason,
+    });
+    if (error || data !== true) {
+      logger.error('[workspace-run] durable launch receipt unavailable', {
+        runId: input.runId,
+        state,
+        error: error?.message ?? null,
+      });
+      return false;
+    }
+    return true;
+  };
   try {
     const resolvedGoal = [input.goal, input.answer ? `Property clarification: ${input.answer}` : ''].filter(Boolean).join('\n');
     const packet = await preparePacket(input.spaceId, resolvedGoal);
     const response = await fetch(url, { method: 'POST', headers: { 'content-type':'application/json','x-chippy-workspace-request': requestId }, body: JSON.stringify({ secret, run_id: input.runId, space_id: input.spaceId, work_session_id: input.workSessionId, goal: resolvedGoal.slice(0, MAX_GOAL), packet, launch_token: launchToken }), signal: AbortSignal.timeout(10_000) });
     if (response.status !== 202) {
+      await recordReceipt('failed', `runtime rejected (${response.status})`);
       await markWorkspaceTerminal(input, 'failed', `Workspace runtime rejected launch (${response.status}).`);
       return;
     }
+    if (!await recordReceipt('accepted', null)) {
+      await markWorkspaceTerminal(input, 'failed', 'Workspace launch acceptance could not be verified.');
+      return;
+    }
   } catch (error) {
+    if (!await recordReceipt('recovering', 'launch outcome unknown')) {
+      await markWorkspaceTerminal(input, 'failed', 'Workspace launch outcome could not be recorded.');
+      return;
+    }
     logger.error('[workspace-run] Modal launch outcome is unknown; lease recovery will decide', { runId: input.runId }, error);
   }
   // A 202 only proves the acceptor replied. It can still crash before its

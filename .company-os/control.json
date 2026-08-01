@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
-  "core_version": "2.2.0",
+  "schema_version": 8,
+  "core_version": "2.5.0",
   "instance": {
     "project_id": "chippi-frontier-agent-program-3124451b39e0",
     "name": "Chippi Frontier Agent Program",
@@ -14,9 +14,9 @@
     "north_star": "Make Chippi the indispensable agentic operating workspace for real-estate professionals through durable background work, bounded specialist delegation, editable deliverables, and Realtime Voice control inside one coherent conversation experience",
     "current_outcome": "Deliver durable background specialist launch continuity so a user can start one authoritative run, continue chatting or leave, and recover the same run without duplicate work, stranded queued state, or a request held open for model completion",
     "success_metric": "One independently accepted feature-off slice proves a short same-run accepted receipt, durable launch attempt, bounded reconciliation, no duplicate model work, no stranded queued state, reload continuity, cancellation precedence, fault tests, and disposable database concurrency evidence",
-    "program_version": 2,
-    "program_updated_at": "2026-07-30T01:28:38.694697+00:00",
-    "program_fingerprint": "84dd8b8a334db55a94f3b3b7bc1f9ec0bfa105aebf06db599cc890016fde5954",
+    "program_version": 3,
+    "program_updated_at": "2026-08-01T16:30:07.865224+00:00",
+    "program_fingerprint": "fb14b9c2c4d021777c17b6f89997548ff0536614193146a85fc7ca732b77e101",
     "constraints": [],
     "non_goals": []
   },
@@ -39,47 +39,30 @@
     ],
     "project_specific_dimensions": []
   },
-  "phase": "experience",
+  "phase": "reality_audit",
   "controller": {
     "validated": false,
     "validation": null,
     "schedule_enabled": false,
     "lease": null,
-    "lease_generation": 1,
+    "lease_generation": 2,
     "revoked_leases": [],
-    "consumed_grant_nonces": [
-      "995f88dd-6dd4-447c-bc90-9914a6392253",
-      "54b2a922-3dc4-44f0-880c-246a5591f66f",
-      "611921ad-9ede-4571-8db3-97f1e951868f",
-      "f54d8482-1167-44c9-b07b-e133ba47465b",
-      "000329a0-b6c3-4a1b-ad3d-d06501a7762f",
-      "fa60fe4a-87c0-4c24-862f-2b866a8d73c5",
-      "6e875dd1-7a7a-4237-8306-985dcd9ad860",
-      "9946cc1f-7f70-410e-8d42-34d04b1011aa",
-      "55626929-531c-40af-814b-9396cb233e07",
-      "10b688bf-3252-4fc5-91b6-a89863c8c188",
-      "f236d5b2-54fe-4d4b-a4b4-32b2877f0d38",
-      "a4ae49f7-3d07-4cc6-9669-a6d4d55e0233",
-      "53dc5aa4-9ee1-412b-a513-c8922ae68398",
-      "ed4c55e8-0efd-45f0-a7ad-7b4fb14a0e96",
-      "9e0c9e8a-a2a1-4bae-8e59-4c04c440474b",
-      "4e654e73-4f6c-4d15-871a-a7af8c1252d2",
-      "63c9f7e5-3b21-47d6-849a-09e6db8a74b4",
-      "cb740302-4f39-4594-b382-17c7dd25fd0d",
-      "8125eb5d-ba7f-4963-aefd-fcc8c80c3cc0",
-      "d210db99-cdd3-4b6e-a567-595cdde593fc",
-      "3cccce1b-6344-40e0-884f-0ca64df05ac8",
-      "1cbba4d4-62c1-4fc3-b5cc-889d0057b50a",
-      "9e77b712-7c0a-4bfd-92c0-31ae2c2320a5",
-      "5a740ec5-8374-4f31-ad90-652f052aa2d4",
-      "91770608-324f-49fa-b57a-9b71a5101182",
-      "335ddea5-ba0d-49a9-9f71-380c862663dc"
-    ],
+    "consumed_grant_nonces": [],
     "max_active_work": 3,
     "meta_loop_depth": 1,
     "last_cycle_at": null,
     "cancellation_requested": false,
-    "restart_checkpoint": null
+    "restart_checkpoint": {
+      "reason": "schema_upgrade",
+      "from_schema_version": 5,
+      "to_schema_version": 8,
+      "from_program_version": 2,
+      "program_version": 3,
+      "phase": "reality_audit",
+      "status": "evidence_required",
+      "created_at": "2026-08-01T16:30:07.865224+00:00",
+      "history_id": "schema-5-to-8-program-2-to-3-f3b89d3ddcd2490aaff641420284cd1a"
+    }
   },
   "portfolio": {
     "allocation": {
@@ -88,224 +71,19 @@
       "enabler": 10,
       "maintenance": 5
     },
-    "committed_outcomes": [
-      {
-        "id": "durable-background-specialist-launch-v1",
-        "type": "capability",
-        "title": "Durable background specialist launch continuity",
-        "user_visible_outcome": "A user starts one bounded specialist task, continues chatting or leaves, and later recovers the same authoritative run, progress, and result without duplicate work or a request held open for model completion",
-        "program_version": 2,
-        "status": "active"
-      }
-    ],
-    "active_work": [
-      {
-        "id": "work-durable-background-launch-v1",
-        "type": "capability",
-        "primary": true,
-        "title": "Build durable launch receipt and stale-run reconciliation",
-        "user_visible_outcome": "Starting a specialist task immediately returns control to chat while the same run continues durably and survives reload",
-        "claimed_progress": "capability",
-        "status": "ready",
-        "program_version": 2,
-        "owner": "bounded-implementation-lane",
-        "queued_primary": true,
-        "queue_payload": {
-          "id": "work-durable-background-launch-v1",
-          "type": "capability",
-          "title": "Build durable launch receipt and stale-run reconciliation",
-          "user_visible_outcome": "Starting a specialist task immediately returns control to chat while the same run continues durably and survives reload",
-          "claimed_progress": "capability",
-          "owner": "bounded-implementation-lane",
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "incident_ref": null,
-          "severity": null,
-          "justification": null,
-          "incident_actor": null,
-          "approval_actor": null,
-          "repeat_override_reason": null,
-          "repeat_override_reviewer": null,
-          "primary": true,
-          "unlocks": [
-            "authenticated-background-demo",
-            "voice-redirect-retry"
-          ]
-        },
-        "outcome_id": "durable-background-specialist-launch-v1",
-        "unlocks": [
-          "voice-redirect-retry",
-          "authenticated-background-demo"
-        ],
-        "work_fingerprint": "0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46"
-      }
-    ],
+    "committed_outcomes": [],
+    "active_work": [],
     "completed_work": [],
     "cancelled_work": []
   },
   "evidence": {
-    "reality": [
-      {
-        "id": "reality-2026-07-30",
-        "outcome": "reality",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/reality-audit-2026-07-30.md",
-        "artifact_sha256": "8e2801131d1a93e706c7abd2967f91a3d1809302c2f3856d124e559cb81e4c02",
-        "observed_at": "2026-07-30T01:29:04.839882+00:00",
-        "freshness_days": 7,
-        "source": "current Git ledger, accepted commits, automation task statuses, and paused automation configuration",
-        "decision_impact": "Replaced loose recurring execution with a paused project-scoped controller and selected durable background launch continuity as the next outcome",
-        "author": "sol-controller",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "evidence_integrity",
-          "operational_readiness",
-          "feedback_health"
-        ]
-      }
-    ],
-    "intelligence": [
-      {
-        "id": "intelligence-2026-07-30",
-        "outcome": "intelligence",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/intelligence-direction-2026-07-30.md",
-        "artifact_sha256": "640388b0b39ba549341badbf180cfc8771d78cf42d2efdc63047d0bba697ec84",
-        "observed_at": "2026-07-30T01:29:05.128786+00:00",
-        "freshness_days": 14,
-        "source": "accepted Chippi source evidence, current execution ledger, prior independent review findings, and bounded official-source research already recorded by the program",
-        "decision_impact": "Ranked durable launch continuity ahead of Voice redirect/retry and broader editable outcomes because it is the shared prerequisite",
-        "author": "research-controller",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "technology_currency",
-          "differentiation",
-          "counterevidence"
-        ]
-      },
-      {
-        "id": "scorecard-2026-07-30",
-        "outcome": "intelligence",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/company-scorecard-2026-07-30.json",
-        "artifact_sha256": "4344f6ec22ea194cabb5413a26fc12e0d1b42046835e84aab616eec3e8cd6a0c",
-        "observed_at": "2026-07-30T01:30:39.949809+00:00",
-        "freshness_days": 14,
-        "source": "Company Scorecard contract plus current Chippi ledger, automation statuses, and controller cycle requirements",
-        "decision_impact": "Added explicit sources, owners, targets, thresholds, cadence, reliability, and stop decisions for capability progress, runtime proof, system errors, collisions, cost, tokens, lead time, rework, and enabler share",
-        "author": "operations-controller",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "observability",
-          "cost_efficiency",
-          "token_efficiency",
-          "feedback_health"
-        ]
-      }
-    ],
-    "direction": [
-      {
-        "id": "direction-2026-07-30",
-        "outcome": "direction",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/program-direction-2026-07-30.md",
-        "artifact_sha256": "2c7246eb237550b6c3bcb65d5fc8df3f8e5fb68fabc39c8415eaff8d517197d4",
-        "observed_at": "2026-07-30T01:29:05.548168+00:00",
-        "freshness_days": 14,
-        "source": "user 100x mandate, current Chippi product reality, and ranked capability dependencies",
-        "decision_impact": "Committed the program to durable background launch continuity with explicit constraints, success metric, and non-goals",
-        "author": "sol-controller",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "north_star_alignment",
-          "user_value",
-          "product_coherence",
-          "autonomy_value"
-        ]
-      }
-    ],
-    "experience": [
-      {
-        "id": "experience-2026-07-30",
-        "outcome": "experience",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/experience-background-continuity-2026-07-30.md",
-        "artifact_sha256": "08b7cd5629e2e490f054855274c048a33f90b9115a01ee9ba981a311571b15c2",
-        "observed_at": "2026-07-30T01:29:05.725255+00:00",
-        "freshness_days": 14,
-        "source": "existing Chippi conversation, specialist tree, launch path, and reload/cancellation contracts",
-        "decision_impact": "Defined the inspectable end-to-end journey and negative-path acceptance contract before implementation",
-        "author": "product-designer",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "information_architecture",
-          "usability",
-          "interaction_quality",
-          "agent_controllability",
-          "agent_transparency"
-        ]
-      },
-      {
-        "id": "experience-independent-review-2026-07-30",
-        "outcome": "experience",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/independent-experience-review-2026-07-30.md",
-        "artifact_sha256": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-        "observed_at": "2026-07-30T01:37:18.389410+00:00",
-        "freshness_days": 14,
-        "source": "two independent read-only agent reviews of the current Chippi repository, governed artifacts, control state, and execution ledger",
-        "decision_impact": "Rejected the experience gate at 4.8/10, kept autonomous scheduling paused, and bound the exact delivery, browser, accessibility, visual, reliability, latency, and cost remediation requirements",
-        "author": "independent-quality-scorer",
-        "reviewer": "independent-acceptance-reviewer",
-        "quality_dimensions": [
-          "accessibility",
-          "brand_cohesion",
-          "differentiation",
-          "domain_fit",
-          "evidence_integrity",
-          "information_architecture",
-          "innovation",
-          "interaction_quality",
-          "north_star_alignment",
-          "product_coherence",
-          "usability",
-          "user_value",
-          "visual_quality"
-        ],
-        "outcome_id": "durable-background-specialist-launch-v1",
-        "work_id": "work-durable-background-launch-v1",
-        "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-        "rubric_version": "chippi-experience-v1"
-      }
-    ],
+    "reality": [],
+    "intelligence": [],
+    "direction": [],
+    "experience": [],
     "delivery": [],
     "verification": [],
-    "learning": [
-      {
-        "id": "operating-learning-2026-07-30",
-        "outcome": "learning",
-        "project_id": "chippi-frontier-agent-program-3124451b39e0",
-        "program_version": 2,
-        "artifact_path": ".company-os/artifacts/operating-adaptation-2026-07-30.md",
-        "artifact_sha256": "9622b4ee41e953550d077c4be8441ab9a945983f057cb1e3492258715e8b4f97",
-        "observed_at": "2026-07-30T01:30:39.990698+00:00",
-        "freshness_days": 14,
-        "source": "eleven recent automation task statuses, automation memory ownership stops, and missing-instance audit",
-        "decision_impact": "Paused the loose cron and proposed a reversible single-controller lease experiment before any recurring schedule can resume",
-        "author": "sol-controller",
-        "reviewer": "evidence-auditor",
-        "quality_dimensions": [
-          "feedback_health",
-          "operational_readiness",
-          "cost_efficiency"
-        ]
-      }
-    ]
+    "learning": []
   },
   "quality": {
     "threshold": 9,
@@ -313,338 +91,74 @@
       "north_star_alignment": {
         "critical": true,
         "applicable": true,
-        "score": 8.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:8.0",
-            "dimension": "north_star_alignment",
-            "expiry": "2026-07-30T01:48:16.973012+00:00",
-            "nonce": "63c9f7e5-3b21-47d6-849a-09e6db8a74b4",
-            "payload_hash": "a85406a067ad57ece819135d1229ded6c5cbbc435f9e4f50471d1369a043171d",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:north_star_alignment",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6OC4wIiwiZGltZW5zaW9uIjoibm9ydGhfc3Rhcl9hbGlnbm1lbnQiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE2Ljk3MzAxMiswMDowMCIsIm5vbmNlIjoiNjNjOWY3ZTUtM2IyMS00N2Q2LTg0OWEtMDllNmRiOGE3NGI0IiwicGF5bG9hZF9oYXNoIjoiYTg1NDA2YTA2N2FkNTdlY2U4MTkxMzVkMTIyOWRlZDZjNWNiYmM0MzVmOWU0ZjUwNDcxZDEzNjlhMDQzMTcxZCIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTpub3J0aF9zdGFyX2FsaWdubWVudCIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.HaAUsGL94MCH7VNB_neCfA6TtHVSO2P1Q9YhHXKp7InX-a22rcK6BlZqy8HWkgCuVE-TIhOaR3jZZPRrqxX5MntQEKMbyi6bB7YsRtPZ95ARHpUzrP105HT8XbLNW8PnYoUCRRNH-PgKFC9UOD5xwUksvPEz-OHyOAi5BF8bH-J2v3r7a_MMlRpn51n5_PvYQXNfzRiykxNlZwGBK6JmWOROQDDFRf0QZMn_t5Xq_dpQTJRDvhQI4zOCPQ-kLYMkTKRf9iWA2wIfag-lLwvCvmucO0-VE4PPvryg-gcr1D9tu_-v30YvsP79lFtL8N70Q9_eWPyG7nRe9PCHC4NbMoDelQoN1LWIty9Z1FBxrB4rOJLGr-frWRFxvGBKRLccSpP3EBMjC8fOS_8oZ5G95R0vHlPhIKJh-U5pE-BBrteUOe3rlet6AEPhRHqMTprg5QhhZueRFqXgQtVeO6HUrwTUZ3Enw28zB4f9fvRduwEt_5KiAs-IBcJK1oHebDKP",
-          "grant_digest": "99a8f241e7d2353e5524dc5abadc84508e312be8e86a408565bb864e051cfb4c"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:8.0",
-            "dimension": "north_star_alignment",
-            "expiry": "2026-07-30T01:48:16.982249+00:00",
-            "nonce": "cb740302-4f39-4594-b382-17c7dd25fd0d",
-            "payload_hash": "a85406a067ad57ece819135d1229ded6c5cbbc435f9e4f50471d1369a043171d",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:north_star_alignment",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjguMCIsImRpbWVuc2lvbiI6Im5vcnRoX3N0YXJfYWxpZ25tZW50IiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNi45ODIyNDkrMDA6MDAiLCJub25jZSI6ImNiNzQwMzAyLTRmMzktNDU5NC1iMzgyLTE3YzdkZDI1ZmQwZCIsInBheWxvYWRfaGFzaCI6ImE4NTQwNmEwNjdhZDU3ZWNlODE5MTM1ZDEyMjlkZWQ2YzVjYmJjNDM1ZjllNGY1MDQ3MWQxMzY5YTA0MzE3MWQiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6bm9ydGhfc3Rhcl9hbGlnbm1lbnQiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.iRUPa4LxohETLHJLp6fr9kxFYjuZk3Q2Ow1SwMskszMDlSFLlE1WbxXNE6okbNFfL8BOVOtCKYvoyXKE_Gz4MnWrqmP0gaybaMaxGoKNdcAsuyNnPfXgyr4LrGhrpiEX1CwpRzeViPyG0csiZ8r-0dguLoQ-kaw44mucFtxaSV_xvGRr_xWjw0KAcew5b1FA4xvBiSujGW_dgmvYEGZBc4KydWCP7mnY2Sq21HcnghCPuz1_FwhkOPKKzai0F6fHTZZwGYBsLZ6K_KLYhIGUB9bPOICH79IC8DTbM8kAHz9Dda0KdE_7MBCyZ-3EbEsD5i9jjV9OjgMKH5OW7T38XmY28tNzB9akTOHEsWIKkv3i6LQoxRbBJNc-V5s2DadWD986Q4_Vgzzz5_JOx8sE_PUoLOjTiuxHDhrTH6DtPRKOeU-kKdRmTpAim1E1xL_wAQWSt9gufpTi1m10XPNVzyXx9UMCuQsFMAzuc6_498m5VTyE01PGGmgRkSAy8Gg6",
-          "grant_digest": "e20c21ae971b7f5dddbee09aa492697937347c6a83f81cf974d2ec5e27491b0f"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "user_value": {
         "critical": true,
         "applicable": true,
-        "score": 6.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:6.0",
-            "dimension": "user_value",
-            "expiry": "2026-07-30T01:48:17.341073+00:00",
-            "nonce": "9e77b712-7c0a-4bfd-92c0-31ae2c2320a5",
-            "payload_hash": "a8875ce21bef35d1e49310e0248e268b4605476ea009ff50edd9313ef68b940a",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:user_value",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Ni4wIiwiZGltZW5zaW9uIjoidXNlcl92YWx1ZSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTcuMzQxMDczKzAwOjAwIiwibm9uY2UiOiI5ZTc3YjcxMi03YzBhLTRiZmQtOTJjMC0zMWFlMmMyMzIwYTUiLCJwYXlsb2FkX2hhc2giOiJhODg3NWNlMjFiZWYzNWQxZTQ5MzEwZTAyNDhlMjY4YjQ2MDU0NzZlYTAwOWZmNTBlZGQ5MzEzZWY2OGI5NDBhIiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OnVzZXJfdmFsdWUiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.VKlZTq_1-6IBvmVycEP_7v1AqrERu0FTmCgerT7Oycov59WTdcDjKlU9IrPBg_CQTyPWlqE0yN7lY7iOStGdoE5Wfbg5twva4RasW1C1868uZxy1xtGW_L1IejKVOrbv7icl3zpdrn7fLlUPE0_egMhhgrOFblN_1iQ2El2bw50cxptnP3RyIRVQ70wCJwWuPvK73-9kAe4qfsho-pqNHLecFBmghPDO8JZxiB5j3hfwgKJnYEMkDm0avHXpNKU7cdGlObjOe5QWXKpyNePGcsu5EhR_A4VfFgigOHZaeN4RhKSSjYJM82NXuqFyQwUsmdvV1GON1rC1OYWLiQ-oRgR0Y_GKq_YIrVlhq-R5lIthKpDC4Cuz26BUNdHAdVHaxjSDp6RxY_yRPGd75yNYnreXox-Akli5ezkkRg7q1s7Kw6Sd80XTd4bZEXFukdN762vZ4ciIM6jGy5kuU-Ex2M2Teivu_kBrNlA8JOt92EZtFYmSmOGpaXLKXf5eKtDl",
-          "grant_digest": "4ce6b3780e9afc1f2a1ec2366ca44e4b71d1c78dcb7abd5c02d7dd58ba5a1a28"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:6.0",
-            "dimension": "user_value",
-            "expiry": "2026-07-30T01:48:17.352485+00:00",
-            "nonce": "5a740ec5-8374-4f31-ad90-652f052aa2d4",
-            "payload_hash": "a8875ce21bef35d1e49310e0248e268b4605476ea009ff50edd9313ef68b940a",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:user_value",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjYuMCIsImRpbWVuc2lvbiI6InVzZXJfdmFsdWUiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE3LjM1MjQ4NSswMDowMCIsIm5vbmNlIjoiNWE3NDBlYzUtODM3NC00ZjMxLWFkOTAtNjUyZjA1MmFhMmQ0IiwicGF5bG9hZF9oYXNoIjoiYTg4NzVjZTIxYmVmMzVkMWU0OTMxMGUwMjQ4ZTI2OGI0NjA1NDc2ZWEwMDlmZjUwZWRkOTMxM2VmNjhiOTQwYSIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTp1c2VyX3ZhbHVlIiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.SHe2wTj1SOFnBU3PDfNj7f_j0uZjAVuFpalkHYyoPBl9Gvl7rmlvOr7uuTuRWAKHtTD8KP5txUUseJFK6iuM94HwjoThD3E_IWtPzmArJdLPgvz2VEQ9rRrxL7sFJHuqR_S92rSK9mXxLzFKJOlThC8rYn3lD7H07VnDX9Jdy65RxaDF8vxTyPxangxLY4U2L2-GW-s0gFicZQOJlBcWBdlpl99pxi9qTIi1tnyv6xgsZHpwqzPYTgJo6aXXLSj8u95eGwa8OIZg6bqHxlznf4pNMx4U1qyR0kkoa-UDEMjUUQFHsF1wAVfpMC0K8f8TNEyqoMXhG4xW7i1NhCJ0JxoQ1Hpa2z4Yzw5DVxq8EXi6icZIqZcsU1kCg_4SMo0csDHcy9sbeAnyD4t-pw0R8cyBgtMoi8xF4NxlP3PeK-CvjvD-_d7gAlWNGTeCWypDJRw7FILcCJPjN-r---hyAu1f0nLCzYOt7y3IXZytX53bvtaMKcPNrH29dKj-t5hU",
-          "grant_digest": "9069b78a3a7490315860d4f91e8b64fbad2b2766ef59cbc9626c50b3e4a22921"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "product_coherence": {
         "critical": true,
         "applicable": true,
-        "score": 7.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:7.0",
-            "dimension": "product_coherence",
-            "expiry": "2026-07-30T01:48:17.089343+00:00",
-            "nonce": "8125eb5d-ba7f-4963-aefd-fcc8c80c3cc0",
-            "payload_hash": "9d071b80fe2a2876abda19a1fb89411c14ae978e7fc0425ede6e4e7983e8d26c",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:product_coherence",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Ny4wIiwiZGltZW5zaW9uIjoicHJvZHVjdF9jb2hlcmVuY2UiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE3LjA4OTM0MyswMDowMCIsIm5vbmNlIjoiODEyNWViNWQtYmE3Zi00OTYzLWFlZmQtZmNjOGM4MGMzY2MwIiwicGF5bG9hZF9oYXNoIjoiOWQwNzFiODBmZTJhMjg3NmFiZGExOWExZmI4OTQxMWMxNGFlOTc4ZTdmYzA0MjVlZGU2ZTRlNzk4M2U4ZDI2YyIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTpwcm9kdWN0X2NvaGVyZW5jZSIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.TDS5S9SOw_WDb8EjyZUUTJLxOLWDZl1yVWN_5pv4M3Ck7wWh-R4FvYMFXS5zXRgU2lnXfu8WrnqlaBCMT_D0I9R3QpCRVNTw0laRDeN9g84fG5xsO1ZhoZWArzGLWYc6RPzaiHuBEQaDo-lx_EENKDIdPV9vthOFg723_bZzLF3OnV2aHubo4W9FgCNEtHFQYUpbfJUluHFeSrvqj2ljhIKmcVL47BqQvWURBiXsN0jQURBmjJvVRxrhd7BBCQO4dBwhvS3kZge7cyZwIpg7sD2tl7mDQ0d1S3OOSeTzKvtxb2TrBGEYQipvDnkyL4GUOPWB9NbMxZm8gOIMbO2O1868kXlNjYqdkHGapPjIohvGLn6morpfsl3WHkk71Jr9TTIzds7LoR0KXZafePi8-pr5Q_v3La6gt5WVVR3cWy-CSS3jD-a3Cn3R4MbHAfQAk2APko74c_Y-EU6nai_5owtp-ZBI1qHqXaiqkSZn3h2y0-SICoCC6URJVI6LtVuY",
-          "grant_digest": "e8670796e5c4e4ee85fc8fa1c7ddbbf5fe4147f0ec9b9f8a124cc330cf992298"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:7.0",
-            "dimension": "product_coherence",
-            "expiry": "2026-07-30T01:48:17.098924+00:00",
-            "nonce": "d210db99-cdd3-4b6e-a567-595cdde593fc",
-            "payload_hash": "9d071b80fe2a2876abda19a1fb89411c14ae978e7fc0425ede6e4e7983e8d26c",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:product_coherence",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjcuMCIsImRpbWVuc2lvbiI6InByb2R1Y3RfY29oZXJlbmNlIiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNy4wOTg5MjQrMDA6MDAiLCJub25jZSI6ImQyMTBkYjk5LWNkZDMtNGI2ZS1hNTY3LTU5NWNkZGU1OTNmYyIsInBheWxvYWRfaGFzaCI6IjlkMDcxYjgwZmUyYTI4NzZhYmRhMTlhMWZiODk0MTFjMTRhZTk3OGU3ZmMwNDI1ZWRlNmU0ZTc5ODNlOGQyNmMiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6cHJvZHVjdF9jb2hlcmVuY2UiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.EuZ09o0bFK0_KBf3I1VyCE3fL_WSIowt6hPtih-zV8KenBYAgt3X4IPZG100vC_j7NAmkyJ9YF0ViUaKp3ZmcMxoLoED4LqwO-dLv13_Bt-5__9LwXAl6xYYMFAjbdqGlZ8MOLnHjIKor19Jc86Jayhm1Un8YJgb5ZCndRU2Pba-X4VTAMUpxc2vN7Xcaqb3bb3VLW-Vpvhs_V7UhckA-kQfpkoo_cJrRc-8v5EzRkvhd4SiN-UzxbUITxU5xH3dJIGrhWJnQRIEh6onVpEo-hG45fFv4Xl27yY1-oOPA81-osKWxUIdCY1V6Wb8aRw43e0VUEQ8j6pZEmOMF2OOVpu6dmh107WRe3cHqsD7jPNHyXyFPL3gQOOUFElpJ2uTEI9ETosutQ0JP_1_u6hnNcwGMSe7WazoTu3n-Mkm-7RplHFFBdnXcsZ8sMG4f67UrGADX3exTON-IgijC3Jd2dyDDB0L5UfuoVjIz4ygd5lcWdfbLS5r_2DXOybCEklE",
-          "grant_digest": "aab8276eaca2e3b399b2b90e5e07da90c0420a58b525140bbfb5a078f2d2b7cf"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "differentiation": {
         "critical": true,
         "applicable": true,
-        "score": 7.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:7.0",
-            "dimension": "differentiation",
-            "expiry": "2026-07-30T01:48:16.038546+00:00",
-            "nonce": "000329a0-b6c3-4a1b-ad3d-d06501a7762f",
-            "payload_hash": "08b64e5968f4c742e7ec8d1a9dc8887e8a86c88ee15ca40f8aa5b712c9456022",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:differentiation",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Ny4wIiwiZGltZW5zaW9uIjoiZGlmZmVyZW50aWF0aW9uIiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNi4wMzg1NDYrMDA6MDAiLCJub25jZSI6IjAwMDMyOWEwLWI2YzMtNGExYi1hZDNkLWQwNjUwMWE3NzYyZiIsInBheWxvYWRfaGFzaCI6IjA4YjY0ZTU5NjhmNGM3NDJlN2VjOGQxYTlkYzg4ODdlOGE4NmM4OGVlMTVjYTQwZjhhYTViNzEyYzk0NTYwMjIiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6ZGlmZmVyZW50aWF0aW9uIiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.IDKpy-nxT2Q591kD-b28vtHROxX4qnkrHvIscuBHbRypLOg6fegBwzKNQQykyLlJh9GDQpqZ7X2OcAqByhR_PcxNbpqJxRof9x0vuom2HMWJNdGzAnppyNQSty_Obvu5uzTrzmgOSP1J5Tkla_7xDSrmyxnueypOgrVwq3k19VlrIODBFvmgwg_pxj42USrozEvjlXmwmEIxcVGkYgPNQ6OK0a0GucIjKPxDgr4QTXWvp7CPg0tzYdeZwKsOHXW8hMKfX7Kd7-TgfdDGrcLpBXgZFqzMeQgU4Ww0xhgpTS5PHRDT272SskVJeJvx_oDjGpu06UAiWCeNZJFeL2arzyQCl_p0UOrTg1z15uyGU6p-te3y5OdWqeX-C3R4Z1icjqH689hi2vN1IWIog8tVBGS6rD1TvCGRFKmlQcYzY0J7Xo3UxRe3qODOGHvOJ-k3LyAqhuJ5AubEW7CZs3Pd0yDjaFDwaGbiDdMP-6OnqYypgkY7CaUTQ0rDKnSpNLK2",
-          "grant_digest": "93337eea64f1a907c1b1bb87e4a73cd1c9bfaf88d3e553e51bafd13fa1827a1c"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:7.0",
-            "dimension": "differentiation",
-            "expiry": "2026-07-30T01:48:16.049589+00:00",
-            "nonce": "fa60fe4a-87c0-4c24-862f-2b866a8d73c5",
-            "payload_hash": "08b64e5968f4c742e7ec8d1a9dc8887e8a86c88ee15ca40f8aa5b712c9456022",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:differentiation",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjcuMCIsImRpbWVuc2lvbiI6ImRpZmZlcmVudGlhdGlvbiIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuMDQ5NTg5KzAwOjAwIiwibm9uY2UiOiJmYTYwZmU0YS04N2MwLTRjMjQtODYyZi0yYjg2NmE4ZDczYzUiLCJwYXlsb2FkX2hhc2giOiIwOGI2NGU1OTY4ZjRjNzQyZTdlYzhkMWE5ZGM4ODg3ZThhODZjODhlZTE1Y2E0MGY4YWE1YjcxMmM5NDU2MDIyIiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmRpZmZlcmVudGlhdGlvbiIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.EpzBOhMoCh9R4PCm6sFN9JbSKtzHaDDgKj3uoDrBVhu5Z6_G_MZh3bqf63F2yCuZsjuhfuAJX9IJjfaT_cEx4vmBEI3CitTfy4VEckOL8hJfb3I-flkveyQmiRuu6GYKvy9ZpDPefRGI95OrBWGF9ZxeYuNm9Nz1vpG9wIVFK4Loob8xU_k0TR6aOkfU0OekDr7f9LT0n_v3Oq4mLvHbkVuh1JoHu3YpaopQMwubUB9PLary5S-CKDIlxb6c_EKoYfL2ACJ74rDzCoAdC3UjDNJu7xRysAfN613X8RyjZA_Ra55y4KKA02u-JVET4upY6qsuIjqV8EShdTdyx238q3MTWNpmnfsgN2YBDPUJWWdAhhPsiQpaZAstzhILX0Xsx9Vo7rts_NFAbGUrE04nlMc27V1sJQkmWWidraWhQHmRX97KjIXt04d7NlNrZzEFXHvSHz1EXq6j1dsIzk8dxj-aSqRhBk3Ne38__PkSGR9K8jw0d4dndcVqCYdXu0Xd",
-          "grant_digest": "8492ecd0de513d61b2a22fab930d7ba6c111cbbdd88606063f749ab3d8607ecd"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "innovation": {
         "critical": true,
         "applicable": true,
-        "score": 6.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:6.0",
-            "dimension": "innovation",
-            "expiry": "2026-07-30T01:48:16.720856+00:00",
-            "nonce": "53dc5aa4-9ee1-412b-a513-c8922ae68398",
-            "payload_hash": "b70c4574b9124ef30791efaea7f95ea4066fbf708518ee1a23312dbf7fb7cc38",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:innovation",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Ni4wIiwiZGltZW5zaW9uIjoiaW5ub3ZhdGlvbiIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuNzIwODU2KzAwOjAwIiwibm9uY2UiOiI1M2RjNWFhNC05ZWUxLTQxMmItYTUxMy1jODkyMmFlNjgzOTgiLCJwYXlsb2FkX2hhc2giOiJiNzBjNDU3NGI5MTI0ZWYzMDc5MWVmYWVhN2Y5NWVhNDA2NmZiZjcwODUxOGVlMWEyMzMxMmRiZjdmYjdjYzM4IiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5Omlubm92YXRpb24iLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.YKnSFAN34GgIEU4W3RyLC5xICpUuq3dh87r_kStneWhEPlLXXvsbekexINGF7YSfRkw-uSrVmpLIX213EbL2Z5B4UyIfhcITbhuZWeseQyOMHA1djwvnVc2-D2CmBZCPTCTYxI-3R9kTXUQPXRnPOiqfrWtD83sMiZe1n51nmHW70jLYFT6AfofLhZbvunzlpMqYahxaNhlrf-lkVR5OGPR_HcDxgPayGcEDo33apbp9JgS-MZLE7NljnmJT9vUa4GgaexayUmvHJ8Bvh4uSXT5GORZvgTVDZ1tgsj_KlRlafWsZzDjTnSxh9u4iRwWQuEX3JysUSnGW_X8_I5Ix6u9nDxrH_S8rkCqDUMzVXrKacwkFreYwB2TbV6zz0fDtuiaEsrAJYSuEJUoKxbeguIiR8KH0nXNmWXldfonXK_MmCQfoL4fjjXXXoARSXMRamCXJgmTPJ0mpVU7OMSe3F8eoSPIt2Xnu1JnpDbTbUt1wVnUBxwwq6XE7zHPxm-MX",
-          "grant_digest": "b5342cbe392d17b1c6d05b770b85d1576182321e1227cab02bb0c2df18ebe791"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:6.0",
-            "dimension": "innovation",
-            "expiry": "2026-07-30T01:48:16.731431+00:00",
-            "nonce": "ed4c55e8-0efd-45f0-a7ad-7b4fb14a0e96",
-            "payload_hash": "b70c4574b9124ef30791efaea7f95ea4066fbf708518ee1a23312dbf7fb7cc38",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:innovation",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjYuMCIsImRpbWVuc2lvbiI6Imlubm92YXRpb24iLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE2LjczMTQzMSswMDowMCIsIm5vbmNlIjoiZWQ0YzU1ZTgtMGVmZC00NWYwLWE3YWQtN2I0ZmIxNGEwZTk2IiwicGF5bG9hZF9oYXNoIjoiYjcwYzQ1NzRiOTEyNGVmMzA3OTFlZmFlYTdmOTVlYTQwNjZmYmY3MDg1MThlZTFhMjMzMTJkYmY3ZmI3Y2MzOCIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTppbm5vdmF0aW9uIiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.S6ruG8Evl85MolpuQC8j1P2YodSK3v6LARy1aIo-Q0F1BlaCj4bDL2xgMoSKHTAPkRBGCn_sX4PChfZY3iA6iMJwCoerdlWpnRQpMxEaEewYYtBy9cnJOgLfD2svo8JOzQNyDoSj1fBIlBNwiSJ2cYqehUp3Blh3xEmDcGufPj929Yvx95u-2x0yAw8XsqebYlzRYu8BjrgR-M5jIPyZuwk80M0HP_amOWDqv2lXFpijc229hxS4th0wmZ-1-qjF9VOXbfNKyh-Nm5eRAO53EFgt94DdZNX23HQaO4mrex7HQufnQ3mkEObEl6g_mJVQ_3lfIkVO1FQgk2hbQG6c-QynDkHwrO4hxlkNck2-68Le2swQp2XghWB38nGj0uIW2Ha6aBQhgGB9RBOH1_7W6xZVs_ZgVN3KuZLF7clx-8V6a3n_1Qtzm3f9-f92wdMtsg4dsviC8dvmZx23IrVz16xO07vdcQCrr-GWnlo82mF_DFvrtbk6wpqVKcOf8KYn",
-          "grant_digest": "0b0b361b9edda27ff85631ee9181b06b9a95e5e6d2ca0899ac32465bf023f038"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "domain_fit": {
         "critical": true,
         "applicable": true,
-        "score": 5.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:5.0",
-            "dimension": "domain_fit",
-            "expiry": "2026-07-30T01:48:16.270072+00:00",
-            "nonce": "6e875dd1-7a7a-4237-8306-985dcd9ad860",
-            "payload_hash": "f489308968d3c77731c8b181c8488b052a239ce3cc40c71744e7ffef6bb45ea9",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:domain_fit",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6NS4wIiwiZGltZW5zaW9uIjoiZG9tYWluX2ZpdCIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuMjcwMDcyKzAwOjAwIiwibm9uY2UiOiI2ZTg3NWRkMS03YTdhLTQyMzctODMwNi05ODVkY2Q5YWQ4NjAiLCJwYXlsb2FkX2hhc2giOiJmNDg5MzA4OTY4ZDNjNzc3MzFjOGIxODFjODQ4OGIwNTJhMjM5Y2UzY2M0MGM3MTc0NGU3ZmZlZjZiYjQ1ZWE5IiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmRvbWFpbl9maXQiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.OrxVB7p5G34Mx49HvXt3dwf31Rpa4J-_t0z-EkPQw3LWg-_JWxSWsw589RqWZ37rSJ_6XlKkQgjjGXDBCG3j3PzlNk2ZY1DseNnLDd71wv8I7nqLCcFlvo4Bj61X1T8DfuSLubPCiAFc5s0zxBifm8SHNA1TDs0NJj1WT7UeGBrKXUmN8n4255FS5K3tV5aVtZgwYHIBDLI7lbxoB8HmWQIpROTM5saZ15kzn9ZEVab9700e8ZEG2W5HpqAobhaSMQkKlH9mD19R8CR05a8dTuX2f253z80BzTyCAPkmnh2GgZD00jWiy_NRPP2FonvJiM95vaQ6_yqpDgMfKjihfFoMbelU-mz6oKoUapKEgNp9w4gajhu76-W-IFTbj_y3h0l_l1kXibdfFLKyb3Sf5WlsIVkbBA3_kR-4VxZKHZl23ZdZjyhOh7T7-0NF-hDRpSPdKlq6B9OZATfwvenWxJEoaDMYa5Kypy6U38iCA8eCyl7gmTEIWWU6x2Bn9NCA",
-          "grant_digest": "531c5ac2df717222c9f081d1f2c6b62c2228703e34542fedbb53aa8fc69a7f47"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:5.0",
-            "dimension": "domain_fit",
-            "expiry": "2026-07-30T01:48:16.284186+00:00",
-            "nonce": "9946cc1f-7f70-410e-8d42-34d04b1011aa",
-            "payload_hash": "f489308968d3c77731c8b181c8488b052a239ce3cc40c71744e7ffef6bb45ea9",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:domain_fit",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjUuMCIsImRpbWVuc2lvbiI6ImRvbWFpbl9maXQiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE2LjI4NDE4NiswMDowMCIsIm5vbmNlIjoiOTk0NmNjMWYtN2Y3MC00MTBlLThkNDItMzRkMDRiMTAxMWFhIiwicGF5bG9hZF9oYXNoIjoiZjQ4OTMwODk2OGQzYzc3NzMxYzhiMTgxYzg0ODhiMDUyYTIzOWNlM2NjNDBjNzE3NDRlN2ZmZWY2YmI0NWVhOSIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTpkb21haW5fZml0Iiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.iKVNE_1TVrS1IEHbW29EqtMRTy-i3L1L-kvOG2zK723xfb-RkV8F1eFAckZ1aChV8tjZ3h6pSYhGK6qXAnlifWF6TyUglbSANEEhFJcWOdtXPpv9QJmKKOqGlvgwOEVHAj_TaPPKjTBLFBpurRoZEjkz5G_fJfk5lq4Sj0_6DFIhZF5Rfcq880jACgqquQLQQYNwfz4rdihcU7b9XCkmOeUCKS5f6CjeiVxK1Fo2ITF2nRLvYllAdqkeQV4vkdvOhZEafIcYsRc0GyMhjkb6SRTpL69dfHaO5oTEZwdQ4hNKxh4pRbCthwxHmFePHw6ed97VbFAeNFdeNF-IW1So1c4xdWjnHpfCSBC3ynKTbqD0vVSVMhnyMlJE--viIBXgZTeDVBb1r4L5EHGgXCrnF2Dpu6i94ah2hjDg5wR-2JCAi3TGMvZ8WBSKB4etntPAh51U4angUaKbwW3McO9JoVKSTHd7xPWCmjJroZdBwt6tQeHZ_AT-Anowk1t65-qQ",
-          "grant_digest": "9b9644a3c3df69df18f3cb8585ff61a75ae6b8b6fbb6d8666ba619863c64a4ca"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "customer_evidence": {
         "critical": false,
@@ -685,282 +199,62 @@
       "information_architecture": {
         "critical": true,
         "applicable": true,
-        "score": 5.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:5.0",
-            "dimension": "information_architecture",
-            "expiry": "2026-07-30T01:48:16.563738+00:00",
-            "nonce": "f236d5b2-54fe-4d4b-a4b4-32b2877f0d38",
-            "payload_hash": "8c086a72ec53a27071434d23713c39ffcb6325eb5a6a5e3fa811d5f69bebeaaa",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:information_architecture",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6NS4wIiwiZGltZW5zaW9uIjoiaW5mb3JtYXRpb25fYXJjaGl0ZWN0dXJlIiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNi41NjM3MzgrMDA6MDAiLCJub25jZSI6ImYyMzZkNWIyLTU0ZmUtNGQ0Yi1hNGI0LTMyYjI4NzdmMGQzOCIsInBheWxvYWRfaGFzaCI6IjhjMDg2YTcyZWM1M2EyNzA3MTQzNGQyMzcxM2MzOWZmY2I2MzI1ZWI1YTZhNWUzZmE4MTFkNWY2OWJlYmVhYWEiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6aW5mb3JtYXRpb25fYXJjaGl0ZWN0dXJlIiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.UjaO1S0zsdswi1CY2vhyW8O0AdiApIzghIB6JpFXkSQgpbzGqymee15HQlItGE3XLC7G8rw4YMepFNnD7Q_pDcfIb7Y7GB3tOLxx0RcR6BM4wMWNCXEtsug1k0jhAy-2tF94LSBU9lhDLbc9MTVuABHuaGRj6BCnw02Z5OLE43WCIFBgAld9y7IS-S-OaZijiJMqK3FW2JgxXGGTceH8Uf2ChWLk3ciAAl4exEHrhfad1wRqOueGgfYlnsIlzB9m2hnfA_awFUNc7gl6B_3Pa8gHwPM8q3JlJvoMucf9LzMsolHrJBqaxrMLgBibi4OTdShUpCzN7TdSdYqde5U_FhP5dYkD5OuWHTWxjshUzqAygTYzF5oaIxoTq83O01HBCTxOPMQHu01skcLuIokRfAoICwPixDLBxBRrurl0Al7a0gAGWPpkYvELBUAoRrRunFuZJG-EDdbqrcy4KsE4zEx4mYCa3dl2uSM_DIlYkF5Ta7Kf5Az2KebqnQpdQqNd",
-          "grant_digest": "30b2c70c1940eac6877a0f2b07b2780f9962cad7769520b324f76f9859cc224e"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:5.0",
-            "dimension": "information_architecture",
-            "expiry": "2026-07-30T01:48:16.574354+00:00",
-            "nonce": "a4ae49f7-3d07-4cc6-9669-a6d4d55e0233",
-            "payload_hash": "8c086a72ec53a27071434d23713c39ffcb6325eb5a6a5e3fa811d5f69bebeaaa",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:information_architecture",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjUuMCIsImRpbWVuc2lvbiI6ImluZm9ybWF0aW9uX2FyY2hpdGVjdHVyZSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuNTc0MzU0KzAwOjAwIiwibm9uY2UiOiJhNGFlNDlmNy0zZDA3LTRjYzYtOTY2OS1hNmQ0ZDU1ZTAyMzMiLCJwYXlsb2FkX2hhc2giOiI4YzA4NmE3MmVjNTNhMjcwNzE0MzRkMjM3MTNjMzlmZmNiNjMyNWViNWE2YTVlM2ZhODExZDVmNjliZWJlYWFhIiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmluZm9ybWF0aW9uX2FyY2hpdGVjdHVyZSIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.iEVW7xcwUUHvN6WhlwGA_U6V7yXUdOzeOytewTBHNeOXpeTrIlTl7GCk_tnZvQP0cWZVWvtV8810LoDRaweClBRKDhguJf-QN7JA4fiV6OpaGXRaNffVhel3-7SWe0J9oFpsUKjZ3ZlNGi0q3CtdGSE7OpsVIgdr4wIlqfwG_X8ikJ01ecA5cgEH_6Tiu6wGA1lbwjuRnML0KsZCmMSjKisijnJbwlgC23jkgdOjLZ7UGTpf5bm4DCgOrcwoMTvoTNgM9wzsEm8veRlxRRxnY-ToORHtw5tH3ODiJmxYFjSfiVmKPpX2IK6Wxj3uwcK0rUvC1k2AIqBqyWb-flunEr8rUiHm3dsTz2WTUhT3puVs-xFtaBGNj6Ad_4jHrM3PgRHUGtqkduQ493ea1Qda62MTyktsOwLJECLCbW2WWo3uEdXiOKhmRyLQ9_ZT7S00Xx8FyNIAMKVfhfX_PvCIASOKAtsyXWx2x05zqB7cw9QzrOZm3Nhu_fcXN60ePrf5",
-          "grant_digest": "d7683475ef23e66cb6c47c89e3f603dd500ced9890f177b364e67d541c354d81"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "usability": {
         "critical": true,
         "applicable": true,
-        "score": 4.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:4.0",
-            "dimension": "usability",
-            "expiry": "2026-07-30T01:48:17.226463+00:00",
-            "nonce": "3cccce1b-6344-40e0-884f-0ca64df05ac8",
-            "payload_hash": "a4632acee312f1c95de88b291865d47f19017bd6777ec5b58edaba9b81c10145",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:usability",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6NC4wIiwiZGltZW5zaW9uIjoidXNhYmlsaXR5IiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNy4yMjY0NjMrMDA6MDAiLCJub25jZSI6IjNjY2NjZTFiLTYzNDQtNDBlMC04ODRmLTBjYTY0ZGYwNWFjOCIsInBheWxvYWRfaGFzaCI6ImE0NjMyYWNlZTMxMmYxYzk1ZGU4OGIyOTE4NjVkNDdmMTkwMTdiZDY3NzdlYzViNThlZGFiYTliODFjMTAxNDUiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6dXNhYmlsaXR5Iiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.IzCXTdpdRncDA9K5-hNEp4YjZdEAdwTzLoZyvLrqwLyMu-g0oej6cBWfqRn-MUVnWejbiYL3qYv15TVBnIZCjuHxWrmf_ljuQbCOI7RYHYkCKoVkq0KgQNODTP7lV9DoDjAXpVfjOHuYY08MwTlgGo1Yyo-fBTAqEW6oMs-anN9FkWAeWUhC3ulmgTx_d00bGHajFivrYYNyGBjvmEgpcqhQjCawaKJJbG2znXSbVuLk191_egQTP41vxP_myTKKylI-3ZvUUkHrt2SNnL8e7yI0QweEwfHL3lHt4-ZOezEicMM-kA8yXRDTyIy1bTxJ6v-e74xWHL2_6vB6TtjD0ZFzPql0u3872H5YcwUlrZh-51wDScMLB1U0OradX3K9UOZ64yryup3RyZFPb1m_9jXbT0oHAW0EYchO2NAxbnIvX-ZDjZMU5Spvrtg9cTZ6aMnT-AsS6qKcXMgYUk5s4rjoD-7THWRJ6UvWEvMRpaypDyUOpMZWRlTZYERQtdcy",
-          "grant_digest": "768a7c8e41fb8be31f54a25f880eebe7d0fb2a87e1c8f387d3f8c68a656f0054"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:4.0",
-            "dimension": "usability",
-            "expiry": "2026-07-30T01:48:17.236410+00:00",
-            "nonce": "1cbba4d4-62c1-4fc3-b5cc-889d0057b50a",
-            "payload_hash": "a4632acee312f1c95de88b291865d47f19017bd6777ec5b58edaba9b81c10145",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:usability",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjQuMCIsImRpbWVuc2lvbiI6InVzYWJpbGl0eSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTcuMjM2NDEwKzAwOjAwIiwibm9uY2UiOiIxY2JiYTRkNC02MmMxLTRmYzMtYjVjYy04ODlkMDA1N2I1MGEiLCJwYXlsb2FkX2hhc2giOiJhNDYzMmFjZWUzMTJmMWM5NWRlODhiMjkxODY1ZDQ3ZjE5MDE3YmQ2Nzc3ZWM1YjU4ZWRhYmE5YjgxYzEwMTQ1IiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OnVzYWJpbGl0eSIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.NPGXmLbOdtqY-1c-oyGizvf3MjiG0WP9PLpONjzLj5o06Qf4Ibi74zUywXdZG_ebShM0dxkYmzYk8j6ak-8bW02uUZr52AO0WabSIfbnHCXr0dSqxToIxd-cjvTh5kesTIWF_GbBIRZOnAihRuNKDM5IjC7qhUJQ3-IxS-V-Opg2tBL5Pa5ktBWZMKT7wO5J3TbPfkbHAxy7Pdb1-K-N4IxUWyhshvO7edrIBoJToqZ0AmHmixm1Mxj-iRLt__42MjKjvDsP5RKQ82PeSgDhEdgbUrx6jOdhf8Lsmqx78Imz5p4o8JrjlSOoNnUkZrUGk9RREIVuEwPpSuVGDzx9kk1ONcD8XepV1HhafzVrKBHK-zVAB14I0ZPUlWSU24LQusyRPU1tTi64ocrN9ruaL32Kx9GE5Xrlq_tu3D6I0J_xdHiLiZ572z3tOaeVR3JF0B1ItDYtvT9qLbS4SkSNbJERcw67DV5iY54lG1GMmDcrHUlradnwsYINlEau2xg4",
-          "grant_digest": "57086d0471c43c0b9f6be6ce114ab2e85bd496d19592b331aeebcb4f716d0e6f"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "accessibility": {
         "critical": true,
         "applicable": true,
-        "score": 1.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:1.0",
-            "dimension": "accessibility",
-            "expiry": "2026-07-30T01:48:15.675864+00:00",
-            "nonce": "995f88dd-6dd4-447c-bc90-9914a6392253",
-            "payload_hash": "55ebe041a8a3fa1673391fd5510c9dd08d40877b93632798254607a61a5afceb",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:accessibility",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6MS4wIiwiZGltZW5zaW9uIjoiYWNjZXNzaWJpbGl0eSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTUuNjc1ODY0KzAwOjAwIiwibm9uY2UiOiI5OTVmODhkZC02ZGQ0LTQ0N2MtYmM5MC05OTE0YTYzOTIyNTMiLCJwYXlsb2FkX2hhc2giOiI1NWViZTA0MWE4YTNmYTE2NzMzOTFmZDU1MTBjOWRkMDhkNDA4NzdiOTM2MzI3OTgyNTQ2MDdhNjFhNWFmY2ViIiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmFjY2Vzc2liaWxpdHkiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.gsGJFFrzA1Rt238_Wx7EFbUCfwaFBSLr9Bon2-PMEqykJ1ActOKMEarulGPIYphB_H1yd0pEl9EW8Us9mSr4jPzL72w2WDXtaJqhbXI9ENQsC7PIoCuUvWr15zz9g4irLzb7jeS12oqcFKjW8JmPFegj87y8fy5kBHdy6juTU3tLJYS_VpTy9CfoTL-yg94djU3vDxU5knusfNDiHB2M7ADZ8csdJladEC4SzXAscWhEb4Jv8wOZ3A0-hxEa_GU6O7ztwWvX_gnPUkpeRlpD6Is2OhIng9cX7O4WDZFK7jd_Q-ebpRGCbrQxvaoCrKiyOEmBTPVMhDdg5OyB0BTxOfzW5yxaX-rNLAap3S_YexCqlV241rlE6jXcvWPutiM79YV5NkUqdwboF0qyQkfZMgnVEaGFd-vIAoX3fXBZsW35nG0c8xHAtm75-3hEdxXrnASvvSB4DChgJ81ASvFcDg30ln0HspyLeLaCUR7uTGnIK6Y6n9NmI4nwsXfFLTSA",
-          "grant_digest": "299ca804266674b2e3c694bbb7a71301dedc4938955efbb64c6474549320510d"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:1.0",
-            "dimension": "accessibility",
-            "expiry": "2026-07-30T01:48:15.690634+00:00",
-            "nonce": "54b2a922-3dc4-44f0-880c-246a5591f66f",
-            "payload_hash": "55ebe041a8a3fa1673391fd5510c9dd08d40877b93632798254607a61a5afceb",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:accessibility",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjEuMCIsImRpbWVuc2lvbiI6ImFjY2Vzc2liaWxpdHkiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE1LjY5MDYzNCswMDowMCIsIm5vbmNlIjoiNTRiMmE5MjItM2RjNC00NGYwLTg4MGMtMjQ2YTU1OTFmNjZmIiwicGF5bG9hZF9oYXNoIjoiNTVlYmUwNDFhOGEzZmExNjczMzkxZmQ1NTEwYzlkZDA4ZDQwODc3YjkzNjMyNzk4MjU0NjA3YTYxYTVhZmNlYiIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTphY2Nlc3NpYmlsaXR5Iiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.HO2vICxtp3XjZylU1M5VROjEOk9sXBPF4lFxfPwX3zVqDOHCZu6-vGPM2v8FiGmoI0G1weVM4Fu1Q8mjnyDVPUeDZTUnhZi9qzJ9Ozpvy5T3kk8q-y0KVms3MCwXIUlC2keZG1cvg2QjZJD0TSI3sdTCSM2HeAbGFm4n98USkpRRFJzkDPfxmtSyeAyChIv1uIs1UJBl75BbOWyAkhKaKjqTRHVgzbusRCa8fCRlY_TdKjuXe6BfNiDeETJAXVVlUO_wRyN-GUQ-lyI1kRVk8BREBC1ASVYv2IG9cbwmSerw2itFy03zUH-28XV-ME4cEAcXfOhaSTKRVvx7QV7ihfuDPP-U0NNcb45UqTiLalt__osoOfXzaTqTfePWEFeGIo5kKyNAB3T8hkxbCxDiajf-7XZYogcfUl6yDadCjzbnjIW1cPZJriralUr8ybHMHgDMRhhem99X44pAENx-gE5sEB09GQsWGRjdQumUb_hX4r6To3E19MLN2NLibCiJ",
-          "grant_digest": "f92d82f288674ecfc500ef8111ee4480a2756c0ea4e8c5057190cf43f79dc5df"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "interaction_quality": {
         "critical": true,
         "applicable": true,
-        "score": 4.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:4.0",
-            "dimension": "interaction_quality",
-            "expiry": "2026-07-30T01:48:16.853880+00:00",
-            "nonce": "9e0c9e8a-a2a1-4bae-8e59-4c04c440474b",
-            "payload_hash": "46b3259076f540db62c11ca32b91b87d15ccc68c0762a00641248c96a03274e4",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:interaction_quality",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6NC4wIiwiZGltZW5zaW9uIjoiaW50ZXJhY3Rpb25fcXVhbGl0eSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuODUzODgwKzAwOjAwIiwibm9uY2UiOiI5ZTBjOWU4YS1hMmExLTRiYWUtOGU1OS00YzA0YzQ0MDQ3NGIiLCJwYXlsb2FkX2hhc2giOiI0NmIzMjU5MDc2ZjU0MGRiNjJjMTFjYTMyYjkxYjg3ZDE1Y2NjNjhjMDc2MmEwMDY0MTI0OGM5NmEwMzI3NGU0IiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmludGVyYWN0aW9uX3F1YWxpdHkiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.XXjwRBWtHs20-hblE-LrHlvKSAFeysPG0fsK7w6Heik_fOfjKia1Wh_cWC3VSTKYnWqRHnKTX-b-IvB34omdYn3tcULSETCfo0ub2Ta4sbZGWZZWBHlCNRC1t1to3kM3Dtyx9DhJF4yC2OR-q4AMMuAWZGn1xEAGqEnUBsqxsE-a1MwA0bXKosPik45nEFFEXVSt-tLFK1A4okx9LmUw4nUnN-v30qyN-ww4sI87hYAItXG1mFnhB8REOKRYy9g4CmkWjOyqP-tBTGoWkn-lKEshiMkSDcIhDqp27fz9wPRRJRVYiTM1icUz1zgt-ObZCpQyDGXHSVotyAyVCGHgpWraZO0267Dch3Hs7AWZUsdpAJeDF7FDXjERxQBNfFVw2F36Hw3D9amjgzJFiDQNx18D0CYIlCpb6hvsuzcDmQAoPBPN6HPB0Ak1WvAAe52X-AJpOU84kAaLcqflRBQo-S3Itp3AWFXkTJBz786ApHyyIG4nviyfpUc5Avt3OrwM",
-          "grant_digest": "a74a4a342b3f1e0f67931332fba3dd7981d95349288545e7e7ccf00d187d44ca"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:4.0",
-            "dimension": "interaction_quality",
-            "expiry": "2026-07-30T01:48:16.863089+00:00",
-            "nonce": "4e654e73-4f6c-4d15-871a-a7af8c1252d2",
-            "payload_hash": "46b3259076f540db62c11ca32b91b87d15ccc68c0762a00641248c96a03274e4",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:interaction_quality",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjQuMCIsImRpbWVuc2lvbiI6ImludGVyYWN0aW9uX3F1YWxpdHkiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE2Ljg2MzA4OSswMDowMCIsIm5vbmNlIjoiNGU2NTRlNzMtNGY2Yy00ZDE1LTg3MWEtYTdhZjhjMTI1MmQyIiwicGF5bG9hZF9oYXNoIjoiNDZiMzI1OTA3NmY1NDBkYjYyYzExY2EzMmI5MWI4N2QxNWNjYzY4YzA3NjJhMDA2NDEyNDhjOTZhMDMyNzRlNCIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTppbnRlcmFjdGlvbl9xdWFsaXR5Iiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.VX43oTmal_Ru9QUf4pFoCHUSyF5GFGbC2mYzipURXkPEQacg6g9rZXlOhkYK6VdVGL_NisjLdrRYYUl34WmV7QCrKmRyMDK4xs0Inx0l242KQn4QoeJkemRtEkwQ8SL0ryaQTbfWMlHoONS94s5hzoByUPhhpQazwgVlX9bjWLB8JMR_elavFTv9TW54Z91h-wtdDyjp33-TAVCZiQSolXEXifePLiY983MVVpOLA9JKf8bdJWbfP96sUrkuHEzDibzZwPDLG56cedzgx97UkiDN9XfYhUGZNDHDmNXlUNh7H7vAeBKsp-rzJvB8k4YlvaYywNiLYYapvVf1fNAYOj1HZ6_f3-bHM0hekYrnVFBjtwO_6WzyQ73u0L5GqDendDt8mNSz7YkLgrp2nBlQ-3Ww6GMbic5pXL7rQLtJ7CVehPCgNsdvmn4jWz2nyNmzU98V4l3RJ2EsdwqxehNFDui7Ja1D0X9ADoT64Nv02KW_fcNTnTGhRraYSVcwdtr5",
-          "grant_digest": "d5c375c63970977e835dc83a75a183e6cadf72f76cd57b438fb3cba8a5ec726b"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "visual_quality": {
         "critical": true,
         "applicable": true,
-        "score": 1.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:1.0",
-            "dimension": "visual_quality",
-            "expiry": "2026-07-30T01:48:17.472530+00:00",
-            "nonce": "91770608-324f-49fa-b57a-9b71a5101182",
-            "payload_hash": "5d3f655d12558704a8459f85cf35e1ca8ef15f5521c84d9bce452dc9c84d4c93",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:visual_quality",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6MS4wIiwiZGltZW5zaW9uIjoidmlzdWFsX3F1YWxpdHkiLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE3LjQ3MjUzMCswMDowMCIsIm5vbmNlIjoiOTE3NzA2MDgtMzI0Zi00OWZhLWI1N2EtOWI3MWE1MTAxMTgyIiwicGF5bG9hZF9oYXNoIjoiNWQzZjY1NWQxMjU1ODcwNGE4NDU5Zjg1Y2YzNWUxY2E4ZWYxNWY1NTIxYzg0ZDliY2U0NTJkYzljODRkNGM5MyIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTp2aXN1YWxfcXVhbGl0eSIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.Q7Tfp51Fivon-RfMOf_tr4PFKEI4aSCQWUjXs375sQqQw5OwcMuw8NqkmNfjhb0iu66V3p_1PU5Sf5lW8r5A0aZcvHULcpvjBSgK8B0-kTnNwQuUA7cWgMNQovplF42xH_cYtJ1VSjJ8mnaofg3-X0p3Ac73vu72LAZsgNQEi82a0054nGmzG4dS9EczUqCzngH8kfV6z895YLjYBwNEN2Y4emC0zyJSVmJOCtNxuVR3RnuA_S4iyhULBmFg6DqytreRSB1fdKeSzovpoU9C49Uh4vHnXBOQ_XsMzmBoSYlkSsKLAbTUqLe60l-mzxsETom21bDM9gY3KZW6Lu3WoUO-4FSWF0BWAC8UKisDzRe2Xd5n8J1CJOlIXYC-Jphj-HMDS0L2zNVoXGkqNsKBtqBzo-jAd5KVvZdypUXwonLaNImFd59gRHQ0kMZhZslCOk4yrIjzpsdN3AyjBLkD4os69lVN7i8_0SN3-65Oj3X4wdvFaYmJoV3ecquwCaeb",
-          "grant_digest": "f916e4d06a541d8e6d5f46d235d95c0652491eae0bf92d58246d0e3cf95b79f8"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:1.0",
-            "dimension": "visual_quality",
-            "expiry": "2026-07-30T01:48:17.484810+00:00",
-            "nonce": "335ddea5-ba0d-49a9-9f71-380c862663dc",
-            "payload_hash": "5d3f655d12558704a8459f85cf35e1ca8ef15f5521c84d9bce452dc9c84d4c93",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:visual_quality",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjEuMCIsImRpbWVuc2lvbiI6InZpc3VhbF9xdWFsaXR5IiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNy40ODQ4MTArMDA6MDAiLCJub25jZSI6IjMzNWRkZWE1LWJhMGQtNDlhOS05ZjcxLTM4MGM4NjI2NjNkYyIsInBheWxvYWRfaGFzaCI6IjVkM2Y2NTVkMTI1NTg3MDRhODQ1OWY4NWNmMzVlMWNhOGVmMTVmNTUyMWM4NGQ5YmNlNDUyZGM5Yzg0ZDRjOTMiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6dmlzdWFsX3F1YWxpdHkiLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.U88j6PupbkmtITL9v3LuR7wVpNTA9cmrZDfGEgp7zTxLT3Gu55ebSUHFA83g8cgKjH3Dod2dIgOA78QExkS9nRpseVhSf7m0zGDhgIfgvVfeYte29GgywYKfLc8RLJAX2VMXVYASUamWzvLG3lZwn3d4NqpY83iYkI_6qurKSUgpUutMxdA-5ptEjxgugZbcze69XxGwiuyibAMQmrSwLlqaB2xTmADuekadGrOtZmQExdPgnjnWkszAT7DLvrJPexrzyklgC1_JDqy5qxB9rMbhQWpHPfyvUINGYU3rbnTfW6-13t0QWKhFWn1pVVERo-DgCbarMdNWrakNvtbihLASheroL14YqQNPCJPAxjS-1rAq-Wg12sJkWcMg04I9FAk0QXXEaGw_60X6aypqtzfMobCEagCASYaj5Vs8oTP2-egh2BedefCJtunCCtuiJqPlI0UhZgL_IlCOMk4KP4SfooFR1HlR6GoLOhqrkcKJjg5cXCwcUiKXYK5zBrCq",
-          "grant_digest": "1ffc3efe12c4437a8a2db5198be766c10123cbffd5b4f08db40087d4d1ca537a"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "motion_quality": {
         "critical": false,
@@ -977,58 +271,14 @@
       "brand_cohesion": {
         "critical": true,
         "applicable": true,
-        "score": 2.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:2.0",
-            "dimension": "brand_cohesion",
-            "expiry": "2026-07-30T01:48:15.862718+00:00",
-            "nonce": "611921ad-9ede-4571-8db3-97f1e951868f",
-            "payload_hash": "fabb810f378a734de44ebf9dd23bd0c87e560526dab06cf56aa368682401ed32",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:brand_cohesion",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Mi4wIiwiZGltZW5zaW9uIjoiYnJhbmRfY29oZXNpb24iLCJleHBpcnkiOiIyMDI2LTA3LTMwVDAxOjQ4OjE1Ljg2MjcxOCswMDowMCIsIm5vbmNlIjoiNjExOTIxYWQtOWVkZS00NTcxLThkYjMtOTdmMWU5NTE4NjhmIiwicGF5bG9hZF9oYXNoIjoiZmFiYjgxMGYzNzhhNzM0ZGU0NGViZjlkZDIzYmQwYzg3ZTU2MDUyNmRhYjA2Y2Y1NmFhMzY4NjgyNDAxZWQzMiIsInByb2dyYW1fdmVyc2lvbiI6MiwicHJvamVjdF9pZCI6ImNoaXBwaS1mcm9udGllci1hZ2VudC1wcm9ncmFtLTMxMjQ0NTFiMzllMCIsInJlc291cmNlIjoicXVhbGl0eTpicmFuZF9jb2hlc2lvbiIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.Xj75W_9lBttg5cYfNpgMaO1RvrkrIc-ol9rr6S9fAYDqCPIDFyxgX3GcP4wQCtHzUW4nKYjuIY7AFCzNFv3UL_Mkg6TlC_4Cy_15shUuXJ3y5xGY1bsBtMsGv57yk62syNdlqWNd6bvS3B6byjwKrmHcL1HpM303MkzHCiTKEiEGTcNRHBcMnCkZeII_0JUcrb0Py7r6kB20UsAq_1YvnWU3Vw5VQyVFW45SBBIHYQ_YE-Z9H4TqBG7eepBun0OeeAN4e8nZb3y4jtIz8O0nzMsX_7RxUmENExoMQqBBq2YDRxH35a7YPwj_PCS9Komb6Y3DPLe6j4vmNqj7EqqX6fMq2Km9HxriIvd5zQSd0q2lUwlndDscnjwZQepFkJw8VyOUAxCQY9lk4twtU06TYtqQRUmSEMUiRJRF95M7VE8XHrEQgipNJlXmSXzT5extDvKVLhgcU4QGIpWZAdo4cqILJB__wh-hGDArdJSlHaGXboEME5bZHwWJpGWhKeov",
-          "grant_digest": "9eeeac0d48a8fa8e5e6f11eaca72a9939e3ebebcc34c4418f8b77fb755cb813c"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:2.0",
-            "dimension": "brand_cohesion",
-            "expiry": "2026-07-30T01:48:15.876385+00:00",
-            "nonce": "f54d8482-1167-44c9-b07b-e133ba47465b",
-            "payload_hash": "fabb810f378a734de44ebf9dd23bd0c87e560526dab06cf56aa368682401ed32",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:brand_cohesion",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjIuMCIsImRpbWVuc2lvbiI6ImJyYW5kX2NvaGVzaW9uIiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNS44NzYzODUrMDA6MDAiLCJub25jZSI6ImY1NGQ4NDgyLTExNjctNDRjOS1iMDdiLWUxMzNiYTQ3NDY1YiIsInBheWxvYWRfaGFzaCI6ImZhYmI4MTBmMzc4YTczNGRlNDRlYmY5ZGQyM2JkMGM4N2U1NjA1MjZkYWIwNmNmNTZhYTM2ODY4MjQwMWVkMzIiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6YnJhbmRfY29oZXNpb24iLCJ3b3JrX2lkIjoid29yay1kdXJhYmxlLWJhY2tncm91bmQtbGF1bmNoLXYxIn0.CmQflvqDlf7QIeHhyC2CDGsGEvUuqYRR1sNH8UVHQrh3rai95tI56wen8kwhdWgs48DnrrPXqyALspGnDYpfU-ZWDIILDNi89y-qxDotPILx7oUaM0Ks2tA6KI1v_mph9qZVUpUKa8o5FhFacNTxHhHnzBPQanalzBT2pJsHwqwouvwA9ruRjxg8zj2V2c1lj8niL0WnFXPS8BimvDRj3I-AzG0vc8mXxBdu1zR_rBjJ5oq_3ICEwxaiwBLE6-j3QxrLHGqFIJoigK59b2rF5f8lkyw7HZv3vp8HvXLlnO1iOiTXQMmOZTy4Rr3T1AixSJyrfI9haBuJU99hMRhKtXAw_mEMwx0WRjPY9pVHGWRZEMwa9OijnazaigfyZDvTq-R9uPb-4gB1dDZtjiNv8o1oPemKdhllYgHfUbEHEEIQ-qV41gq5tbNkwxYd6T8LMlt9S-uD0-pRG4UWNmLpZtAvWbB_9aNtGQF271WfXShtZ10aqmFO8M-GuqD-0HUh",
-          "grant_digest": "9173d6c8ef3e898e8f4f1f485007f807c738aa3d7af5a0d2525d036c82646dbb"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       },
       "agent_intelligence": {
         "critical": true,
@@ -1285,58 +535,14 @@
       "evidence_integrity": {
         "critical": true,
         "applicable": true,
-        "score": 7.0,
-        "evidence": [
-          "experience-independent-review-2026-07-30"
-        ],
-        "rubric_version": "chippi-experience-v1",
-        "scored_by": "independent-quality-scorer",
-        "reviewed_by": "independent-acceptance-reviewer",
-        "scorer_grant": {
-          "actor": "independent-quality-scorer",
-          "claims": {
-            "action": "score-quality",
-            "actor": "independent-quality-scorer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "score:7.0",
-            "dimension": "evidence_integrity",
-            "expiry": "2026-07-30T01:48:16.418693+00:00",
-            "nonce": "55626929-531c-40af-814b-9396cb233e07",
-            "payload_hash": "80dfd17abca09659b2d2964b9d406ef75fb99a7b0e8e274fc807ced5415f785d",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:evidence_integrity",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5IiwiYWN0b3IiOiJpbmRlcGVuZGVudC1xdWFsaXR5LXNjb3JlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoic2NvcmU6Ny4wIiwiZGltZW5zaW9uIjoiZXZpZGVuY2VfaW50ZWdyaXR5IiwiZXhwaXJ5IjoiMjAyNi0wNy0zMFQwMTo0ODoxNi40MTg2OTMrMDA6MDAiLCJub25jZSI6IjU1NjI2OTI5LTUzMWMtNDBhZi04MTRiLTkzOTZjYjIzM2UwNyIsInBheWxvYWRfaGFzaCI6IjgwZGZkMTdhYmNhMDk2NTliMmQyOTY0YjlkNDA2ZWY3NWZiOTlhN2IwZThlMjc0ZmM4MDdjZWQ1NDE1Zjc4NWQiLCJwcm9ncmFtX3ZlcnNpb24iOjIsInByb2plY3RfaWQiOiJjaGlwcGktZnJvbnRpZXItYWdlbnQtcHJvZ3JhbS0zMTI0NDUxYjM5ZTAiLCJyZXNvdXJjZSI6InF1YWxpdHk6ZXZpZGVuY2VfaW50ZWdyaXR5Iiwid29ya19pZCI6IndvcmstZHVyYWJsZS1iYWNrZ3JvdW5kLWxhdW5jaC12MSJ9.kzSBRhuqGOoB-z1k1sKlHrht0hfzLEfOw7-Mh8HfOUEqgJW97MOsmo25MUad0GT8KeWS-mwB0B6z35UOODRWC-Kinrcp1QMazziTBuJHLz7BVGHnzQ5MHI7TejMlSl-lxKd4uETjmrkin7Q4NnznpBn8MBNiW8FnvhKqKhU7W3IMofEmp2G1GNpFM-k9YKRVX1_xQjFwcQcVbZ7elBcmcXJae8W_F7rthljWB9IVAuY4YEc6wJCwYd1pcNllMftxDr-MYv4s7LOapJQ6VLr5hssbDCDE2rJXVz3FqpD9uPHCVnAnkHPnyoBwpFTApAnVQzmNkQmEzx_hrayG09toOoiw34-bKv_HJg3p2xgO4sEosViDlVFsnfRtdjJIUT_qsA3Tr1rM-_n_4UOQAC92Q2yD9aXqKIYsKgYtkUX78wl8kN5Gvip9Dpqh4VG84xQwaR7jlYoco86fH7KydrOcfPw6EH7wRtf8y6RIuhSY1L_7_FhMJSJEgYRn5hfPs-Mc",
-          "grant_digest": "0c82454455147c3449b3ca67bba05864f54bbde8b3ee676d518a5f7eafa9255d"
-        },
-        "reviewer_grant": {
-          "actor": "independent-acceptance-reviewer",
-          "claims": {
-            "action": "score-quality-review",
-            "actor": "independent-acceptance-reviewer",
-            "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-            "decision": "review:7.0",
-            "dimension": "evidence_integrity",
-            "expiry": "2026-07-30T01:48:16.428207+00:00",
-            "nonce": "10b688bf-3252-4fc5-91b6-a89863c8c188",
-            "payload_hash": "80dfd17abca09659b2d2964b9d406ef75fb99a7b0e8e274fc807ced5415f785d",
-            "program_version": 2,
-            "project_id": "chippi-frontier-agent-program-3124451b39e0",
-            "resource": "quality:evidence_integrity",
-            "work_id": "work-durable-background-launch-v1"
-          },
-          "token": "eyJhY3Rpb24iOiJzY29yZS1xdWFsaXR5LXJldmlldyIsImFjdG9yIjoiaW5kZXBlbmRlbnQtYWNjZXB0YW5jZS1yZXZpZXdlciIsImN5Y2xlX2lkIjoiY2hlY2twb2ludDpleHBlcmllbmNlOjI6MGQ1MWVmM2YyYmI2MDg5NDcyMzE1ZjdjOTQyNWFiNjdmZjExZjc5ODc2ZjRkMjdiODIyZGZjMDE5NWE4ZWU0NiIsImRlY2lzaW9uIjoicmV2aWV3OjcuMCIsImRpbWVuc2lvbiI6ImV2aWRlbmNlX2ludGVncml0eSIsImV4cGlyeSI6IjIwMjYtMDctMzBUMDE6NDg6MTYuNDI4MjA3KzAwOjAwIiwibm9uY2UiOiIxMGI2ODhiZi0zMjUyLTRmYzUtOTFiNi1hODk4NjNjOGMxODgiLCJwYXlsb2FkX2hhc2giOiI4MGRmZDE3YWJjYTA5NjU5YjJkMjk2NGI5ZDQwNmVmNzVmYjk5YTdiMGU4ZTI3NGZjODA3Y2VkNTQxNWY3ODVkIiwicHJvZ3JhbV92ZXJzaW9uIjoyLCJwcm9qZWN0X2lkIjoiY2hpcHBpLWZyb250aWVyLWFnZW50LXByb2dyYW0tMzEyNDQ1MWIzOWUwIiwicmVzb3VyY2UiOiJxdWFsaXR5OmV2aWRlbmNlX2ludGVncml0eSIsIndvcmtfaWQiOiJ3b3JrLWR1cmFibGUtYmFja2dyb3VuZC1sYXVuY2gtdjEifQ.fZDlKLWqyF-9nDV8sRnqaeuHnDuLta9tzE63c3MOXTBjonyXxBZludkRCm8OuDLezbr5mw8V9oGDVrOLHBnIuRQgmOQzVVwYguI5y2bUBURRZAiIn3CYLsztHqUM_87pdcp8U_7lPYn8d6VrGjY645FqGI1D-Uf1B_7CEu3JKNTdXQnM1DrzNFE9lDjtg563UydznrQKmz-OLGSQEuGVrggCz1p1DwGzlN1gkTFk39qjTTGAvfQ1lVD80jmKIHtVqiVpV9lCaLr-g2K6KeogU5hkVXPBuJLDSih3P6FZPDGglhDkVSpLfpv7NC70chUtxteNNf-aUNDpyxqPsIzQ_Rn32NVNJQovIoQlhsM_mIc6HonJW3h0u9SJcFsJOvpF-0X2pMncTRuU8HsOxMYLNi7aL_ML57NcmChEka1WqGcd36yxg-30fha8ZphPmXbE768XZjlQ1QUSPj5blX1j2J6Jq_6BZde3EeZSB4Li0Q7SpBaiJvRLY2mavpbyenhx",
-          "grant_digest": "5927772e347f680e72b94bbbf9580d363aa9a3b1e96ccc9ceef63f9ba7ec10f3"
-        },
-        "binding": {
-          "outcome_id": "durable-background-specialist-launch-v1",
-          "work_id": "work-durable-background-launch-v1",
-          "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
-          "artifact_digest": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
-          "rubric_version": "chippi-experience-v1"
-        }
+        "score": null,
+        "evidence": [],
+        "rubric_version": null,
+        "scored_by": null,
+        "reviewed_by": null,
+        "scorer_grant": null,
+        "reviewer_grant": null,
+        "binding": null
       }
     }
   },
@@ -1344,32 +550,7 @@
     "cycles": [],
     "failure_patterns": [],
     "pending_adaptations": [],
-    "applied_adaptations": [
-      {
-        "id": "adaptation-single-controller-v1",
-        "program_version": 2,
-        "failure_pattern": "Loose cron fan-out created separate tasks without a project lease; eleven recent tasks included two system errors and repeated ownership collisions",
-        "hypothesis": "One project instance with a fenced primary work lease and cycle scorecard will eliminate overlapping ownership and make cost per accepted capability measurable",
-        "experiment": "Pause the loose cron, bind the current program and scorecard to the project instance, and forward-test one manually initiated governed cycle before any schedule is re-enabled",
-        "success_metric": "Zero overlapping leases, zero system-error wakes, exactly one primary capability, and a complete cost latency token movement reviewer receipt",
-        "rollback": "Cancel the instance, keep the cron paused, preserve evidence, and return to explicitly user-directed bounded tasks",
-        "proposer": "sol-controller",
-        "time_cap_minutes": 180,
-        "cost_cap_usd": 30.0,
-        "changes": [
-          "cadence",
-          "scorecard",
-          "work_in_progress_limit",
-          "model_routing"
-        ],
-        "meta_depth": 1,
-        "status": "applied",
-        "proposed_at": "2026-07-30T01:29:33.524970+00:00",
-        "reviewer": "independent-acceptance-reviewer",
-        "review_decision": "accepted",
-        "reviewed_at": "2026-07-30T01:37:07.623322+00:00"
-      }
-    ],
+    "applied_adaptations": [],
     "core_promotion_candidates": [],
     "archived_evidence": [
       {
@@ -1386,6 +567,304 @@
           "learning": []
         }
       }
+    ],
+    "schema_upgrade_history": [
+      {
+        "id": "schema-5-to-8-program-2-to-3-f3b89d3ddcd2490aaff641420284cd1a",
+        "reason": "schema_upgrade",
+        "archived_at": "2026-08-01T16:30:07.865224+00:00",
+        "from_schema_version": 5,
+        "to_schema_version": 8,
+        "from_core_version": "2.2.0",
+        "to_core_version": "2.5.0",
+        "program_version": 2,
+        "next_program_version": 3,
+        "strategy": {
+          "north_star": "Make Chippi the indispensable agentic operating workspace for real-estate professionals through durable background work, bounded specialist delegation, editable deliverables, and Realtime Voice control inside one coherent conversation experience",
+          "current_outcome": "Deliver durable background specialist launch continuity so a user can start one authoritative run, continue chatting or leave, and recover the same run without duplicate work, stranded queued state, or a request held open for model completion",
+          "success_metric": "One independently accepted feature-off slice proves a short same-run accepted receipt, durable launch attempt, bounded reconciliation, no duplicate model work, no stranded queued state, reload continuity, cancellation precedence, fault tests, and disposable database concurrency evidence",
+          "program_version": 2,
+          "program_updated_at": "2026-07-30T01:28:38.694697+00:00",
+          "program_fingerprint": "84dd8b8a334db55a94f3b3b7bc1f9ec0bfa105aebf06db599cc890016fde5954",
+          "constraints": [],
+          "non_goals": []
+        },
+        "portfolio": {
+          "committed_outcomes": [
+            {
+              "id": "durable-background-specialist-launch-v1",
+              "type": "capability",
+              "title": "Durable background specialist launch continuity",
+              "user_visible_outcome": "A user starts one bounded specialist task, continues chatting or leaves, and later recovers the same authoritative run, progress, and result without duplicate work or a request held open for model completion",
+              "program_version": 2,
+              "status": "active"
+            }
+          ],
+          "active_work": [
+            {
+              "id": "work-durable-background-launch-v1",
+              "type": "capability",
+              "primary": true,
+              "title": "Build durable launch receipt and stale-run reconciliation",
+              "user_visible_outcome": "Starting a specialist task immediately returns control to chat while the same run continues durably and survives reload",
+              "claimed_progress": "capability",
+              "status": "ready",
+              "program_version": 2,
+              "owner": "bounded-implementation-lane",
+              "queued_primary": true,
+              "queue_payload": {
+                "id": "work-durable-background-launch-v1",
+                "type": "capability",
+                "title": "Build durable launch receipt and stale-run reconciliation",
+                "user_visible_outcome": "Starting a specialist task immediately returns control to chat while the same run continues durably and survives reload",
+                "claimed_progress": "capability",
+                "owner": "bounded-implementation-lane",
+                "outcome_id": "durable-background-specialist-launch-v1",
+                "incident_ref": null,
+                "severity": null,
+                "justification": null,
+                "incident_actor": null,
+                "approval_actor": null,
+                "repeat_override_reason": null,
+                "repeat_override_reviewer": null,
+                "primary": true,
+                "unlocks": [
+                  "authenticated-background-demo",
+                  "voice-redirect-retry"
+                ]
+              },
+              "outcome_id": "durable-background-specialist-launch-v1",
+              "unlocks": [
+                "voice-redirect-retry",
+                "authenticated-background-demo"
+              ],
+              "work_fingerprint": "0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46"
+            }
+          ],
+          "completed_work": [],
+          "cancelled_work": []
+        },
+        "evidence": {
+          "reality": [
+            {
+              "id": "reality-2026-07-30",
+              "outcome": "reality",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/reality-audit-2026-07-30.md",
+              "artifact_sha256": "8e2801131d1a93e706c7abd2967f91a3d1809302c2f3856d124e559cb81e4c02",
+              "observed_at": "2026-07-30T01:29:04.839882+00:00",
+              "freshness_days": 7,
+              "source": "current Git ledger, accepted commits, automation task statuses, and paused automation configuration",
+              "decision_impact": "Replaced loose recurring execution with a paused project-scoped controller and selected durable background launch continuity as the next outcome",
+              "author": "sol-controller",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "evidence_integrity",
+                "operational_readiness",
+                "feedback_health"
+              ]
+            }
+          ],
+          "intelligence": [
+            {
+              "id": "intelligence-2026-07-30",
+              "outcome": "intelligence",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/intelligence-direction-2026-07-30.md",
+              "artifact_sha256": "640388b0b39ba549341badbf180cfc8771d78cf42d2efdc63047d0bba697ec84",
+              "observed_at": "2026-07-30T01:29:05.128786+00:00",
+              "freshness_days": 14,
+              "source": "accepted Chippi source evidence, current execution ledger, prior independent review findings, and bounded official-source research already recorded by the program",
+              "decision_impact": "Ranked durable launch continuity ahead of Voice redirect/retry and broader editable outcomes because it is the shared prerequisite",
+              "author": "research-controller",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "technology_currency",
+                "differentiation",
+                "counterevidence"
+              ]
+            },
+            {
+              "id": "scorecard-2026-07-30",
+              "outcome": "intelligence",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/company-scorecard-2026-07-30.json",
+              "artifact_sha256": "4344f6ec22ea194cabb5413a26fc12e0d1b42046835e84aab616eec3e8cd6a0c",
+              "observed_at": "2026-07-30T01:30:39.949809+00:00",
+              "freshness_days": 14,
+              "source": "Company Scorecard contract plus current Chippi ledger, automation statuses, and controller cycle requirements",
+              "decision_impact": "Added explicit sources, owners, targets, thresholds, cadence, reliability, and stop decisions for capability progress, runtime proof, system errors, collisions, cost, tokens, lead time, rework, and enabler share",
+              "author": "operations-controller",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "observability",
+                "cost_efficiency",
+                "token_efficiency",
+                "feedback_health"
+              ]
+            }
+          ],
+          "direction": [
+            {
+              "id": "direction-2026-07-30",
+              "outcome": "direction",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/program-direction-2026-07-30.md",
+              "artifact_sha256": "2c7246eb237550b6c3bcb65d5fc8df3f8e5fb68fabc39c8415eaff8d517197d4",
+              "observed_at": "2026-07-30T01:29:05.548168+00:00",
+              "freshness_days": 14,
+              "source": "user 100x mandate, current Chippi product reality, and ranked capability dependencies",
+              "decision_impact": "Committed the program to durable background launch continuity with explicit constraints, success metric, and non-goals",
+              "author": "sol-controller",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "north_star_alignment",
+                "user_value",
+                "product_coherence",
+                "autonomy_value"
+              ]
+            }
+          ],
+          "experience": [
+            {
+              "id": "experience-2026-07-30",
+              "outcome": "experience",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/experience-background-continuity-2026-07-30.md",
+              "artifact_sha256": "08b7cd5629e2e490f054855274c048a33f90b9115a01ee9ba981a311571b15c2",
+              "observed_at": "2026-07-30T01:29:05.725255+00:00",
+              "freshness_days": 14,
+              "source": "existing Chippi conversation, specialist tree, launch path, and reload/cancellation contracts",
+              "decision_impact": "Defined the inspectable end-to-end journey and negative-path acceptance contract before implementation",
+              "author": "product-designer",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "information_architecture",
+                "usability",
+                "interaction_quality",
+                "agent_controllability",
+                "agent_transparency"
+              ]
+            },
+            {
+              "id": "experience-independent-review-2026-07-30",
+              "outcome": "experience",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/independent-experience-review-2026-07-30.md",
+              "artifact_sha256": "448b25b042215ecbea95fd38f48de39db2b5211c4fa18e5d18f3121338fc3e89",
+              "observed_at": "2026-07-30T01:37:18.389410+00:00",
+              "freshness_days": 14,
+              "source": "two independent read-only agent reviews of the current Chippi repository, governed artifacts, control state, and execution ledger",
+              "decision_impact": "Rejected the experience gate at 4.8/10, kept autonomous scheduling paused, and bound the exact delivery, browser, accessibility, visual, reliability, latency, and cost remediation requirements",
+              "author": "independent-quality-scorer",
+              "reviewer": "independent-acceptance-reviewer",
+              "quality_dimensions": [
+                "accessibility",
+                "brand_cohesion",
+                "differentiation",
+                "domain_fit",
+                "evidence_integrity",
+                "information_architecture",
+                "innovation",
+                "interaction_quality",
+                "north_star_alignment",
+                "product_coherence",
+                "usability",
+                "user_value",
+                "visual_quality"
+              ],
+              "outcome_id": "durable-background-specialist-launch-v1",
+              "work_id": "work-durable-background-launch-v1",
+              "cycle_id": "checkpoint:experience:2:0d51ef3f2bb6089472315f7c9425ab67ff11f79876f4d27b822dfc0195a8ee46",
+              "rubric_version": "chippi-experience-v1"
+            }
+          ],
+          "delivery": [],
+          "verification": [],
+          "learning": [
+            {
+              "id": "operating-learning-2026-07-30",
+              "outcome": "learning",
+              "project_id": "chippi-frontier-agent-program-3124451b39e0",
+              "program_version": 2,
+              "artifact_path": ".company-os/artifacts/operating-adaptation-2026-07-30.md",
+              "artifact_sha256": "9622b4ee41e953550d077c4be8441ab9a945983f057cb1e3492258715e8b4f97",
+              "observed_at": "2026-07-30T01:30:39.990698+00:00",
+              "freshness_days": 14,
+              "source": "eleven recent automation task statuses, automation memory ownership stops, and missing-instance audit",
+              "decision_impact": "Paused the loose cron and proposed a reversible single-controller lease experiment before any recurring schedule can resume",
+              "author": "sol-controller",
+              "reviewer": "evidence-auditor",
+              "quality_dimensions": [
+                "feedback_health",
+                "operational_readiness",
+                "cost_efficiency"
+              ]
+            }
+          ]
+        },
+        "feedback": {
+          "cycles": [],
+          "pending_adaptations": [],
+          "applied_adaptations": [
+            {
+              "id": "adaptation-single-controller-v1",
+              "program_version": 2,
+              "failure_pattern": "Loose cron fan-out created separate tasks without a project lease; eleven recent tasks included two system errors and repeated ownership collisions",
+              "hypothesis": "One project instance with a fenced primary work lease and cycle scorecard will eliminate overlapping ownership and make cost per accepted capability measurable",
+              "experiment": "Pause the loose cron, bind the current program and scorecard to the project instance, and forward-test one manually initiated governed cycle before any schedule is re-enabled",
+              "success_metric": "Zero overlapping leases, zero system-error wakes, exactly one primary capability, and a complete cost latency token movement reviewer receipt",
+              "rollback": "Cancel the instance, keep the cron paused, preserve evidence, and return to explicitly user-directed bounded tasks",
+              "proposer": "sol-controller",
+              "time_cap_minutes": 180,
+              "cost_cap_usd": 30.0,
+              "changes": [
+                "cadence",
+                "scorecard",
+                "work_in_progress_limit",
+                "model_routing"
+              ],
+              "meta_depth": 1,
+              "status": "applied",
+              "proposed_at": "2026-07-30T01:29:33.524970+00:00",
+              "reviewer": "independent-acceptance-reviewer",
+              "review_decision": "accepted",
+              "reviewed_at": "2026-07-30T01:37:07.623322+00:00"
+            }
+          ]
+        },
+        "execution_fabric": null,
+        "runtime_adapter": null
+      }
     ]
+  },
+  "execution_fabric": {
+    "enabled": false,
+    "status": "unconfigured",
+    "program_version": 3,
+    "work_id": null,
+    "cycle_id": null,
+    "manifest": null,
+    "manifest_digest": null,
+    "configured_at": null,
+    "managers": {},
+    "decisions": [],
+    "cancelled_at": null,
+    "cancellation_reason": null
+  },
+  "runtime_adapter": {
+    "enabled": false,
+    "status": "disabled",
+    "program_version": 3,
+    "gateway_public_key_env": "COMPANY_OS_RUNTIME_GATEWAY_PUBLIC_KEY",
+    "phase2_contract_digest": "b83f727e472c95911a60757efb0769a0c39acf11f0c8a7051e1056e34b8b8348",
+    "provider_allowlist": [],
+    "attempts": []
   }
 }

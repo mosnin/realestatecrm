@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const { state, supabase } = vi.hoisted(() => {
-const state = { eventInsertCalls: 0, rpcCalls: [] as Array<{ name: string; args: Record<string, unknown> }>, runStatus: 'launching' };
+const state = { eventInsertCalls: 0, rpcCalls: [] as Array<{ name: string; args: Record<string, unknown> }>, runStatus: 'launching', launchToken: 'token-1' };
 const chain = (result: unknown): any => ({
   eq: () => chain(result), in: () => chain(result), is: () => chain(result), order: () => chain(result), limit: () => chain(result),
   maybeSingle: async () => result, single: async () => result,
@@ -11,8 +11,8 @@ const chain = (result: unknown): any => ({
 const supabase: any = {
   from(table: string) {
     if (table === 'WorkspaceRun') return {
-      select: () => chain({ data: { id: 'run-1', workSessionId: 'session-1', status: state.runStatus, cancellationRequestedAt: null }, error: null }),
-      update: () => chain({ data: null, error: null }),
+      select: () => chain({ data: { id: 'run-1', workSessionId: 'session-1', status: state.runStatus, launchToken: state.launchToken, cancellationRequestedAt: null }, error: null }),
+      update: () => chain({ data: { id: 'run-1' }, error: null }),
     };
     if (table === 'WorkspaceRunEvent') return {
       insert: () => ({ select: () => ({ maybeSingle: async () => { state.eventInsertCalls += 1; return state.eventInsertCalls === 1 ? { data: { id: 'event-1' }, error: null } : { data: null, error: { code: '23505' } }; } }) }),
@@ -43,10 +43,11 @@ function signedRequest(url: string, body: Record<string, unknown>) {
 }
 
 describe('Workspace Run lifecycle behavior', () => {
-  beforeEach(() => { process.env.CHIPPI_WORKSPACE_CALLBACK_SECRET = secret; state.eventInsertCalls = 0; state.rpcCalls = []; state.runStatus = 'launching'; send.mockReset(); });
+  beforeEach(() => { process.env.CHIPPI_WORKSPACE_CALLBACK_SECRET = secret; state.eventInsertCalls = 0; state.rpcCalls = []; state.runStatus = 'launching'; state.launchToken = 'token-1'; send.mockReset(); });
 
   it('makes a duplicate intermediate callback a lifecycle no-op', async () => {
-    const body = { run_id: 'run-1', space_id: 'space-1', sequence: 1, type: 'command_started', message: 'building' };
+    state.runStatus = 'running';
+    const body = { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 1, type: 'command_started', message: 'building' };
     expect((await callback(signedRequest('http://localhost/callback', body))).status).toBe(200);
     const duplicate = await callback(signedRequest('http://localhost/callback', body));
     expect(await duplicate.json()).toMatchObject({ ignored: 'duplicate_event' });
@@ -54,9 +55,28 @@ describe('Workspace Run lifecycle behavior', () => {
   });
 
   it('terminal-fails an invalid completed publication through the terminal RPC', async () => {
-    const response = await callback(signedRequest('http://localhost/callback', { run_id: 'run-1', space_id: 'space-1', sequence: 9, type: 'completed', message: 'ready', files: [] }));
+    state.runStatus = 'running';
+    const response = await callback(signedRequest('http://localhost/callback', { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 9, type: 'completed', message: 'ready', files: [] }));
     expect(response.status).toBe(409);
     expect(state.rpcCalls).toContainEqual(expect.objectContaining({ name: 'finish_workspace_run_and_session', args: expect.objectContaining({ p_outcome: 'failed', p_sequence: 9 }) }));
+  });
+
+  it('stops a stale worker before it can record events or publish files', async () => {
+    state.launchToken = 'token-current';
+    const response = await callback(signedRequest('http://localhost/callback', {
+      run_id: 'run-1',
+      space_id: 'space-1',
+      launch_token: 'token-stale',
+      sequence: 1,
+      type: 'workspace_started',
+      message: 'starting',
+    }));
+    expect(await response.json()).toMatchObject({
+      ignored: 'stale_launch',
+      cancellationRequested: true,
+    });
+    expect(state.eventInsertCalls).toBe(0);
+    expect(state.rpcCalls).toHaveLength(0);
   });
 
   it('returns no download before the parent run has completed', async () => {

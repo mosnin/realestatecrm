@@ -481,12 +481,14 @@ export const handleComposioTrigger = inngest.createFunction(
 export const workSessionPlan = inngest.createFunction(
   { id: 'work-session-plan', triggers: [{ event: 'work-session/plan' }] },
   async ({ event, step }) => {
-    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    const data = event.data as { sessionId?: unknown; workspaceRunId?: unknown };
+    const sessionId = String(data.sessionId ?? '');
+    const workspaceRunId = typeof data.workspaceRunId === 'string' ? data.workspaceRunId : undefined;
     if (!sessionId) return { skipped: true };
-    const status = await step.run('plan', () => planWorkSession(sessionId));
+    const status = await step.run('plan', () => planWorkSession(sessionId, workspaceRunId));
     // just_go sessions fall straight through to execution.
     if (status === 'running') {
-      await step.run('execute', () => executeWorkSession(sessionId));
+      await step.run('execute', () => executeWorkSession(sessionId, workspaceRunId));
     }
     return { sessionId, status };
   },
@@ -495,9 +497,11 @@ export const workSessionPlan = inngest.createFunction(
 export const workSessionExecute = inngest.createFunction(
   { id: 'work-session-execute', triggers: [{ event: 'work-session/execute' }] },
   async ({ event, step }) => {
-    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    const data = event.data as { sessionId?: unknown; workspaceRunId?: unknown };
+    const sessionId = String(data.sessionId ?? '');
+    const workspaceRunId = typeof data.workspaceRunId === 'string' ? data.workspaceRunId : undefined;
     if (!sessionId) return { skipped: true };
-    await step.run('execute', () => executeWorkSession(sessionId));
+    await step.run('execute', () => executeWorkSession(sessionId, workspaceRunId));
     return { sessionId };
   },
 );

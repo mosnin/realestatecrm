@@ -44,7 +44,9 @@ describe('Workspace Run vertical contract', () => {
     expect(read('supabase/migrations/20260914000000_workspace_runs.sql')).toContain('count(DISTINCT wrf.name)');
     expect(read('lib/workspace-runs/server.ts')).toContain("run.status === 'completed' ? files ?? [] : []");
     expect(read('agent/workspace_modal_app.py')).toContain('_claim_launch(item)');
+    expect(read('agent/workspace_modal_app.py')).toContain('"launch_token":launch_token');
     expect(read('app/api/internal/workspace-runs/launch-claim/route.ts')).toContain('accept_workspace_launch');
+    expect(read('app/api/internal/workspace-runs/callback/route.ts')).toContain("ignored: 'stale_launch'");
     expect(read('supabase/migrations/20260914000000_workspace_runs.sql')).toContain("jsonb_to_recordset(p_files)");
     expect(read('supabase/migrations/20260914000000_workspace_runs.sql')).toContain('INSERT INTO "File"');
     expect(read('app/api/internal/workspace-runs/callback/route.ts')).not.toContain("from('File').upsert");

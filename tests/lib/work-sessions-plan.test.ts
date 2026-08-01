@@ -10,6 +10,9 @@ vi.mock('server-only', () => ({}));
 // ── Supabase mock: getSession reads + patch captures ─────────────────────────
 let sessionRow: Record<string, unknown> | null = null;
 const patches: Record<string, unknown>[] = [];
+const { dispatchWorkspaceRun } = vi.hoisted(() => ({
+  dispatchWorkspaceRun: vi.fn(),
+}));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -38,8 +41,9 @@ vi.mock('@/lib/ai-tools/agent-model', () => ({ getAgentModel: () => undefined })
 vi.mock('@/lib/ai-tools/sdk-bridge', () => ({ toSdkTool: vi.fn() }));
 vi.mock('@/lib/ai-tools/tools', () => ({ ALL_TOOLS: [] }));
 vi.mock('@openai/agents', () => ({ run: vi.fn(), Agent: class {} }));
+vi.mock('@/lib/workspace-runs/server', () => ({ dispatchWorkspaceRun }));
 
-import { planSession } from '@/lib/work-sessions/engine';
+import { executeSession, planSession } from '@/lib/work-sessions/engine';
 
 function baseSession(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -61,6 +65,7 @@ beforeEach(() => {
   patches.length = 0;
   sessionRow = baseSession();
   llmContent = '{"steps":[{"title":"Pull comps"},{"title":"Review the deal"}],"question":null}';
+  dispatchWorkspaceRun.mockReset();
 });
 
 describe('planSession', () => {
@@ -106,5 +111,20 @@ describe('planSession', () => {
     sessionRow = baseSession({ status: 'running' });
     expect(await planSession('ws1')).toBe('running');
     expect(patches.length).toBe(0);
+  });
+
+  it('refuses a stale recovery event after the session was linked to another run', async () => {
+    sessionRow = baseSession({
+      status: 'running',
+      kind: 'workspace',
+      workspaceRunId: 'run-current',
+    });
+    await executeSession('ws1', 'run-stale');
+    expect(dispatchWorkspaceRun).not.toHaveBeenCalled();
+
+    await executeSession('ws1', 'run-current');
+    expect(dispatchWorkspaceRun).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 'run-current', workSessionId: 'ws1' }),
+    );
   });
 });

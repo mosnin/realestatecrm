@@ -192,21 +192,22 @@ async def run_workspace(item: dict):
 
     expected = os.environ.get("CHIPPI_WORKSPACE_MODAL_SECRET", "")
     if not expected or not hmac.compare_digest(str(item.get("secret", "")), expected): return JSONResponse({"error":"Unauthorized"}, status_code=401)
-    run_id, space_id, goal, packet = str(item.get("run_id", "")), str(item.get("space_id", "")), str(item.get("goal", "")).strip()[:MAX_GOAL], item.get("packet")
+    run_id, space_id, launch_token, goal, packet = str(item.get("run_id", "")), str(item.get("space_id", "")), str(item.get("launch_token", "")), str(item.get("goal", "")).strip()[:MAX_GOAL], item.get("packet")
     try: uuid.UUID(run_id)
     except ValueError: return JSONResponse({"error":"invalid run id"}, status_code=400)
-    if not space_id or len(goal) < 10 or not isinstance(packet, dict): return JSONResponse({"error":"invalid workspace request"}, status_code=400)
+    if not space_id or not launch_token or len(goal) < 10 or not isinstance(packet, dict): return JSONResponse({"error":"invalid workspace request"}, status_code=400)
     seq = 1
     def event(kind: str, message: str, **extra):
         nonlocal seq
         # Advance before I/O: a committed callback whose HTTP response is lost
         # must never cause the later failure callback to reuse its sequence.
         current_sequence, seq = reserve_sequence(seq)
-        reply = _callback({"run_id":run_id,"space_id":space_id,"sequence":current_sequence,"type":kind,"message":message,**extra})
+        reply = _callback({"run_id":run_id,"space_id":space_id,"launch_token":launch_token,"sequence":current_sequence,"type":kind,"message":message,**extra})
         return reply.get("cancellationRequested", False)
     sandbox = None
     try:
-        event("workspace_started", "Initialized an isolated Chippy workspace.")
+        if event("workspace_started", "Initialized an isolated Chippy workspace."):
+            return {"cancelled": True, "run_id": run_id}
         sandbox = await modal.Sandbox.create.aio("sleep", "120", app=app, image=image, timeout=120, cpu=1, memory=1024, block_network=True, experimental_options={"vm_runtime": True})
         mkdir = await sandbox.exec.aio("mkdir", "-p", "/workspace", timeout=5); await mkdir.wait.aio()
         await sandbox.filesystem.write_text.aio(json.dumps({"goal": goal, "packet": packet}), "/workspace/input.json")

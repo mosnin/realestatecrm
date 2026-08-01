@@ -5,6 +5,13 @@ No stage advances unless every applicable **critical** dimension is at least **9
 Evidence: **SR** source review · **LT** local test · **UI** captured interaction · **RU** unverified runtime assumption.
 Current stage assessed: **A — trust boundary + durable protocol foundation**.
 
+> Historical baseline: the matrix below predates the 2026-08-01 Workspace
+> launch-recovery acceptance candidate. It is retained for traceability, not as
+> a current score for that slice. See
+> [CHIPPY_WORKSPACE_RECOVERY_ACCEPTANCE_2026-08-01.md](./CHIPPY_WORKSPACE_RECOVERY_ACCEPTANCE_2026-08-01.md)
+> for the evidence-backed focused re-audit. The product-wide gate remains
+> NO-GO; old low scores were not cosmetically increased.
+
 Owner codes: **SOL** architecture/security lead · **ENG** implementation · **UX** product design/accessibility · **OPS** runtime/observability.
 Remedy codes are defined after the matrix.
 
@@ -125,3 +132,4 @@ Every sub-9 row references one entry here; re-audit records must cite the result
 - 2026-07-28 / baseline + initial local foundation: matrix created. No UI score has UI evidence; all visual/interaction claims remain deliberately low/unverified. Stage A no-go.
 - 2026-07-28 / focused re-audit: 111 targeted tests across 11 files, TypeScript compilation, and diff validation passed; independent policy and migration reviews completed. Failure acknowledgement and local regression evidence improved to 8, but caller propagation, database execution, workflow occurrence idempotency, sandbox, voice, UI interaction, and runtime gates keep Stage A no-go.
 - 2026-07-28 / grant + occurrence seam re-audit: Python-issued, per-call narrow grants now pass cross-language verification and subject-binding denial tests; the disabled occurrence/step contract adds tenant identity, lease-generation/expiry fencing, cancellation, definition-version refusal, and stable idempotency keys. Full local Vitest and 211 Python tests pass. Because no disposable Docker/Postgres service is available, SQL behavior, provider-effect replay, runtime grant enforcement, and all critical <9 dimensions remain no-go; no score is advanced.
+- 2026-08-01 / Workspace launch-recovery focused re-audit: the local/staging slice has no evidence-backed score below 8 across product alignment, architecture, durability, idempotency, concurrency, cancellation, tenant isolation, failure truth, observability, cost containment, migration safety, tests, rollback, and evidence integrity. Accessibility, visual/brand, interaction, live Modal reliability, and measured latency/cost remain unscored activation blockers because the managed workspace cannot bind a local port and no application/runtime deployment was made. Stage remains NO-GO.

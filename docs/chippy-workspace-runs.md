@@ -6,6 +6,21 @@ Feature-off, tenant-bound Workspace Runs turn `/work` into a visible managed-wor
 
 All three must be true: `CHIPPI_WORKSPACE_RUNS_ENABLED=true`, `NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED=true`, and the target Space ID appears in `CHIPPI_WORKSPACE_RUNS_SPACE_IDS`. Keep all unset to leave production behavior unchanged.
 
+Durable stale-launch recovery has a separate server-only rollout gate:
+`CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED=true`. Keep it unset until the launch
+receipt migration, Inngest registration, callback URLs, and one non-customer
+Workspace Run have been verified together. Disabling either the Workspace Run
+flag or this recovery flag stops the sweep from re-entering work.
+
+The recovery sweep is bounded to 25 candidates per cycle and reports scanned,
+enqueued, planning, execution, accepted-but-silent failures, feature-disabled
+candidates, maximum candidate age, and total cycle duration. The panel exposes
+only calm user-facing launch continuity; internal receipt reasons remain in
+server evidence. The migration and rollback-only fault matrix passed on the
+dedicated `chippistaging` database on 2026-08-01. The application and Modal
+runtime are still undeployed for this slice, so the flag must remain off until
+the authenticated launch → leave/reload → recover → cancel journey passes.
+
 ## Private continuations
 
 Completed workspaces may optionally be continued from the same right panel.
