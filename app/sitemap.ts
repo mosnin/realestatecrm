@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { LANGS, LOCALIZED_PATHS, localizedPath } from '@/lib/i18n/markets';
 
 /**
  * Marketing-site base URL. Prefer NEXT_PUBLIC_SITE_URL; fall back to the
@@ -36,10 +37,27 @@ const ROUTES: ReadonlyArray<{
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
-  return ROUTES.map(({ path, changeFrequency, priority }) => ({
+  const entries = ROUTES.map(({ path, changeFrequency, priority }) => ({
     url: `${BASE_URL}${path}`,
     lastModified,
     changeFrequency,
     priority,
   }));
+  // Localized mirrors (`/es/pricing`, `/ru/pricing`, …) of every translated
+  // marketing path — LOCALIZED_PATHS is the same registry the middleware's
+  // language routing uses, so the sitemap can't advertise a translation that
+  // doesn't exist (or miss one that does).
+  for (const path of LOCALIZED_PATHS) {
+    const base = ROUTES.find((r) => r.path === path);
+    for (const lang of LANGS) {
+      if (lang === 'en') continue; // unprefixed English entry already listed
+      entries.push({
+        url: `${BASE_URL}${localizedPath(path, lang)}`,
+        lastModified,
+        changeFrequency: base?.changeFrequency ?? 'monthly',
+        priority: base?.priority ?? 0.7,
+      });
+    }
+  }
+  return entries;
 }
