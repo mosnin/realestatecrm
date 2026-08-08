@@ -1,15 +1,17 @@
 /**
  * Inngest cron mirrors for the app/api/cron/* routes.
  *
- * PRODUCTION SCHEDULING IS VERCEL CRON: vercel.json declares a `crons` array
- * (path + schedule identical to CRON_MANIFEST below — a parity test pins the
- * two together) and Vercel invokes each route with
- * `Authorization: Bearer CRON_SECRET`. The Inngest functions here are kept as
- * an alternate trigger but are registered in app/api/inngest/route.ts ONLY
- * when INNGEST_CRONS_ENABLED is set, so the two schedulers never double-tick
- * a route. (History: the Inngest cutover left scheduled jobs not firing in
- * production for weeks; Vercel cron is the trigger that observably worked.)
- * Both evaluate crontabs in UTC, so tick times are identical either way.
+ * PRODUCTION SCHEDULING IS THE BACKGROUND WORKER: the always-on worker
+ * service (worker/src/index.ts, deployed separately — docs/WORKER.md) keeps
+ * one BullMQ repeatable job per entry in worker/src/schedule.ts and invokes
+ * each route with `Authorization: Bearer CRON_SECRET`. CRON_MANIFEST below
+ * remains the app-side record of those jobs, and
+ * tests/lib/worker-schedule-parity.test.ts pins the two lists together so
+ * they cannot drift. The Inngest functions here are a legacy alternate
+ * trigger, registered in app/api/inngest/route.ts ONLY when
+ * INNGEST_CRONS_ENABLED is set, so two schedulers never double-tick a route.
+ * (History: the Inngest cutover left scheduled jobs not firing in production
+ * for weeks.) All schedulers evaluate crontab patterns in UTC.
  *
  * Each function does NOT reimplement its job. It invokes the existing route
  * handler in-process with a synthetic request carrying

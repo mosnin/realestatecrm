@@ -188,6 +188,11 @@ const optionalSchema = z.object({
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
+  // Background worker (worker/ service): Redis queues + cache, and the
+  // secret the worker uses to call back into /api/worker/execute
+  REDIS_URL: z.string().optional(),                  // lib/queue.ts, lib/redis-cache.ts
+  WORKER_SECRET: z.string().optional(),              // app/api/worker/execute
+
   // Briefing email sender domain
   BRIEF_EMAIL_DOMAIN: z.string().optional(),         // lib/briefing/delivery.ts
 
@@ -254,6 +259,10 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
   {
     label: 'Inngest background jobs — scheduled crons and Composio trigger events never fire without the Inngest keys',
     keys: ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'],
+  },
+  {
+    label: 'Background worker — recurring jobs, task offload queue, and Redis cache are inert without REDIS_URL + WORKER_SECRET (deploy worker/, see docs/WORKER.md)',
+    keys: ['REDIS_URL', 'WORKER_SECRET'],
   },
   {
     label: 'Composio integrations — connecting apps and receiving triggers needs COMPOSIO_API_KEY',

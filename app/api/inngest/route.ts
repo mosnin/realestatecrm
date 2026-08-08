@@ -3,13 +3,13 @@
  * HTTP invocation per step. Node runtime — the steps touch Wasabi (AWS SDK)
  * and Composio.
  *
- * SCHEDULING IS BACK ON VERCEL CRON (vercel.json `crons`), which invokes the
- * app/api/cron/* routes directly with `Authorization: Bearer CRON_SECRET` —
- * the trigger path that was verified working before the Inngest cutover. The
- * Inngest cron mirrors in lib/inngest/cron-functions.ts are registered ONLY
- * when INNGEST_CRONS_ENABLED is set, so the two schedulers can never
- * double-tick a route; event-driven functions (scheduled posts, Composio
- * triggers, work sessions) remain registered unconditionally.
+ * SCHEDULING LIVES IN THE BACKGROUND WORKER (worker/ service — BullMQ over
+ * Redis, docs/WORKER.md), which invokes the app/api/cron/* routes with
+ * `Authorization: Bearer CRON_SECRET`. The Inngest cron mirrors in
+ * lib/inngest/cron-functions.ts are registered ONLY when
+ * INNGEST_CRONS_ENABLED is set, so two schedulers can never double-tick a
+ * route; event-driven functions (scheduled posts, Composio triggers, work
+ * sessions) remain registered unconditionally.
  */
 
 import { serve } from 'inngest/next';
