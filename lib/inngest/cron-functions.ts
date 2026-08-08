@@ -1,10 +1,15 @@
 /**
- * Inngest cron functions — the scheduler for the app/api/cron/* routes.
+ * Inngest cron mirrors for the app/api/cron/* routes.
  *
- * Vercel cron is removed (vercel.json no longer declares a `crons` array);
- * these Inngest functions fire on the exact same 5-field crontab expressions
- * instead. Inngest cron triggers evaluate in UTC unless prefixed with `TZ=`,
- * and Vercel crons also evaluated in UTC, so tick times are unchanged.
+ * PRODUCTION SCHEDULING IS VERCEL CRON: vercel.json declares a `crons` array
+ * (path + schedule identical to CRON_MANIFEST below — a parity test pins the
+ * two together) and Vercel invokes each route with
+ * `Authorization: Bearer CRON_SECRET`. The Inngest functions here are kept as
+ * an alternate trigger but are registered in app/api/inngest/route.ts ONLY
+ * when INNGEST_CRONS_ENABLED is set, so the two schedulers never double-tick
+ * a route. (History: the Inngest cutover left scheduled jobs not firing in
+ * production for weeks; Vercel cron is the trigger that observably worked.)
+ * Both evaluate crontabs in UTC, so tick times are identical either way.
  *
  * Each function does NOT reimplement its job. It invokes the existing route
  * handler in-process with a synthetic request carrying
