@@ -37,6 +37,7 @@ import { createAppNotification } from '@/lib/notifications';
 
 import type { PlanStep, WorkSessionRow } from './types';
 export type { PlanStep, WorkSessionRow } from './types';
+import { proposeActions } from './actions';
 
 const MAX_STEPS = 6;
 const STEP_MAX_TURNS = 12;
@@ -344,12 +345,24 @@ async function assembleArtifact(
     logger.warn('[work-sessions] artifact save failed — summary still lands', { sessionId }, err);
   }
 
+  // Deliverable is done. Now (approval-gated actions layer) let the session
+  // PROPOSE concrete follow-up actions from its findings; if any are proposed,
+  // the session waits in 'awaiting_actions' for per-action approval instead of
+  // completing outright. proposeActions never throws and returns 0 on any
+  // failure, so a proposer hiccup can't strand an otherwise-finished session.
+  const freshForActions = await getSession(sessionId);
+  const proposed = freshForActions ? await proposeActions(freshForActions).catch(() => 0) : 0;
+
+  const finalStatus = proposed > 0 ? 'awaiting_actions' : 'completed';
   await patchSession(sessionId, {
-    status: 'completed',
+    status: finalStatus,
     summary,
     artifactFileId,
     artifactName: fileName,
-    completedAt: new Date().toISOString(),
+    // completedAt marks genuine completion; a session waiting on action
+    // approval isn't done yet (decideAction sets it when the last action
+    // settles).
+    ...(finalStatus === 'completed' ? { completedAt: new Date().toISOString() } : {}),
   });
 
   // Best-effort completion ping — the whole point of a background run is
