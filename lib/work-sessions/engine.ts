@@ -175,68 +175,94 @@ export async function planSession(sessionId: string): Promise<WorkSessionRow['st
 // ── Phase 2: execute ─────────────────────────────────────────────────────────
 
 /**
- * Execute every pending step, updating the row after each so the client's
- * realtime subscription renders live progress. Idempotent: re-entry skips
- * steps already done (Inngest retries land here safely).
+ * Advance the session by EXACTLY ONE step — the unit of durable execution.
+ *
+ * The queue path (lib/jobs/tasks.ts) runs one advance per Cloudflare Queues
+ * job and re-enqueues while 'more' remains, so every step gets its own
+ * invocation, its own retry budget, and the session survives any crash or
+ * timeout between steps. Each advance re-reads the row, so cancellation and
+ * external edits take effect between steps.
+ *
+ * Returns:
+ *   'more'    — a step was attempted (done or skipped); pending steps remain
+ *               (or the artifact still needs assembling on the next advance).
+ *   'done'    — no pending steps were left; the deliverable was assembled.
+ *   'stopped' — session missing / not running (cancelled, failed, awaiting).
+ *
+ * Idempotent: re-entry skips steps already done/skipped, so at-least-once
+ * queue delivery and retries land safely. A step found in 'running' state is
+ * re-executed — that's the crash-recovery path, not an error.
  */
-export async function executeSession(sessionId: string): Promise<void> {
+export async function advanceSession(sessionId: string): Promise<'more' | 'done' | 'stopped'> {
   const session = await getSession(sessionId);
-  if (!session || session.status !== 'running') return;
+  if (!session || session.status !== 'running') return 'stopped';
+
+  const idx = session.plan.findIndex((s) => s.status !== 'done' && s.status !== 'skipped');
+  if (idx === -1) {
+    await assembleArtifact(sessionId, [...session.findings]);
+    return 'done';
+  }
 
   const ctx = await contextForSpace(session.spaceId);
   if (!ctx) {
     await patchSession(sessionId, { status: 'failed', error: 'Workspace not found.' });
-    return;
+    return 'stopped';
   }
 
   const tools = readOnlyTools().map((t) => toSdkTool(t, ctx));
   // Default chat model via the shared resolver (prompt-cache-wrapped).
   const model = getAgentModel();
 
-  let plan = [...session.plan];
+  let plan = session.plan.map((s, j) => (j === idx ? { ...s, status: 'running' as const } : s));
+  await patchSession(sessionId, { plan });
   const findings = [...session.findings];
 
-  for (let i = 0; i < plan.length; i++) {
-    if (plan[i].status === 'done' || plan[i].status === 'skipped') continue;
-
-    // Cancelled mid-run? Stop cleanly between steps.
-    const fresh = await getSession(sessionId);
-    if (!fresh || fresh.status === 'cancelled') return;
-
-    plan = plan.map((s, j) => (j === i ? { ...s, status: 'running' } : s));
+  try {
+    const agent = new Agent({
+      name: 'work_session_step',
+      model,
+      instructions:
+        `You are executing ONE step of a background work session for a real estate professional. ` +
+        `Use the read-only tools to gather what the step needs, then answer with your findings — ` +
+        `specific names, numbers, and dates, written so they can be dropped into a report. ` +
+        `You cannot send or modify anything; if an action would help, note it as a recommendation.\n\n` +
+        `Session goal: ${session.goal}` +
+        (session.answer ? `\nRealtor clarification: ${session.answer}` : ''),
+      tools,
+    });
+    const prior = findings.length
+      ? `\n\nFindings so far:\n${findings.map((f) => `- ${f.text.slice(0, 400)}`).join('\n')}`
+      : '';
+    const result = await run(agent, `Step: ${plan[idx].title}${prior}`, {
+      maxTurns: STEP_MAX_TURNS,
+    });
+    const text = (result.finalOutput ?? '').toString().trim().slice(0, FINDING_CAP);
+    findings.push({ stepId: plan[idx].id, text: text || '(no findings)' });
+    plan = plan.map((s, j) => (j === idx ? { ...s, status: 'done' as const } : s));
+    await patchSession(sessionId, { plan, findings });
+  } catch (err) {
+    logger.warn('[work-sessions] step failed', { sessionId, step: plan[idx].title }, err);
+    plan = plan.map((s, j) =>
+      j === idx ? { ...s, status: 'skipped' as const, note: 'Step failed — continued without it.' } : s,
+    );
     await patchSession(sessionId, { plan });
-
-    try {
-      const agent = new Agent({
-        name: 'work_session_step',
-        model,
-        instructions:
-          `You are executing ONE step of a background work session for a real estate professional. ` +
-          `Use the read-only tools to gather what the step needs, then answer with your findings — ` +
-          `specific names, numbers, and dates, written so they can be dropped into a report. ` +
-          `You cannot send or modify anything; if an action would help, note it as a recommendation.\n\n` +
-          `Session goal: ${session.goal}` +
-          (session.answer ? `\nRealtor clarification: ${session.answer}` : ''),
-        tools,
-      });
-      const prior = findings.length
-        ? `\n\nFindings so far:\n${findings.map((f) => `- ${f.text.slice(0, 400)}`).join('\n')}`
-        : '';
-      const result = await run(agent, `Step: ${plan[i].title}${prior}`, {
-        maxTurns: STEP_MAX_TURNS,
-      });
-      const text = (result.finalOutput ?? '').toString().trim().slice(0, FINDING_CAP);
-      findings.push({ stepId: plan[i].id, text: text || '(no findings)' });
-      plan = plan.map((s, j) => (j === i ? { ...s, status: 'done' } : s));
-      await patchSession(sessionId, { plan, findings });
-    } catch (err) {
-      logger.warn('[work-sessions] step failed', { sessionId, step: plan[i].title }, err);
-      plan = plan.map((s, j) => (j === i ? { ...s, status: 'skipped', note: 'Step failed — continued without it.' } : s));
-      await patchSession(sessionId, { plan });
-    }
   }
+  return 'more';
+}
 
-  await assembleArtifact(sessionId, findings);
+/**
+ * Execute every remaining step in this invocation — the INLINE path (previews
+ * / no queue configured). Same state machine as the queue path: it just calls
+ * advanceSession until the session stops moving.
+ */
+export async function executeSession(sessionId: string): Promise<void> {
+  // MAX_STEPS attempts + one final advance to assemble the artifact; the
+  // guard only backstops a state-machine bug, it never truncates real work.
+  for (let guard = 0; guard <= MAX_STEPS + 1; guard++) {
+    const progress = await advanceSession(sessionId);
+    if (progress !== 'more') return;
+  }
+  logger.error('[work-sessions] executeSession exceeded the advance guard', { sessionId });
 }
 
 // ── Phase 3: deliverable ─────────────────────────────────────────────────────
