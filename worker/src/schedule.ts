@@ -2,10 +2,12 @@
  * Recurring jobs the worker keeps alive — one entry per background job the
  * product depends on (lead SLAs, reminders, briefings, billing reconciles…).
  *
- * Each entry becomes a BullMQ job scheduler (repeatable job) in Redis; the
- * worker upserts them on boot and removes any scheduler that no longer
- * appears here. `pattern` is a 5-field crontab evaluated in UTC — the same
- * cadence contract the app's route monitors (Sentry check-ins) expect.
+ * The Cloudflare Worker's 5-minute master trigger (wrangler.toml) checks
+ * every entry against the current UTC instant (src/cron-match.ts), enqueuing a
+ * Cloudflare Queues message per due job. `pattern` is a 5-field crontab
+ * evaluated in UTC — the same cadence contract the app's route monitors
+ * (Sentry check-ins) expect. Every minute field must align to 5-minute
+ * boundaries (the master tick's cadence) — a test enforces this.
  *
  * PARITY: tests/lib/worker-schedule-parity.test.ts (in the app package) pins
  * this list against the app's CRON_MANIFEST — add/change jobs in both places
@@ -15,7 +17,7 @@
  */
 
 export interface RecurringJob {
-  /** Stable scheduler id in Redis — renaming orphans the schedule. */
+  /** Stable job id — appears in queue messages and worker logs. */
   id: string;
   /** App route the tick invokes. */
   path: string;

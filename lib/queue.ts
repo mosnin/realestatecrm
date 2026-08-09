@@ -1,91 +1,83 @@
 /**
- * App-side handle to the background worker's Redis queues (server-only).
+ * App-side handle to the Cloudflare background worker (server-only).
  *
- * `enqueueWorkerTask(task, payload)` pushes a named job onto the
- * `chippi-tasks` queue; the always-on worker (worker/src/index.ts) consumes
- * it and executes the matching handler from lib/jobs/tasks.ts by calling
- * back into /api/worker/execute. Retries/backoff/run-history live in BullMQ.
+ * `enqueueWorkerTask(task, payload)` POSTs the job to the Worker's /enqueue
+ * endpoint (Bearer WORKER_SECRET); the Worker pushes it onto Cloudflare
+ * Queues and its consumer executes the matching handler from
+ * lib/jobs/tasks.ts by calling back into /api/worker/execute. Retries with
+ * backoff and the dead-letter queue live on the Cloudflare side
+ * (worker/wrangler.toml).
  *
- * Degrades honestly: without REDIS_URL the queue is inert — enqueue returns
- * null and logs once, callers must treat null as "not offloaded" and either
- * run inline or surface the degraded state. Never pretend a job was queued.
+ * Degrades honestly: without WORKER_URL + WORKER_SECRET the queue is inert —
+ * enqueue returns null and logs once. Callers must treat null as "not
+ * offloaded" and either run inline or surface the degraded state. Never
+ * pretend a job was queued.
  */
 
-import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
-
-const TASKS_QUEUE = 'chippi-tasks';
-
-let queue: Queue | null | undefined;
 let warned = false;
 
-function getTaskQueue(): Queue | null {
-  if (queue !== undefined) return queue;
-  const url = process.env.REDIS_URL;
-  if (!url) {
+function workerConfig(): { url: string; secret: string } | null {
+  const url = process.env.WORKER_URL?.replace(/\/$/, '');
+  const secret = process.env.WORKER_SECRET;
+  if (!url || !secret) {
     if (!warned) {
-      console.warn('[queue] REDIS_URL not set — background task offload is inert.');
+      console.warn('[queue] WORKER_URL/WORKER_SECRET not set — background task offload is inert.');
       warned = true;
     }
-    queue = null;
-    return queue;
+    return null;
   }
-  const connection = new IORedis(url, { maxRetriesPerRequest: null, enableReadyCheck: false });
-  queue = new Queue(TASKS_QUEUE, { connection });
-  return queue;
+  return { url, secret };
 }
 
 export interface EnqueueOptions {
-  /** Delay before the worker picks the job up, in ms. */
-  delayMs?: number;
-  /** Override retry attempts (worker default: 3). */
-  attempts?: number;
-  /** Idempotency: two enqueues with the same jobId collapse into one. */
-  jobId?: string;
+  /** Delay before the worker picks the job up, in seconds (max 12h on CF Queues). */
+  delaySeconds?: number;
 }
 
 /**
- * Queue a named task for the background worker. Returns the BullMQ job id,
- * or null when the queue is unavailable (no REDIS_URL / Redis down).
+ * Queue a named task for the background worker. Returns true when the worker
+ * accepted the job, or null when offload is unavailable (unconfigured,
+ * worker unreachable, or rejected) — never a false success.
  */
 export async function enqueueWorkerTask(
   task: string,
   payload: unknown = null,
   opts: EnqueueOptions = {},
-): Promise<string | null> {
-  const q = getTaskQueue();
-  if (!q) return null;
+): Promise<true | null> {
+  const cfg = workerConfig();
+  if (!cfg) return null;
   try {
-    const job = await q.add(
-      task,
-      { task, payload },
-      {
-        delay: opts.delayMs,
-        attempts: opts.attempts ?? 3,
-        backoff: { type: 'exponential', delay: 15_000 },
-        removeOnComplete: { count: 200 },
-        removeOnFail: { count: 500 },
-        ...(opts.jobId ? { jobId: opts.jobId } : {}),
+    const res = await fetch(`${cfg.url}/enqueue`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.secret}`,
+        'Content-Type': 'application/json',
       },
-    );
-    return job.id ?? null;
+      body: JSON.stringify({ task, payload, delaySeconds: opts.delaySeconds }),
+    });
+    if (!res.ok) {
+      console.error(`[queue] worker rejected ${task}: ${res.status}`);
+      return null;
+    }
+    return true;
   } catch (err) {
     console.error('[queue] enqueue failed:', err);
     return null;
   }
 }
 
-/** Worker liveness, from the heartbeat the worker refreshes every 30s.
- *  Null = no worker seen (or Redis unavailable). */
-export async function workerHeartbeat(): Promise<string | null> {
-  const url = process.env.REDIS_URL;
+/**
+ * Worker liveness: hits the Worker's /health endpoint. Returns its status
+ * (with the recurring-job count it's carrying) or null when unreachable.
+ */
+export async function workerHealth(): Promise<{ ok: boolean; scheduledJobs: number } | null> {
+  const url = process.env.WORKER_URL?.replace(/\/$/, '');
   if (!url) return null;
   try {
-    const redis = new IORedis(url, { maxRetriesPerRequest: 1, connectTimeout: 3_000, lazyConnect: true });
-    await redis.connect();
-    const beat = await redis.get('chippi:worker:heartbeat');
-    redis.disconnect();
-    return beat;
+    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { ok?: boolean; scheduledJobs?: number };
+    return { ok: body.ok === true, scheduledJobs: body.scheduledJobs ?? 0 };
   } catch {
     return null;
   }

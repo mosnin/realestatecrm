@@ -188,10 +188,11 @@ const optionalSchema = z.object({
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
 
-  // Background worker (worker/ service): Redis queues + cache, and the
-  // secret the worker uses to call back into /api/worker/execute
-  REDIS_URL: z.string().optional(),                  // lib/queue.ts, lib/redis-cache.ts
-  WORKER_SECRET: z.string().optional(),              // app/api/worker/execute
+  // Cloudflare background worker (worker/, docs/WORKER.md): job offload +
+  // recurring jobs run on Cloudflare Queues; Redis serves the app cache
+  WORKER_URL: z.string().optional(),                 // lib/queue.ts → the Worker's /enqueue + /health
+  WORKER_SECRET: z.string().optional(),              // app/api/worker/execute + enqueue auth
+  REDIS_URL: z.string().optional(),                  // lib/redis-cache.ts
 
   // Briefing email sender domain
   BRIEF_EMAIL_DOMAIN: z.string().optional(),         // lib/briefing/delivery.ts
@@ -261,8 +262,12 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     keys: ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'],
   },
   {
-    label: 'Background worker — recurring jobs, task offload queue, and Redis cache are inert without REDIS_URL + WORKER_SECRET (deploy worker/, see docs/WORKER.md)',
-    keys: ['REDIS_URL', 'WORKER_SECRET'],
+    label: 'Cloudflare background worker — recurring jobs and task offload are inert without WORKER_URL + WORKER_SECRET (deploy worker/, see docs/WORKER.md)',
+    keys: ['WORKER_URL', 'WORKER_SECRET'],
+  },
+  {
+    label: 'Redis cache — lib/redis-cache.ts runs cold (every read is a miss) without REDIS_URL',
+    keys: ['REDIS_URL'],
   },
   {
     label: 'Composio integrations — connecting apps and receiving triggers needs COMPOSIO_API_KEY',
