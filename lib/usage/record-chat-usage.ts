@@ -71,6 +71,17 @@ export interface RecordChatUsageInput {
   route: ChatRoute;
   /** 'modal' (production agent path) | 'ts' (direct path or local fallback). */
   runtime?: 'modal' | 'ts';
+  /**
+   * Stable per-turn key for BILLING IDEMPOTENCY. When set, the insert is
+   * ON CONFLICT DO NOTHING against a unique (spaceId, idempotencyKey) index,
+   * so re-persisting the same logical turn cannot charge the customer twice.
+   *
+   * REQUIRED IN SPIRIT for any path that can re-execute or re-persist a turn
+   * (the chat paths keep running after the browser leaves and recover on
+   * reconnect — exactly the shape that replays). Omit only for one-shot
+   * call sites that physically cannot repeat.
+   */
+  idempotencyKey?: string | null;
 }
 
 async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
@@ -95,7 +106,7 @@ async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
     route: input.route,
   });
   try {
-    await supabase.from('ChatUsage').insert({
+    const row = {
       spaceId: input.spaceId,
       userId: input.userId ?? null,
       conversationId: input.conversationId ?? null,
@@ -109,7 +120,17 @@ async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
         ? input.costUsd
         : calculateCost(input.model, promptTokens, completionTokens),
       runtime: input.runtime ?? 'ts',
-    });
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    };
+    // A keyed row upserts-ignore: a replayed turn is a no-op, not a second
+    // credit debit. Unkeyed rows keep the plain insert (unchanged behavior).
+    if (input.idempotencyKey) {
+      await supabase
+        .from('ChatUsage')
+        .upsert(row, { onConflict: 'spaceId,idempotencyKey', ignoreDuplicates: true });
+    } else {
+      await supabase.from('ChatUsage').insert(row);
+    }
   } catch (err) {
     logger.warn('[record-chat-usage] insert failed', { spaceId: input.spaceId }, err);
   }
