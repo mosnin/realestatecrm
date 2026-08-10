@@ -69,6 +69,20 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   BrowserPairingCode: 'spaceId',
   BrowserSession: 'spaceId',
   BrowserAction: 'spaceId',
+  // Added after the security audit found these ACTIVELY QUERIED tenant tables
+  // absent from the registry — meaning the scope guard was blind to exactly
+  // the most sensitive sharing surfaces (tokenised CMA payloads, packet
+  // documents, portal messages).
+  CmaReport: 'spaceId',
+  PropertyPacket: 'spaceId',
+  DealContact: 'spaceId',
+  ClientMessage: 'spaceId',
+  ApplicationMessage: 'spaceId',
+  ApplicationStatusUpdate: 'spaceId',
+  SpaceSetting: 'spaceId',
+  MessagingSuppression: 'spaceId',
+  MessagingConsent: 'spaceId',
+  WorkSessionAction: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',

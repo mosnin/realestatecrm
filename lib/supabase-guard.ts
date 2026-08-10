@@ -38,8 +38,24 @@ function isEnabled(): boolean {
   return process.env.TENANT_GUARD === '1';
 }
 
+/**
+ * Should an unscoped tenant query THROW rather than merely be logged?
+ *
+ * Always in dev/test. In production it is now opt-in via TENANT_GUARD_ENFORCE,
+ * because the security audit's core finding was that the guard — the advertised
+ * backstop for a boundary held together by ~1,900 hand-written .eq() filters —
+ * was telemetry-only in prod: it logged the leak and then SERVED IT. A smoke
+ * alarm wired to a logbook.
+ *
+ * Enabling it turns a forgotten filter into a 500 for that one request instead
+ * of a cross-tenant data leak. That is the correct trade: a broken page is
+ * recoverable, a breach is not. It is a separate flag from TENANT_GUARD so the
+ * observation period (log-only) can run first and the enforcement flip is a
+ * deliberate, reversible act.
+ */
 function isHardFail(): boolean {
-  return process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') return true;
+  return process.env.TENANT_GUARD_ENFORCE === '1';
 }
 
 interface QueryState {
@@ -63,7 +79,8 @@ function violation(state: QueryState): Error | null {
         `with .unscoped('reason').`,
     );
   }
-  // Prod: telemetry only — log and let the query proceed unchanged.
+  // Prod with enforcement OFF: telemetry only — log and let the query
+  // proceed unchanged. Flip TENANT_GUARD_ENFORCE=1 to fail closed instead.
   captureMessage(msg, 'warning', { table: state.table, op: state.op, scopeColumn: column });
   return null;
 }
