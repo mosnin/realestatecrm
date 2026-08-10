@@ -177,7 +177,17 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // possible here — treat false as a delivery failure.
     const idemKey = makeIdempotencyKey('send_sms', ctx.space.id, resolvedPhone, args.body);
     const ok = await withIdempotency(idemKey, () =>
-      sendSMS({ to: resolvedPhone!, body: args.body, mediaUrls }),
+      // Consumer outreach on the realtor's behalf. Approval-gated in chat, but
+      // approval is not consent — the compliance gate still applies.
+      sendSMS({
+        to: resolvedPhone!,
+        body: args.body,
+        mediaUrls,
+        audience: 'consumer',
+        category: 'marketing',
+        spaceId: ctx.space.id,
+        contactId: resolvedContactId ?? null,
+      }),
     );
     if (!ok) {
       return {

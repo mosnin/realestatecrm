@@ -224,6 +224,7 @@ export async function POST(req: NextRequest) {
         tourConfirmationSMS({
           guestName: tour.guestName,
           guestPhone: tour.guestPhone,
+          spaceId: space.id,
           businessName: settingsFull?.businessName || space.name,
           date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),

@@ -7,6 +7,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import type { Audience, MessageCategory } from '@/lib/messaging/compliance';
 
 // Log a clear warning at module load time if Telnyx env vars are missing
 if (!process.env.TELNYX_API_KEY) {
@@ -46,13 +47,75 @@ export interface SendSMSParams {
    *  upgrades the message to MMS. Carrier-side limits apply (typically
    *  ~600 KB per asset, ~1 MB total). */
   mediaUrls?: string[];
+  /**
+   * WHO this message is for. REQUIRED — deliberately not optional and never
+   * defaulted, because the whole point is that a consumer send cannot be
+   * mislabelled by omission. TypeScript refuses to compile a call site that
+   * hasn't decided.
+   *
+   *   'internal' — the realtor's own phone (their notifications, their daily
+   *                brief). The customer relationship, not consumer outreach:
+   *                skips the compliance gate.
+   *   'consumer' — a lead, applicant, or tour guest. Goes through the TCPA
+   *                gate in lib/messaging/compliance.ts (opt-out, consent,
+   *                quiet hours), which requires spaceId.
+   */
+  audience: Audience;
+  /**
+   * Required for consumer sends: 'transactional' (something they asked for —
+   * the tour they booked) vs 'marketing' (drip/nurture/promotional, which
+   * requires express written consent on record). Defaults to the STRICTER
+   * 'marketing' when omitted, so an unclassified consumer send fails closed.
+   */
+  category?: MessageCategory;
+  /** Required for consumer sends — the compliance gate is per-space. */
+  spaceId?: string;
+  contactId?: string | null;
 }
 
 /**
  * Send an SMS via Telnyx. Returns true if sent, false if skipped/failed.
  * Never throws — errors are logged and swallowed.
+ *
+ * CONSUMER SENDS PASS THROUGH THE COMPLIANCE GATE (lib/messaging/compliance):
+ * opted-out recipients, missing marketing consent, and quiet hours all block
+ * the send here — inside the chokepoint — so no caller can bypass it.
  */
 export async function sendSMS(params: SendSMSParams): Promise<boolean> {
+  // ── Compliance gate (consumer audience only) ──────────────────────────
+  if (params.audience === 'consumer') {
+    if (!params.spaceId) {
+      // Fail closed: a consumer send with no space cannot be checked.
+      logger.error('[sms] blocked — consumer send without spaceId, cannot run the compliance gate');
+      return false;
+    }
+    const { checkSendAllowed, withOptOutFooter } = await import('@/lib/messaging/compliance');
+    const decision = await checkSendAllowed({
+      spaceId: params.spaceId,
+      channel: 'sms',
+      address: params.to,
+      audience: 'consumer',
+      category: params.category ?? 'marketing',
+      contactId: params.contactId ?? null,
+    });
+    if (!decision.allowed) {
+      logger.warn('[sms] blocked by compliance gate', {
+        reason: decision.reason,
+        detail: decision.detail,
+        spaceId: params.spaceId,
+      });
+      return false;
+    }
+    // Marketing messages carry the opt-out disclosure, always.
+    if ((params.category ?? 'marketing') === 'marketing') {
+      params = { ...params, body: withOptOutFooter(params.body) };
+    }
+  }
+  return sendSMSUnchecked(params);
+}
+
+/** The raw transport. Private — everything goes through sendSMS's gate. */
+async function sendSMSUnchecked(params: SendSMSParams): Promise<boolean> {
   const client = await getClient();
   const fromNumber = process.env.TELNYX_FROM_NUMBER;
 
@@ -131,6 +194,7 @@ export function newLeadSMS(p: { spaceName: string; leadName: string; leadPhone?:
   const score = p.scoreLabel ? ` (${p.scoreLabel})` : '';
   const leadContact = p.leadPhone ? ` Phone: ${p.leadPhone}.` : '';
   return {
+    audience: 'internal',
     to: p.phone,
     body: `[${p.spaceName}] New lead: ${p.leadName}${score}.${leadContact} Open your dashboard to review.`,
   };
@@ -139,38 +203,55 @@ export function newLeadSMS(p: { spaceName: string; leadName: string; leadPhone?:
 export function newTourSMS(p: { spaceName: string; guestName: string; date: string; time: string; property?: string | null; phone: string }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {
+    audience: 'internal',
     to: p.phone,
     body: `[${p.spaceName}] New tour booked: ${p.guestName}${prop} on ${p.date} at ${p.time}. Check your dashboard for details.`,
   };
 }
 
-export function tourConfirmationSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
+export function tourConfirmationSMS(p: { guestName: string; guestPhone: string; spaceId: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {
+    // The guest asked for this tour — transactional, not marketing.
+    audience: 'consumer',
+    category: 'transactional',
+    spaceId: p.spaceId,
     to: p.guestPhone,
     body: `Hi ${p.guestName}! Your tour with ${p.businessName}${prop} is confirmed for ${p.date} at ${p.time}. Contact your agent if you need to reschedule.`,
   };
 }
 
-export function tourReminderSMS(p: { guestName: string; guestPhone: string; businessName: string; time: string; property?: string | null }): SendSMSParams {
+export function tourReminderSMS(p: { guestName: string; guestPhone: string; spaceId: string; businessName: string; time: string; property?: string | null }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {
+    // The guest asked for this tour — transactional, not marketing.
+    audience: 'consumer',
+    category: 'transactional',
+    spaceId: p.spaceId,
     to: p.guestPhone,
     body: `Hi ${p.guestName}, reminder: your tour with ${p.businessName}${prop} is tomorrow at ${p.time}. See you there!`,
   };
 }
 
-export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
+export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; spaceId: string; businessName: string; date: string; time: string; property?: string | null }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {
+    // The guest asked for this tour — transactional, not marketing.
+    audience: 'consumer',
+    category: 'transactional',
+    spaceId: p.spaceId,
     to: p.guestPhone,
     body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} has been moved to ${p.date} at ${p.time}. Reply if that doesn't work.`,
   };
 }
 
-export function tourCancelledSMS(p: { guestName: string; guestPhone: string; businessName: string; date: string; property?: string | null }): SendSMSParams {
+export function tourCancelledSMS(p: { guestName: string; guestPhone: string; spaceId: string; businessName: string; date: string; property?: string | null }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {
+    // The guest asked for this tour — transactional, not marketing.
+    audience: 'consumer',
+    category: 'transactional',
+    spaceId: p.spaceId,
     to: p.guestPhone,
     body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} on ${p.date} has been cancelled. Reply to rebook.`,
   };
@@ -179,6 +260,7 @@ export function tourCancelledSMS(p: { guestName: string; guestPhone: string; bus
 export function newDealSMS(p: { spaceName: string; dealTitle: string; value?: string | null; phone: string }): SendSMSParams {
   const val = p.value ? ` (${p.value})` : '';
   return {
+    audience: 'internal',
     to: p.phone,
     body: `[${p.spaceName}] New deal created: ${p.dealTitle}${val}. Open your dashboard to manage it.`,
   };
@@ -186,6 +268,7 @@ export function newDealSMS(p: { spaceName: string; dealTitle: string; value?: st
 
 export function followUpReminderSMS(p: { spaceName: string; contactName: string; phone: string }): SendSMSParams {
   return {
+    audience: 'internal',
     to: p.phone,
     body: `[${p.spaceName}] Reminder: Follow up with ${p.contactName} today. Open your dashboard to review.`,
   };

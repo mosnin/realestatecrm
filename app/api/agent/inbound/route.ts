@@ -18,6 +18,12 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
+import {
+  isStopKeyword,
+  isStartKeyword,
+  suppressAddress,
+  unsuppressAddress,
+} from '@/lib/messaging/compliance';
 import { recordInboundMessage } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
 
@@ -62,7 +68,7 @@ export async function POST(req: NextRequest) {
   // Validate contact belongs to the stated space
   const { data: contact } = await supabase
     .from('Contact')
-    .select('id, name, leadScore')
+    .select('id, name, leadScore, phone, email')
     .eq('id', contactId)
     .eq('spaceId', spaceId)
     .maybeSingle();
@@ -72,6 +78,59 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString();
+
+  // ── Opt-out / opt-in keywords (TCPA) ──────────────────────────────────
+  // A consumer replying STOP has revoked consent, and honoring it is legally
+  // mandatory and immediate. Handled BEFORE anything else in this route so an
+  // opt-out can never be processed as a normal reply that triggers follow-up.
+  // The reply is still recorded below — the record matters for the audit
+  // trail — but the suppression is written first.
+  {
+    const c = contact as { phone?: string | null; email?: string | null };
+    const address = channel === 'sms' ? c.phone : c.email;
+    if (address) {
+      if (isStopKeyword(content)) {
+        const ok = await suppressAddress({
+          spaceId,
+          channel,
+          address,
+          reason: 'stop_keyword',
+          sourceText: content.slice(0, 200),
+          contactId,
+        });
+        // Report honestly: a failed suppression write must not look like a
+        // successful opt-out, or we keep messaging someone who said stop.
+        if (!ok) {
+          console.error('[agent/inbound] STOP received but suppression write FAILED', { spaceId, contactId });
+          return NextResponse.json(
+            { error: 'Could not record the opt-out. Retry required.' },
+            { status: 500 },
+          );
+        }
+        await supabase.from('ContactActivity').insert({
+          id: crypto.randomUUID(),
+          contactId,
+          spaceId,
+          type: 'note',
+          content: `[Opt-out] Contact replied "${content.trim().slice(0, 40)}" via ${channel.toUpperCase()} — suppressed from further ${channel} messages.`,
+          metadata: { source: 'inbound', channel, optOut: true },
+        });
+        return NextResponse.json({ ok: true, optedOut: true, replyGenerated: false });
+      }
+      if (isStartKeyword(content)) {
+        await unsuppressAddress({ spaceId, channel, address });
+        await supabase.from('ContactActivity').insert({
+          id: crypto.randomUUID(),
+          contactId,
+          spaceId,
+          type: 'note',
+          content: `[Opt-in] Contact replied "${content.trim().slice(0, 40)}" via ${channel.toUpperCase()} — messages re-enabled.`,
+          metadata: { source: 'inbound', channel, optIn: true },
+        });
+        return NextResponse.json({ ok: true, optedIn: true, replyGenerated: false });
+      }
+    }
+  }
 
   // Record as ContactActivity
   const { error: activityError } = await supabase.from('ContactActivity').insert({

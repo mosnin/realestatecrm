@@ -127,6 +127,7 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
           tourReminderSMS({
             guestName: tour.guestName,
             guestPhone: tour.guestPhone,
+            spaceId: tour.spaceId,
             businessName,
             time: new Date(tour.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
             property: tour.propertyAddress,
