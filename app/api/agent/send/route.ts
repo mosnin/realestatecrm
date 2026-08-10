@@ -124,6 +124,11 @@ export async function POST(req: NextRequest) {
 
     try {
       await sendEmailFromCRM({
+        // Agent outreach to a lead — consumer; the gate decides if it goes.
+        audience: 'consumer',
+        category: 'marketing',
+        spaceId,
+        contactId,
         toEmail: contact.email,
         fromName,
         subject: subject!,

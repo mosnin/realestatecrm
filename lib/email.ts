@@ -1,6 +1,7 @@
 import type { ApplicationData, IntakeFormConfig } from '@/lib/types';
 import { getSubmissionDisplay, formatAnswerValue } from '@/lib/form-versioning';
 import { logger } from '@/lib/logger';
+import type { Audience, MessageCategory } from '@/lib/messaging/compliance';
 
 /**
  * Redact an email address to its first character + masked local part +
@@ -397,6 +398,32 @@ export interface SendEmailFromCRMParams {
   subject: string;
   body: string;
   attachments?: SendEmailAttachment[];
+  /**
+   * WHO this is for. REQUIRED and never defaulted — see lib/sms.ts for the
+   * same contract. Every send site must decide, so a consumer email can't
+   * skip the compliance gate by omission.
+   */
+  audience: Audience;
+  /** Required for consumer sends; defaults to the stricter 'marketing'. */
+  category?: MessageCategory;
+  /** Required for consumer sends — the gate is per-space. */
+  spaceId?: string;
+  contactId?: string | null;
+}
+
+/**
+ * Thrown when the compliance gate refuses a send. Distinct from a provider
+ * failure so callers can tell the realtor the truth: this wasn't a delivery
+ * error, the recipient opted out / hasn't consented / it's the middle of the
+ * night for them.
+ */
+export class ComplianceBlockedError extends Error {
+  readonly reason: string;
+  constructor(reason: string, detail: string) {
+    super(detail);
+    this.name = 'ComplianceBlockedError';
+    this.reason = reason;
+  }
 }
 
 /**
@@ -421,6 +448,40 @@ export class EmailSendError extends Error {
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
+  // ── Compliance gate (consumer audience only) ────────────────────────────
+  // Inside the chokepoint, exactly like sendSMS: opted-out recipients, missing
+  // marketing consent, and quiet hours block here so no caller can bypass it.
+  // THROWS (rather than silently returning) because this function's contract
+  // is "throw when it didn't go out" — a blocked send must never read as
+  // delivered.
+  if (params.audience === 'consumer') {
+    if (!params.spaceId) {
+      throw new ComplianceBlockedError(
+        'unscoped',
+        'Consumer email without spaceId — the compliance gate cannot run.',
+      );
+    }
+    const { checkSendAllowed } = await import('@/lib/messaging/compliance');
+    const decision = await checkSendAllowed({
+      spaceId: params.spaceId,
+      channel: 'email',
+      address: params.toEmail,
+      audience: 'consumer',
+      category: params.category ?? 'marketing',
+      contactId: params.contactId ?? null,
+    });
+    if (!decision.allowed) {
+      logger.warn('[email] blocked by compliance gate', {
+        reason: decision.reason,
+        spaceId: params.spaceId,
+      });
+      throw new ComplianceBlockedError(
+        decision.reason ?? 'blocked',
+        decision.detail ?? 'This message was blocked by messaging compliance rules.',
+      );
+    }
+  }
+
   if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);

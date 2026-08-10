@@ -235,6 +235,11 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     try {
       await withIdempotency(idemKey, () =>
         sendEmailFromCRM({
+          // Consumer outreach on the realtor's behalf. Chat approval is not
+          // consent — the compliance gate still applies.
+          audience: 'consumer',
+          category: 'marketing',
+          spaceId: ctx.space.id,
           toEmail: resolvedEmail!,
           fromName,
           subject: args.subject,

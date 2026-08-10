@@ -224,3 +224,26 @@ describe('address normalization + opt-out footer', () => {
     expect(withOptOutFooter(already)).toBe(already);
   });
 });
+
+describe('email channel', () => {
+  it('applies the same suppression rule as SMS', async () => {
+    db.suppression = { id: 'sup_1' };
+    const d = await checkSendAllowed(consumerReq({ channel: 'email', address: 'bob@example.com' }));
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toBe('suppressed');
+  });
+
+  it('marketing email requires consent; transactional does not', async () => {
+    db.consent = [];
+    const marketing = await checkSendAllowed(
+      consumerReq({ channel: 'email', address: 'bob@example.com', category: 'marketing' }),
+    );
+    expect(marketing.allowed).toBe(false);
+    expect(marketing.reason).toBe('no_consent');
+
+    const transactional = await checkSendAllowed(
+      consumerReq({ channel: 'email', address: 'bob@example.com', category: 'transactional' }),
+    );
+    expect(transactional.allowed).toBe(true);
+  });
+});

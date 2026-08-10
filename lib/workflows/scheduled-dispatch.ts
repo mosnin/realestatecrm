@@ -313,6 +313,11 @@ async function processAuto(
     const fromName = (spaceSetting?.businessName as string | undefined) ?? row.spaceId;
     try {
       await sendEmailFromCRM({
+        // AUTONOMOUS consumer outreach — highest TCPA/CAN-SPAM risk path.
+        audience: 'consumer',
+        category: 'marketing',
+        spaceId: row.spaceId,
+        contactId: contact.id,
         toEmail: contact.email,
         fromName,
         subject: `Message from ${fromName}`,

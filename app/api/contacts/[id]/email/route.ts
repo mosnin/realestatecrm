@@ -58,6 +58,9 @@ export async function POST(
   // as a 502 so the UI can show a real error instead of a false success toast.
   try {
     await sendEmailFromCRM({
+      // Realtor-composed email to a contact — still consumer outreach.
+      audience: 'consumer',
+      category: 'marketing',
       toEmail: contact.email,
       fromName: user?.name ?? space.name,
       replyTo: user?.email,
