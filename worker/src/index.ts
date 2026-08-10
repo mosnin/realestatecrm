@@ -25,14 +25,28 @@
  */
 
 import { RECURRING_JOBS } from './schedule';
-import { cronMatches } from './cron-match';
+import { cronMatchesInWindow } from './cron-match';
 
 export interface Env {
   JOBS: Queue<JobMessage>;
   APP_BASE_URL: string;
   CRON_SECRET: string;
   WORKER_SECRET: string;
+  /**
+   * Optional KV namespace holding the last successfully-processed master-tick
+   * instant. With it, a SKIPPED trigger is recovered on the next firing (the
+   * window spans the whole gap). Without it, the window falls back to the
+   * fixed tick interval, which still recovers DELAYED triggers. Bind it with:
+   *   wrangler kv namespace create chippi-worker-state
+   */
+  STATE?: KVNamespace;
 }
+
+/** Master trigger cadence (wrangler.toml crons). The no-KV fallback window. */
+const TICK_INTERVAL_MS = 5 * 60_000;
+/** Cap catch-up after a long outage so one tick can't enqueue a storm. */
+const MAX_CATCHUP_MS = 6 * 60 * 60_000;
+const WATERMARK_KEY = 'master-tick-watermark';
 
 export type JobMessage =
   | { type: 'tick'; id: string; path: string }
@@ -79,15 +93,87 @@ async function processMessage(env: Env, msg: JobMessage): Promise<void> {
   console.log(`[worker] task ${msg.task} ok`);
 }
 
+/** Tell the app this tick fired. Best-effort — never blocks the tick. */
+async function heartbeat(env: Env, at: Date): Promise<void> {
+  try {
+    await callApp(
+      env,
+      '/api/worker/execute',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.WORKER_SECRET}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ task: 'worker-heartbeat', payload: { at: at.toISOString() } }),
+      },
+      'heartbeat',
+    );
+  } catch (err) {
+    console.error('[worker] heartbeat failed:', err instanceof Error ? err.message : err);
+  }
+}
+
+/** Start of this tick's catch-up window (exclusive). */
+async function readWatermark(env: Env, now: Date): Promise<Date> {
+  const fallback = new Date(now.getTime() - TICK_INTERVAL_MS);
+  if (!env.STATE) return fallback;
+  try {
+    const raw = await env.STATE.get(WATERMARK_KEY);
+    const prev = raw ? new Date(raw) : null;
+    if (!prev || Number.isNaN(prev.getTime()) || prev >= now) return fallback;
+    const floor = new Date(now.getTime() - MAX_CATCHUP_MS);
+    return prev < floor ? floor : prev;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeWatermark(env: Env, at: Date): Promise<void> {
+  if (!env.STATE) return;
+  try {
+    await env.STATE.put(WATERMARK_KEY, at.toISOString());
+  } catch {
+    /* best-effort: a missed write just means a slightly wider next window */
+  }
+}
+
 export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const now = new Date(controller.scheduledTime);
-    const due = RECURRING_JOBS.filter((jobDef) => cronMatches(jobDef.pattern, now));
+
+    // Heartbeat FIRST and directly (not through the queue): this timestamp is
+    // the app's only proof that the Cloudflare trigger actually fires, so it
+    // must land even if every enqueue below fails.
+    await heartbeat(env, now);
+
+    // Window since the last processed tick — recovers delayed AND (with KV)
+    // skipped triggers instead of silently dropping a day's daily jobs.
+    const from = await readWatermark(env, now);
+    const due = RECURRING_JOBS.filter((jobDef) => cronMatchesInWindow(jobDef.pattern, from, now));
+
+    // Each enqueue is isolated: one failing send must not drop its siblings
+    // (they share a tick, and a daily job gets no second chance today).
+    let enqueued = 0;
+    const failed: string[] = [];
     for (const jobDef of due) {
-      await env.JOBS.send({ type: 'tick', id: jobDef.id, path: jobDef.path });
+      try {
+        await env.JOBS.send({ type: 'tick', id: jobDef.id, path: jobDef.path });
+        enqueued++;
+      } catch (err) {
+        failed.push(jobDef.id);
+        console.error(`[worker] enqueue failed for ${jobDef.id}:`, err instanceof Error ? err.message : err);
+      }
     }
+
+    // Only advance the watermark when everything due was enqueued — a partial
+    // tick leaves the window open so the next firing retries the stragglers.
+    if (failed.length === 0) await writeWatermark(env, now);
+
     console.log(
-      `[worker] master tick ${now.toISOString()} — enqueued ${due.length}/${RECURRING_JOBS.length} jobs`,
+      `[worker] master tick ${now.toISOString()} (window from ${from.toISOString()}) — ` +
+        `enqueued ${enqueued}/${due.length} due of ${RECURRING_JOBS.length}` +
+        (failed.length ? ` — FAILED: ${failed.join(', ')}` : ''),
     );
   },
 

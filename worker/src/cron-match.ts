@@ -49,6 +49,33 @@ export function parseCron(pattern: string): CronFields {
   };
 }
 
+/**
+ * Did `pattern` fire at ANY minute in the half-open window
+ * (fromExclusive, toInclusive] (UTC)?
+ *
+ * This is what makes a best-effort 5-minute master trigger safe: Cloudflare
+ * scheduled events can be delayed or skipped, and exact-instant matching means
+ * a daily `0 9 * * *` job whose 09:00 tick lands at 09:01 NEVER RUNS THAT DAY.
+ * Matching across the window since the last processed tick catches the missed
+ * slot instead. Windows are half-open so consecutive ticks can't both claim the
+ * same minute (no double-fire).
+ *
+ * Returns true on the FIRST matching minute — callers enqueue one catch-up run
+ * per job per tick, never one per missed slot.
+ */
+export function cronMatchesInWindow(
+  pattern: string,
+  fromExclusive: Date,
+  toInclusive: Date,
+): boolean {
+  const start = Math.floor(fromExclusive.getTime() / 60_000) * 60_000 + 60_000;
+  const end = Math.floor(toInclusive.getTime() / 60_000) * 60_000;
+  for (let t = start; t <= end; t += 60_000) {
+    if (cronMatches(pattern, new Date(t))) return true;
+  }
+  return false;
+}
+
 /** Does `pattern` fire at this instant (UTC)? Standard cron dom/dow rule:
  *  when both are restricted, either matching fires; our schedules restrict at
  *  most one, where the rule degenerates to plain AND. */

@@ -69,6 +69,10 @@ export async function enqueueWorkerTask(
 /**
  * Worker liveness: hits the Worker's /health endpoint. Returns its status
  * (with the recurring-job count it's carrying) or null when unreachable.
+ *
+ * NOTE: /health only proves the Worker is DEPLOYED and reachable — it does not
+ * prove its scheduled trigger is firing. Pair it with readWorkerTick() below,
+ * which is the real "background work is happening" signal.
  */
 export async function workerHealth(): Promise<{ ok: boolean; scheduledJobs: number } | null> {
   const url = process.env.WORKER_URL?.replace(/\/$/, '');
@@ -78,6 +82,39 @@ export async function workerHealth(): Promise<{ ok: boolean; scheduledJobs: numb
     if (!res.ok) return null;
     const body = (await res.json()) as { ok?: boolean; scheduledJobs?: number };
     return { ok: body.ok === true, scheduledJobs: body.scheduledJobs ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Master-tick heartbeat. The Worker's scheduled() handler calls the
+ * 'worker-heartbeat' task on EVERY firing (directly, not through the queue),
+ * so this timestamp is proof the Cloudflare cron trigger actually fired —
+ * the signal whose absence let a dead scheduler look healthy for 60 days.
+ *
+ * Stored with a TTL well past the tick interval so a stale-but-present value
+ * still reads as "last seen at X" rather than vanishing into ambiguity.
+ */
+export const WORKER_TICK_KEY = 'chippi:worker:last-tick';
+const WORKER_TICK_TTL_SECONDS = 24 * 60 * 60;
+
+/** Record a master tick. Best-effort: never throws into the worker's path. */
+export async function recordWorkerTick(at: string = new Date().toISOString()): Promise<void> {
+  try {
+    const { redis } = await import('@/lib/redis');
+    await redis.set(WORKER_TICK_KEY, at, { ex: WORKER_TICK_TTL_SECONDS });
+  } catch {
+    /* best-effort — a heartbeat write failure must not fail the tick */
+  }
+}
+
+/** ISO timestamp of the last master tick, or null if none recorded/readable. */
+export async function readWorkerTick(): Promise<string | null> {
+  try {
+    const { redis } = await import('@/lib/redis');
+    const v = await redis.get<string>(WORKER_TICK_KEY);
+    return typeof v === 'string' ? v : null;
   } catch {
     return null;
   }

@@ -20,7 +20,7 @@
  */
 
 import { planSession, executeSession, advanceSession } from '@/lib/work-sessions/engine';
-import { enqueueWorkerTask } from '@/lib/queue';
+import { enqueueWorkerTask, recordWorkerTick } from '@/lib/queue';
 
 export type TaskHandler = (payload: unknown) => Promise<unknown>;
 
@@ -35,6 +35,22 @@ export const WORKER_TASKS: Record<string, TaskHandler> = {
    *  `enqueueWorkerTask('noop', {echo:'hi'})` should land in the worker log
    *  and return the payload here. */
   noop: async (payload) => ({ ok: true, echo: payload ?? null, at: new Date().toISOString() }),
+
+  /**
+   * Master-tick heartbeat. Called DIRECTLY by the worker's scheduled() handler
+   * on every firing (not via the queue), so the recorded timestamp proves the
+   * Cloudflare cron trigger fired even if queue delivery is broken. The
+   * background-readiness diagnostics read it and report a stale tick as down —
+   * this is the check whose absence hid a dead scheduler for 60 days.
+   */
+  'worker-heartbeat': async (payload) => {
+    const at =
+      typeof (payload as { at?: unknown } | null)?.at === 'string'
+        ? (payload as { at: string }).at
+        : new Date().toISOString();
+    await recordWorkerTick(at);
+    return { ok: true, at };
+  },
 
   /** Work session, plan phase. just_go sessions land in 'running' and chain
    *  straight into step execution — one queued job per step. */

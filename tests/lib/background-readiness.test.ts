@@ -4,10 +4,15 @@
  * Drives getBackgroundReadiness across env permutations by mutating
  * process.env (saved in beforeEach, restored in afterEach). Asserts:
  *   - all prerequisites set → overall 'ok'
- *   - Modal unset but Inngest/Composio/cron set → 'degraded' (the executor
- *     check is 'degraded', NOT 'missing' — the in-process fallback works)
- *   - Inngest/Composio/cron missing → 'down'
+ *   - Modal unset but the rest set → 'degraded' (the executor check is
+ *     'degraded', NOT 'missing' — the in-process fallback works)
+ *   - no-fallback prerequisites missing → 'down'
  *   - no secret VALUES leak into the report (only presence is reported)
+ *
+ * Scheduler note: the Cloudflare worker — not Inngest — is the production
+ * scheduler, so the worker probe is mocked healthy here and Inngest's absence
+ * is 'degraded' (it only carries event-driven jobs now). The scheduler check's
+ * own semantics live in background-readiness-worker.test.ts.
  *
  * Supabase is mocked so the per-space "recent activity" check resolves without
  * a real DB. The recent-activity query is fixed to return no rows so the
@@ -36,7 +41,21 @@ vi.mock('@/lib/supabase', () => ({ supabase: supabaseMock }));
 const { redisMock } = vi.hoisted(() => ({
   redisMock: { get: vi.fn() },
 }));
-vi.mock('@/lib/redis', () => ({ redis: redisMock }));
+vi.mock('@/lib/redis', () => ({ redis: redisMock, isRedisConfigured: () => true }));
+
+// The Cloudflare worker is the scheduler; hold it healthy here so these
+// permutations exercise the OTHER checks. Its own states are covered in
+// tests/lib/background-readiness-worker.test.ts.
+const { queueMock } = vi.hoisted(() => ({
+  queueMock: {
+    workerHealth: vi.fn(async () => ({ ok: true, scheduledJobs: 23 })),
+    readWorkerTick: vi.fn(async () => new Date().toISOString()),
+  },
+}));
+vi.mock('@/lib/queue', () => queueMock);
+vi.mock('@/lib/inngest/cron-functions', () => ({
+  CRON_MANIFEST: Array.from({ length: 23 }, (_, i) => ({ id: `cron-${i}` })),
+}));
 
 import {
   getBackgroundReadiness,
@@ -56,6 +75,8 @@ const KEYS = [
   'VAPID_SUBJECT',
   'COMPOSIO_API_KEY',
   'COMPOSIO_WEBHOOK_SECRET',
+  'WORKER_URL',
+  'WORKER_SECRET',
 ] as const;
 
 // Sentinel secret values — used to prove no VALUE leaks into the report.
@@ -71,6 +92,8 @@ const SECRETS: Record<(typeof KEYS)[number], string> = {
   VAPID_SUBJECT: 'mailto:security-SECRET@example.test',
   COMPOSIO_API_KEY: 'composio-SECRET',
   COMPOSIO_WEBHOOK_SECRET: 'composio-webhook-SECRET',
+  WORKER_URL: 'https://worker.example/workers-SECRET',
+  WORKER_SECRET: 'worker-SECRET',
 };
 
 let saved: Record<string, string | undefined>;
@@ -110,6 +133,8 @@ describe('getBackgroundReadiness', () => {
     const report = await getBackgroundReadiness('space_1');
 
     expect(report.overall).toBe('ok');
+    expect(checkByKey(report.checks, 'worker').status).toBe('ok');
+    expect(checkByKey(report.checks, 'scheduler-conflict').status).toBe('ok');
     expect(checkByKey(report.checks, 'executor').status).toBe('ok');
     expect(checkByKey(report.checks, 'chat-offload').status).toBe('ok');
     expect(checkByKey(report.checks, 'cron').status).toBe('ok');
@@ -118,7 +143,9 @@ describe('getBackgroundReadiness', () => {
     expect(checkByKey(report.checks, 'composio').status).toBe('ok');
   });
 
-  it("Modal unset but Inngest/Composio/cron set → 'degraded' with executor 'degraded' (NOT 'missing')", async () => {
+  it("Modal unset but the rest set → 'degraded' with executor 'degraded' (NOT 'missing')", async () => {
+    process.env.WORKER_URL = SECRETS.WORKER_URL;
+    process.env.WORKER_SECRET = SECRETS.WORKER_SECRET;
     process.env.CRON_SECRET = SECRETS.CRON_SECRET;
     process.env.INNGEST_EVENT_KEY = SECRETS.INNGEST_EVENT_KEY;
     process.env.INNGEST_SIGNING_KEY = SECRETS.INNGEST_SIGNING_KEY;
@@ -146,7 +173,7 @@ describe('getBackgroundReadiness', () => {
     expect(report.checks.some((c) => c.status === 'missing')).toBe(false);
   });
 
-  it("missing Inngest/Composio/cron → overall 'down' and those checks are 'missing'", async () => {
+  it("missing scheduler/cron/push/Composio → overall 'down' and those checks are 'missing'", async () => {
     // Only Modal set — the no-fallback prerequisites are absent.
     process.env.MODAL_WEBHOOK_URL = SECRETS.MODAL_WEBHOOK_URL;
     process.env.AGENT_INTERNAL_SECRET = SECRETS.AGENT_INTERNAL_SECRET;
@@ -154,19 +181,25 @@ describe('getBackgroundReadiness', () => {
     const report = await getBackgroundReadiness('space_1');
 
     expect(report.overall).toBe('down');
+    // No worker configured → the scheduler itself is the headline gap.
+    expect(checkByKey(report.checks, 'worker').status).toBe('missing');
     expect(checkByKey(report.checks, 'cron').status).toBe('missing');
-    expect(checkByKey(report.checks, 'inngest').status).toBe('missing');
     expect(checkByKey(report.checks, 'web-push').status).toBe('missing');
     expect(checkByKey(report.checks, 'composio').status).toBe('missing');
     // Executor IS configured here → 'ok'.
     expect(checkByKey(report.checks, 'executor').status).toBe('ok');
   });
 
-  it("partial Inngest (only one key) → that check is 'missing'", async () => {
+  it("partial Inngest (only one key) → event jobs are 'degraded', not a scheduler outage", async () => {
+    process.env.WORKER_URL = SECRETS.WORKER_URL;
+    process.env.WORKER_SECRET = SECRETS.WORKER_SECRET;
     process.env.INNGEST_EVENT_KEY = SECRETS.INNGEST_EVENT_KEY;
     // INNGEST_SIGNING_KEY intentionally absent.
     const report = await getBackgroundReadiness();
-    expect(checkByKey(report.checks, 'inngest').status).toBe('missing');
+    // Inngest no longer schedules recurring jobs, so an incomplete key set
+    // degrades event delivery — it must NOT read as "background work is dead".
+    expect(checkByKey(report.checks, 'inngest').status).toBe('degraded');
+    expect(checkByKey(report.checks, 'worker').status).toBe('ok');
   });
 
   it("partial VAPID configuration → web push is 'missing'", async () => {
