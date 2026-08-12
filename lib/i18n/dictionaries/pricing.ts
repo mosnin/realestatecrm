@@ -1,20 +1,23 @@
 /**
  * Pricing-page copy, all languages.
  *
- * `en` (American English) is the CANONICAL BASE — it is the source of truth
- * for what the page says, and `PricingDict` is derived from it, so adding a
- * string to `en` breaks the build until every language carries it. Edit `en`
- * first, then update the translations to match (the intended workflow: an
- * English copy change must reflect in every language unless a divergence is
- * explicitly decided).
+ * VOICE: docs/MARKETING_VOICE.md — sell the outcome, not the machine. A
+ * five-year-old should understand every sentence. Short sentences, plain
+ * words, no jargon, no hype. The top of the page says what you GET; the FAQ
+ * further down keeps every number and billing term accurate for the buyer who
+ * goes looking. Simplifying the pitch must never become hiding the facts.
  *
- * Translation register (keep consistent across all marketing dictionaries):
- *  - es: neutral Latin-American Spanish (es-419), informal "tú", same short
- *    confident sentences as the English. No vosotros, no Castilian idiom.
- *  - ru: formal «вы», same register. Product terms stay natural, not calqued.
- *  - Numbers are NEVER hardcoded in prose — price/seat figures interpolate
- *    via tokens ({teamSeat}, {teamPlusSeat}) so currency localization applies
- *    everywhere at once.
+ * `en` is the CANONICAL BASE — `PricingDict` is derived from it, so adding a
+ * string breaks the build until every language carries it. Edit `en` first.
+ *
+ * The translations are as simple IN THEIR OWN LANGUAGE as the English is in
+ * English — NOT literal renderings (a word-for-word translation of plain
+ * English produces stiff Spanish and bureaucratic Russian):
+ *  - es: neutral Latin-American Spanish, informal "tú", everyday spoken words.
+ *  - ru: formal «вы» (the register this market expects) but plain — short
+ *    sentences, ordinary verbs, no noun chains.
+ * Prices are NEVER hardcoded in prose — they interpolate via tokens
+ * ({teamSeat}, {price}, {amount}) so currency localization applies everywhere.
  */
 
 import type { Lang } from '../markets';
@@ -23,74 +26,74 @@ const en = {
   metaTitle: 'Pricing · Chippi',
   hero: {
     pill: 'Pricing',
-    h1: 'Pricing that scales with you.',
-    sub: 'Every plan starts with a 7-day free trial. Move up as you grow, premium AI workflows draw from a monthly credit balance, and brokerage pricing expands automatically as you add agents.',
+    h1: 'Pay for what you use.',
+    sub: 'Try it free for 7 days. Chippi does the work you hate. You keep the deals.',
   },
   plans: {
-    individualEyebrow: 'For individual agents',
-    teamEyebrow: 'For teams and brokerages',
+    individualEyebrow: 'For one agent',
+    teamEyebrow: 'For teams',
     monthly: 'Monthly',
-    annual: 'Annual',
+    annual: 'Yearly',
     save20: 'Save 20%',
     mostPopular: 'Most popular',
     perMonth: '/mo',
-    billedMonthly: 'billed monthly',
+    billedMonthly: 'billed each month',
     /** {amount} = localized yearly total */
-    billedAnnually: 'billed annually at {amount}/yr',
+    billedAnnually: 'billed once a year at {amount}',
     /** {n} = included seat count */
-    seatsIncluded: '{n} seats included',
-    forOneAgent: 'For one agent',
-    creditsPerMonth: 'credits / month',
+    seatsIncluded: '{n} people included',
+    forOneAgent: 'For one person',
+    creditsPerMonth: 'credits a month',
     /** {price} localized seat price, {credits} formatted credit count */
-    perSeatLine: '+{price}/seat, +{credits} credits',
+    perSeatLine: '+{price}/person, +{credits} credits',
     cards: {
       solo: {
-        blurb: 'Organize your pipeline and put the core AI workflows to work.',
-        highlights: ['Reads and drafts every lead', 'Tour booking and follow-ups', 'Every integration included'],
-        cta: 'Start free trial',
+        blurb: 'Chippi reads your leads and writes back for you.',
+        highlights: ['Answers every new lead', 'Books showings for you', 'Works with your email and calendar'],
+        cta: 'Start free',
       },
       pro: {
-        blurb: 'The full daily AI workflow for serious lead volume.',
-        highlights: ['Everything in Solo', 'Higher monthly credit balance', 'Priority support'],
-        cta: 'Start free trial',
+        blurb: 'For agents with a lot of leads coming in.',
+        highlights: ['Everything in Solo', 'More credits each month', 'We answer you first'],
+        cta: 'Start free',
       },
       team: {
-        blurb: 'A shared command center for scoring, routing, and accountability.',
-        highlights: ['Lead routing across the floor', 'Live floor view and analytics', 'Roles, approvals, and audit log'],
+        blurb: 'See what everyone on your team is doing.',
+        highlights: ['Sends each lead to the right person', 'One screen for the whole team', 'You decide who can do what'],
         cta: 'Start a team',
       },
       team_plus: {
-        blurb: 'Brokerage-level workflow without enterprise complexity.',
-        highlights: ['Everything in Team', 'More seats and credits', 'Better per-seat rate'],
+        blurb: 'Run a big team. Keep it simple.',
+        highlights: ['Everything in Team', 'More people and more credits', 'Cheaper per person'],
         cta: 'Start Team Plus',
       },
     },
   },
   seats: {
-    eyebrow: 'Adding agents',
-    h2: 'Add an agent, billing updates itself.',
-    sub: 'Team and Team Plus include a block of seats. Past that, each additional agent is a flat monthly add-on, added or removed automatically as your floor changes.',
-    perAgentSuffix: '/ additional agent / mo',
+    eyebrow: 'Adding people',
+    h2: 'Add someone. We fix the bill.',
+    sub: 'Team and Team Plus come with people included. Need more? Each extra person costs the same flat price. Add or remove them any time.',
+    perAgentSuffix: '/ extra person / mo',
     /** {credits} formatted credit count */
-    creditsPerAgent: '+{credits} credits per added agent',
-    largeFloor: 'Running a large floor?',
-    talkToSales: 'Talk to sales',
+    creditsPerAgent: '+{credits} credits for each person you add',
+    largeFloor: 'Got a big team?',
+    talkToSales: 'Talk to us',
   },
   credits: {
-    eyebrow: 'Premium AI workflows',
-    h2: 'Credits are spent when Chippi does real work.',
-    sub: 'Every plan includes a monthly credit balance. High-value actions cost more, routine ones cost little. Unused credits roll over for 30 days.',
+    eyebrow: 'Credits',
+    h2: 'One credit = one job Chippi does.',
+    sub: 'Big jobs cost more. Small jobs cost almost nothing. Credits you do not use wait 30 days for you.',
     workflows: {
-      tour_booking: 'Tour booking workflow',
-      daily_briefing: 'Daily AI briefing',
-      lead_score: 'Lead score update',
+      tour_booking: 'Book a showing',
+      daily_briefing: 'Your daily update',
+      lead_score: 'Rank a new lead',
     },
     /** Intl.PluralRules category → the word "credit" declined for a count. */
     creditForms: { one: 'credit', other: 'credits' } as Record<string, string>,
-    topupsEyebrow: 'Need more? One-time top-ups',
-    topupLabels: { starter: 'Starter refill', growth: 'Growth refill', power: 'Power refill' },
+    topupsEyebrow: 'Need more? Buy a top-up',
+    topupLabels: { starter: 'Small top-up', growth: 'Medium top-up', power: 'Big top-up' },
     /** {price} = localized one-time price */
-    topupLine: 'credits, {price} one-time',
+    topupLine: 'credits for {price}, one time',
   },
   faq: {
     eyebrow: 'Questions',
@@ -98,31 +101,31 @@ const en = {
     items: [
       {
         q: 'Is there a free plan?',
-        a: 'No. Every plan starts with a 7-day free trial. A card is required to begin, you are not charged until the trial ends, and you can cancel anytime before then at no cost.',
+        a: 'No. But you get 7 days free. We ask for a card to start. We do not charge you until day 7. Cancel before then and you pay nothing.',
       },
       {
-        q: 'What are credits?',
-        a: 'Premium AI workflows draw from a monthly credit balance, like booking a tour, running your daily AI briefing, or scoring a new lead. Routine actions cost little or nothing, and unused credits roll over for 30 days.',
+        q: 'What is a credit?',
+        a: 'One credit is one job Chippi does for you. Like booking a showing, writing your daily update, or ranking a new lead. Small jobs cost little or nothing. Credits you do not use wait 30 days.',
       },
       {
-        q: 'What happens when I run out of credits?',
-        a: 'Buy a one-time top-up anytime, or move up a plan for a larger monthly allocation and a better rate. Your workspace never locks, only the premium AI workflows pause.',
+        q: 'What if I run out?',
+        a: 'Buy more any time. Or move up a plan and get more each month for a better price. Your account keeps working. Only the big AI jobs pause.',
       },
       {
-        q: 'How does brokerage pricing work?',
-        a: 'Add an agent and billing updates automatically. Each agent beyond your included seats is a flat monthly add-on ({teamSeat} on Team, {teamPlusSeat} on Team Plus), added or removed as your floor changes. No tier jumping, no calls to sales until you want them.',
+        q: 'How does team pricing work?',
+        a: 'Add someone and we fix the bill for you. Extra people cost a flat price each month. That is {teamSeat} on Team and {teamPlusSeat} on Team Plus. Add or remove them any time. No jumping plans. No sales calls unless you want one.',
       },
     ],
   },
   closing: {
     h2: 'Try Chippi free for 7 days.',
-    sub: 'Bring your inbox and let Chippi start working the leads today. Card required, cancel anytime before day 7 at no charge.',
-    startTrial: 'Start free trial',
-    bookDemo: 'Book a demo',
+    sub: 'Connect your email. Chippi starts working your leads today. Cancel before day 7 and you pay nothing.',
+    startTrial: 'Start free',
+    bookDemo: 'See a demo',
   },
   /** Shown only when the display currency isn't USD (checkout bills USD until
    *  Stripe currency_options ship). {currency} = the display currency code. */
-  billedInUsdNote: 'Prices shown in {currency} for convenience. Billing is in USD at the equivalent rate.',
+  billedInUsdNote: 'Prices shown in {currency} to help you. We charge in USD.',
 };
 
 export type PricingDict = typeof en;
@@ -131,68 +134,68 @@ const es: PricingDict = {
   metaTitle: 'Precios · Chippi',
   hero: {
     pill: 'Precios',
-    h1: 'Precios que escalan contigo.',
-    sub: 'Cada plan comienza con una prueba gratis de 7 días. Sube de plan a medida que creces, los flujos de IA premium consumen créditos de un saldo mensual y el precio para inmobiliarias se amplía automáticamente al agregar agentes.',
+    h1: 'Paga por lo que usas.',
+    sub: 'Pruébalo gratis 7 días. Chippi hace el trabajo que odias. Tú te quedas con los negocios.',
   },
   plans: {
-    individualEyebrow: 'Para agentes individuales',
-    teamEyebrow: 'Para equipos e inmobiliarias',
+    individualEyebrow: 'Para un agente',
+    teamEyebrow: 'Para equipos',
     monthly: 'Mensual',
     annual: 'Anual',
     save20: 'Ahorra 20%',
     mostPopular: 'Más popular',
     perMonth: '/mes',
-    billedMonthly: 'facturación mensual',
-    billedAnnually: 'facturación anual de {amount}/año',
-    seatsIncluded: '{n} puestos incluidos',
-    forOneAgent: 'Para un agente',
-    creditsPerMonth: 'créditos / mes',
-    perSeatLine: '+{price}/puesto, +{credits} créditos',
+    billedMonthly: 'se cobra cada mes',
+    billedAnnually: 'se cobra una vez al año: {amount}',
+    seatsIncluded: '{n} personas incluidas',
+    forOneAgent: 'Para una persona',
+    creditsPerMonth: 'créditos al mes',
+    perSeatLine: '+{price}/persona, +{credits} créditos',
     cards: {
       solo: {
-        blurb: 'Organiza tu pipeline y pon a trabajar los flujos de IA esenciales.',
-        highlights: ['Lee y redacta cada lead', 'Agenda visitas y da seguimiento', 'Todas las integraciones incluidas'],
-        cta: 'Comenzar prueba gratis',
+        blurb: 'Chippi lee tus leads y les responde por ti.',
+        highlights: ['Responde cada lead nuevo', 'Agenda las visitas por ti', 'Funciona con tu correo y tu calendario'],
+        cta: 'Empieza gratis',
       },
       pro: {
-        blurb: 'El flujo de IA diario completo para un volumen serio de leads.',
-        highlights: ['Todo lo de Solo', 'Mayor saldo mensual de créditos', 'Soporte prioritario'],
-        cta: 'Comenzar prueba gratis',
+        blurb: 'Para agentes que reciben muchos leads.',
+        highlights: ['Todo lo de Solo', 'Más créditos cada mes', 'Te respondemos primero'],
+        cta: 'Empieza gratis',
       },
       team: {
-        blurb: 'Un centro de mando compartido para calificación, asignación y rendición de cuentas.',
-        highlights: ['Asignación de leads en todo el equipo', 'Vista del equipo y analítica en vivo', 'Roles, aprobaciones y registro de auditoría'],
-        cta: 'Crear un equipo',
+        blurb: 'Mira qué hace todo tu equipo.',
+        highlights: ['Manda cada lead a la persona correcta', 'Una pantalla para todo el equipo', 'Tú decides quién puede hacer qué'],
+        cta: 'Crea un equipo',
       },
       team_plus: {
-        blurb: 'Flujo de trabajo a nivel inmobiliaria, sin complejidad corporativa.',
-        highlights: ['Todo lo de Team', 'Más puestos y créditos', 'Mejor precio por puesto'],
-        cta: 'Comenzar Team Plus',
+        blurb: 'Maneja un equipo grande. Sin complicarte.',
+        highlights: ['Todo lo de Team', 'Más personas y más créditos', 'Más barato por persona'],
+        cta: 'Empieza Team Plus',
       },
     },
   },
   seats: {
-    eyebrow: 'Agregar agentes',
-    h2: 'Agrega un agente y la facturación se actualiza sola.',
-    sub: 'Team y Team Plus incluyen un bloque de puestos. A partir de ahí, cada agente adicional es un cargo mensual fijo, que se suma o se quita automáticamente según cambia tu equipo.',
-    perAgentSuffix: '/ agente adicional / mes',
-    creditsPerAgent: '+{credits} créditos por cada agente agregado',
-    largeFloor: '¿Manejas un equipo grande?',
-    talkToSales: 'Habla con ventas',
+    eyebrow: 'Agregar personas',
+    h2: 'Agrega a alguien. Nosotros arreglamos la cuenta.',
+    sub: 'Team y Team Plus ya incluyen personas. ¿Necesitas más? Cada persona extra cuesta lo mismo. Agrégalas o quítalas cuando quieras.',
+    perAgentSuffix: '/ persona extra / mes',
+    creditsPerAgent: '+{credits} créditos por cada persona que agregues',
+    largeFloor: '¿Tienes un equipo grande?',
+    talkToSales: 'Habla con nosotros',
   },
   credits: {
-    eyebrow: 'Flujos de IA premium',
-    h2: 'Los créditos se gastan cuando Chippi hace trabajo real.',
-    sub: 'Cada plan incluye un saldo mensual de créditos. Las acciones de alto valor cuestan más, las rutinarias cuestan poco. Los créditos sin usar se conservan por 30 días.',
+    eyebrow: 'Créditos',
+    h2: 'Un crédito = un trabajo que hace Chippi.',
+    sub: 'Los trabajos grandes cuestan más. Los pequeños casi nada. Los créditos que no uses te esperan 30 días.',
     workflows: {
-      tour_booking: 'Flujo de agendamiento de visitas',
-      daily_briefing: 'Resumen diario con IA',
-      lead_score: 'Actualización del score del lead',
+      tour_booking: 'Agendar una visita',
+      daily_briefing: 'Tu resumen del día',
+      lead_score: 'Calificar un lead nuevo',
     },
     creditForms: { one: 'crédito', other: 'créditos' },
-    topupsEyebrow: '¿Necesitas más? Recargas únicas',
-    topupLabels: { starter: 'Recarga Starter', growth: 'Recarga Growth', power: 'Recarga Power' },
-    topupLine: 'créditos, {price} pago único',
+    topupsEyebrow: '¿Necesitas más? Compra una recarga',
+    topupLabels: { starter: 'Recarga chica', growth: 'Recarga mediana', power: 'Recarga grande' },
+    topupLine: 'créditos por {price}, pago único',
   },
   faq: {
     eyebrow: 'Preguntas',
@@ -200,127 +203,127 @@ const es: PricingDict = {
     items: [
       {
         q: '¿Hay un plan gratis?',
-        a: 'No. Cada plan comienza con una prueba gratis de 7 días. Se requiere una tarjeta para empezar, no se te cobra hasta que termina la prueba y puedes cancelar en cualquier momento antes de que termine, sin costo.',
+        a: 'No. Pero tienes 7 días gratis. Te pedimos una tarjeta para empezar. No te cobramos hasta el día 7. Cancela antes y no pagas nada.',
       },
       {
-        q: '¿Qué son los créditos?',
-        a: 'Los flujos de IA premium consumen créditos de un saldo mensual, como agendar una visita, generar tu resumen diario con IA o calificar un lead nuevo. Las acciones rutinarias cuestan poco o nada, y los créditos sin usar se conservan por 30 días.',
+        q: '¿Qué es un crédito?',
+        a: 'Un crédito es un trabajo que Chippi hace por ti. Como agendar una visita, escribir tu resumen del día o calificar un lead nuevo. Los trabajos pequeños cuestan poco o nada. Los créditos que no uses te esperan 30 días.',
       },
       {
-        q: '¿Qué pasa cuando me quedo sin créditos?',
-        a: 'Compra una recarga única en cualquier momento, o sube de plan para obtener una asignación mensual mayor y una mejor tarifa. Tu espacio de trabajo nunca se bloquea, solo se pausan los flujos de IA premium.',
+        q: '¿Y si se me acaban?',
+        a: 'Compra más cuando quieras. O sube de plan y recibe más cada mes a mejor precio. Tu cuenta sigue funcionando. Solo se pausan los trabajos grandes de IA.',
       },
       {
-        q: '¿Cómo funciona el precio para inmobiliarias?',
-        a: 'Agrega un agente y la facturación se actualiza automáticamente. Cada agente por encima de los puestos incluidos es un cargo mensual fijo ({teamSeat} en Team, {teamPlusSeat} en Team Plus), que se suma o se quita según cambia tu equipo. Sin saltos de plan ni llamadas a ventas hasta que tú quieras.',
+        q: '¿Cómo funciona el precio para equipos?',
+        a: 'Agrega a alguien y nosotros arreglamos la cuenta. Cada persona extra cuesta un precio fijo al mes. Son {teamSeat} en Team y {teamPlusSeat} en Team Plus. Agrégalas o quítalas cuando quieras. Sin cambiar de plan. Sin llamadas de ventas, a menos que tú quieras.',
       },
     ],
   },
   closing: {
-    h2: 'Prueba Chippi gratis por 7 días.',
-    sub: 'Conecta tu bandeja de entrada y deja que Chippi empiece a trabajar tus leads hoy. Se requiere tarjeta, cancela en cualquier momento antes del día 7 sin cargo.',
-    startTrial: 'Comenzar prueba gratis',
-    bookDemo: 'Agendar una demo',
+    h2: 'Prueba Chippi gratis 7 días.',
+    sub: 'Conecta tu correo. Chippi empieza a trabajar tus leads hoy. Cancela antes del día 7 y no pagas nada.',
+    startTrial: 'Empieza gratis',
+    bookDemo: 'Ver una demo',
   },
-  billedInUsdNote: 'Los precios se muestran en {currency} como referencia. La facturación es en USD al valor equivalente.',
+  billedInUsdNote: 'Los precios se muestran en {currency} para ayudarte. Cobramos en USD.',
 };
 
 const ru: PricingDict = {
   metaTitle: 'Цены · Chippi',
   hero: {
     pill: 'Цены',
-    h1: 'Цены, которые масштабируются вместе с вами.',
-    sub: 'Каждый план начинается с бесплатного 7-дневного пробного периода. Переходите на план выше по мере роста, премиальные ИИ-процессы оплачиваются из ежемесячного баланса кредитов, а тариф для агентства масштабируется автоматически по мере добавления агентов.',
+    h1: 'Платите за то, что используете.',
+    sub: 'Попробуйте бесплатно 7 дней. Chippi делает работу, которую вы не любите. Сделки остаются вам.',
   },
   plans: {
-    individualEyebrow: 'Для индивидуальных агентов',
-    teamEyebrow: 'Для команд и агентств',
-    monthly: 'Ежемесячно',
-    annual: 'Ежегодно',
+    individualEyebrow: 'Для одного агента',
+    teamEyebrow: 'Для команд',
+    monthly: 'Помесячно',
+    annual: 'На год',
     save20: 'Скидка 20%',
     mostPopular: 'Самый популярный',
     perMonth: '/мес',
-    billedMonthly: 'ежемесячная оплата',
-    billedAnnually: 'при годовой оплате {amount}/год',
-    seatsIncluded: 'Мест включено: {n}',
-    forOneAgent: 'Для одного агента',
-    creditsPerMonth: 'кредитов / месяц',
-    perSeatLine: '+{price}/место, +{credits} кредитов',
+    billedMonthly: 'списываем каждый месяц',
+    billedAnnually: 'списываем раз в год: {amount}',
+    seatsIncluded: 'Людей включено: {n}',
+    forOneAgent: 'Для одного человека',
+    creditsPerMonth: 'кредитов в месяц',
+    perSeatLine: '+{price}/человек, +{credits} кредитов',
     cards: {
       solo: {
-        blurb: 'Наведите порядок в воронке и запустите в работу базовые ИИ-процессы.',
-        highlights: ['Читает каждый лид и готовит черновики ответов', 'Запись на показы и повторные контакты с лидами', 'Все интеграции включены'],
-        cta: 'Начать бесплатный период',
+        blurb: 'Chippi читает ваши лиды и отвечает за вас.',
+        highlights: ['Отвечает на каждый новый лид', 'Записывает на показы за вас', 'Работает с вашей почтой и календарём'],
+        cta: 'Начать бесплатно',
       },
       pro: {
-        blurb: 'Полный ежедневный ИИ-процесс для серьёзного потока лидов.',
-        highlights: ['Всё из плана Solo', 'Больше кредитов ежемесячно', 'Приоритетная поддержка'],
-        cta: 'Начать бесплатный период',
+        blurb: 'Для агентов, у которых много лидов.',
+        highlights: ['Всё из плана Solo', 'Больше кредитов каждый месяц', 'Отвечаем вам первым'],
+        cta: 'Начать бесплатно',
       },
       team: {
-        blurb: 'Общий центр управления для скоринга, распределения лидов и контроля.',
-        highlights: ['Распределение лидов по всей команде', 'Панель команды и аналитика в реальном времени', 'Роли, согласования и журнал действий'],
+        blurb: 'Видно, что делает вся ваша команда.',
+        highlights: ['Отправляет каждый лид нужному человеку', 'Один экран для всей команды', 'Вы решаете, кому что можно'],
         cta: 'Создать команду',
       },
       team_plus: {
-        blurb: 'Процессы уровня агентства без корпоративной сложности.',
-        highlights: ['Всё из плана Team', 'Больше мест и кредитов', 'Лучшая цена за место'],
+        blurb: 'Большая команда. И всё просто.',
+        highlights: ['Всё из плана Team', 'Больше людей и кредитов', 'Дешевле за человека'],
         cta: 'Начать Team Plus',
       },
     },
   },
   seats: {
-    eyebrow: 'Добавление агентов',
-    h2: 'Добавьте агента — счёт обновится сам.',
-    sub: 'Team и Team Plus включают набор мест. Сверх него каждый дополнительный агент — фиксированная месячная доплата, которая добавляется и убирается автоматически вместе с изменениями в команде.',
-    perAgentSuffix: '/ доп. агент / мес',
-    creditsPerAgent: '+{credits} кредитов за каждого добавленного агента',
+    eyebrow: 'Добавить людей',
+    h2: 'Добавьте человека. Счёт поправим сами.',
+    sub: 'В Team и Team Plus места уже входят. Нужно больше? Каждый лишний человек стоит одну и ту же цену. Добавляйте и убирайте когда угодно.',
+    perAgentSuffix: '/ доп. человек / мес',
+    creditsPerAgent: '+{credits} кредитов за каждого добавленного человека',
     largeFloor: 'У вас большая команда?',
-    talkToSales: 'Свяжитесь с отделом продаж',
+    talkToSales: 'Напишите нам',
   },
   credits: {
-    eyebrow: 'Премиальные ИИ-процессы',
-    h2: 'Кредиты тратятся, когда Chippi выполняет реальную работу.',
-    sub: 'Каждый план включает ежемесячный баланс кредитов. Ценные действия стоят дороже, рутинные — совсем немного. Неиспользованные кредиты сохраняются в течение 30 дней.',
+    eyebrow: 'Кредиты',
+    h2: 'Один кредит = одна работа Chippi.',
+    sub: 'Большие работы стоят дороже. Мелкие — почти ничего. Неиспользованные кредиты ждут вас 30 дней.',
     workflows: {
-      tour_booking: 'Процесс записи на показ',
-      daily_briefing: 'Ежедневная ИИ-сводка',
-      lead_score: 'Обновление скоринга лида',
+      tour_booking: 'Записать на показ',
+      daily_briefing: 'Ваша сводка за день',
+      lead_score: 'Оценить новый лид',
     },
     creditForms: { one: 'кредит', few: 'кредита', many: 'кредитов', other: 'кредита' },
-    topupsEyebrow: 'Нужно больше? Разовые пополнения',
-    topupLabels: { starter: 'Пополнение Starter', growth: 'Пополнение Growth', power: 'Пополнение Power' },
-    topupLine: 'кредитов, {price} разовым платежом',
+    topupsEyebrow: 'Нужно больше? Купите пакет',
+    topupLabels: { starter: 'Малый пакет', growth: 'Средний пакет', power: 'Большой пакет' },
+    topupLine: 'кредитов за {price}, разовый платёж',
   },
   faq: {
     eyebrow: 'Вопросы',
     h2: 'О чём спрашивают в первую очередь.',
     items: [
       {
-        q: 'Есть ли бесплатный план?',
-        a: 'Нет. Каждый план начинается с бесплатного 7-дневного пробного периода. Для старта нужна карта, оплата не списывается до конца пробного периода, и вы можете отменить подписку в любой момент до его окончания без каких-либо расходов.',
+        q: 'Есть бесплатный план?',
+        a: 'Нет. Но у вас есть 7 дней бесплатно. Для старта нужна карта. Мы не списываем деньги до 7-го дня. Отмените раньше — не заплатите ничего.',
       },
       {
-        q: 'Что такое кредиты?',
-        a: 'Премиальные ИИ-процессы оплачиваются из ежемесячного баланса кредитов — например, запись на показ, ежедневная ИИ-сводка или скоринг нового лида. Рутинные действия почти или совсем ничего не стоят, а неиспользованные кредиты сохраняются в течение 30 дней.',
+        q: 'Что такое кредит?',
+        a: 'Кредит — это одна работа, которую Chippi делает за вас. Например, запись на показ, сводка за день или оценка нового лида. Мелкие работы стоят мало или ничего. Неиспользованные кредиты ждут 30 дней.',
       },
       {
-        q: 'Что будет, когда кредиты закончатся?',
-        a: 'Купите разовое пополнение в любой момент или перейдите на план выше — с большим ежемесячным объёмом и лучшей ценой. Рабочее пространство никогда не блокируется, приостанавливаются только премиальные ИИ-процессы.',
+        q: 'А если кредиты закончатся?',
+        a: 'Купите ещё в любой момент. Или перейдите на план выше: больше кредитов за лучшую цену. Аккаунт продолжает работать. Останавливаются только большие ИИ-работы.',
       },
       {
-        q: 'Как устроен тариф для агентства?',
-        a: 'Добавьте агента — счёт обновится автоматически. Каждый агент сверх включённых мест — фиксированная месячная доплата ({teamSeat} на плане Team, {teamPlusSeat} на плане Team Plus), которая добавляется и убирается вместе с изменениями в команде. Без скачков между планами и без звонков в отдел продаж, пока вы сами не захотите.',
+        q: 'Как считается цена для команды?',
+        a: 'Добавьте человека — счёт поправим сами. Каждый лишний человек стоит фиксированную цену в месяц. Это {teamSeat} на плане Team и {teamPlusSeat} на плане Team Plus. Добавляйте и убирайте когда угодно. Без смены плана. Без звонков продавцов, пока вы сами не захотите.',
       },
     ],
   },
   closing: {
     h2: 'Попробуйте Chippi бесплатно 7 дней.',
-    sub: 'Подключите почту — и Chippi начнёт работать с вашими лидами уже сегодня. Нужна карта; отменить можно в любой момент до 7-го дня — без списаний.',
-    startTrial: 'Начать бесплатный период',
-    bookDemo: 'Записаться на демо',
+    sub: 'Подключите почту. Chippi начнёт работать с вашими лидами уже сегодня. Отмените до 7-го дня — не заплатите ничего.',
+    startTrial: 'Начать бесплатно',
+    bookDemo: 'Посмотреть демо',
   },
-  billedInUsdNote: 'Цены показаны в {currency} для удобства. Оплата производится в USD по эквивалентному курсу.',
+  billedInUsdNote: 'Цены показаны в {currency} для удобства. Списываем в USD.',
 };
 
 export const PRICING_DICTS: Record<Lang, PricingDict> = { en, es, ru };
