@@ -25,14 +25,21 @@ WRANGLER="npx wrangler"
 
 # ── 1. Auth ────────────────────────────────────────────────────────────────
 cyan "1/6  Checking Cloudflare login…"
+# `wrangler whoami` exits 0 even when NOT authenticated, so the exit code is
+# useless — inspect the output instead. (This false-positived once and let the
+# script run to a confusing failure two steps later.)
+WHOAMI_OUT="$($WRANGLER whoami 2>&1 || true)"
 if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
   green "Using CLOUDFLARE_API_TOKEN from the environment."
-elif $WRANGLER whoami >/dev/null 2>&1; then
-  green "Already logged in."
-else
-  warn "Not logged in — opening the browser to authorize."
+elif printf '%s' "$WHOAMI_OUT" | grep -qi 'not authenticated'; then
+  warn "Not logged in — opening the browser to authorize. Click Allow."
   $WRANGLER login || die "Login failed. Alternatively set CLOUDFLARE_API_TOKEN and re-run."
+  # Verify the login actually took.
+  $WRANGLER whoami 2>&1 | grep -qi 'not authenticated' && die "Still not authenticated after login."
   green "Logged in."
+else
+  green "Already logged in:"
+  printf '%s\n' "$WHOAMI_OUT" | grep -iE 'email|account' | head -2 || true
 fi
 
 # ── 2. Queues ──────────────────────────────────────────────────────────────
