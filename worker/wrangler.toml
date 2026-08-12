@@ -43,3 +43,9 @@ max_batch_size = 5
 max_batch_timeout = 5
 max_retries = 5
 dead_letter_queue = "chippi-dlq"
+
+# Watermark of the last fully-enqueued master tick, so a SKIPPED Cloudflare
+# trigger is recovered on the next firing rather than silently dropping jobs.
+[[kv_namespaces]]
+binding = "STATE"
+id = "27b64b362fe94099acbfd3927c139516"
