@@ -20,6 +20,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/lib/form-config-schema';
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { logger } from '@/lib/logger';
+import { recordConsent } from '@/lib/messaging/compliance';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -586,6 +587,42 @@ export async function POST(req: NextRequest) {
       .select();
     if (insertError) throw insertError;
     const contact = contacts![0] as Contact;
+
+    // TCPA/CAN-SPAM: turn the intake checkbox into real, per-channel consent
+    // RECORDS (lib/messaging/compliance.ts). Without these the compliance gate
+    // — which fails closed — blocks every automated marketing message to this
+    // lead, so this write is what makes drip/nurture legal AND functional.
+    // The disclosure text is frozen alongside the record: that is the artifact
+    // that makes consent provable in a dispute.
+    if (privacyConsent === true) {
+      const disclosure =
+        `Consented at intake on ${new Date().toISOString()} via the public application form` +
+        (spacePrivacyPolicyUrl ? ` (privacy policy: ${spacePrivacyPolicyUrl})` : '');
+      await Promise.all(
+        ([
+          ['email', contact.email],
+          ['sms', contact.phone],
+        ] as const)
+          .filter(([, address]) => Boolean(address))
+          .map(([channel, address]) =>
+            recordConsent({
+              spaceId: space.id,
+              channel,
+              address: address as string,
+              contactId: contact.id,
+              consentType: 'express_written',
+              source: 'intake_form',
+              disclosureText: disclosure,
+              sourceIp: ip,
+            }).catch((err) => {
+              // Never fail an application over the consent record — but say so
+              // loudly, because a missing record silently disables outreach.
+              logger.error('[apply] consent record write failed', { contactId: contact.id }, err);
+            }),
+          ),
+      );
+    }
+
     // Create initial status update record for audit trail
     const { error: statusAuditErr } = await supabase
       .from('ApplicationStatusUpdate')

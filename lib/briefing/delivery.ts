@@ -206,7 +206,7 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
       .neq('id', ctx.briefId);
 
     if ((priorSends ?? 0) === 0) {
-      await sendSMS({ to: ctx.space.phoneNumber, body: BRIEF_SMS_FIRST_DISCLOSURE });
+      await sendSMS({ to: ctx.space.phoneNumber, body: BRIEF_SMS_FIRST_DISCLOSURE, audience: 'internal' });
     }
 
     const { body } = buildBriefSms({
@@ -216,7 +216,8 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
       appOrigin: ctx.appOrigin,
     });
 
-    const sent = await sendSMS({ to: ctx.space.phoneNumber, body });
+    // The realtor's own daily brief to their own phone — internal.
+    const sent = await sendSMS({ to: ctx.space.phoneNumber, body, audience: 'internal' });
     if (!sent) {
       // sendSMS already classifies/logs internally — treat as transient
       // and release the lock so we retry within today.

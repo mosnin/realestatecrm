@@ -2,6 +2,12 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { captureError } from '@/lib/observability';
+import {
+  CURRENCY_COOKIE,
+  LANG_COOKIE,
+  decideLangRouting,
+  resolveMarket,
+} from '@/lib/i18n/markets';
 
 const isProtectedRoute = createRouteMatcher([
   '/s/(.*)',
@@ -93,6 +99,12 @@ const isFullyPublicRoute = createRouteMatcher([
   '/features/(.*)',
   '/pricing',
   '/about',
+  // Localized marketing trees (Spanish / Russian mirrors of the pages above;
+  // app/[lang]/(marketing) 404s unknown languages).
+  '/es',
+  '/es/(.*)',
+  '/ru',
+  '/ru/(.*)',
   '/status',                 // marketing system-status page
   '/legal',                  // legal hub + the documents under it
   '/legal/(.*)',
@@ -113,6 +125,31 @@ export default clerkMiddleware(async (auth, request) => {
   if (isFullyPublicRoute(request)) {
     const headers = new Headers(request.headers);
     headers.set('x-public-page', '1');
+
+    // Logged-out i18n (lib/i18n/markets): resolve the visitor's market from
+    // Vercel's geo header, keep the display currency in a cookie the client
+    // price components read, and route translated marketing paths to the
+    // visitor's language (explicit ?hl= / cookie choice always beats geo;
+    // absent both — e.g. crawlers, local dev — nothing redirects off the
+    // English base). GET-only so non-page requests are never redirected.
+    if (request.method === 'GET') {
+      const country = request.headers.get('x-vercel-ip-country');
+      const { lang, redirectTo, setCookie } = decideLangRouting({
+        pathname,
+        country,
+        cookieLang: request.cookies.get(LANG_COOKIE)?.value,
+        hlParam: request.nextUrl.searchParams.get('hl'),
+      });
+      const res = redirectTo
+        ? NextResponse.redirect(new URL(redirectTo, request.url))
+        : NextResponse.next({ request: { headers } });
+      const cookieOpts = { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' as const };
+      if (setCookie) res.cookies.set(LANG_COOKIE, lang, cookieOpts);
+      if (!request.cookies.get(CURRENCY_COOKIE)) {
+        res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
+      }
+      return res;
+    }
     return NextResponse.next({ request: { headers } });
   }
 

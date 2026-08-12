@@ -124,6 +124,11 @@ export async function POST(req: NextRequest) {
 
     try {
       await sendEmailFromCRM({
+        // Agent outreach to a lead — consumer; the gate decides if it goes.
+        audience: 'consumer',
+        category: 'marketing',
+        spaceId,
+        contactId,
         toEmail: contact.email,
         fromName,
         subject: subject!,
@@ -141,7 +146,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${contact.name} has no phone on file` }, { status: 422 });
     }
 
-    const ok = await sendSMS({ to: contact.phone, body: content });
+    // Agent-initiated outreach to a lead: consumer audience, and marketing
+    // unless a caller proves otherwise — the compliance gate (opt-out,
+    // consent, quiet hours) decides whether it actually goes out.
+    const ok = await sendSMS({
+      to: contact.phone,
+      body: content,
+      audience: 'consumer',
+      category: 'marketing',
+      spaceId,
+      contactId,
+    });
     if (!ok) {
       return NextResponse.json({ error: 'SMS delivery failed — check Telnyx config' }, { status: 502 });
     }

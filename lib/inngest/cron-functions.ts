@@ -1,10 +1,17 @@
 /**
- * Inngest cron functions — the scheduler for the app/api/cron/* routes.
+ * Inngest cron mirrors for the app/api/cron/* routes.
  *
- * Vercel cron is removed (vercel.json no longer declares a `crons` array);
- * these Inngest functions fire on the exact same 5-field crontab expressions
- * instead. Inngest cron triggers evaluate in UTC unless prefixed with `TZ=`,
- * and Vercel crons also evaluated in UTC, so tick times are unchanged.
+ * PRODUCTION SCHEDULING IS THE BACKGROUND WORKER: the always-on worker
+ * service (worker/src/index.ts, deployed separately — docs/WORKER.md) keeps
+ * one BullMQ repeatable job per entry in worker/src/schedule.ts and invokes
+ * each route with `Authorization: Bearer CRON_SECRET`. CRON_MANIFEST below
+ * remains the app-side record of those jobs, and
+ * tests/lib/worker-schedule-parity.test.ts pins the two lists together so
+ * they cannot drift. The Inngest functions here are a legacy alternate
+ * trigger, registered in app/api/inngest/route.ts ONLY when
+ * INNGEST_CRONS_ENABLED is set, so two schedulers never double-tick a route.
+ * (History: the Inngest cutover left scheduled jobs not firing in production
+ * for weeks.) All schedulers evaluate crontab patterns in UTC.
  *
  * Each function does NOT reimplement its job. It invokes the existing route
  * handler in-process with a synthetic request carrying

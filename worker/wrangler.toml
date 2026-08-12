@@ -1,0 +1,45 @@
+# Chippi background worker — Cloudflare Worker (docs/WORKER.md).
+#
+# One Worker, three roles:
+#   - scheduled handler: a single */5 master trigger; each firing enqueues a
+#     queue message for every recurring job (worker/src/schedule.ts) due at
+#     that instant, so retries/backoff apply per job, not per trigger.
+#   - queue consumer: executes ticks (GET app cron routes, Bearer CRON_SECRET)
+#     and offloaded tasks (POST /api/worker/execute, Bearer WORKER_SECRET).
+#   - fetch handler: POST /enqueue (the app's producer entrypoint, Bearer
+#     WORKER_SECRET) and GET /health.
+#
+# One-time setup (see docs/WORKER.md):
+#   wrangler queues create chippi-jobs
+#   wrangler queues create chippi-dlq
+#   wrangler secret put CRON_SECRET
+#   wrangler secret put WORKER_SECRET
+#   wrangler deploy
+
+# Account this Worker deploys to. Not a credential — an account ID alone
+# grants nothing; it just saves wrangler from prompting which account to
+# use when a token has access to several.
+account_id = "c2b6b1e9005a1f4ac9bb8efc47910ff4"
+name = "chippi-worker"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[vars]
+APP_BASE_URL = "https://www.usechippi.com"
+
+[triggers]
+# Master tick. Every recurring-job pattern aligns to 5-minute boundaries — a
+# test (tests/lib/worker-cron-match.test.ts) enforces that alignment so no
+# schedule can silently fall between master ticks.
+crons = ["*/5 * * * *"]
+
+[[queues.producers]]
+binding = "JOBS"
+queue = "chippi-jobs"
+
+[[queues.consumers]]
+queue = "chippi-jobs"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "chippi-dlq"

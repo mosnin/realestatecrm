@@ -95,6 +95,7 @@ export async function notifyTourRescheduled(input: TourNoticeInput): Promise<voi
         tourRescheduledSMS({
           guestName: input.guestName,
           guestPhone: input.guestPhone,
+          spaceId: input.spaceId,
           businessName,
           date: fmtDate(input.startsAt),
           time: fmtTime(input.startsAt),
@@ -140,6 +141,7 @@ export async function notifyTourCancelled(input: TourNoticeInput): Promise<void>
         tourCancelledSMS({
           guestName: input.guestName,
           guestPhone: input.guestPhone,
+          spaceId: input.spaceId,
           businessName,
           date: fmtDate(input.startsAt),
           property: input.propertyAddress,

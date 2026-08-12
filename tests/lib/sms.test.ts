@@ -43,11 +43,16 @@ describe('SMS template builders', () => {
     const result = tourConfirmationSMS({
       guestName: 'Bob',
       guestPhone: '+15551112222',
+      spaceId: 'sp_1',
       businessName: 'Acme',
       date: 'Mar 5',
       time: '2 PM',
     });
     expect(result.to).toBe('+15551112222');
+    // Guest-facing → must be classified for the TCPA compliance gate.
+    expect(result.audience).toBe('consumer');
+    expect(result.category).toBe('transactional');
+    expect(result.spaceId).toBe('sp_1');
     expect(result.body.startsWith('Hi Bob')).toBe(true);
   });
 

@@ -340,7 +340,17 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     // RAIL 1: rate limit checked AFTER the claim via a recent-sent-count query.
     expect(countQueries()).toHaveLength(1);
     // REAL SEND happened.
-    expect(sendSMSMock).toHaveBeenCalledWith({ to: CONTACT.phone, body: 'Your tour is confirmed' });
+    // Autonomous consumer outreach MUST be classified for the TCPA gate
+    // (lib/messaging/compliance.ts): an unlabelled send would skip consent,
+    // opt-out, and quiet-hours enforcement on the product's highest-risk path.
+    expect(sendSMSMock).toHaveBeenCalledWith({
+      to: CONTACT.phone,
+      body: 'Your tour is confirmed',
+      audience: 'consumer',
+      category: 'marketing',
+      spaceId: 'space-1',
+      contactId: CONTACT.id,
+    });
     // No drafting on the auto path.
     expect(runAutonomousInstructionMock).not.toHaveBeenCalled();
     // RAIL 2: audit — a ContactActivity row + inbox transcript.

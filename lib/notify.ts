@@ -377,6 +377,8 @@ export async function notifyDraftReady(params: NotifyWorkflowDispatchParams): Pr
   if (info.smsEnabled && info.ownerPhone) {
     promises.push(
       sendSMS({
+        // The realtor's own notification phone — internal, not consumer outreach.
+        audience: 'internal',
         to: info.ownerPhone,
         body: `${info.spaceName}: Chippi drafted a ${params.channel}${who} — review & send in the app.`,
       }).catch((err) => logger.error('[notify] draft-ready SMS failed', { spaceId: params.spaceId }, err)),
@@ -424,6 +426,8 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
   if (info.smsEnabled && info.ownerPhone) {
     promises.push(
       sendSMS({
+        // The realtor's own notification phone — internal, not consumer outreach.
+        audience: 'internal',
         to: info.ownerPhone,
         body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}.`,
       }).catch((err) => logger.error('[notify] auto-send SMS failed', { spaceId: params.spaceId }, err)),

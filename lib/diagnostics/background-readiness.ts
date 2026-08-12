@@ -25,7 +25,9 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { redis } from '@/lib/redis';
+import { redis, isRedisConfigured } from '@/lib/redis';
+import { workerHealth, readWorkerTick } from '@/lib/queue';
+import { CRON_MANIFEST } from '@/lib/inngest/cron-functions';
 
 export type ReadinessStatus = 'ok' | 'degraded' | 'missing';
 
@@ -52,6 +54,13 @@ export interface BackgroundReadiness {
  *  plus slack means a run inside ~36h is healthy; older than that and we nudge
  *  ("routines exist but nothing has run lately"). */
 const RECENT_RUN_WINDOW_MS = 36 * 60 * 60 * 1000;
+/**
+ * How old the worker's last master tick may be before the scheduler is
+ * reported as down. The trigger fires every 5 minutes; 20 tolerates a few
+ * best-effort misses without crying wolf, while still surfacing a genuinely
+ * stopped scheduler within a third of an hour (not 60 days).
+ */
+const WORKER_TICK_STALE_MS = 20 * 60 * 1000;
 const COMPOSIO_HEALTH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const COMPOSIO_WEBHOOK_HEALTH_KEY = 'composio:webhook:last-verified-at';
 
@@ -113,10 +122,140 @@ function checkChatOffload(): ReadinessCheck {
 }
 
 /**
- * c. Scheduled runs (cron auth). Still required post-Inngest-cutover: the
- * Inngest cron functions authenticate to the /api/cron/* routes with
- * `Bearer ${CRON_SECRET}`. No fallback — without it every tick 401s and
- * scheduled routines silently never fire.
+ * c. THE SCHEDULER (Cloudflare worker). The single most important check on
+ * this page: every recurring job in the product fires from the worker's
+ * scheduled trigger. If it is unconfigured, undeployed, or its trigger has
+ * stopped firing, ALL background work stops — and that is precisely the
+ * failure that once went undiagnosed for weeks because nothing here looked
+ * at it.
+ *
+ * Two independent signals, because they fail differently:
+ *   - /health   → the worker is deployed and reachable (and how many jobs it
+ *                 carries — a mismatch means it's running an older deploy).
+ *   - last tick → the worker's scheduled() heartbeat, i.e. proof the trigger
+ *                 ACTUALLY FIRES. A reachable worker whose cron trigger is
+ *                 disabled is still a dead scheduler, and only this catches it.
+ *
+ * Never reports 'ok' on absence of evidence: when the tick history can't be
+ * read (no Redis), it says so as 'degraded' rather than implying health.
+ */
+async function checkWorker(): Promise<ReadinessCheck> {
+  const key = 'worker';
+  const label = 'Background scheduler (Cloudflare worker)';
+
+  if (!isSet('WORKER_URL') || !isSet('WORKER_SECRET')) {
+    return {
+      key,
+      label,
+      status: 'missing',
+      detail:
+        'No background worker is configured — every recurring job (lead SLAs, reminders, briefings, drips, billing reconciles) is dead.',
+      fix: 'Deploy worker/ and set WORKER_URL + WORKER_SECRET. See docs/WORKER.md.',
+    };
+  }
+
+  const [health, lastTick] = await Promise.all([workerHealth(), readWorkerTick()]);
+
+  if (!health) {
+    return {
+      key,
+      label,
+      status: 'missing',
+      detail:
+        "The worker is configured but its /health endpoint is unreachable — nothing is running recurring jobs right now.",
+      fix: 'Check the Cloudflare deployment (`wrangler tail`) and that WORKER_URL points at it.',
+    };
+  }
+
+  const expected = CRON_MANIFEST.length;
+  if (health.scheduledJobs !== expected) {
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: `The worker is live but carries ${health.scheduledJobs} recurring jobs; this app expects ${expected}. It is probably running an older deploy.`,
+      fix: 'Redeploy the worker (`wrangler deploy`) so its schedule matches the app.',
+    };
+  }
+
+  // Reachable ≠ scheduling. The heartbeat is the real signal.
+  if (!isRedisConfigured()) {
+    return {
+      key,
+      label,
+      status: 'degraded',
+      detail: `The worker is live with all ${expected} jobs, but tick history can't be verified without Redis — whether its trigger is actually firing is unknown.`,
+      fix: 'Set KV_REST_API_URL and KV_REST_API_TOKEN so master ticks are recorded.',
+    };
+  }
+
+  if (!lastTick) {
+    return {
+      key,
+      label,
+      status: 'missing',
+      detail:
+        'The worker is reachable but has never recorded a master tick — its scheduled trigger is not firing, so no recurring job has run.',
+      fix: 'Confirm the [triggers] crons block is deployed (`wrangler deploy`) and check `wrangler tail` for "master tick".',
+    };
+  }
+
+  const ageMs = Date.now() - new Date(lastTick).getTime();
+  if (!Number.isFinite(ageMs) || ageMs > WORKER_TICK_STALE_MS) {
+    return {
+      key,
+      label,
+      status: 'missing',
+      detail: `The worker's last master tick was ${relativeTime(ageMs)} — its trigger has stopped firing, so recurring jobs are not running.`,
+      fix: 'Check `wrangler tail` and the Cloudflare dashboard (Workers → Triggers) for the cron schedule.',
+    };
+  }
+
+  return {
+    key,
+    label,
+    status: 'ok',
+    detail: `Live with all ${expected} recurring jobs; last master tick ${relativeTime(ageMs)}.`,
+  };
+}
+
+/**
+ * d. Scheduler conflict. The worker and the legacy Inngest cron mirrors carry
+ * the SAME job list. If both are live they double-fire every tick — duplicate
+ * reminder emails, double sends, double charges. The mirrors are opt-in for
+ * exactly this reason; this check makes the dangerous combination loud instead
+ * of silent.
+ */
+function checkSchedulerConflict(): ReadinessCheck {
+  const key = 'scheduler-conflict';
+  const label = 'Scheduler exclusivity';
+  const workerLive = isSet('WORKER_URL') && isSet('WORKER_SECRET');
+  const inngestCrons = isSet('INNGEST_CRONS_ENABLED');
+
+  if (workerLive && inngestCrons) {
+    return {
+      key,
+      label,
+      status: 'missing',
+      detail:
+        'TWO schedulers are enabled at once — the Cloudflare worker and the legacy Inngest cron mirrors run the same jobs, so every recurring job fires twice (duplicate messages and charges).',
+      fix: 'Unset INNGEST_CRONS_ENABLED — the worker is the production scheduler.',
+    };
+  }
+  return {
+    key,
+    label,
+    status: 'ok',
+    detail: inngestCrons
+      ? 'Inngest cron mirrors are the active scheduler; the Cloudflare worker is not configured.'
+      : 'Exactly one scheduler is active (the Cloudflare worker).',
+  };
+}
+
+/**
+ * e. Scheduled runs (cron auth). The worker authenticates to the /api/cron/*
+ * routes with `Bearer ${CRON_SECRET}`. No fallback — without it every tick
+ * 401s and scheduled routines silently never fire.
  */
 function checkCron(): ReadinessCheck {
   if (isSet('CRON_SECRET')) {
@@ -124,7 +263,7 @@ function checkCron(): ReadinessCheck {
       key: 'cron',
       label: 'Scheduled runs (cron auth)',
       status: 'ok',
-      detail: 'CRON_SECRET set — the Inngest cron ticks authenticate to the cron routes and fire.',
+      detail: 'CRON_SECRET set — the worker\'s ticks authenticate to the cron routes and fire.',
     };
   }
   return {
@@ -132,31 +271,33 @@ function checkCron(): ReadinessCheck {
     label: 'Scheduled runs (cron auth)',
     status: 'missing',
     detail:
-      'The cron routes 401 without CRON_SECRET — the Inngest cron ticks cannot authenticate, so scheduled routines never run.',
-    fix: 'Set CRON_SECRET and redeploy — the Inngest cron functions send it as their Bearer token.',
+      'The cron routes 401 without CRON_SECRET — the worker\'s ticks cannot authenticate, so scheduled routines never run.',
+    fix: 'Set CRON_SECRET on BOTH Vercel and the worker (`wrangler secret put CRON_SECRET`) — they must match.',
   };
 }
 
 /**
- * d. Background jobs (Inngest). Both keys are required for Inngest to execute
- * functions — scheduled crons AND Composio → Inngest trigger dispatch; without
- * them scheduled ticks and background app events never fire.
+ * f. Event jobs (Inngest). Inngest is NO LONGER the scheduler (the Cloudflare
+ * worker is — see the scheduler check). It still carries the event-driven
+ * functions: Studio scheduled posts and Composio trigger dispatch, which have
+ * no fallback. Work sessions do not depend on it (they run on the queue).
  */
 function checkInngest(): ReadinessCheck {
   if (isSet('INNGEST_EVENT_KEY') && isSet('INNGEST_SIGNING_KEY')) {
     return {
       key: 'inngest',
-      label: 'Background jobs (Inngest)',
+      label: 'Event jobs (Inngest)',
       status: 'ok',
-      detail: 'Inngest keys set — cron scheduling and Composio trigger delivery are wired.',
+      detail: 'Inngest keys set — Studio scheduled posts and Composio trigger delivery are wired.',
     };
   }
   return {
     key: 'inngest',
-    label: 'Background jobs (Inngest)',
-    status: 'missing',
-    detail: "Scheduled crons and Composio trigger delivery won't fire without both Inngest keys.",
-    fix: 'Set INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY and redeploy.',
+    label: 'Event jobs (Inngest)',
+    status: 'degraded',
+    detail:
+      "Studio scheduled posts and Composio trigger delivery won't fire without both Inngest keys. Recurring jobs are unaffected — the Cloudflare worker schedules those.",
+    fix: 'Set INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY to enable event-driven jobs. Do NOT set INNGEST_CRONS_ENABLED while the worker is live.',
   };
 }
 
@@ -353,10 +494,14 @@ function deriveOverall(checks: ReadinessCheck[]): OverallStatus {
  * per-space "recent activity" check; omit it for the env-only view.
  */
 export async function getBackgroundReadiness(spaceId?: string): Promise<BackgroundReadiness> {
+  // The scheduler leads: it is the prerequisite for every other background
+  // path, and the one whose silent death this page exists to catch.
   const checks: ReadinessCheck[] = [
+    await checkWorker(),
+    checkSchedulerConflict(),
+    checkCron(),
     checkExecutor(),
     checkChatOffload(),
-    checkCron(),
     checkInngest(),
     checkWebPush(),
     await checkComposio(),

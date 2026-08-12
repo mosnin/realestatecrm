@@ -5,6 +5,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { GeneralSettingsForm, DangerZone } from './general-settings-form';
 import { ProfileSection } from './profile-section';
+import { LanguageSection } from './language-section';
 import { NotificationsSection } from './notifications-section';
 import { BriefSection } from './brief-section';
 import { LegalSettingsForm } from './legal/legal-settings-form';
@@ -275,6 +276,16 @@ export default async function SettingsPage({
               and packets.
             </p>
             <ProfileSection slug={space.slug} />
+          </section>
+          <section
+            id="language"
+            className="space-y-5 pt-10 border-t border-border/60 scroll-mt-24"
+          >
+            <p className={SECTION_LABEL}>Language</p>
+            <p className={BODY_MUTED}>
+              The language Chippi&apos;s public pages use for you.
+            </p>
+            <LanguageSection />
           </section>
           <section
             id="ai-profile"

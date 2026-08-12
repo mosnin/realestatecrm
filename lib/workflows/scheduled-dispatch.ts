@@ -313,6 +313,11 @@ async function processAuto(
     const fromName = (spaceSetting?.businessName as string | undefined) ?? row.spaceId;
     try {
       await sendEmailFromCRM({
+        // AUTONOMOUS consumer outreach — highest TCPA/CAN-SPAM risk path.
+        audience: 'consumer',
+        category: 'marketing',
+        spaceId: row.spaceId,
+        contactId: contact.id,
         toEmail: contact.email,
         fromName,
         subject: `Message from ${fromName}`,
@@ -331,7 +336,18 @@ async function processAuto(
       await setStatus(row.id, 'failed', { stage: 'auto', error: `${contact.name} has no phone on file` });
       return 'failed';
     }
-    const ok = await sendSMS({ to: contact.phone, body });
+    // AUTONOMOUS consumer outreach (drip / workflow auto-send) — the highest
+    // TCPA-risk path in the product: no human taps approve. Marketing category
+    // means the gate requires express written consent on record, an unexpired
+    // opt-out check, and quiet hours before anything leaves.
+    const ok = await sendSMS({
+      to: contact.phone,
+      body,
+      audience: 'consumer',
+      category: 'marketing',
+      spaceId: row.spaceId,
+      contactId: contact.id,
+    });
     if (!ok) {
       await setStatus(row.id, 'failed', { stage: 'auto', error: 'SMS delivery failed — check Telnyx config' });
       return 'failed';

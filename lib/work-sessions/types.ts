@@ -23,6 +23,7 @@ export interface WorkSessionRow {
     | 'awaiting_approval'
     | 'awaiting_input'
     | 'running'
+    | 'awaiting_actions'
     | 'completed'
     | 'failed'
     | 'cancelled';
@@ -34,4 +35,30 @@ export interface WorkSessionRow {
   artifactName: string | null;
   summary: string | null;
   error: string | null;
+}
+
+/**
+ * One approval-gated action a finished session proposed (append-only audit
+ * row — see supabase/migrations/..._work_session_actions.sql). Shared with the
+ * client approval strip.
+ */
+export interface WorkSessionAction {
+  id: string;
+  sessionId: string;
+  spaceId: string;
+  /** Registry tool name (e.g. 'send_email'). */
+  tool: string;
+  /** Schema-validated args, frozen at propose time. */
+  args: Record<string, unknown>;
+  /** Human-readable "what will happen if you approve" (the tool's summariseCall). */
+  summary: string;
+  /** The model's one-line justification tying the action to a finding. */
+  rationale: string | null;
+  status: 'proposed' | 'approved' | 'denied' | 'executed' | 'failed';
+  result: Record<string, unknown> | null;
+  error: string | null;
+  decidedByUserId: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  executedAt: string | null;
 }
