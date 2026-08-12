@@ -16,6 +16,10 @@
 #   wrangler secret put WORKER_SECRET
 #   wrangler deploy
 
+# Account this Worker deploys to. Not a credential — an account ID alone
+# grants nothing; it just saves wrangler from prompting which account to
+# use when a token has access to several.
+account_id = "c2b6b1e9005a1f4ac9bb8efc47910ff4"
 name = "chippi-worker"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
