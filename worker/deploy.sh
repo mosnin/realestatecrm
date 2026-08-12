@@ -39,13 +39,24 @@ fi
 # `queues create` errors if the queue exists; that is a success for our
 # purposes, so we tolerate it rather than aborting a re-run.
 cyan "2/6  Creating queues…"
+QUEUE_LIST="$($WRANGLER queues list 2>&1 || true)"
 for q in chippi-jobs chippi-dlq; do
-  if $WRANGLER queues create "$q" >/dev/null 2>&1; then
+  if printf '%s' "$QUEUE_LIST" | grep -q "$q"; then
+    green "Queue $q already exists."
+  elif CREATE_OUT="$($WRANGLER queues create "$q" 2>&1)"; then
     green "Created queue $q"
   else
-    warn "Queue $q already exists (or Queues is unavailable — check you are on the Workers Paid plan)."
+    # Do NOT mask the failure — a missing queue means nothing will run.
+    printf '%s\n' "$CREATE_OUT" | tail -5
+    die "Could not create queue $q. Usual causes: the account is not on the Workers Paid plan, or the API token lacks the Queues Edit permission."
   fi
 done
+# Verify both actually exist before continuing — deploying without them fails.
+QUEUE_LIST="$($WRANGLER queues list 2>&1 || true)"
+for q in chippi-jobs chippi-dlq; do
+  printf '%s' "$QUEUE_LIST" | grep -q "$q" || die "Queue $q is not visible after creation — check plan and token permissions."
+done
+green "Both queues verified."
 
 # ── 3. KV namespace for missed-tick recovery ───────────────────────────────
 # Optional but recommended: without it a SKIPPED scheduled trigger is not
