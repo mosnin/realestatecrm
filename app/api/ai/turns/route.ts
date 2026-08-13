@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import { claimConversationMode } from '@/lib/chat/conversation-mode';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
   enqueueConversationTurn,
@@ -112,7 +113,8 @@ export async function POST(req: NextRequest) {
   }
   const bound = await callerConversation(auth.userId, body.conversationId);
   if (!bound) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (bound.conversation.mode !== body.mode) {
+  let conversationMode = bound.conversation.mode;
+  if (conversationMode !== null && conversationMode !== body.mode) {
     return NextResponse.json({ error: 'Conversation mode mismatch' }, { status: 409 });
   }
   if ((body.source === 'steer') !== Boolean(body.activeTurnId)) {
@@ -154,12 +156,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Attachment manifest is required for queued files' }, { status: 400 });
   }
 
+  if (conversationMode === null) {
+    try {
+      conversationMode = await claimConversationMode(supabase, {
+        conversationId: body.conversationId,
+        spaceId: bound.space.id,
+        requestedMode: body.mode,
+      });
+    } catch {
+      return NextResponse.json({ error: 'Could not claim conversation mode' }, { status: 500 });
+    }
+  }
+  if (conversationMode !== body.mode) {
+    return NextResponse.json({ error: 'Conversation mode mismatch' }, { status: 409 });
+  }
+
   try {
     const turn = await enqueueConversationTurn(supabase, {
       turnId: body.turnId ?? crypto.randomUUID(),
       spaceId: bound.space.id,
       conversationId: body.conversationId,
-      mode: body.mode,
+      mode: conversationMode,
       source: body.source,
       clientRequestId: body.clientRequestId,
       message: sanitized.sanitized,
