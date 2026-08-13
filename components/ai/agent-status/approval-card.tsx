@@ -28,9 +28,13 @@ export function AgentApprovalCard({
   return (
     <section
       data-beui-surface="approval-card"
+      data-agent-surface-style="inline"
       data-state={interactive ? 'pending' : 'history'}
       aria-label={typeof title === 'string' ? title : 'Agent question'}
-      className={cn('mt-2 w-full max-w-lg', className)}
+      className={cn(
+        'mt-2 w-full max-w-lg border-y border-border/40 bg-transparent py-3',
+        className,
+      )}
     >
       <div className="mb-2 flex items-start justify-between gap-3 px-1">
         <div className="flex min-w-0 items-start gap-2">
@@ -42,7 +46,7 @@ export function AgentApprovalCard({
             ) : null}
           </div>
         </div>
-        <span className="shrink-0 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="shrink-0 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em] text-muted-foreground">
           {interactive ? 'Response needed' : 'Past prompt'}
         </span>
       </div>

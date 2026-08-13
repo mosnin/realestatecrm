@@ -78,6 +78,10 @@ export async function GET(req: NextRequest) {
 
   const { data: contacts, error } = await query
     .order('createdAt', { ascending: false })
+    // CSV imports intentionally share one timestamp across a batch. The
+    // unique secondary key keeps offset pages deterministic at tie boundaries
+    // so a 500-row fetch loop cannot duplicate or skip contacts.
+    .order('id', { ascending: true })
     .range(offset, offset + limit - 1);
   if (error) {
     console.error('[contacts/GET] query error:', error);

@@ -40,7 +40,11 @@ import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multi
 import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
-import { getChatTools, selectDirectExecutionToolNames } from './toolsets';
+import {
+  getChatTools,
+  isUnsupportedPdfDeliverableIntent,
+  selectDirectExecutionToolNames,
+} from './toolsets';
 import { withLoopGuard } from './loop-guard';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
@@ -92,6 +96,28 @@ const MAX_TURNS_PER_TURN = 6;
  * re-billing a long thread on every step.
  */
 const HISTORY_WINDOW = 10;
+
+/**
+ * @openai/agents-openai 0.8.5's Chat Completions streaming adapter preserves
+ * plaintext `delta.reasoning`, but drops OpenRouter's structured
+ * `delta.reasoning_details`. Qwen can require those exact signed blocks on the
+ * request that follows a tool result, so enabling its reasoning on this SDK
+ * path can make a successful tool batch end in provider HTTP 400 on replay.
+ *
+ * Until the adapter carries reasoning_details unmodified, explicitly disable
+ * Qwen reasoning for agent loops. Direct chat and other providers keep their
+ * existing policy. This is a request-shape compatibility guard, not a model
+ * swap.
+ */
+export function agentReasoningBodyParams(
+  model: string,
+  effort: ReturnType<typeof decideReasoningEffort>,
+) {
+  if (model.toLowerCase().startsWith('qwen/qwen3')) {
+    return reasoningBodyParams(model, 'none');
+  }
+  return reasoningBodyParams(model, effort);
+}
 
 // ── Agent construction ─────────────────────────────────────────────────────
 
@@ -190,6 +216,9 @@ export function buildChatAgent(
   const reasoningEffort = decideReasoningEffort(opts.userMessage ?? null, {
     surface: 'agent',
   });
+  const resolvedModel = resolveChatModel(opts.modelSlug);
+  const unsupportedPdfDeliverable =
+    opts.userMessage != null && isUnsupportedPdfDeliverableIntent(opts.userMessage);
 
   return new Agent({
     name: 'Chippi',
@@ -203,8 +232,17 @@ export function buildChatAgent(
     // pre-charge (see DEFAULT_MAX_TOKENS).
     modelSettings: {
       maxTokens: DEFAULT_MAX_TOKENS,
+      // One provider response must not fan out into duplicate plans or a
+      // tier-by-tier contact scan. Sequential calls let the model observe the
+      // prior result and let the loop guard stop the second plan before more
+      // work starts.
+      parallelToolCalls: false,
+      // The current durable artifact engine publishes Markdown, not PDF. Make
+      // this capability gap deterministic instead of trusting prompt text to
+      // beat an attractive but insufficient CRM read tool.
+      toolChoice: unsupportedPdfDeliverable ? 'none' : undefined,
       providerData: {
-        ...reasoningBodyParams(resolveChatModel(opts.modelSlug), reasoningEffort),
+        ...agentReasoningBodyParams(resolvedModel, reasoningEffort),
       },
     },
   });

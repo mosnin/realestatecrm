@@ -435,11 +435,12 @@ export function SubagentTaskBlockView({ block }: SubagentTaskBlockViewProps) {
 
   return (
     <motion.section
+      data-agent-surface-style="inline"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0, transition: { duration: DURATION_BASE, ease: EASE_OUT } }}
       className={cn(
-        'rounded-xl border bg-muted/20 px-4 py-3',
-        failed ? 'border-destructive/30' : 'border-border/70',
+        'border-y bg-transparent px-0 py-3.5',
+        failed ? 'border-destructive/30' : 'border-border/45',
       )}
       aria-label={`Specialist task: ${block.goal}`}
     >
@@ -482,7 +483,7 @@ export function SubagentTaskBlockView({ block }: SubagentTaskBlockViewProps) {
       </div>
 
       {members.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-border/60 bg-background/60 px-3">
+        <div className="mt-3 border-t border-border/40 pt-1">
           <p className={cn(CAPTION, 'pt-2 uppercase tracking-wide')}>Specialists</p>
           <ol>
             {members.map((member) => (
@@ -500,7 +501,7 @@ export function SubagentTaskBlockView({ block }: SubagentTaskBlockViewProps) {
       ) : null}
 
       {state.result ? (
-        <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3">
+        <div className="mt-3 border-l border-emerald-500/30 py-1 pl-3">
           <p className={cn(CAPTION, 'uppercase tracking-wide text-foreground')}>
             Combined outcome
           </p>

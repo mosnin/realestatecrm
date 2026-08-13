@@ -22,26 +22,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { DURATION_BASE, DURATION_FAST, EASE_OUT } from '@/lib/motion';
-import {
-  Loader2,
-  ChevronRight,
-  Search,
-  Sparkles,
-  Send,
-  PencilLine,
-  Workflow,
-  CalendarClock,
-  Plug,
-  Repeat,
-  Mail,
-  CheckCircle2,
-  Clock3,
-  CircleX,
-  MinusCircle,
-  Info,
-  SlidersHorizontal,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Loader2, Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { SECTION_LABEL } from '@/lib/typography';
@@ -49,7 +30,6 @@ import { groupActivityByDay } from '@/lib/activity/group';
 import type {
   ActivityKind,
   ActivityStatus,
-  ActivityTone,
   ActivityLink,
   UnifiedActivityItem,
 } from '@/lib/activity/types';
@@ -100,18 +80,17 @@ export function resolveLink(
 interface KindMeta {
   /** Friendly label used by the filter chips. */
   label: string;
-  icon: LucideIcon;
 }
 
 const KIND_META: Record<ActivityKind, KindMeta> = {
-  agent_action: { label: 'Actions', icon: Sparkles },
-  agent_dispatch: { label: 'Dispatches', icon: Send },
-  draft: { label: 'Drafts', icon: PencilLine },
-  workflow_run: { label: 'Workflows', icon: Workflow },
-  scheduled_message: { label: 'Scheduled', icon: CalendarClock },
-  integration_event: { label: 'App events', icon: Plug },
-  routine_run: { label: 'Routines', icon: Repeat },
-  outbound_message: { label: 'Sends', icon: Mail },
+  agent_action: { label: 'Actions' },
+  agent_dispatch: { label: 'Dispatches' },
+  draft: { label: 'Drafts' },
+  workflow_run: { label: 'Workflows' },
+  scheduled_message: { label: 'Scheduled' },
+  integration_event: { label: 'App events' },
+  routine_run: { label: 'Routines' },
+  outbound_message: { label: 'Sends' },
 };
 
 /** Filter chip order — "All" is prepended in the bar itself. */
@@ -134,21 +113,6 @@ const STATUS_LABEL: Record<ActivityStatus, string> = {
   failed: 'Failed',
   skipped: 'Skipped',
   info: 'Info',
-};
-
-const TONE_PILL: Record<ActivityTone, string> = {
-  green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
-  amber: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
-  rose: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
-  muted: 'bg-foreground/[0.05] text-muted-foreground',
-};
-
-const STATUS_ICON: Record<ActivityStatus, LucideIcon> = {
-  success: CheckCircle2,
-  pending: Clock3,
-  failed: CircleX,
-  skipped: MinusCircle,
-  info: Info,
 };
 
 /** Status filter — a subset (the four the realtor reasons about), plus All. */
@@ -180,12 +144,14 @@ function sinceForPreset(preset: RangePreset): string | null {
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 
-function StatusPill({ status, tone }: { status: ActivityStatus; tone: ActivityTone }) {
+function StatusPill({ status }: { status: ActivityStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 flex-shrink-0',
-        TONE_PILL[tone],
+        'inline-flex flex-shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+        status === 'failed'
+          ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400'
+          : 'border-border text-muted-foreground',
       )}
     >
       {STATUS_LABEL[status]}
@@ -218,7 +184,7 @@ function FeedRow({ item, slug }: { item: UnifiedActivityItem; slug: string }) {
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
           {meta?.label ?? item.kind}
         </span>
-        <StatusPill status={item.status} tone={item.tone} />
+        <StatusPill status={item.status} />
       </div>
     </div>
   );
@@ -258,10 +224,10 @@ function Chip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center h-7 px-3 rounded-full text-xs font-medium transition-colors',
+        'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors',
         selected
           ? 'bg-foreground text-background'
-          : 'bg-foreground/[0.05] text-muted-foreground hover:text-foreground',
+          : 'border border-border/70 bg-background text-muted-foreground hover:text-foreground',
       )}
     >
       {label}
@@ -413,7 +379,7 @@ export function UnifiedActivityFeed() {
   const digest = useMemo(() => summarizeFeed(items, Boolean(nextCursor)), [items, nextCursor]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5" data-secondary-list="unified-activity">
       {/* ── Filter bar ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
         {/* Search + a Filters toggle that hides the heavier facets until asked. */}
@@ -430,7 +396,7 @@ export function UnifiedActivityFeed() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search activity…"
               aria-label="Search activity"
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-foreground/[0.04] text-sm text-foreground placeholder:text-muted-foreground/70 outline-none focus:ring-1 focus:ring-foreground/20"
+              className="h-9 w-full rounded-lg border border-border/70 bg-background pl-9 pr-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring/30"
             />
           </div>
           <button
@@ -439,10 +405,10 @@ export function UnifiedActivityFeed() {
             aria-expanded={filtersOpen}
             aria-label="Toggle type and status filters"
             className={cn(
-              'inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors',
+              'inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors',
               filtersOpen
-                ? 'bg-foreground/[0.07] text-foreground'
-                : 'bg-foreground/[0.04] text-muted-foreground hover:text-foreground',
+                ? 'border-foreground/20 bg-foreground/[0.06] text-foreground'
+                : 'border-border/70 bg-background text-muted-foreground hover:text-foreground',
             )}
           >
             <SlidersHorizontal size={13} aria-hidden />
@@ -482,7 +448,7 @@ export function UnifiedActivityFeed() {
               transition={{ duration: DURATION_FAST, ease: EASE_OUT }}
               className="overflow-hidden"
             >
-              <div className="space-y-3 rounded-lg border border-border/50 bg-muted/10 p-3">
+              <div className="space-y-3 rounded-xl bg-muted/25 p-3 sm:p-4">
                 <div className="space-y-1.5">
                   <p className={SECTION_LABEL}>Type</p>
               <div
@@ -532,9 +498,9 @@ export function UnifiedActivityFeed() {
 
       {/* ── Feed ───────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="space-y-4" aria-busy="true" aria-label="Loading activity">
+        <div className="divide-y divide-border/60" aria-busy="true" aria-label="Loading activity">
           {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="flex items-center gap-3">
+            <div key={n} className="flex items-center gap-3 py-3">
               <div className="flex-1 space-y-1">
                 <div className="h-4 w-2/3 rounded bg-muted/40 animate-pulse" />
                 <div className="h-3 w-1/2 rounded bg-muted/30 animate-pulse" />
@@ -543,14 +509,14 @@ export function UnifiedActivityFeed() {
           ))}
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+        <div className="px-5 py-10 text-center">
           <p className="text-sm text-foreground">Couldn&apos;t load activity.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Something went wrong. Try a filter, or refresh.
           </p>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        <div className="px-5 py-12 text-center">
           <p className="text-sm text-foreground">
             {hasFilters ? 'No activity matches these filters.' : 'Nothing yet.'}
           </p>

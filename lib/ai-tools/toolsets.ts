@@ -155,7 +155,21 @@ const AUTOMATION_INTENT =
 const CONTACT_CREATION_INTENT =
   /\b(?:add|create|save|log)\s+(?:(?:a|the|this|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b|\b(?:add|create|save)\b[\s\S]{0,40}\bas\s+(?:(?:a|the|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b/i;
 const DURABLE_WORK_INTENT =
-  /\b(research|report|audit|deep[\s-]?dive|comprehensive|multi[\s-]?file|terminal|workspace|deliverable|compare\s+(?:multiple|several|three|\d+)\s+(?:sites|sources|listings))\b/i;
+  /\b(research|report|audit|deep[\s-]?dive|comprehensive|multi[\s-]?file|terminal|workspace|deliverable|downloadable|artifact|compare\s+(?:multiple|several|three|\d+)\s+(?:sites|sources|listings))\b/i;
+
+/**
+ * The current durable WorkSession engine publishes a private Markdown file.
+ * It cannot truthfully promise PDF bytes. Keep explicit PDF creation/export
+ * out of the execution catalog so the model must state the capability gap
+ * instead of doing CRM reads and narrating a file that will never exist.
+ * Reading or summarizing an uploaded PDF does not match this output intent.
+ */
+const PDF_DELIVERABLE_INTENT =
+  /\b(?:create|make|generate|produce|build|prepare|export|convert|downloadable)\b[\s\S]{0,100}\bpdf\b|\bpdf\b[\s\S]{0,100}\b(?:create|make|generate|produce|build|prepare|export|convert|downloadable)\b/i;
+
+export function isUnsupportedPdfDeliverableIntent(message: string): boolean {
+  return PDF_DELIVERABLE_INTENT.test(message ?? '');
+}
 
 /**
  * Work mode executes mutations without the legacy approval pause, so the
@@ -333,6 +347,7 @@ export function getChatTools(
   const isAutomationRequest = AUTOMATION_INTENT.test(text);
   const isContactCreation = CONTACT_CREATION_INTENT.test(text);
   const isImageGeneration = IMAGE_GENERATION_INTENT.test(text);
+  const isUnsupportedPdfDeliverable = isUnsupportedPdfDeliverableIntent(text);
 
   // Intent is enforced in the catalog, not left to model preference. Explicit
   // drafting and sending are mutually exclusive, while automation creation
@@ -362,6 +377,11 @@ export function getChatTools(
     // such as "plan" or "batch" in the user's request.
     wanted.add('create_plan');
 
+    // A plan for an artifact format the runtime cannot produce is misleading
+    // activity, not progress. sdk-chat.ts also fixes tool_choice to `none` for
+    // this exact intent, making the capability response deterministic.
+    if (isUnsupportedPdfDeliverable) wanted.delete('create_plan');
+
     const mutationScope = selectWorkMutationScope(text);
 
     // Destructive tools are never incidental Work-mode siblings. They enter
@@ -386,7 +406,12 @@ export function getChatTools(
 
   if (capabilities.workspaceContinuationEligible && isWorkspaceRunContinuationIntent(message)) wanted.add('continue_workspace_run');
   const isSimpleMutation = isSendRequest || isAutomationRequest || isContactCreation || isImageGeneration;
-  if (capabilities.workMode && !isSimpleMutation && DURABLE_WORK_INTENT.test(text)) {
+  if (
+    capabilities.workMode
+    && !isSimpleMutation
+    && !isUnsupportedPdfDeliverable
+    && DURABLE_WORK_INTENT.test(text)
+  ) {
     wanted.add('start_work_session');
   }
   return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));

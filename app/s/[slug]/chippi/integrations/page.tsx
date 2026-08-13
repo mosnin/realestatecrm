@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { ConnectedAppsSection } from '@/components/settings/connected-apps-section';
 import { PluginsSkillsManager } from '@/components/chippi/plugins-skills-manager';
+import { DASHBOARD_SURFACE } from '@/components/ui/surface-card';
+import { SECTION_LABEL } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Plugins — Chippi' };
@@ -62,10 +65,22 @@ export default async function ChippiIntegrationsPage({
       greeting="Plugins."
       title="The tools I act through."
       subtitle="Connect apps, add your own plugins, and save skills. I use them to complete the actions you request."
+      layout="dashboard"
     >
-      <div className="space-y-10">
-        <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
-        <PluginsSkillsManager slug={slug} />
+      <div className="mx-auto w-full max-w-6xl space-y-5" data-chippi-secondary-page="integrations">
+        <section className={cn(DASHBOARD_SURFACE, 'p-6 sm:p-8')}>
+          <div className="mb-7 space-y-1.5">
+            <p className={SECTION_LABEL}>Connected apps</p>
+            <p className="text-sm text-muted-foreground">
+              Choose the services Chippi can use when you ask it to act.
+            </p>
+          </div>
+          <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />
+        </section>
+
+        <section className={cn(DASHBOARD_SURFACE, 'p-6 sm:p-8')}>
+          <PluginsSkillsManager slug={slug} />
+        </section>
       </div>
     </ChippiPageShell>
   );

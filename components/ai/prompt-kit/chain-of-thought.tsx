@@ -18,8 +18,9 @@ export function ChainOfThought({ content, streaming, className, ...props }: Chai
   if (!content.trim()) return null;
   return (
     <div
+      data-agent-surface-style="inline"
       className={cn(
-        'max-h-[400px] overflow-y-auto rounded-md border border-border/40 bg-muted/30 px-3 py-2.5 text-[12.5px] leading-relaxed text-foreground/80',
+        'max-h-[400px] overflow-y-auto border-l border-border/40 bg-transparent py-2.5 pl-3 pr-0 text-[12.5px] leading-relaxed text-foreground/80',
         className,
       )}
       {...props}

@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { ArrowLeft, Wrench, MessageCircle } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -81,34 +80,18 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
 
 function statusBadge(status: TaskStatus) {
   const map: Record<TaskStatus, { label: string; classes: string }> = {
-    queued:    { label: 'Queued',    classes: 'bg-muted text-muted-foreground' },
-    running:   { label: 'Running',   classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
-    completed: { label: 'Completed', classes: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' },
-    failed:    { label: 'Failed',    classes: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' },
-    cancelled: { label: 'Cancelled', classes: 'bg-muted text-muted-foreground/60' },
-    paused:    { label: 'Paused',    classes: 'bg-muted text-muted-foreground' },
+    queued:    { label: 'Queued',    classes: 'border-border text-muted-foreground' },
+    running:   { label: 'Running',   classes: 'border-transparent bg-foreground/[0.06] text-foreground/75' },
+    completed: { label: 'Completed', classes: 'border-border text-muted-foreground' },
+    failed:    { label: 'Failed',    classes: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400' },
+    cancelled: { label: 'Cancelled', classes: 'border-border/70 text-muted-foreground/60' },
+    paused:    { label: 'Paused',    classes: 'border-border text-muted-foreground' },
   };
   const { label, classes } = map[status] ?? map.queued;
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', classes)}>
+    <span className={cn('inline-flex items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide', classes)}>
       {label}
     </span>
-  );
-}
-
-function stepStatusDot(status: StepStatus) {
-  const map: Record<StepStatus, string> = {
-    pending:   'bg-muted-foreground/40',
-    running:   'bg-blue-500',
-    completed: 'bg-green-500',
-    failed:    'bg-red-500',
-    skipped:   'bg-muted-foreground/30',
-  };
-  return (
-    <span
-      className={cn('mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0', map[status] ?? map.pending)}
-      aria-hidden
-    />
   );
 }
 
@@ -204,18 +187,20 @@ export default async function AgentTaskDetailPage({
   if (taskResult.error) {
     console.error('[chippi/tasks/[taskId]] task fetch error:', taskResult.error);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load this task. This is usually temporary.</p>
+      <ChippiPageShell
+        greeting="Task."
+        title="Something went wrong."
+        subtitle="We couldn't load this task. This is usually temporary."
+      >
+        <div>
           <a
             href={`/s/${slug}/chippi/tasks`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-9 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
           >
             All tasks
           </a>
         </div>
-      </div>
+      </ChippiPageShell>
     );
   }
 
@@ -223,6 +208,10 @@ export default async function AgentTaskDetailPage({
 
   const task = taskResult.data as AgentTask;
   const steps = (stepsResult.data ?? []) as ExecutionStep[];
+  const stepsUnavailable = Boolean(stepsResult.error);
+  if (stepsResult.error) {
+    console.error('[chippi/tasks/[taskId]] steps fetch error:', stepsResult.error);
+  }
 
   const cost =
     typeof task.estimatedCostUsd === 'number'
@@ -244,35 +233,36 @@ export default async function AgentTaskDetailPage({
       title={goalText}
       subtitle={statusSentence(task, steps)}
     >
-      {/* Back-link + chrome row sit inside children so the shell header stays pure. */}
-      <Link
-        href={`/s/${slug}/chippi/tasks`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={12} /> All Tasks
-      </Link>
+      <div className="space-y-8" data-chippi-secondary-page="task-detail">
+        <div className="space-y-3 border-b border-border/60 pb-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href={`/s/${slug}/chippi/tasks`}
+              className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Back to all tasks
+            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {statusBadge(task.status)}
+              {cost > 0 && (
+                <span className="text-xs tabular-nums text-muted-foreground">${cost.toFixed(2)}</span>
+              )}
+            </div>
+          </div>
 
-      {/* Status badge + cost */}
-      <div className="flex flex-wrap items-center gap-3">
-        {statusBadge(task.status)}
-        {cost > 0 && (
-          <span className="text-xs text-muted-foreground tabular-nums">${cost.toFixed(2)}</span>
-        )}
-      </div>
-
-      {/* Timestamps */}
-      <p className="text-xs text-muted-foreground tabular-nums space-x-3">
-        <span>Created {relativeTime(task.createdAt)} · {formatAbsolute(task.createdAt)}</span>
-        {task.completedAt && (
-          <span>· Completed {formatAbsolute(task.completedAt)}</span>
-        )}
-        {task.cancelledAt && (
-          <span>· Cancelled {formatAbsolute(task.cancelledAt)}</span>
-        )}
-      </p>
+          <p className="space-x-3 text-xs tabular-nums text-muted-foreground">
+            <span>Created {relativeTime(task.createdAt)} · {formatAbsolute(task.createdAt)}</span>
+            {task.completedAt && (
+              <span>· Completed {formatAbsolute(task.completedAt)}</span>
+            )}
+            {task.cancelledAt && (
+              <span>· Cancelled {formatAbsolute(task.cancelledAt)}</span>
+            )}
+          </p>
+        </div>
 
       {/* Execution steps */}
-      <section className="border-t border-border/60 pt-6 space-y-4">
+      <section className="space-y-3">
         <h2 className={SECTION_LABEL}>
           Execution steps
           {steps.length > 0 && (
@@ -282,12 +272,15 @@ export default async function AgentTaskDetailPage({
           )}
         </h2>
 
-        {steps.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No steps recorded yet.</p>
+        {stepsUnavailable ? (
+          <p role="alert" className="py-8 text-center text-sm text-destructive">
+            Execution steps could not be loaded. Refresh to try again.
+          </p>
+        ) : steps.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No steps recorded yet.</p>
         ) : (
           <ul className="divide-y divide-border/60">
             {steps.map((step) => {
-              const isLlmCall = step.stepType === 'llm_call';
               const duration = formatDuration(step.startedAt, step.completedAt);
 
               // Input summary: prefer explicit inputSummary, fall back to toolArgs
@@ -303,20 +296,21 @@ export default async function AgentTaskDetailPage({
                   : null;
 
               return (
-                <li key={step.id} className="flex items-start gap-3 py-3">
-                  {/* Status dot */}
-                  {stepStatusDot(step.status)}
-
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    {/* Tool name + type icon */}
-                    <div className="flex items-center gap-1.5">
-                      {isLlmCall ? (
-                        <MessageCircle size={12} className="flex-shrink-0 text-muted-foreground" />
-                      ) : (
-                        <Wrench size={12} className="flex-shrink-0 text-muted-foreground" />
-                      )}
+                <li key={step.id} className="group/row -mx-2 rounded-md px-2 py-3 transition-colors hover:bg-muted/30">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-start justify-between gap-3">
                       <span className="text-sm font-medium text-foreground">
                         {humanizeStepName(step.toolName)}
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+                          step.status === 'failed'
+                            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400'
+                            : 'border-border text-muted-foreground',
+                        )}
+                      >
+                        {step.status}
                       </span>
                     </div>
 
@@ -341,9 +335,8 @@ export default async function AgentTaskDetailPage({
                       </p>
                     )}
 
-                    {/* Status + duration + cost */}
-                    <p className="text-xs text-muted-foreground/70 tabular-nums space-x-2">
-                      <span>{step.status}</span>
+                    <p className="space-x-2 text-xs tabular-nums text-muted-foreground/70">
+                      {step.stepType && <span>{humanizeStepName(step.stepType)}</span>}
                       {duration && <span>· {duration}</span>}
                       {step.costUsd > 0 && (
                         <span>· ${Number(step.costUsd).toFixed(4)}</span>
@@ -359,15 +352,16 @@ export default async function AgentTaskDetailPage({
 
       {/* Result section */}
       {resultText && (
-        <section className="border-t border-border/60 pt-6 space-y-3">
+        <section className="space-y-3 border-t border-border/60 pt-6">
           <h2 className={SECTION_LABEL}>Result</h2>
-          <div className="rounded-md bg-muted/40 border border-border/60 px-4 py-3">
-            <pre className="text-sm text-muted-foreground whitespace-pre-wrap break-words font-mono leading-relaxed">
+          <div className="rounded-xl bg-muted/30 px-4 py-3">
+            <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-muted-foreground">
               {resultText}
             </pre>
           </div>
         </section>
       )}
+      </div>
     </ChippiPageShell>
   );
 }

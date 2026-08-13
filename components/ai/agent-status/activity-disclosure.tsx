@@ -81,9 +81,9 @@ export function AgentActivityDisclosure({
   return (
     <section
       data-agent-activity-status={status}
+      data-agent-surface-style="inline"
       className={cn(
-        'overflow-hidden rounded-2xl border border-border/70 bg-card',
-        'shadow-[0_1px_2px_rgba(15,23,42,0.035)] dark:shadow-none',
+        'overflow-hidden border-y border-border/45 bg-transparent',
         className,
       )}
     >
@@ -94,10 +94,10 @@ export function AgentActivityDisclosure({
         aria-disabled={status === 'working'}
         onClick={() => setExpanded(!expanded)}
         className={cn(
-          'flex w-full items-start justify-between gap-3 px-4 py-3 text-left',
-          'outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-          status === 'complete' && 'hover:bg-muted/25',
-          expanded && 'border-b border-border/60',
+          'flex w-full items-start justify-between gap-3 px-0 py-3.5 text-left',
+          'outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/45',
+          status === 'complete' && 'hover:text-foreground',
+          expanded && 'border-b border-border/45',
         )}
       >
         <span className="min-w-0 flex-1">

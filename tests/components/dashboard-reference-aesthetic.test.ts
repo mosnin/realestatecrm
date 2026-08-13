@@ -39,21 +39,23 @@ describe('dashboard reference aesthetic contract', () => {
     expect(type).toContain('inline-flex items-center gap-1.5 rounded-full');
   });
 
-  it('preserves the real daily-brief information architecture', () => {
+  it('preserves the real daily-brief outcomes in the new editorial hierarchy', () => {
     const brief = read('components/chippi/brief-dashboard.tsx');
 
-    for (const cell of [
-      'GreetingCell',
-      'NeedsYouCell',
-      'OnDeckCell',
-      'ToursCell',
-      'PipelineCell',
-      'HotLeadsCell',
-      'OvernightCell',
+    for (const surface of [
+      'Hero',
+      'NeedsYouPanel',
+      'ActivityPanel',
+      'ToursPanel',
+      'HotLeadsPanel',
+      'EmptyTodayOrientation',
     ]) {
-      expect(brief).toContain(cell);
+      expect(brief).toContain(surface);
     }
-    expect(brief).toContain('grid grid-cols-1 md:grid-cols-4');
+    expect(brief).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4');
+    expect(brief).toContain('lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.8fr)]');
+    expect(brief).toContain('data-chippi-atmosphere="ascii-field"');
+    expect(brief).toContain('pendingDrafts');
     expect(brief).toContain("import { Button } from '@/components/ui/button'");
     expect(brief).toContain('variant="ghost"');
     expect(brief).toContain('has-[>svg]:px-0');

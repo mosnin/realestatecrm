@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * brief-motion — shared motion primitives for the BriefDashboard bento.
+ * brief-motion — shared motion primitives for the editorial BriefDashboard.
  *
  * Small, dependency-free helpers that give every cell on the daily brief
  * the same confident entrance + hover language WITHOUT inventing new
@@ -16,11 +16,11 @@
  * envelope the existing cells render INTO.
  */
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
-import { ACCENT_CARD, SURFACE_CARD } from '@/components/ui/surface-card';
+import { DASHBOARD_INSET, DASHBOARD_SURFACE } from '@/components/ui/surface-card';
 
 /**
  * Reduced-motion-aware hook. Returns true only after mount on the client,
@@ -37,30 +37,25 @@ export function useBriefMotionEnabled(): boolean {
 }
 
 /**
- * BriefCell — the bento card frame.
- *
- * Replaces the old inline `BentoCell`: same span + plain-vs-card chrome,
- * but adds a barely-there hover lift (2px rise + border brighten) on
- * card cells. The lift is suppressed under reduced motion (the border
- * still warms so hover stays legible). Entrance is the same EASE_OUT
- * fade-up the original used, gated by reduced-motion.
+ * BriefCell — one calm editorial region. Panels no longer lift by default;
+ * movement belongs to the page's entrance and to controls the realtor can
+ * actually use. `interactive` is an explicit opt-in for a linked panel.
  */
 export function BriefCell({
   children,
   span,
   delay = 0,
-  plain = false,
-  accent = false,
+  surface = 'paper',
+  interactive = false,
   className,
 }: {
   children: React.ReactNode;
   span: string;
   delay?: number;
-  /** Plain cells skip the card chrome (bg + shadow) — for content that
-   *  should read as the page's voice, not a boxed stat. */
-  plain?: boolean;
-  /** The bento's ONE solid accent card (agent-orange, white ink). */
-  accent?: boolean;
+  /** Paper is the primary panel; muted is an inset; none is open whitespace. */
+  surface?: 'paper' | 'muted' | 'none';
+  /** Opt into a 2px hover lift only when the whole panel is actionable. */
+  interactive?: boolean;
   className?: string;
 }) {
   const motionOn = useBriefMotionEnabled();
@@ -70,15 +65,16 @@ export function BriefCell({
       className={cn(
         span,
         'min-w-0',
-        // Card chrome: large radius, borderless, whisper-soft shadow — the
-        // reference language. Exactly one cell per view takes the accent.
-        !plain && ['group/cell relative', accent ? ACCENT_CARD : SURFACE_CARD],
+        surface !== 'none' && [
+          'group/cell relative',
+          surface === 'muted' ? DASHBOARD_INSET : DASHBOARD_SURFACE,
+        ],
         className,
       )}
       initial={motionOn ? { opacity: 0, y: 10 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: motionOn ? delay : 0 }}
-      whileHover={!plain && motionOn ? { y: -2 } : undefined}
+      whileHover={interactive && motionOn ? { y: -2 } : undefined}
     >
       {children}
     </motion.div>

@@ -56,16 +56,18 @@ export default async function ChippiInboxPage({
       greeting="Inbox."
       title={draftCount === 0 ? 'No drafts.' : `${draftCount} ${draftCount === 1 ? 'draft' : 'drafts'} ready.`}
     >
-      {!hasDrafts ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-base text-foreground">You&apos;re all caught up.</p>
-          <p className={cn(BODY_MUTED, 'mt-1.5 max-w-xs')}>
-            Drafts you explicitly ask Chippi to prepare will appear here.
-          </p>
-        </div>
-      ) : (
-        <AgentDraftInbox slug={slug} />
-      )}
+      <section data-chippi-secondary-page="inbox">
+        {!hasDrafts ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-base text-foreground">You&apos;re all caught up.</p>
+            <p className={cn(BODY_MUTED, 'mt-1.5 max-w-xs')}>
+              Drafts you explicitly ask Chippi to prepare will appear here.
+            </p>
+          </div>
+        ) : (
+          <AgentDraftInbox slug={slug} />
+        )}
+      </section>
     </ChippiPageShell>
   );
 }

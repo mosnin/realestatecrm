@@ -20,9 +20,10 @@ import type { DealMetricRow, StageMetricRow } from '@/lib/deal-metrics';
 async function loadPerformanceData(spaceId: string): Promise<{
   deals: DealMetricRow[];
   stages: StageMetricRow[];
+  unavailable: boolean;
 }> {
   try {
-    const [{ data: dealRows }, { data: stageRows }] = await Promise.all([
+    const [{ data: dealRows, error: dealError }, { data: stageRows, error: stageError }] = await Promise.all([
       supabase
         .from('Deal')
         .select('id, status, stageId, createdAt, closedAt, stageChangedAt')
@@ -33,13 +34,17 @@ async function loadPerformanceData(spaceId: string): Promise<{
         .eq('spaceId', spaceId)
         .order('position', { ascending: true }),
     ]);
+    if (dealError || stageError) {
+      throw new Error(dealError?.message ?? stageError?.message ?? 'performance_query_failed');
+    }
     return {
       deals: (dealRows ?? []) as DealMetricRow[],
       stages: (stageRows ?? []) as StageMetricRow[],
+      unavailable: false,
     };
   } catch (err) {
     console.error('[contacts] performance fetch failed', err);
-    return { deals: [], stages: [] };
+    return { deals: [], stages: [], unavailable: true };
   }
 }
 
@@ -61,20 +66,22 @@ export default async function ContactsPage({
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) notFound();
 
-  const { deals, stages } = await loadPerformanceData(space.id);
+  const { deals, stages, unavailable } = await loadPerformanceData(space.id);
 
-  // ContactTable owns its own header, filters, and rows — one client
-  // component, one source of truth for the surface. The New/All tab strip
-  // that used to sit above is gone: the stage filter already cuts state,
-  // and stacking two state-cuts on top of each other was the chief source
-  // of the "messy top" the realtor flagged.
-  //
-  // The performance strip sits above the table: the three numbers that move
-  // output (time-to-close, conversion, bottleneck) read first, then the book.
+  // The client component remains the single source of truth for contacts,
+  // filters, selection, saved views, import, and all mutations. The server
+  // hands its real pipeline summary into the header-to-directory flow so the
+  // order is title → quiet paper facts → one dense records surface.
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      <PerformanceStrip deals={deals} stages={stages} />
-      <ContactTable slug={slug} openCreateForm={sp.new === 'contact'} />
+    <div
+      className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-6xl pb-12 pt-3 sm:pt-5"
+      data-contacts-overview="premium"
+    >
+      <ContactTable
+        slug={slug}
+        openCreateForm={sp.new === 'contact'}
+        summary={<PerformanceStrip deals={deals} stages={stages} unavailable={unavailable} />}
+      />
       {/* Floating quick-capture dock — jot a thought without leaving the list. */}
       <ContactsQuickCapture slug={slug} />
     </div>

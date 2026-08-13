@@ -35,6 +35,24 @@ describe('Chippi BEUI and OpenUI integration', () => {
     expect(options).toContain('<AgentApprovalCard');
   });
 
+  it('keeps agent execution disclosures transparent and inline', () => {
+    const activity = read('components/ai/agent-status/activity-disclosure.tsx');
+    const approval = read('components/ai/agent-status/tool-approval.tsx');
+    const result = read('components/ai/agent-status/tool-result.tsx');
+    const plan = read('components/chippi/plan-card.tsx');
+    const specialists = read('components/ai/blocks/subagent-task-block-view.tsx');
+
+    for (const surface of [activity, approval, result, plan, specialists]) {
+      expect(surface).toContain('data-agent-surface-style="inline"');
+      expect(surface).toContain('bg-transparent');
+    }
+    expect(activity).not.toContain('bg-card');
+    expect(approval).not.toContain('bg-card');
+    expect(result).not.toContain('bg-muted/35');
+    expect(plan).not.toContain('rounded-xl border border-border/70 bg-background');
+    expect(specialists).not.toContain('rounded-xl border bg-muted/20');
+  });
+
   it('renders generated media only from a persisted file identity', () => {
     const media = read('components/ai/blocks/tool-results/generated-image-result.tsx');
     const toolCall = read('components/ai/blocks/tool-call-block-view.tsx');

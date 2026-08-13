@@ -3,7 +3,7 @@
 /**
  * ToolGroupBlockView — renders a sequence of consecutive ToolCallBlocks as a
  * single collapsible group (chevron + shimmer-header + nested rows). Mirrors
- * Claude and ChatGPT's "Task completed, 3 files, 1 search, 6s" pattern.
+ * Claude and ChatGPT's compact tool-count disclosure pattern.
  *
  * Decision: groups of 2+ tools collapse here. A single tool keeps the
  * existing per-block rich view (`ToolCallBlockView`) — that's where the
@@ -93,6 +93,27 @@ function toNestedTool(block: ToolCallBlock): NestedTool {
   };
 }
 
+export function toolGroupOutcomeLabel(blocks: ToolCallBlock[]): string {
+  const completed = blocks.filter((block) => block.status === 'complete');
+  const failures = blocks.filter((block) => block.status === 'error');
+  const skipped = blocks.filter(
+    (block) => block.status === 'denied' || block.status === 'skipped',
+  );
+  const parts: string[] = [];
+
+  if (completed.length > 0) {
+    parts.push(`${countLabel(completed.length, 'call')} completed`);
+  }
+  if (failures.length > 0) {
+    parts.push(`${failures.length} failed`);
+  }
+  if (skipped.length > 0) {
+    parts.push(`${skipped.length} skipped`);
+  }
+
+  return parts.join(' · ') || 'No tool calls completed';
+}
+
 /** Inline rich card for completed tools that returned a known data shape.
  *  Same switch as tool-call-block-view — duplicated rather than re-exported
  *  to keep the two views structurally independent. */
@@ -180,23 +201,14 @@ export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGr
   // success path with the same calm copy.
   const failures = blocks.filter((b) => b.status === 'error');
   const anyFailed = failures.length > 0;
-  const allFailed = !anyLive && failures.length === blocks.length;
 
   const state = anyLive ? 'pending' : 'completed';
   const shimmerLabel = inferShimmerLabel(blocks);
 
-  // Header label maps to outcome. Mixed runs ("3 of 4 tools failed") still
-  // need to read as failure — partial truth isn't truth here. When the
-  // whole group fails we'd ideally swap to a destructive-tinted row;
-  // ToolGroup doesn't expose tint slots, so we surface the failure inline
-  // via the failure summary row below and keep the count in the header.
-  const completeLabel = !anyFailed
-    ? 'Task completed'
-    : allFailed
-      ? blocks.length === 1
-        ? 'Task failed'
-        : 'Tasks failed'
-      : `Task completed with ${countLabel(failures.length, 'failure')}`;
+  // This label describes only the grouped tool calls. It must never imply
+  // that the enclosing Work turn succeeded: the assistant may still fail
+  // after several commands or searches completed successfully.
+  const completeLabel = toolGroupOutcomeLabel(blocks);
 
   // First failure's error string is the most useful breadcrumb — surface it
   // truncated so the realtor sees WHY without expanding. Empty result.error

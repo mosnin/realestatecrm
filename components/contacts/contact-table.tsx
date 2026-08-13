@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,24 +17,10 @@ import {
   Pencil,
   Phone,
   Mail,
-  Wallet,
-  MapPin,
-  LayoutGrid,
-  List,
-  Download,
-  Upload,
-  Bookmark,
   X,
-  CheckSquare,
-  GitCompare,
-  CalendarDays,
   MoreHorizontal,
-  Inbox,
   Mic,
-  Tag as TagIcon,
-  AlertTriangle,
   ChevronRight,
-  Users,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -43,8 +29,16 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/sharkui/context-menu';
-import { BODY_MUTED, CHIPPI_PILL, H1, QUIET_LINK, TITLE_FONT } from '@/lib/typography';
-import { SURFACE_CARD } from '@/components/ui/surface-card';
+import {
+  BODY_MUTED,
+  CHIPPI_PILL,
+  H1,
+  PRIMARY_PILL,
+  QUIET_LINK,
+  SECTION_LABEL,
+  TITLE_FONT,
+} from '@/lib/typography';
+import { DASHBOARD_SURFACE } from '@/components/ui/surface-card';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -55,16 +49,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
-import { formatCurrency as _formatCurrency, getInitials, countLabel } from '@/lib/formatting';
+import { countLabel } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
 import { CsvImportModal } from './csv-import-modal';
 import { DuplicatesPanel } from './duplicates-panel';
@@ -94,57 +84,40 @@ type Client = {
 
 const STAGES = CONTACT_STAGES;
 
-function formatCurrency(value: number | null) {
-  if (value == null) return null;
-  return _formatCurrency(value);
-}
-
 /**
  * Lead-score → tier. Thresholds mirror lib/dynamic-lead-scoring.ts
- * (>=75 hot, >=45 warm, else cold). Null/unscored returns null so the card
+ * (>=75 hot, >=45 warm, else cold). Null/unscored returns null so the row
  * renders nothing rather than a misleading zero.
  */
-function scoreTier(
-  score: number | null,
-): { label: string; dot: string; text: string } | null {
+function scoreTier(score: number | null): string | null {
   if (score == null || score <= 0) return null;
-  if (score >= 75) return { label: 'Hot', dot: 'bg-lead-hot', text: 'text-lead-hot' };
-  if (score >= 45) return { label: 'Warm', dot: 'bg-lead-warm', text: 'text-lead-warm' };
-  return { label: 'Cold', dot: 'bg-lead-cold', text: 'text-lead-cold' };
+  if (score >= 75) return 'Hot';
+  if (score >= 45) return 'Warm';
+  return 'Cold';
 }
 
 /**
- * Avatar ring + initials tint keyed to lead heat. The score chip already
- * shows the number; this lets the heat read from the avatar at the start of
- * the row too — a quiet ring, not a fill, so a wall of contacts doesn't turn
- * into a wall of color. Unscored stays fully neutral.
- */
-function scoreAvatar(score: number | null): string {
-  const tier = scoreTier(score);
-  if (!tier) return 'bg-muted/40 text-muted-foreground ring-1 ring-transparent';
-  if (tier.label === 'Hot')
-    return 'bg-red-50 text-red-700 ring-1 ring-red-500/25 dark:bg-red-500/15 dark:text-red-400 dark:ring-red-500/30';
-  if (tier.label === 'Warm')
-    return 'bg-amber-50 text-amber-700 ring-1 ring-amber-500/25 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30';
-  return 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:ring-blue-500/25';
-}
-
-/**
- * Lead-score chip — a tier dot + the score, scannable at a glance. The one
- * piece of "who's hot" signal a realtor wants without sorting for it.
+ * Lead-score label — the tier and score, scannable without decorative color.
  */
 function ScoreChip({ score }: { score: number | null }) {
   const tier = scoreTier(score);
   if (!tier) return null;
   return (
     <span
-      className="inline-flex items-center gap-1 flex-shrink-0"
-      title={`${tier.label} lead · score ${score}`}
+      className="inline-flex flex-shrink-0 items-baseline gap-1 text-[11px] text-muted-foreground"
+      title={`${tier} lead · score ${score}`}
     >
-      <span className={cn('h-1.5 w-1.5 rounded-full', tier.dot)} aria-hidden />
-      <span className={cn('text-[11px] font-semibold tabular-nums', tier.text)}>
-        {score}
-      </span>
+      <span>{tier}</span>
+      <span aria-hidden>·</span>
+      <span className="font-mono tabular-nums text-foreground/75">{score}</span>
+    </span>
+  );
+}
+
+function StagePill({ stage }: { stage: (typeof STAGES)[number] }) {
+  return (
+    <span className="inline-flex w-fit rounded-full border border-border/75 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+      {stage.label}
     </span>
   );
 }
@@ -152,9 +125,10 @@ function ScoreChip({ score }: { score: number | null }) {
 interface ContactTableProps {
   slug: string;
   openCreateForm?: boolean;
+  summary?: ReactNode;
 }
 
-export function ContactTable({ slug, openCreateForm = false }: ContactTableProps) {
+export function ContactTable({ slug, openCreateForm = false, summary }: ContactTableProps) {
   const router = useRouter();
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
@@ -177,7 +151,6 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   // list instead of silently falling through to the "fresh workspace" empty
   // state — which would tell a realtor with 200 contacts they have none.
   const [error, setError] = useState(false);
-  const [view, setView] = useState<'card' | 'list'>('list');
   // Multi-select moves behind a deliberate Select mode. Default is "scan and
   // tap a row" — the row is a link, no checkbox in sight. Hit Select and the
   // checkboxes appear and the row toggles instead of navigating. The
@@ -195,10 +168,11 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [savingView, setSavingView] = useState(false);
   const saveInputRef = useRef<HTMLInputElement>(null);
+  const contactsRequestRef = useRef(0);
   const { confirm, ConfirmDialog } = useConfirm();
 
   // Staggered row entrance fires exactly once — the FIRST paint of a loaded
-  // list. Refetches (edits, deletes, searches) and view toggles re-render
+  // list. Refetches (edits, deletes, searches) re-render
   // with the flag already true, so rows never re-choreograph. Same
   // rAF-deferred pattern as the kanban columns: the flag flips one frame
   // after the initial entrance commits.
@@ -217,18 +191,16 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   const stickySentinelRef = useRef<HTMLDivElement>(null);
   const [headerStuck, setHeaderStuck] = useState(false);
   useEffect(() => {
-    if (!selectMode || view !== 'list') {
+    if (!selectMode) {
       setHeaderStuck(false);
       return;
     }
     const el = stickySentinelRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(([entry]) =>
-      setHeaderStuck(!entry.isIntersecting),
-    );
+    const observer = new IntersectionObserver(([entry]) => setHeaderStuck(!entry.isIntersecting));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [selectMode, view]);
+  }, [selectMode]);
 
   // The global quick-create menu can open this form from any realtor route.
   // Keep the URL as the cross-route hand-off, then remove the flag when the
@@ -263,9 +235,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/saved-views?slug=${encodeURIComponent(slug)}&entity=contact`,
-        );
+        const res = await fetch(`/api/saved-views?slug=${encodeURIComponent(slug)}&entity=contact`);
         if (!res.ok) throw new Error('fetch failed');
         const data: SavedView[] = await res.json();
         if (!cancelled) setSavedViews(Array.isArray(data) ? data : []);
@@ -343,20 +313,34 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   }
 
   const fetchContacts = useCallback(async () => {
+    const requestId = ++contactsRequestRef.current;
     try {
-      const params = new URLSearchParams({ slug, search, type: typeFilter });
-      const res = await fetch(`/api/contacts?${params}`);
-      if (!res.ok) {
-        setError(true);
-        return;
+      const pageSize = 500;
+      const allContacts: Client[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const params = new URLSearchParams({
+          slug,
+          search,
+          type: typeFilter,
+          limit: String(pageSize),
+          offset: String(offset),
+        });
+        const res = await fetch(`/api/contacts?${params}`);
+        if (!res.ok) throw new Error('contacts_fetch_failed');
+        const page = (await res.json()) as Client[];
+        if (requestId !== contactsRequestRef.current) return;
+        allContacts.push(...page);
+        if (page.length < pageSize) break;
       }
-      setContacts(await res.json());
+      if (requestId !== contactsRequestRef.current) return;
+      setContacts(allContacts);
       setError(false);
     } catch (err) {
+      if (requestId !== contactsRequestRef.current) return;
       console.error('[contact-table] fetchContacts failed:', err);
       setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === contactsRequestRef.current) setLoading(false);
     }
   }, [slug, search, typeFilter]);
 
@@ -477,9 +461,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
     applied: number;
     results: { id: string; ok: boolean; error?: string }[];
   };
-  async function runBulk(
-    payload: Record<string, unknown>,
-  ): Promise<BulkResult | null> {
+  async function runBulk(payload: Record<string, unknown>): Promise<BulkResult | null> {
     const ids = [...selectedIds];
     try {
       const res = await fetch('/api/contacts/bulk', {
@@ -547,7 +529,10 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
     const stageLabel = stageLabels[newType] ?? newType.toLowerCase();
     if (successes > 0) {
       toast.success(`Moved ${successes} to ${stageLabel}.`, {
-        action: { label: 'Undo', onClick: () => undoBulkStageChange(prevTypes) },
+        action: {
+          label: 'Undo',
+          onClick: () => undoBulkStageChange(prevTypes),
+        },
       });
     }
     // Keep ONLY the failed rows selected so retrying is one tap on the same
@@ -576,7 +561,12 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
           fetch('/api/contacts/bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug, ids, action: 'set-stage', stage: type }),
+            body: JSON.stringify({
+              slug,
+              ids,
+              action: 'set-stage',
+              stage: type,
+            }),
           }),
         ),
       );
@@ -657,9 +647,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
         Preferences: c.preferences ?? '',
         Notes: c.notes ?? '',
         Tags: c.tags.join('; '),
-        'Follow-up': c.followUpAt
-          ? new Date(c.followUpAt).toLocaleDateString('en-US')
-          : '',
+        'Follow-up': c.followUpAt ? new Date(c.followUpAt).toLocaleDateString('en-US') : '',
         Added: new Date(c.createdAt).toLocaleDateString('en-US'),
       })),
     );
@@ -711,9 +699,21 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
     count: number;
   }[] = [
     { key: 'all', label: 'All', count: contacts.length },
-    { key: 'new', label: 'New', count: contacts.filter((c) => c.tags.includes('new-lead')).length },
-    { key: 'rental', label: 'Rental', count: contacts.filter((c) => c.leadType === 'rental').length },
-    { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
+    {
+      key: 'new',
+      label: 'New',
+      count: contacts.filter((c) => c.tags.includes('new-lead')).length,
+    },
+    {
+      key: 'rental',
+      label: 'Rental',
+      count: contacts.filter((c) => c.leadType === 'rental').length,
+    },
+    {
+      key: 'buyer',
+      label: 'Buyer',
+      count: contacts.filter((c) => c.leadType === 'buyer').length,
+    },
   ];
 
   const sortLabels: Record<typeof sortBy, string> = {
@@ -749,660 +749,552 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   })();
 
   return (
-    <div className="space-y-6">
-      {/* Header — canonical three-line pattern: muted greeting, serif Times
-          h1, one-sentence status. The "Tell Chippi → / or fill out the form"
-          pair that used to sit awkwardly inside the h1 row moved to the
-          empty state — when there's data, that affordance is noise. */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>People.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Your relationships" />
-        </h1>
-        {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+    <div className="space-y-10 sm:space-y-12">
+      <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <p className={BODY_MUTED}>People.</p>
+          <h1 className={cn(H1, 'text-[2.5rem] leading-none sm:text-[3.25rem]')} style={TITLE_FONT}>
+            <SplitReveal as="span" text="Your relationships" />
+          </h1>
+          {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className={cn(PRIMARY_PILL, 'w-fit shrink-0')}
+        >
+          Add person
+        </button>
       </header>
 
-      {/* Lead-type chip strip — small line directly under the title, only
-          when there's data to filter. The chip count format matches the
-          existing labels (All · New · Rental · Buyer). Reveal fires once on
-          first paint — this row doesn't re-choreograph on refetch since the
-          component instance (and its scroll-triggered "once" state) persists
-          across the filter's own re-renders. */}
-      {!loading && !error && contacts.length > 0 && (
-        <Reveal variant="fade">
-        <div
-          role="tablist"
-          aria-label="Filter people"
-          className="flex items-center gap-5 border-b border-border/70 -mt-1"
-        >
-          {leadTypeChips.map((chip) => {
-            const active = leadTypeFilter === chip.key;
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setLeadTypeFilter(chip.key)}
-                className={cn(
-                  // Underline tab — the page's primary spine. The active tab
-                  // carries a 2px foreground rail, the rest recede to muted.
-                  'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
-                  active
-                    ? 'text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground font-normal',
-                )}
+      {summary}
+
+      <section aria-label="Contact directory" className={cn(DASHBOARD_SURFACE, 'overflow-hidden')}>
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+          {/* One compact records spine: lead cut, filters, then one hairline
+              list. It scrolls horizontally only at the controls on narrow
+              screens; the records themselves always remain a list. */}
+          {!loading && !error && contacts.length > 0 && (
+            <Reveal variant="fade">
+              <div
+                role="tablist"
+                aria-label="Filter people"
+                className="-mb-px flex items-center gap-5 overflow-x-auto border-b border-border/70"
               >
-                {chip.label}
-                <span
+                {leadTypeChips.map((chip) => {
+                  const active = leadTypeFilter === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setLeadTypeFilter(chip.key)}
+                      className={cn(
+                        'relative -mb-px inline-flex shrink-0 items-center gap-1.5 pb-3 pt-0.5 text-sm transition-colors duration-150 ease-out',
+                        active
+                          ? 'font-medium text-foreground'
+                          : 'font-normal text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {chip.label}
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[11px] tabular-nums transition-colors duration-150 ease-out',
+                          active
+                            ? 'bg-foreground/[0.06] text-foreground/70'
+                            : 'bg-foreground/[0.035] text-muted-foreground',
+                        )}
+                      >
+                        <AnimatedNumber value={chip.count} duration={500} />
+                      </span>
+                      {active && (
+                        <span
+                          aria-hidden
+                          className="absolute -bottom-px left-0 right-0 h-px bg-foreground/75"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Reveal>
+          )}
+
+          {!loading && !error && contacts.length > 0 && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 flex-1 sm:max-w-sm">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                />
+                <Input
+                  placeholder="Search…"
+                  className="h-9 w-full rounded-full border-border/70 bg-background pl-9"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:ml-auto sm:w-auto sm:pb-0">
+                {/* Stage filter */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+                    >
+                      <span className="text-muted-foreground">Stage:</span>
+                      {stageLabels[typeFilter] ?? 'All stages'}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {(['ALL', 'QUALIFICATION', 'TOUR', 'APPLICATION'] as const).map((key) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onSelect={() => setTypeFilter(key)}
+                        className={cn(typeFilter === key && 'font-semibold')}
+                      >
+                        {stageLabels[key]}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Tag filter — hidden when no user-defined tags exist. */}
+                {allTags.length > 0 && (
+                  <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-border/70 bg-background">
+                    <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            'inline-flex h-9 items-center px-3 text-xs font-medium transition-colors hover:bg-foreground/[0.04]',
+                            tagFilter ? 'text-foreground' : 'text-muted-foreground',
+                          )}
+                        >
+                          <span className="max-w-[160px] truncate">{tagFilter || 'Tag'}</span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-64 p-0">
+                        <div className="border-b border-border/60 px-2 py-1.5">
+                          <Input
+                            value={tagPopoverSearch}
+                            onChange={(e) => setTagPopoverSearch(e.target.value)}
+                            placeholder="Search tags…"
+                            className="h-8 border-0 px-1 text-xs shadow-none focus-visible:ring-0"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto py-1">
+                          {(() => {
+                            const q = tagPopoverSearch.trim().toLowerCase();
+                            const filtered = q
+                              ? allTags.filter((t) => t.toLowerCase().includes(q))
+                              : allTags;
+                            if (filtered.length === 0) {
+                              return (
+                                <p className="px-3 py-2 text-xs text-muted-foreground">
+                                  No tags match.
+                                </p>
+                              );
+                            }
+                            return filtered.map((tag) => {
+                              const active = tagFilter === tag;
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => {
+                                    setTagFilter(active ? '' : tag);
+                                    setTagPopoverOpen(false);
+                                    setTagPopoverSearch('');
+                                  }}
+                                  className={cn(
+                                    'w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-foreground/[0.04]',
+                                    active && 'font-semibold text-foreground',
+                                  )}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {tagFilter && (
+                      <button
+                        type="button"
+                        aria-label="Clear tag filter"
+                        onClick={() => setTagFilter('')}
+                        className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Sort */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+                    >
+                      <span className="text-muted-foreground">Sort:</span>
+                      {sortLabels[sortBy]}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onSelect={() => setSortBy(key)}
+                        className={cn(sortBy === key && 'font-semibold')}
+                      >
+                        {sortLabels[key]}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Select-mode toggle — bulk actions live behind a deliberate
+                gesture instead of a permanent checkbox column on every row. */}
+                <button
+                  type="button"
+                  onClick={() => setSelectMode((s) => !s)}
+                  aria-pressed={selectMode}
                   className={cn(
-                    'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
-                    active
-                      ? 'bg-foreground/[0.06] text-foreground/70'
-                      : 'bg-foreground/[0.04] text-muted-foreground',
+                    'inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-xs font-medium transition-colors',
+                    selectMode
+                      ? 'border-border/80 bg-dashboard-paper-muted text-foreground'
+                      : 'bg-background border-border/70 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
                   )}
                 >
-                  <AnimatedNumber value={chip.count} duration={500} />
-                </span>
-                {active && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full bg-foreground"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-        </Reveal>
-      )}
-
-      {/* ONE filter row — search · stage · tag · sort · view · select ·
-          overflow. Used to be three rows of chrome plus a pipeline progress
-          strip; mirrors the deals page toolbar pattern. */}
-      {!loading && !error && contacts.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 sm:flex-initial min-w-[160px]">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
-            />
-            <Input
-              placeholder="Search…"
-              className="pl-9 h-9 w-full sm:w-64 bg-background border-border/70"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
-            {/* Stage filter */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
-                >
-                  <span className="text-muted-foreground">Stage:</span>
-                  {stageLabels[typeFilter] ?? 'All stages'}
+                  {selectMode ? 'Done' : 'Select'}
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {(['ALL', 'QUALIFICATION', 'TOUR', 'APPLICATION'] as const).map((key) => (
-                  <DropdownMenuItem
-                    key={key}
-                    onSelect={() => setTypeFilter(key)}
-                    className={cn(typeFilter === key && 'font-semibold')}
-                  >
-                    {stageLabels[key]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
 
-            {/* Tag filter — hidden when no user-defined tags exist. */}
-            {allTags.length > 0 && (
-              <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium transition-colors hover:bg-foreground/[0.04]',
-                      tagFilter ? 'text-foreground' : 'text-muted-foreground',
-                    )}
-                  >
-                    <TagIcon
-                      size={12}
-                      className={tagFilter ? 'text-foreground' : 'text-muted-foreground'}
-                    />
-                    {tagFilter ? (
-                      <>
-                        <span className="truncate max-w-[160px]">{tagFilter}</span>
-                        <span
-                          role="button"
-                          aria-label="Clear tag filter"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTagFilter('');
-                          }}
-                          className="ml-0.5 -mr-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-sm hover:bg-foreground/10"
-                        >
-                          <X size={10} />
-                        </span>
-                      </>
-                    ) : (
-                      'Tag'
-                    )}
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-64 p-0">
-                  <div className="border-b border-border/60 px-2 py-1.5">
-                    <Input
-                      value={tagPopoverSearch}
-                      onChange={(e) => setTagPopoverSearch(e.target.value)}
-                      placeholder="Search tags…"
-                      className="h-8 border-0 shadow-none focus-visible:ring-0 text-xs px-1"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-64 overflow-y-auto py-1">
-                    {(() => {
-                      const q = tagPopoverSearch.trim().toLowerCase();
-                      const filtered = q
-                        ? allTags.filter((t) => t.toLowerCase().includes(q))
-                        : allTags;
-                      if (filtered.length === 0) {
-                        return (
-                          <p className="px-3 py-2 text-xs text-muted-foreground">
-                            No tags match.
-                          </p>
-                        );
-                      }
-                      return filtered.map((tag) => {
-                        const active = tagFilter === tag;
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => {
-                              setTagFilter(active ? '' : tag);
-                              setTagPopoverOpen(false);
-                              setTagPopoverSearch('');
-                            }}
-                            className={cn(
-                              'w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-foreground/[0.04]',
-                              active && 'font-semibold text-foreground',
-                            )}
-                          >
-                            {tag}
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+                {/* Overflow */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="More options"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
+                      Save view
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setImportOpen(true)}>Import</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setDuplicatesOpen(true)}>
+                      Find duplicates
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => handleExportAll()}
+                      disabled={contacts.length === 0}
+                    >
+                      Export
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          )}
 
-            {/* Sort */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
-                >
-                  <span className="text-muted-foreground">Sort:</span>
-                  {sortLabels[sortBy]}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {(Object.keys(sortLabels) as (keyof typeof sortLabels)[]).map((key) => (
-                  <DropdownMenuItem
-                    key={key}
-                    onSelect={() => setSortBy(key)}
-                    className={cn(sortBy === key && 'font-semibold')}
-                  >
-                    {sortLabels[key]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* View toggle */}
-            <div className="flex rounded-md border border-border/70 overflow-hidden bg-background flex-shrink-0">
+          {/* Save-view inline input */}
+          {showSaveInput && (
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={saveInputRef}
+                type="text"
+                value={saveViewName}
+                onChange={(e) => setSaveViewName(e.target.value)}
+                placeholder="Name this view…"
+                className="h-8 w-44 rounded-full border border-border/70 bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveView();
+                  if (e.key === 'Escape') setShowSaveInput(false);
+                }}
+                autoFocus
+              />
               <button
                 type="button"
-                onClick={() => setView('list')}
-                aria-label="List view"
-                aria-pressed={view === 'list'}
-                className={cn(
-                  'h-9 w-9 flex items-center justify-center transition-colors',
-                  view === 'list'
-                    ? 'bg-foreground/[0.045] text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                )}
+                onClick={handleSaveView}
+                disabled={savingView || !saveViewName.trim()}
+                className="h-8 rounded-full bg-foreground px-3 text-xs font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
               >
-                <List size={14} />
+                {savingView ? 'Saving…' : 'Save'}
               </button>
               <button
                 type="button"
-                onClick={() => setView('card')}
-                aria-label="Grid view"
-                aria-pressed={view === 'card'}
-                className={cn(
-                  'h-9 w-9 flex items-center justify-center transition-colors',
-                  view === 'card'
-                    ? 'bg-foreground/[0.045] text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-                )}
+                onClick={() => setShowSaveInput(false)}
+                aria-label="Cancel saving view"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
               >
-                <LayoutGrid size={14} />
+                <X size={13} />
               </button>
             </div>
+          )}
 
-            {/* Select-mode toggle — bulk actions live behind a deliberate
-                gesture instead of a permanent checkbox column on every row. */}
-            <button
-              type="button"
-              onClick={() => setSelectMode((s) => !s)}
-              aria-pressed={selectMode}
-              className={cn(
-                'inline-flex items-center gap-1.5 h-9 px-3 rounded-md border text-xs font-medium transition-colors',
-                selectMode
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-background border-border/70 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
-              )}
-            >
-              <CheckSquare size={12} />
-              {selectMode ? 'Done' : 'Select'}
-            </button>
-
-            {/* Overflow */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="More options"
-                  className="h-9 w-9 flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+          {/* Saved-view chips */}
+          {contactViews.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-xs text-muted-foreground mr-1">Saved:</span>
+              {contactViews.map((v) => (
+                <span
+                  key={v.id}
+                  className="inline-flex items-center gap-1 text-xs font-medium rounded-full pl-2.5 pr-1 h-6 border border-border/70 bg-background"
                 >
-                  <MoreHorizontal size={14} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onSelect={() => setShowSaveInput(true)}>
-                  <Bookmark size={12} />
-                  Save view
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                  <Upload size={12} />
-                  Import
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDuplicatesOpen(true)}>
-                  <Users size={12} />
-                  Find duplicates
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => handleExportAll()}
-                  disabled={contacts.length === 0}
+                  <button
+                    type="button"
+                    onClick={() => applyView(v)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {v.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteView(v.id)}
+                    aria-label={`Delete saved view ${v.name}`}
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
+                  >
+                    <X size={9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Loading skeleton — rows match the dense directory vocabulary. */}
+          {loading && (
+            <ul className="divide-y divide-border/60">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <li
+                  key={i}
+                  className="grid grid-cols-1 gap-2 py-3.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_7rem_5rem_7rem_6rem] lg:items-center lg:gap-4"
                 >
-                  <Download size={12} />
-                  Export
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      )}
+                  <div className="min-w-0 space-y-1.5">
+                    <Skeleton className="h-3.5 w-36" />
+                    <Skeleton className="h-3 w-24 lg:hidden" />
+                  </div>
+                  <Skeleton className="h-3 w-52 max-w-full" />
+                  <Skeleton className="hidden h-5 w-16 rounded-full lg:block" />
+                  <Skeleton className="hidden h-3 w-10 lg:block" />
+                  <Skeleton className="hidden h-3 w-16 lg:block" />
+                </li>
+              ))}
+            </ul>
+          )}
 
-      {/* Save-view inline input */}
-      {showSaveInput && (
-        <div className="flex items-center gap-1.5">
-          <input
-            ref={saveInputRef}
-            type="text"
-            value={saveViewName}
-            onChange={(e) => setSaveViewName(e.target.value)}
-            placeholder="Name this view…"
-            className="text-xs rounded-md border border-border/70 bg-background px-2.5 h-8 w-44 focus:outline-none focus:ring-2 focus:ring-ring"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSaveView();
-              if (e.key === 'Escape') setShowSaveInput(false);
-            }}
-            autoFocus
-          />
-          <button
-            type="button"
-            onClick={handleSaveView}
-            disabled={savingView || !saveViewName.trim()}
-            className="h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
-          >
-            {savingView ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowSaveInput(false)}
-            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* Saved-view chips */}
-      {contactViews.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 items-center">
-          <span className="text-xs text-muted-foreground mr-1">Saved:</span>
-          {contactViews.map((v) => (
-            <span
-              key={v.id}
-              className="inline-flex items-center gap-1 text-xs font-medium rounded-full pl-2.5 pr-1 h-6 border border-border/70 bg-background"
-            >
+          {/* Inline error banner — fetch failed. */}
+          {!loading && error && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="mb-1 text-xl tracking-tight text-foreground" style={TITLE_FONT}>
+                I couldn&apos;t reach your contacts.
+              </p>
+              <p className="text-sm text-muted-foreground">Usually temporary.</p>
               <button
                 type="button"
-                onClick={() => applyView(v)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => {
+                  setLoading(true);
+                  fetchContacts();
+                }}
+                className="mt-4 inline-flex h-8 items-center rounded-full bg-foreground px-3 text-xs font-medium text-background transition-colors hover:bg-foreground/90"
               >
-                {v.name}
+                Try again
               </button>
-              <button
-                type="button"
-                onClick={() => deleteView(v.id)}
-                className="w-4 h-4 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
-              >
-                <X size={9} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Loading skeleton — rows match the calmer divide-y vocabulary. */}
-      {loading && (
-        <ul className="divide-y divide-border/60">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <li key={i} className="flex items-center gap-3 py-3">
-              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <Skeleton className="h-3.5 w-40" />
-                <Skeleton className="h-3 w-56" />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Inline error banner — fetch failed. */}
-      {!loading && error && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mb-4">
-            <AlertTriangle
-              size={20}
-              className="text-rose-600 dark:text-rose-400"
-              strokeWidth={1.5}
-            />
-          </div>
-          <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
-            I couldn&apos;t reach your contacts.
-          </p>
-          <p className="text-sm text-muted-foreground">Usually temporary.</p>
-          <button
-            type="button"
-            onClick={() => {
-              setLoading(true);
-              fetchContacts();
-            }}
-            className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors"
-          >
-            Try again
-          </button>
-        </div>
-      )}
-
-      {/* Empty state — context-aware. The fresh-workspace case is where the
+          {/* Empty state — context-aware. The fresh-workspace case is where the
           "Tell Chippi → / or fill out the form" pair lives now: when the
           list is empty the affordance earns its place; when it isn't, that
           header CTA was just chrome competing with the title. */}
-      {!loading && !error && visibleContacts.length === 0 && (() => {
-        const hasStageFilter = typeFilter !== 'ALL';
-        const hasLeadTypeFilter = leadTypeFilter !== 'all';
-        const hasTagFilter = !!tagFilter;
-        const hasAnyFilter = hasStageFilter || hasLeadTypeFilter || hasTagFilter;
-        const isSearchOrFilterCase = !!search || hasTagFilter;
-        const isFreshWorkspace = !search && !hasAnyFilter && contacts.length === 0;
-        const clearAllFilters = () => {
-          setTypeFilter('ALL');
-          setLeadTypeFilter('all');
-          setTagFilter('');
-        };
+          {!loading &&
+            !error &&
+            visibleContacts.length === 0 &&
+            (() => {
+              const hasStageFilter = typeFilter !== 'ALL';
+              const hasLeadTypeFilter = leadTypeFilter !== 'all';
+              const hasTagFilter = !!tagFilter;
+              const hasAnyFilter = hasStageFilter || hasLeadTypeFilter || hasTagFilter;
+              const isSearchOrFilterCase = !!search || hasTagFilter;
+              const isFreshWorkspace = !search && !hasAnyFilter && contacts.length === 0;
+              const clearAllFilters = () => {
+                setTypeFilter('ALL');
+                setLeadTypeFilter('all');
+                setTagFilter('');
+              };
 
-        if (isFreshWorkspace) {
-          // First-run composition — surface-card language (borderless
-          // rounded-3xl, whisper shadow): one headline, one line, one
-          // primary action, with the form offered as the quiet alternative.
-          return (
-            <Reveal variant="rise" className={cn(SURFACE_CARD, 'px-6 py-16 text-center')}>
-              <h2
-                className="text-2xl tracking-tight text-foreground"
-                style={TITLE_FONT}
-              >
-                No relationships yet.
-              </h2>
-              <p className={cn(BODY_MUTED, 'mt-2 max-w-sm mx-auto')}>
-                Every deal starts with a person — add your first and
-                I&apos;ll keep the details close.
-              </p>
-              <div className="mt-6 flex flex-col items-center gap-2">
-                <Link
-                  href={`/s/${slug}/chippi?prefill=${encodeURIComponent(
-                    "I'm adding a new person — ",
-                  )}`}
-                  className={CHIPPI_PILL}
-                >
-                  Tell Chippi about someone
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(true)}
-                  className={QUIET_LINK}
-                >
-                  or fill out the form
-                </button>
-              </div>
-            </Reveal>
-          );
-        }
+              if (isFreshWorkspace) {
+                // First-run composition stays inside the one directory surface:
+                // one headline, one line, and the two existing create paths.
+                return (
+                  <Reveal variant="rise" className="px-6 py-16 text-center">
+                    <h2 className="text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+                      No relationships yet.
+                    </h2>
+                    <p className={cn(BODY_MUTED, 'mt-2 max-w-sm mx-auto')}>
+                      Every deal starts with a person — add your first and I&apos;ll keep the
+                      details close.
+                    </p>
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                      <Link
+                        href={`/s/${slug}/chippi?prefill=${encodeURIComponent(
+                          "I'm adding a new person — ",
+                        )}`}
+                        className={CHIPPI_PILL}
+                      >
+                        Tell Chippi about someone
+                      </Link>
+                      <button type="button" onClick={() => setAddOpen(true)} className={QUIET_LINK}>
+                        or fill out the form
+                      </button>
+                    </div>
+                  </Reveal>
+                );
+              }
 
-        if (isSearchOrFilterCase) {
-          return (
-            <Reveal variant="fade" className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
-                <Search size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
-              </div>
-              <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
-                No matches.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Try a shorter query or clear filters.
-              </p>
-              {hasAnyFilter && (
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
-                >
-                  <X size={13} /> Clear filters
-                </button>
-              )}
-            </Reveal>
-          );
-        }
+              if (isSearchOrFilterCase) {
+                return (
+                  <Reveal
+                    variant="fade"
+                    className="flex flex-col items-center justify-center py-16 text-center"
+                  >
+                    <p className="mb-1 text-xl tracking-tight text-foreground" style={TITLE_FONT}>
+                      No matches.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Try a shorter query or clear filters.
+                    </p>
+                    {hasAnyFilter && (
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                      >
+                        <X size={13} /> Clear filters
+                      </button>
+                    )}
+                  </Reveal>
+                );
+              }
 
-        return (
-          <Reveal variant="fade" className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-12 h-12 rounded-full bg-foreground/[0.04] flex items-center justify-center mb-4">
-              <Inbox size={20} className="text-muted-foreground/60" strokeWidth={1.5} />
-            </div>
-            <p className="text-xl tracking-tight font-semibold text-foreground mb-1">
-              Nothing in this view.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Adjust the current filters to see more.
-            </p>
-            {hasAnyFilter && (
-              <button
-                type="button"
-                onClick={clearAllFilters}
-                className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors"
-              >
-                <X size={13} /> Clear filters
-              </button>
-            )}
-          </Reveal>
-        );
-      })()}
-
-      {/* Card view — stage-grouped (existing pattern, kept for the grid
-          toggle; cleaned only of the always-on checkbox). */}
-      {!loading && !error && visibleContacts.length > 0 && view === 'card' && (
-        <motion.div
-          key="card-view"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
-          className="grid grid-cols-1 gap-5 sm:grid-cols-3"
-        >
-          {STAGES.map((stage) => {
-            const stageContacts = visibleContacts.filter((c) => c.type === stage.key);
-            if (stageContacts.length === 0 && !search && !tagFilter) {
               return (
-                <div
-                  key={stage.key}
-                  className={cn(
-                    'rounded-lg border-2 border-dashed p-4 flex flex-col items-center justify-center min-h-[120px] text-center gap-2',
-                    stage.border,
-                  )}
+                <Reveal
+                  variant="fade"
+                  className="flex flex-col items-center justify-center py-16 text-center"
                 >
-                  <span className={cn('w-2 h-2 rounded-full', stage.dotColor)} />
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {stage.label}
+                  <p className="mb-1 text-xl tracking-tight text-foreground" style={TITLE_FONT}>
+                    Nothing in this view.
                   </p>
-                  <p className="text-[11px] text-muted-foreground/60">
-                    {stage.description}
+                  <p className="text-sm text-muted-foreground">
+                    Adjust the current filters to see more.
                   </p>
-                </div>
+                  {hasAnyFilter && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+                    >
+                      <X size={13} /> Clear filters
+                    </button>
+                  )}
+                </Reveal>
               );
-            }
-            if (stageContacts.length === 0) return null;
-            return (
-              <div key={stage.key} className="flex flex-col gap-2">
-                <div
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg px-3 py-2',
-                    stage.headerBg,
-                  )}
-                >
-                  <span className={cn('w-2 h-2 rounded-full flex-shrink-0', stage.dotColor)} />
-                  <span className="text-xs font-semibold text-foreground">{stage.label}</span>
-                  <span
+            })()}
+
+          {/* The record surface never switches into a contact-card wall. A
+              compact desktop header clarifies the columns; mobile keeps the
+              same records as stacked, still hairline-divided rows. */}
+          {!loading && !error && visibleContacts.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
+            >
+              {selectMode && (
+                <>
+                  {/* Zero-height sentinel — drives the stuck detection above. */}
+                  <div ref={stickySentinelRef} aria-hidden />
+                  <div
                     className={cn(
-                      'ml-auto text-[11px] font-semibold rounded-md px-1.5 py-0.5',
-                      stage.className,
+                      // Sticky so select-all / the running count stay in reach on
+                      // a long list. bg-background because content scrolls under
+                      // it; the hairline shadow appears only once pinned.
+                      'sticky top-0 z-20 -mx-2 mb-1 flex items-center gap-3 border-b border-border/60 bg-dashboard-paper/95 px-2 py-2 backdrop-blur-sm',
+                      'transition-shadow duration-200 ease-out',
+                      headerStuck && 'shadow-[0_1px_2px_rgb(0_0_0/0.06)]',
                     )}
                   >
-                    {stageContacts.length}
-                  </span>
-                </div>
-                {stageContacts.map((contact) => (
-                  <ContactCard
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedIds.size === visibleContacts.length && visibleContacts.length > 0
+                      }
+                      onChange={toggleSelectAll}
+                      aria-label="Select all"
+                      className="rounded border-border cursor-pointer flex-shrink-0"
+                    />
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      {selectedIds.size > 0
+                        ? `${selectedIds.size} selected`
+                        : `Select up to ${visibleContacts.length}`}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              <div
+                aria-hidden="true"
+                className={cn(
+                  'hidden grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_7rem_5rem_7rem_6rem] gap-4 border-b border-border/60 pb-2 lg:grid',
+                  SECTION_LABEL,
+                  selectMode && 'pl-7',
+                )}
+              >
+                <span>Person</span>
+                <span>Contact</span>
+                <span>Stage</span>
+                <span>Score</span>
+                <span>Follow-up</span>
+                <span />
+              </div>
+
+              <ul className="divide-y divide-border/60">
+                {visibleContacts.map((contact, idx) => (
+                  <ContactRow
                     key={contact.id}
                     contact={contact}
                     slug={slug}
-                    onEdit={() => setEditContact(contact)}
-                    onDelete={() => handleDelete(contact.id)}
+                    // First loaded paint only — afterwards rows mount silently.
+                    entranceIndex={hasStaggeredRef.current ? null : idx}
                     selectMode={selectMode}
                     selected={selectedIds.has(contact.id)}
                     onToggleSelect={() => toggleSelect(contact.id)}
+                    onEdit={() => setEditContact(contact)}
+                    onDelete={() => handleDelete(contact.id)}
                   />
                 ))}
-              </div>
-            );
-          })}
-        </motion.div>
-      )}
-
-      {/* List view — divide-y row vocabulary. Keyed fade so toggling from the
-          card grid cross-dissolves rather than hard-cuts. The per-row stagger
-          is gated to the first mount, so it doesn't re-fire on every toggle. */}
-      {!loading && !error && visibleContacts.length > 0 && view === 'list' && (
-        <motion.div
-          key="list-view"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: DURATION_FAST, ease: EASE_APPLE }}
-        >
-          {/* Tiny strip — only when select mode is on, so the select-all
-              checkbox has a home. Otherwise the row list speaks for itself;
-              column labels on a single-data-line list are chrome that pays
-              no rent. */}
-          {selectMode && (
-            <>
-              {/* Zero-height sentinel — drives the stuck detection above. */}
-              <div ref={stickySentinelRef} aria-hidden />
-              <div
-                className={cn(
-                  // Sticky so select-all / the running count stay in reach on
-                  // a long list. bg-background because content scrolls under
-                  // it; the hairline shadow appears only once pinned.
-                  'sticky top-0 z-20 -mx-2 px-2 flex items-center gap-3 py-2 bg-background border-b border-border/60 mb-1',
-                  'transition-shadow duration-200 ease-out',
-                  headerStuck && 'shadow-[0_1px_2px_rgb(0_0_0/0.06)]',
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    selectedIds.size === visibleContacts.length && visibleContacts.length > 0
-                  }
-                  onChange={toggleSelectAll}
-                  aria-label="Select all"
-                  className="rounded border-border cursor-pointer flex-shrink-0"
-                />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {selectedIds.size > 0
-                    ? `${selectedIds.size} selected`
-                    : `Select up to ${visibleContacts.length}`}
-                </span>
-              </div>
-            </>
+              </ul>
+            </motion.div>
           )}
-
-          <ul className="divide-y divide-border/60">
-            {visibleContacts.map((contact, idx) => (
-              <ContactRow
-                key={contact.id}
-                contact={contact}
-                slug={slug}
-                // First loaded paint only — afterwards rows mount silently.
-                entranceIndex={hasStaggeredRef.current ? null : idx}
-                selectMode={selectMode}
-                selected={selectedIds.has(contact.id)}
-                onToggleSelect={() => toggleSelect(contact.id)}
-                onEdit={() => setEditContact(contact)}
-                onDelete={() => handleDelete(contact.id)}
-              />
-            ))}
-          </ul>
-        </motion.div>
-      )}
+        </div>
+      </section>
 
       {/* Bulk-action bar — only when something is selected. */}
       {selectedIds.size > 0 && (
-        <div className="sticky bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto w-fit z-30 flex items-center flex-wrap gap-2 rounded-lg border border-border/70 bg-card px-3 sm:px-4 py-2 sm:py-3 max-w-[calc(100vw-2rem)]">
-          <CheckSquare size={14} className="text-foreground" />
+        <div className="chippi-dashboard-panel sticky bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 mx-auto flex w-fit max-w-[calc(100vw-2rem)] flex-wrap items-center gap-2 rounded-2xl border border-border/70 px-3 py-2 sm:px-4 sm:py-3">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border mx-1" />
           <Select onValueChange={(v) => handleBulkChangeType(v as Client['type'])}>
-            <SelectTrigger className="h-8 text-xs w-36 bg-muted border-0">
+            <SelectTrigger className="h-8 w-36 rounded-full border-0 bg-dashboard-paper-muted text-xs">
               <SelectValue placeholder="Move to stage…" />
             </SelectTrigger>
             <SelectContent>
@@ -1422,8 +1314,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
             }}
           >
             <PopoverTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-                <TagIcon size={12} />
+              <Button size="sm" variant="outline" className="h-8 rounded-full text-xs">
                 Tag
               </Button>
             </PopoverTrigger>
@@ -1450,7 +1341,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                       setBulkTagOpen(false);
                       handleBulkTag(bulkTagInput, 'add');
                     }}
-                    className="flex-1 h-7 rounded-md text-xs font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 transition-colors"
+                    className="h-7 flex-1 rounded-full bg-foreground text-xs font-medium text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
                   >
                     Add
                   </button>
@@ -1461,7 +1352,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
                       setBulkTagOpen(false);
                       handleBulkTag(bulkTagInput, 'remove');
                     }}
-                    className="flex-1 h-7 rounded-md text-xs font-medium border border-border/70 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] disabled:opacity-50 transition-colors"
+                    className="h-7 flex-1 rounded-full border border-border/70 text-xs font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
                   >
                     Remove
                   </button>
@@ -1499,9 +1390,8 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
               size="sm"
               variant="outline"
               onClick={() => setShowCompare(true)}
-              className="h-8 gap-1.5 text-xs hidden sm:inline-flex"
+              className="hidden h-8 rounded-full text-xs sm:inline-flex"
             >
-              <GitCompare size={12} />
               Compare
             </Button>
           )}
@@ -1509,25 +1399,23 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
             size="sm"
             variant="outline"
             onClick={handleExportSelected}
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 rounded-full text-xs"
           >
-            <Download size={12} />
             Export
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleBulkArchive}
-            className="h-8 gap-1.5 text-xs"
+            className="h-8 rounded-full text-xs"
           >
-            <Inbox size={12} />
             Archive
           </Button>
           <Button
             size="sm"
             variant="destructive"
             onClick={handleBulkDelete}
-            className="h-8 text-xs"
+            className="h-8 rounded-full text-xs"
           >
             Delete
           </Button>
@@ -1535,7 +1423,7 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
             type="button"
             onClick={() => setSelectedIds(new Set())}
             aria-label="Clear selection"
-            className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-1"
+            className="ml-1 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <X size={13} />
           </button>
@@ -1603,13 +1491,12 @@ export function ContactTable({ slug, openCreateForm = false }: ContactTableProps
   );
 }
 
-// ─── ContactRow — canonical divide-y row vocabulary ────────────────────────
+// ─── ContactRow — one disciplined hairline record ──────────────────────────
 //
-// Avatar (32) / name + stage pill on top / email · phone on a single line
-// below. The line truncates as one — phone numbers no longer wrap to their
-// own line on mobile. Edit / mic / delete fade in on row hover at lg+; on
-// smaller screens a quiet chevron hints the row is tappable. Multi-select
-// moves behind the page-level Select toggle.
+// Desktop aligns real fields as a compact table. Mobile folds those same
+// fields beneath the name without changing the record into a card. Selection
+// stays a light paper wash and row actions remain available on hover, focus,
+// or the existing context menu.
 
 function ContactRow({
   contact,
@@ -1624,7 +1511,7 @@ function ContactRow({
   contact: Client;
   slug: string;
   /** Index for the first-load stagger. `null` = the list already made its
-   *  entrance (a refetch / view toggle) — mount silently, no re-choreography. */
+   *  entrance (a refetch) — mount silently, no re-choreography. */
   entranceIndex: number | null;
   selectMode: boolean;
   selected: boolean;
@@ -1638,124 +1525,94 @@ function ContactRow({
   // second: one composed gesture, not a parade.
   const shouldAnimate = entranceIndex !== null && entranceIndex < 20;
   const delay = shouldAnimate ? entranceIndex * 0.015 : 0;
-  // Stage pill follows the row by 50ms — small enough to feel like a single
-  // composed gesture; large enough that the eye registers the row first.
-  const pillDelay = shouldAnimate ? delay + 0.05 : 0;
   const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
   const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
+  const followUpLabel = followUpDate
+    ? `${followUpOverdue ? 'Overdue' : 'Due'} · ${followUpDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })}`
+    : '—';
+  const contactLine = [contact.email, contact.phone].filter(Boolean).join(' · ');
 
-  // The body of the row — shared between Link and select-toggle wrappers so
-  // the visual layout never drifts between modes.
+  // Shared field grid so normal and select modes cannot drift apart.
   const body = (
-    <>
-      <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0', scoreAvatar(contact.leadScore))}>
-        {getInitials(contact.name)}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-medium text-foreground truncate">
-            {contact.name}
-          </span>
-          <motion.span
-            initial={shouldAnimate ? { opacity: 0 } : false}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.18, ease: EASE_APPLE, delay: pillDelay }}
-            className={cn(
-              'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
-              stage.className,
-            )}
-          >
-            {stage.label}
-          </motion.span>
-        </div>
-        {/* email · phone — single truncating line. Either may be absent;
-            the separator only renders when both are present. */}
-        {(contact.email || contact.phone) && (
-          <div className="mt-0.5 text-xs text-muted-foreground truncate">
-            {contact.email && <span>{contact.email}</span>}
-            {contact.email && contact.phone && (
-              <span className="text-muted-foreground/40"> · </span>
-            )}
-            {contact.phone && <span className="tabular-nums">{contact.phone}</span>}
-          </div>
-        )}
-      </div>
-      {/* Right metadata — follow-up pill stays visible (the realtor needs
-          to see it without hovering). The action icons hide until row
-          hover at lg+; smaller screens fall back to a quiet chevron. */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {/* Lead temperature — always visible, same signal as the cards. */}
+    <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_7rem_5rem_7rem] lg:gap-4">
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-medium text-foreground">{contact.name}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground lg:hidden">
+          {contactLine || 'No contact details'}
+        </span>
+        <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 lg:hidden">
+          <StagePill stage={stage} />
+          <ScoreChip score={contact.leadScore} />
+          {followUpDate && (
+            <span
+              className={cn(
+                'text-[11px]',
+                followUpOverdue ? 'text-destructive' : 'text-muted-foreground',
+              )}
+            >
+              {followUpLabel}
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="hidden min-w-0 truncate text-xs text-muted-foreground lg:block">
+        {contactLine || '—'}
+      </span>
+      <span className="hidden lg:block">
+        <StagePill stage={stage} />
+      </span>
+      <span className="hidden lg:block">
         <ScoreChip score={contact.leadScore} />
-        {followUpDate && (
-          <span
-            className={cn(
-              'hidden sm:inline-flex items-center gap-1 text-[11px] font-medium rounded px-1.5 py-0.5',
-              followUpOverdue
-                ? 'text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/15'
-                : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15',
-            )}
-          >
-            <CalendarDays size={10} />
-            {followUpDate.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })}
-          </span>
+      </span>
+      <span
+        className={cn(
+          'hidden text-[11px] lg:block',
+          followUpOverdue ? 'text-destructive' : 'text-muted-foreground',
         )}
-        {!selectMode && (
-          <>
-            {/* Fade-in actions — opacity only, so the row never shifts.
-                focus-within keeps them visible for keyboard users. */}
-            <div className="hidden lg:flex gap-0.5 opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 transition-opacity duration-150">
-              <Link
-                href={`/s/${slug}/chippi/log?personId=${contact.id}`}
-                aria-label={`Log a note for ${contact.name}`}
-                title="Log a note"
-                onClick={(e) => e.stopPropagation()}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
-              >
-                <Mic size={13} />
-              </Link>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                aria-label={`Edit ${contact.name}`}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                aria-label={`Delete ${contact.name}`}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 transition-colors"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-            <ChevronRight
-              size={14}
-              className="lg:hidden text-muted-foreground/40 flex-shrink-0"
-              aria-hidden
-            />
-          </>
-        )}
-      </div>
-    </>
+      >
+        {followUpLabel}
+      </span>
+    </span>
   );
 
   const rowClassName = cn(
-    'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors duration-150 ease-out',
+    'group/row -mx-2 flex items-center gap-3 rounded-xl px-2 py-3.5 transition-colors duration-150 ease-out',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset',
-    selected ? 'bg-muted/40' : 'hover:bg-muted/30',
+    selected
+      ? 'bg-dashboard-paper-muted ring-1 ring-inset ring-border/60'
+      : 'hover:bg-foreground/[0.025]',
+  );
+
+  const actions = !selectMode && (
+    <div className="hidden w-24 shrink-0 justify-end gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100 group-focus-within/row:opacity-100 lg:flex">
+      <Link
+        href={`/s/${slug}/chippi/log?personId=${contact.id}`}
+        aria-label={`Log a note for ${contact.name}`}
+        title="Log a note"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <Mic size={13} />
+      </Link>
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${contact.name}`}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <Pencil size={13} />
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Delete ${contact.name}`}
+        className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
   );
 
   return (
@@ -1768,33 +1625,60 @@ function ContactRow({
       transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
     >
       {selectMode ? (
-        <button
-          type="button"
-          onClick={onToggleSelect}
-          aria-pressed={selected}
-          className={cn(rowClassName, 'w-full text-left cursor-pointer')}
-        >
+        <label className={cn(rowClassName, 'w-full cursor-pointer')}>
           <input
             type="checkbox"
             checked={selected}
             onChange={onToggleSelect}
-            onClick={(e) => e.stopPropagation()}
             aria-label={`Select ${contact.name}`}
-            className="rounded border-border cursor-pointer flex-shrink-0"
+            className="shrink-0 cursor-pointer rounded border-border"
           />
           {body}
-        </button>
+          <span aria-hidden className="hidden w-24 shrink-0 lg:block" />
+        </label>
       ) : (
         /* Right-click gets the power-user menu: everything you'd do to a
            person without leaving the list. Left-click still navigates. */
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <Link
-              href={`/s/${slug}/contacts/${contact.id}`}
-              className={cn(rowClassName, 'cursor-pointer')}
-            >
-              {body}
-            </Link>
+            <div className={rowClassName}>
+              <Link
+                href={`/s/${slug}/contacts/${contact.id}`}
+                className="flex min-w-0 flex-1 cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                {body}
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`Actions for ${contact.name}`}
+                    className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-48 lg:hidden">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/s/${slug}/contacts/${contact.id}`}>Open</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/s/${slug}/chippi/log?personId=${contact.id}`}>Log a note</Link>
+                  </DropdownMenuItem>
+                  {contact.phone && (
+                    <DropdownMenuItem asChild><a href={`tel:${contact.phone}`}>Call</a></DropdownMenuItem>
+                  )}
+                  {contact.email && (
+                    <DropdownMenuItem asChild><a href={`mailto:${contact.email}`}>Email</a></DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive">
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {actions}
+            </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="min-w-48">
             <ContextMenuItem value="open" asChild>
@@ -1833,145 +1717,5 @@ function ContactRow({
         </ContextMenu>
       )}
     </motion.li>
-  );
-}
-
-// ─── Card view sub-component ────────────────────────────────────────────────
-
-function ContactCard({
-  contact,
-  slug,
-  onEdit,
-  onDelete,
-  selectMode,
-  selected,
-  onToggleSelect,
-}: {
-  contact: Client;
-  slug: string;
-  onEdit: () => void;
-  onDelete: () => void;
-  selectMode: boolean;
-  selected: boolean;
-  onToggleSelect: () => void;
-}) {
-  return (
-    <div
-      className={cn(
-        'group rounded-lg border bg-card overflow-hidden transition-colors duration-150 hover:bg-muted/30',
-        selected ? 'border-border bg-muted/40' : 'border-border/70',
-      )}
-    >
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-start gap-2.5 min-w-0">
-            {selectMode && (
-              <input
-                type="checkbox"
-                checked={selected}
-                onChange={onToggleSelect}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded border-border cursor-pointer flex-shrink-0 mt-0.5"
-                aria-label={`Select ${contact.name}`}
-              />
-            )}
-            <div className={cn('w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0', scoreAvatar(contact.leadScore))}>
-              {getInitials(contact.name)}
-            </div>
-            <div className="min-w-0">
-              <Link
-                href={`/s/${slug}/contacts/${contact.id}`}
-                className="font-semibold text-sm hover:text-foreground transition-colors truncate block leading-tight"
-              >
-                {contact.name}
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Lead temperature — always visible, the scannable signal. */}
-            <ScoreChip score={contact.leadScore} />
-            {!selectMode && (
-              <div className="flex gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={onEdit}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  aria-label={`Edit ${contact.name}`}
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                  aria-label={`Delete ${contact.name}`}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          {contact.phone && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Phone size={10} className="flex-shrink-0" />
-              <a
-                href={`tel:${contact.phone}`}
-                className="truncate hover:text-foreground transition-colors"
-              >
-                {contact.phone}
-              </a>
-            </div>
-          )}
-          {contact.email && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Mail size={10} className="flex-shrink-0" />
-              <a
-                href={`mailto:${contact.email}`}
-                className="truncate hover:text-foreground transition-colors"
-              >
-                {contact.email}
-              </a>
-            </div>
-          )}
-          {contact.budget != null && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Wallet size={10} className="flex-shrink-0" />
-              <span>
-                {formatCurrency(contact.budget)}
-                {contact.leadType === 'rental' ? '/mo' : ''}
-              </span>
-            </div>
-          )}
-          {contact.preferences && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MapPin size={10} className="flex-shrink-0" />
-              <span className="truncate">{contact.preferences}</span>
-            </div>
-          )}
-          {contact.followUpAt && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5 text-xs font-medium',
-                new Date(contact.followUpAt) < new Date()
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-amber-600 dark:text-amber-400',
-              )}
-            >
-              <CalendarDays size={10} className="flex-shrink-0" />
-              <span>
-                {new Date(contact.followUpAt) < new Date() ? 'Overdue' : 'Due'}{' '}
-                {new Date(contact.followUpAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

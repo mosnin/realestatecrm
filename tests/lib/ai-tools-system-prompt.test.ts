@@ -88,6 +88,15 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Do not create a plan for a quick lookup or one-step action');
   });
 
+  it('pins one full-book read and refuses to invent a PDF artifact', () => {
+    const prompt = buildSystemPrompt({ ...makeCtx(), workMode: true });
+    expect(prompt).toContain('call `list_contacts` once');
+    expect(prompt).toContain('Do not split the same read into hot, warm, cold, and unscored calls');
+    expect(prompt).toContain('cannot guarantee a PDF artifact');
+    expect(prompt).toContain('PDF export is not available');
+    expect(prompt).toContain('persisted session or file receipt');
+  });
+
   it('injects the exact versioned conversation goal without silently replacing it', () => {
     const goal = 'Close five more qualified buyer deals before September 30.';
     const prompt = buildSystemPrompt({

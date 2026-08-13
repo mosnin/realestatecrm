@@ -1,11 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
+import { SECTION_LABEL } from '@/lib/typography';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,16 +39,16 @@ function relativeTime(iso: string): string {
 
 function statusBadge(status: TaskStatus) {
   const map: Record<TaskStatus, { label: string; classes: string }> = {
-    queued:    { label: 'Queued',    classes: 'bg-muted text-muted-foreground' },
-    running:   { label: 'Running',   classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
-    completed: { label: 'Completed', classes: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' },
-    failed:    { label: 'Failed',    classes: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' },
-    cancelled: { label: 'Cancelled', classes: 'bg-muted text-muted-foreground/60' },
-    paused:    { label: 'Paused',    classes: 'bg-muted text-muted-foreground' },
+    queued:    { label: 'Queued',    classes: 'border-border text-muted-foreground' },
+    running:   { label: 'Running',   classes: 'border-transparent bg-foreground/[0.06] text-foreground/75' },
+    completed: { label: 'Completed', classes: 'border-border text-muted-foreground' },
+    failed:    { label: 'Failed',    classes: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400' },
+    cancelled: { label: 'Cancelled', classes: 'border-border/70 text-muted-foreground/60' },
+    paused:    { label: 'Paused',    classes: 'border-border text-muted-foreground' },
   };
   const { label, classes } = map[status] ?? map.queued;
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', classes)}>
+    <span className={cn('inline-flex items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide', classes)}>
       {label}
     </span>
   );
@@ -58,8 +58,10 @@ function statusBadge(status: TaskStatus) {
 
 export default async function AgentTasksPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { slug } = await params;
   const { userId } = await auth();
@@ -77,28 +79,33 @@ export default async function AgentTasksPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
-  const { data: tasks, error } = await supabase
+  const rawPage = Number((await searchParams).page ?? '1');
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+  const pageSize = 50;
+  const { data: tasks, error, count } = await supabase
     .from('AgentTask')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
-    .limit(50);
+    .range((page - 1) * pageSize, page * pageSize - 1);
 
   if (error) {
     console.error('[chippi/tasks] query error:', error);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-sm text-muted-foreground">We couldn&apos;t load your tasks. This is usually temporary.</p>
+      <ChippiPageShell
+        greeting="Tasks."
+        title="Something went wrong."
+        subtitle="We couldn't load your tasks. This is usually temporary."
+      >
+        <div>
           <a
             href={`/s/${slug}/chippi/tasks`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-9 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
           >
             Try again
           </a>
         </div>
-      </div>
+      </ChippiPageShell>
     );
   }
 
@@ -110,54 +117,73 @@ export default async function AgentTasksPage({
       title="Agent Tasks"
       subtitle="Long-running goals Chippi is working on."
     >
-      <Link
-        href={`/s/${slug}/chippi`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={12} /> Chippi
-      </Link>
-
-      {/* Task list */}
-      {taskList.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            No tasks yet. Ask Chippi to work on a complex goal and it will appear here.
+      <div className="space-y-3" data-chippi-secondary-page="tasks">
+        <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3">
+          <p className={SECTION_LABEL}>
+            Recent work{taskList.length > 0 ? ` · ${taskList.length}` : ''}
           </p>
+          <Link
+            href={`/s/${slug}/chippi`}
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Back to Chippi
+          </Link>
         </div>
-      ) : (
-        <ul className="divide-y divide-border/60">
-          {taskList.map((task) => {
-            const goal = task.goalDescription ?? task.title;
-            const truncated = goal.length > 120 ? goal.slice(0, 120) + '…' : goal;
-            const cost = typeof task.estimatedCostUsd === 'number' ? task.estimatedCostUsd : Number(task.estimatedCostUsd);
 
-            return (
-              <li key={task.id}>
-                <Link
-                  href={`/s/${slug}/chippi/tasks/${task.id}`}
-                  className="flex items-start gap-3 py-4 hover:bg-muted/30 transition-colors -mx-2 px-2 rounded-md"
-                >
-                  {/* Status badge */}
-                  <div className="pt-0.5 flex-shrink-0">
-                    {statusBadge(task.status)}
-                  </div>
+        {/* Task list */}
+        {taskList.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              No tasks yet. Ask Chippi to work on a complex goal and it will appear here.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {taskList.map((task) => {
+              const goal = task.goalDescription ?? task.title;
+              const truncated = goal.length > 120 ? goal.slice(0, 120) + '…' : goal;
+              const cost = typeof task.estimatedCostUsd === 'number' ? task.estimatedCostUsd : Number(task.estimatedCostUsd);
 
-                  {/* Goal text + meta */}
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-sm text-foreground leading-snug">{truncated}</p>
-                    <p className="text-xs text-muted-foreground tabular-nums">
-                      {relativeTime(task.createdAt)}
-                      {cost > 0 && (
-                        <span className="ml-3">${cost.toFixed(2)}</span>
-                      )}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              return (
+                <li key={task.id}>
+                  <Link
+                    href={`/s/${slug}/chippi/tasks/${task.id}`}
+                    className="group/row -mx-2 flex items-start gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="flex-shrink-0 pt-0.5">
+                      {statusBadge(task.status)}
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="text-sm font-medium leading-snug text-foreground">{truncated}</p>
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        {relativeTime(task.createdAt)}
+                        {cost > 0 && (
+                          <span className="ml-3">${cost.toFixed(2)}</span>
+                        )}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {(page > 1 || (count ?? 0) > page * pageSize) && (
+          <nav aria-label="Task pages" className="flex items-center justify-between border-t border-border/60 pt-4">
+            {page > 1 ? (
+              <Link href={`/s/${slug}/chippi/tasks?page=${page - 1}`} className="text-xs text-muted-foreground hover:text-foreground">
+                Newer tasks
+              </Link>
+            ) : <span />}
+            {(count ?? 0) > page * pageSize && (
+              <Link href={`/s/${slug}/chippi/tasks?page=${page + 1}`} className="text-xs text-muted-foreground hover:text-foreground">
+                Older tasks
+              </Link>
+            )}
+          </nav>
+        )}
+      </div>
     </ChippiPageShell>
   );
 }

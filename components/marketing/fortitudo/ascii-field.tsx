@@ -7,10 +7,12 @@
  * for performance; honors prefers-reduced-motion (draws a single static frame).
  *
  * Orange-on-transparent so it reads on BOTH light and dark: the page surface
- * shows through. Marketing/auth only.
+ * shows through. Marketing/auth may use it, and authenticated dashboards may
+ * reuse one low-opacity instance as the atmosphere authorized in
+ * docs/ui/STYLESHEET.md. It remains the single source; never redraw it in CSS.
  */
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export function AsciiField({
   className,

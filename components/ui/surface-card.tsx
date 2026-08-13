@@ -36,6 +36,24 @@ export const SURFACE_CARD =
 export const SURFACE_CARD_PAD = 'p-6 sm:p-7';
 
 /**
+ * Open editorial dashboard panel. This is intentionally borderless and a
+ * little rounder than the dense app card: it frames one meaningful region on
+ * the shared warm dashboard canvas without turning every row into a box.
+ */
+export const DASHBOARD_SURFACE =
+  'chippi-dashboard-panel rounded-[1.75rem] text-card-foreground';
+
+/** A quiet inset used for controls or one selected metric inside a panel. */
+export const DASHBOARD_INSET =
+  'chippi-dashboard-panel-muted rounded-2xl text-card-foreground';
+
+/** Hairline-divided dashboard row with the People/Deals interaction rhythm. */
+export const DASHBOARD_ROW =
+  'group/row flex min-w-0 items-start gap-3 border-t chippi-dashboard-divider ' +
+  'px-2 py-3.5 -mx-2 first:border-t-0 transition-colors duration-150 ' +
+  'hover:bg-foreground/[0.025] focus-within:bg-foreground/[0.025]';
+
+/**
  * The ONE solid accent card per view — restrained graphite with white ink.
  * It echoes the reference's selected controls without turning the dashboard
  * into a field of dark panels. Same geometry as SURFACE_CARD.

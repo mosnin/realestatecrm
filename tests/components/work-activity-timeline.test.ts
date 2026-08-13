@@ -74,12 +74,14 @@ describe('WorkActivityTimeline normalization', () => {
 });
 
 describe('WorkActivityTimeline presentation contract', () => {
-  it('uses the existing paper surface and an accessible, single-update live region', () => {
+  it('uses a transparent inline surface and an accessible, single-update live region', () => {
     const html = renderToStaticMarkup(createElement(WorkActivityTimeline, {
       events: [event({ phase: 'tool', status: 'active', label: 'Running contact search' })],
     }));
 
-    expect(html).toContain('rounded-2xl border border-border/70 bg-card');
+    expect(html).toContain('data-agent-surface-style="inline"');
+    expect(html).toContain('border-y border-border/45 bg-transparent');
+    expect(html).not.toContain('bg-card');
     expect(html).toContain('aria-live="polite"');
     expect(html.match(/aria-live=/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Grounded work progress"');

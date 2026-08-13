@@ -36,6 +36,7 @@ describe('Chippi execution receipt UI contract', () => {
     expect(source).toContain('block.result?.ok === true');
     expect(source).toContain('EXECUTION_RECEIPT_TOOLS.has(block.name)');
     expect(source).toContain('aria-label="Execution receipt"');
-    expect(source).toContain('border-emerald-500/15 bg-emerald-500/[0.035]');
+    expect(source).toContain('border-l border-emerald-500/30 bg-transparent');
+    expect(source).not.toContain('bg-emerald-500/[0.035]');
   });
 });

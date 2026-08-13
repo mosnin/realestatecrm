@@ -1,17 +1,17 @@
 /**
  * /chippi/brief — the realtor's daily dashboard.
  *
- * A calm, premium bento grid that gives the realtor an at-a-glance picture
- * of their day and their business. Every number on it is REAL: composed
+ * A calm, outcome-first Today dashboard that gives the realtor an at-a-glance
+ * picture of their day and their business. Every number on it is REAL: composed
  * server-side by composeBriefDashboard (one parallel fan-out against the
  * realtor's own tables) and handed to the client bento as props, so the
  * grid paints with truthful numbers on first byte — no client fetch
  * waterfall, no zeros that count up after a round-trip.
  *
- * The shell's "Today." greeting orients; the bento owns everything below.
- * Each cell renders its own empty state and is omitted when it has no data
- * — calm silence over filler. See components/chippi/brief-dashboard.tsx for
- * the cell map and lib/briefing/dashboard.ts for the per-cell data source.
+ * The dashboard owns the full CHIPPI // TODAY hierarchy; the shared shell only
+ * provides the authenticated canvas and responsive frame. See
+ * components/chippi/brief-dashboard.tsx for the view model and
+ * lib/briefing/dashboard.ts for the per-region data source.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -48,7 +48,7 @@ export default async function ChippiBriefPage({
   const dashboard = await composeBriefDashboard(space.id, space.ownerId);
 
   return (
-    <ChippiPageShell greeting="Today." washed>
+    <ChippiPageShell layout="dashboard">
       <BriefDashboard slug={slug} data={dashboard} />
     </ChippiPageShell>
   );

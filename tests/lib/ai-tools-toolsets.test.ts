@@ -5,6 +5,7 @@ import {
   TOOLSETS,
   selectToolsets,
   getChatTools,
+  isUnsupportedPdfDeliverableIntent,
   selectDirectExecutionToolNames,
 } from '@/lib/ai-tools/toolsets';
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
@@ -88,6 +89,29 @@ describe('toolsets — per-turn selection', () => {
         (tool) => tool.name,
       ),
     ).toContain('start_work_session');
+  });
+
+  it('routes a downloadable Markdown report to durable work', () => {
+    const names = getChatTools(
+      'Go through my contacts and make a downloadable report ranking the best people',
+      { workMode: true },
+    ).map((tool) => tool.name);
+    expect(names).toContain('start_work_session');
+  });
+
+  it('fails the observed PDF request honestly instead of exposing fake artifact work', () => {
+    const request =
+      'Set this as the active Work goal: go through my contacts and make a downloadable pdf based on who the best leads are in order';
+    const names = getChatTools(request, { workMode: true }).map((tool) => tool.name);
+
+    expect(isUnsupportedPdfDeliverableIntent(request)).toBe(true);
+    expect(names).not.toContain('start_work_session');
+    expect(names).not.toContain('create_plan');
+  });
+
+  it('does not mistake reading an uploaded PDF for unsupported PDF creation', () => {
+    const request = 'Read the uploaded PDF and summarize the seller disclosures';
+    expect(isUnsupportedPdfDeliverableIntent(request)).toBe(false);
   });
 
   it('keeps create_plan available throughout Work without adding it to simple Chat', () => {

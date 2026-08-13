@@ -17,12 +17,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus, Trash2, Puzzle, SlashSquare } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SECTION_LABEL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface PluginRow {
   id: string;
@@ -46,15 +47,22 @@ export function PluginsSkillsManager({ slug }: { slug: string }) {
   const [plugins, setPlugins] = useState<PluginRow[]>([]);
   const [skills, setSkills] = useState<SkillRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError('');
     try {
       const [pRes, sRes] = await Promise.all([
         fetch(`/api/plugins?slug=${encodeURIComponent(slug)}`),
         fetch(`/api/skills?slug=${encodeURIComponent(slug)}`),
       ]);
-      if (pRes.ok) setPlugins(((await pRes.json()) as { plugins: PluginRow[] }).plugins);
-      if (sRes.ok) setSkills(((await sRes.json()) as { skills: SkillRow[] }).skills);
+      if (!pRes.ok || !sRes.ok) throw new Error('Could not load plugins and skills.');
+      setPlugins(((await pRes.json()) as { plugins: PluginRow[] }).plugins);
+      setSkills(((await sRes.json()) as { skills: SkillRow[] }).skills);
+      setHasLoaded(true);
+    } catch {
+      setLoadError('Plugins and skills could not be loaded. Try again.');
     } finally {
       setLoading(false);
     }
@@ -73,9 +81,21 @@ export function PluginsSkillsManager({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="space-y-10">
-      <PluginsSection slug={slug} plugins={plugins} onChanged={() => void load()} />
-      <SkillsSection slug={slug} skills={skills} onChanged={() => { void load(); router.refresh(); }} />
+    <div className="space-y-10" data-secondary-list="plugins-and-skills">
+      {loadError && (
+        <div role="alert" className="flex items-center justify-between gap-4 border-b border-border/60 pb-4 text-sm text-destructive">
+          <span>{loadError}</span>
+          <Button variant="outline" size="xs" onClick={() => { setLoading(true); void load(); }}>
+            Try again
+          </Button>
+        </div>
+      )}
+      {hasLoaded && (
+        <>
+          <PluginsSection slug={slug} plugins={plugins} onChanged={() => void load()} />
+          <SkillsSection slug={slug} skills={skills} onChanged={() => { void load(); router.refresh(); }} />
+        </>
+      )}
     </div>
   );
 }
@@ -107,24 +127,36 @@ function PluginsSection({
       setForm({ name: '', description: '', url: '', method: 'POST', authHeaderName: '', authHeaderValue: '' });
       setCreating(false);
       onChanged();
+    } catch {
+      setError('Could not create the plugin. Try again.');
     } finally {
       setBusy(false);
     }
   }
 
   async function toggle(p: PluginRow) {
-    await fetch(`/api/plugins/${p.id}?slug=${encodeURIComponent(slug)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: !p.enabled }),
-    });
-    onChanged();
+    try {
+      const res = await fetch(`/api/plugins/${p.id}?slug=${encodeURIComponent(slug)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !p.enabled }),
+      });
+      if (!res.ok) throw new Error('toggle_failed');
+      onChanged();
+    } catch {
+      toast.error(`Could not turn ${p.name} ${p.enabled ? 'off' : 'on'}.`);
+    }
   }
 
   async function remove(p: PluginRow) {
     if (!confirm(`Delete the "${p.name}" plugin? Chippi will no longer be able to call it.`)) return;
-    await fetch(`/api/plugins/${p.id}?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
-    onChanged();
+    try {
+      const res = await fetch(`/api/plugins/${p.id}?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete_failed');
+      onChanged();
+    } catch {
+      toast.error(`Could not delete ${p.name}.`);
+    }
   }
 
   return (
@@ -133,7 +165,7 @@ function PluginsSection({
         <p className={SECTION_LABEL}>Your plugins</p>
         {!creating && (
           <Button variant="outline" size="xs" onClick={() => setCreating(true)}>
-            <Plus /> New plugin
+            New plugin
           </Button>
         )}
       </div>
@@ -142,9 +174,11 @@ function PluginsSection({
       </p>
 
       {creating && (
-        <div className="mb-4 space-y-2.5 rounded-xl border border-border bg-card p-4">
+        <div className="mb-5 space-y-2.5 rounded-2xl bg-muted/30 p-4 sm:p-5">
           <div className="grid gap-2.5 sm:grid-cols-2">
+            <label htmlFor="plugin-name" className="sr-only">Plugin name</label>
             <Input
+              id="plugin-name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="name (e.g. mls-lookup)"
@@ -160,11 +194,13 @@ function PluginsSection({
             </select>
           </div>
           <Input
+            aria-label="Plugin URL"
             value={form.url}
             onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
             placeholder="https://your-api.example.com/endpoint"
           />
           <Textarea
+            aria-label="Plugin description and usage"
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             placeholder="What it does and when Chippi should use it — e.g. “Look up live MLS status for an address. Use when I ask about listing status.”"
@@ -172,11 +208,13 @@ function PluginsSection({
           />
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Input
+              aria-label="Authentication header name"
               value={form.authHeaderName}
               onChange={(e) => setForm((f) => ({ ...f, authHeaderName: e.target.value }))}
               placeholder="Auth header name (optional, e.g. Authorization)"
             />
             <Input
+              aria-label="Authentication header value"
               value={form.authHeaderValue}
               onChange={(e) => setForm((f) => ({ ...f, authHeaderValue: e.target.value }))}
               placeholder="Auth header value (stored, never shown again)"
@@ -196,33 +234,35 @@ function PluginsSection({
       )}
 
       {plugins.length === 0 && !creating ? (
-        <div className="flex items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-          <Puzzle className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="py-7">
           <p className="text-[13px] text-muted-foreground">
             No custom plugins yet. Add one and Chippi can call your own tools by name.
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-border/60 rounded-xl border border-border bg-card">
+        <ul className="divide-y divide-border/60">
           {plugins.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-              <Puzzle className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <li key={p.id} className="group/row -mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/30">
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-foreground">
-                  {p.name}
-                  <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-                    {p.method} · {p.hasAuth ? 'authed' : 'no auth'}
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-foreground">{p.name}</p>
+                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {p.method}
                   </span>
-                </p>
+                  <span className="text-[11px] text-muted-foreground">
+                    {p.hasAuth ? 'Authenticated' : 'No authentication'}
+                  </span>
+                </div>
                 <p className="truncate text-[12px] text-muted-foreground">{p.description}</p>
               </div>
               <button
                 type="button"
                 onClick={() => void toggle(p)}
+                aria-pressed={p.enabled}
                 className={cn(
                   'shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors',
                   p.enabled
-                    ? 'border-border text-foreground hover:bg-accent'
+                    ? 'border-transparent bg-foreground/[0.06] text-foreground hover:bg-foreground/[0.09]'
                     : 'border-border/60 text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -232,7 +272,7 @@ function PluginsSection({
                 type="button"
                 onClick={() => void remove(p)}
                 aria-label={`Delete ${p.name}`}
-                className="shrink-0 text-muted-foreground/60 transition-colors hover:text-destructive"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -271,6 +311,8 @@ function SkillsSection({
       setForm({ title: '', description: '', prompt: '' });
       setCreating(false);
       onChanged();
+    } catch {
+      setError('Could not create the skill. Try again.');
     } finally {
       setBusy(false);
     }
@@ -278,8 +320,13 @@ function SkillsSection({
 
   async function remove(s: SkillRow) {
     if (!confirm(`Delete the "${s.title}" skill?`)) return;
-    await fetch(`/api/skills/${s.id}?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
-    onChanged();
+    try {
+      const res = await fetch(`/api/skills/${s.id}?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete_failed');
+      onChanged();
+    } catch {
+      toast.error(`Could not delete ${s.title}.`);
+    }
   }
 
   return (
@@ -288,7 +335,7 @@ function SkillsSection({
         <p className={SECTION_LABEL}>Your skills</p>
         {!creating && (
           <Button variant="outline" size="xs" onClick={() => setCreating(true)}>
-            <Plus /> New skill
+            New skill
           </Button>
         )}
       </div>
@@ -298,18 +345,21 @@ function SkillsSection({
       </p>
 
       {creating && (
-        <div className="mb-4 space-y-2.5 rounded-xl border border-border bg-card p-4">
+        <div className="mb-5 space-y-2.5 rounded-2xl bg-muted/30 p-4 sm:p-5">
           <Input
+            aria-label="Skill name"
             value={form.title}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             placeholder="Name (e.g. Open-house follow-up)"
           />
           <Input
+            aria-label="Skill description"
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             placeholder="One line on what it does (shows in the / menu)"
           />
           <Textarea
+            aria-label="Skill prompt"
             value={form.prompt}
             onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))}
             placeholder="The prompt to run — e.g. “Draft warm follow-ups for everyone who visited the open house at {address}, mention one specific detail each.”"
@@ -328,26 +378,24 @@ function SkillsSection({
       )}
 
       {skills.length === 0 && !creating ? (
-        <div className="flex items-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-5">
-          <SlashSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="py-7">
           <p className="text-[13px] text-muted-foreground">
             No saved skills yet. Turn the asks you repeat every week into one-tap plays.
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-border/60 rounded-xl border border-border bg-card">
+        <ul className="divide-y divide-border/60">
           {skills.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-3">
-              <SlashSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <li key={s.id} className="group/row -mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/30">
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-foreground">{s.title}</p>
+                <p className="text-sm font-medium text-foreground">{s.title}</p>
                 <p className="truncate text-[12px] text-muted-foreground">{s.description || s.prompt}</p>
               </div>
               <button
                 type="button"
                 onClick={() => void remove(s)}
                 aria-label={`Delete ${s.title}`}
-                className="shrink-0 text-muted-foreground/60 transition-colors hover:text-destructive"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted/40 hover:text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

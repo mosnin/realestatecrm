@@ -55,7 +55,7 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
     const subject = typeof a.subject === 'string' ? a.subject : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
-      <div className="mt-2.5 space-y-1.5 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[12px]">
+      <div className="mt-2.5 space-y-1.5 bg-transparent py-1 text-[12px]">
         <div><span className="text-muted-foreground font-medium">To:</span> {to}</div>
         <div><span className="text-muted-foreground font-medium">Subject:</span> {subject}</div>
         <div>
@@ -74,7 +74,7 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
     const to = typeof a.toPhone === 'string' ? a.toPhone : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
-      <div className="mt-2.5 space-y-1.5 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[12px]">
+      <div className="mt-2.5 space-y-1.5 bg-transparent py-1 text-[12px]">
         <div><span className="text-muted-foreground font-medium">To:</span> {to}</div>
         <div>
           <span className="text-muted-foreground font-medium">Message:</span>
@@ -130,7 +130,7 @@ function InlineComposeCard({
   const smsSegments = smsLen === 0 ? 0 : Math.ceil(Math.max(smsLen, 1) / SMS_SOFT_LIMIT);
 
   return (
-    <div className="mt-2.5 rounded-md border border-border bg-background/80 overflow-hidden">
+    <div className="mt-2.5 overflow-hidden border-y border-border/40 bg-transparent">
       {/* To row — read-only */}
       <div className="flex items-center gap-2 px-2.5 py-1.5 border-b border-border/60 text-[12px] text-muted-foreground">
         {kind === 'email' ? (
@@ -351,7 +351,7 @@ export function PermissionPromptView({
           setParseError(null);
         }}
         rows={Math.min(10, Math.max(4, argsText.split('\n').length + 1))}
-        className="w-full rounded-lg border border-border bg-background px-2.5 py-2 font-mono text-[11px] text-foreground outline-none transition-colors focus:border-foreground"
+        className="w-full rounded-lg border border-border bg-transparent px-2.5 py-2 font-mono text-[11px] text-foreground outline-none transition-colors focus:border-foreground"
         spellCheck={false}
         disabled={disabled}
       />
@@ -363,7 +363,7 @@ export function PermissionPromptView({
     </div>
   ) : (
     PrettyArgs({ prompt }) ?? (
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-muted/35 px-2.5 py-2 font-mono text-[11px] text-foreground/80">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words border-y border-border/40 bg-transparent py-2 font-mono text-[11px] text-foreground/80">
         {JSON.stringify(prompt.args, null, 2)}
       </pre>
     )

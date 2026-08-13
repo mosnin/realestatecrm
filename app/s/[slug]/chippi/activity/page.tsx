@@ -1,6 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
@@ -48,13 +47,12 @@ export default async function ChippiActivityPage({
       title="Everything I've done."
       subtitle="Filter by type, status, or date to find exactly what happened, when, and how it turned out."
     >
-      <div className="flex justify-end -mt-2">
+      <div className="-mt-2 flex justify-end border-b border-border/60 pb-3">
         <Link
           href={`/s/${slug}/chippi/triggers`}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           Manage what Chippi listens to
-          <ChevronRight size={13} aria-hidden />
         </Link>
       </div>
       <UnifiedActivityFeed />

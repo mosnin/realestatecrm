@@ -120,7 +120,7 @@ export function AgentTodoList({
       collapseOnComplete={collapseOnComplete}
       className={className}
     >
-      <ol aria-label="Agent task plan" className="divide-y divide-border/50 px-4">
+      <ol aria-label="Agent task plan" className="divide-y divide-border/40 px-0">
         <AnimatePresence initial={false} mode="popLayout">
           {items.map((item) => {
             const progress = boundedTodoProgress(item.progress);
@@ -132,7 +132,7 @@ export function AgentTodoList({
                 animate={{ opacity: 1, y: 0 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
                 transition={{ duration: DURATION_DROP, ease: EASE_OUT }}
-                className="flex min-w-0 items-start gap-2.5 py-2.5"
+                className="flex min-w-0 items-start gap-2.5 py-3"
               >
                 <TodoStatusMark status={item.status} />
                 <span className="min-w-0 flex-1">

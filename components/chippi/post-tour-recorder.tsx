@@ -13,20 +13,21 @@
  *     Tap is forgiving.
  *   - The transcript is invisible. The realtor never sees it. They see
  *     the actions land, which is the substance.
- *   - "Approve all" is the primary path. Editing exists but is one click
- *     away — the brief says most realtors approve all.
+ *   - "Approve selected" is the primary path. Editing exists but is one
+ *     click away, and unchecked actions remain visibly excluded.
  *   - One done-sentence. No toasts.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square, Pencil, X, ArrowLeft } from 'lucide-react';
+import { Mic, Square, Pencil, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TITLE_FONT, PRIMARY_PILL, GHOST_PILL } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import { DASHBOARD_SURFACE } from '@/components/ui/surface-card';
 
 type State =
   | 'idle'
@@ -273,14 +274,16 @@ export function PostTourRecorder({ slug, personId, dealId }: Props) {
               : 'Done.';
 
   return (
-    <div className="w-full max-w-md">
+    <div
+      className={cn(DASHBOARD_SURFACE, 'w-full max-w-xl p-6 sm:p-10')}
+      data-chippi-recorder="post-tour"
+    >
       {/* Back link — single muted breadcrumb. Doesn't compete with the focal element. */}
       <div className="mb-10">
         <Link
           href={`/s/${slug}/chippi`}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeft size={12} />
           Back to Chippi
         </Link>
       </div>
@@ -346,7 +349,7 @@ export function PostTourRecorder({ slug, personId, dealId }: Props) {
                 className={PRIMARY_PILL}
                 disabled={proposals.every((p) => !p.enabled)}
               >
-                Approve all
+                Approve selected
               </button>
               <button
                 type="button"
@@ -467,7 +470,7 @@ function RecordButton({
 
 function CalmPulse() {
   return (
-    <div className="flex items-center gap-1.5" aria-label="Working">
+    <div className="flex items-center gap-1.5" role="status" aria-live="polite" aria-label="Working">
       {[0, 1, 2].map((i) => (
         <motion.span
           key={i}
@@ -498,11 +501,11 @@ function ProposalStack({
   }
 
   return (
-    <ul className="divide-y divide-border/60 rounded-xl border border-border/70 bg-card overflow-hidden">
+    <ul className="divide-y divide-border/60 border-y border-border/60">
       {proposals.map((p) => {
         const label = p.humanSummary ?? p.summary;
         return (
-        <li key={p.uid} className="px-4 py-3">
+        <li key={p.uid} className="px-2 py-3">
           <div className="flex items-center gap-3">
             <input
               type="checkbox"

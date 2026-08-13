@@ -56,6 +56,109 @@ import {
 const COMPACTION_THRESHOLD_CHARS = 80_000;
 const WORK_ACTIVITY_LABEL_LIMIT = 160;
 
+export type ProviderTurnErrorClass =
+  | 'reasoning_replay_rejected'
+  | 'tool_replay_rejected'
+  | 'context_limit'
+  | 'rate_limited'
+  | 'authentication'
+  | 'bad_request'
+  | 'provider_server_error'
+  | 'transport'
+  | 'unknown';
+
+function errorRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+}
+
+function safeMetadataToken(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const compact = value.trim();
+  return /^[A-Za-z0-9_.:-]{1,120}$/.test(compact) ? compact : undefined;
+}
+
+function providerErrorDetail(error: unknown): string {
+  const outer = errorRecord(error);
+  const providerBody = errorRecord(outer?.error);
+  const cause = errorRecord(outer?.cause);
+  const causeBody = errorRecord(cause?.error);
+  const detail =
+    providerBody?.message
+    ?? causeBody?.message
+    ?? outer?.message
+    ?? cause?.message;
+  return typeof detail === 'string' ? detail.slice(0, 32_768) : '';
+}
+
+function classifyProviderTurnError(status: number | undefined, detail: string): ProviderTurnErrorClass {
+  const text = detail.toLowerCase();
+  if (/reasoning[_\s-]?details?|thinking blocks?|reasoning signature/.test(text)) {
+    return 'reasoning_replay_rejected';
+  }
+  if (/tool[_\s-]?calls?|tool[_\s-]?call[_\s-]?id|tool results?|tool messages?/.test(text)) {
+    return 'tool_replay_rejected';
+  }
+  if (/context.{0,20}(?:length|window|limit)|maximum context/.test(text)) return 'context_limit';
+  if (status === 429 || /rate limit|too many requests/.test(text)) return 'rate_limited';
+  if (status === 401 || status === 403) return 'authentication';
+  if (status === 400 || status === 422) return 'bad_request';
+  if (status != null && status >= 500) return 'provider_server_error';
+  if (/network|fetch failed|econn|socket|timed? out|connection/.test(text)) return 'transport';
+  return 'unknown';
+}
+
+/**
+ * Extract only non-content provider diagnostics. Never return the provider's
+ * message, request body, tool arguments, or user content. A bounded detail is
+ * inspected in memory solely to assign a coarse class and correlation hash.
+ */
+export function providerTurnErrorLogContext(error: unknown): Record<string, unknown> {
+  const outer = errorRecord(error);
+  const cause = errorRecord(outer?.cause);
+  const statusCandidate = outer?.status ?? outer?.statusCode ?? cause?.status ?? cause?.statusCode;
+  const status = typeof statusCandidate === 'number' && Number.isFinite(statusCandidate)
+    ? statusCandidate
+    : undefined;
+  const detail = providerErrorDetail(error);
+  const requestId = safeMetadataToken(
+    outer?.requestID ?? outer?.requestId ?? cause?.requestID ?? cause?.requestId,
+  );
+  const code = safeMetadataToken(outer?.code ?? cause?.code);
+  const providerType = safeMetadataToken(outer?.type ?? cause?.type);
+  const errorName = safeMetadataToken(outer?.name ?? cause?.name);
+
+  return {
+    providerErrorClass: classifyProviderTurnError(status, detail),
+    ...(status != null ? { providerStatus: status } : {}),
+    ...(code ? { providerCode: code } : {}),
+    ...(providerType ? { providerType } : {}),
+    ...(requestId ? { providerRequestId: requestId } : {}),
+    ...(errorName ? { errorName } : {}),
+    ...(detail
+      ? {
+          providerBodyBytes: new TextEncoder().encode(detail).byteLength,
+          providerBodySha256: crypto.createHash('sha256').update(detail).digest('hex'),
+        }
+      : {}),
+  };
+}
+
+/**
+ * Provider exceptions can embed the entire rejected request, including user
+ * content and tool arguments. Keep the raw error out of logger.error's third
+ * parameter because that parameter is forwarded to observability providers.
+ */
+export function logProviderTurnFailure(
+  stage: 'start failed' | 'stream pump crashed',
+  context: { conversationId: string; model: string },
+  error: unknown,
+): void {
+  logger.error(`[ai/task ts] ${stage}`, {
+    ...context,
+    ...providerTurnErrorLogContext(error),
+  });
+}
+
 /** Keep activity copy compact even when a provider or tool supplied a long value. */
 export function boundedWorkActivityLabel(value: string): string {
   const compact = value.replace(/\s+/g, ' ').trim();
@@ -724,7 +827,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             code: 'internal',
           });
         } else if (!aborted) {
-          logger.error('[ai/task ts] start failed', { conversationId: input.conversationId }, err);
+          logProviderTurnFailure('start failed', {
+            conversationId: input.conversationId,
+            model: input.model ?? DEFAULT_CHAT_MODEL,
+          }, err);
           pushEvent({
             type: 'error',
             message: chippiErrorMessage('internal'),
@@ -920,7 +1026,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             code: 'internal',
           });
         } else if (!aborted) {
-          logger.error('[ai/task ts] stream pump crashed', { conversationId: input.conversationId }, err);
+          logProviderTurnFailure('stream pump crashed', {
+            conversationId: input.conversationId,
+            model: input.model ?? DEFAULT_CHAT_MODEL,
+          }, err);
           pushEvent({
             type: 'error',
             message: chippiErrorMessage('internal'),

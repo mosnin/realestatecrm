@@ -78,6 +78,24 @@ describe('withLoopGuard', () => {
     expect(JSON.parse(second).ok).toBe(false);
   });
 
+  it('allows create_plan once and blocks the second call even when its payload changes', async () => {
+    const { tool, exec } = fakeTool('create_plan');
+    const [g] = withLoopGuard([tool]);
+
+    await invoke(g, JSON.stringify({
+      task: 'Rank the people',
+      steps: [{ title: 'Read', description: 'Read the book.' }],
+    }));
+    const second = await invoke(g, JSON.stringify({
+      steps: [{ description: 'Read every person.', title: 'Read' }],
+      task: 'Rank all the people',
+    }));
+
+    expect(exec).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(second)).toMatchObject({ ok: false });
+    expect(JSON.parse(second).error).toMatch(/only be called once per turn/i);
+  });
+
   it('counts each tool independently', async () => {
     const a = fakeTool('tool_a');
     const b = fakeTool('tool_b');

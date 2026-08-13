@@ -31,11 +31,9 @@ import {
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { ThinkingOrb, type OrbState } from 'thinking-orbs';
-import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { getTurn, consumeFinishedTurn, turnKey } from '@/components/ai/hooks/turn-runner';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
-import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import type { ChatConversation } from '@/lib/types';
 import { useUser } from '@clerk/nextjs';
 import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
@@ -64,6 +62,7 @@ import {
   researchActivityFromToolResult,
   type ResearchSourceLink,
 } from '@/lib/chippi/research-workspace';
+import { consumeWorkDraftHandoff } from '@/lib/chippi/work-draft-handoff';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -1238,6 +1237,20 @@ export function ChippiWorkspace({
   const [prefill, setPrefill] = useState<{ text: string; nonce: number } | null>(
     initialPrefill ? { text: initialPrefill, nonce: Date.now() } : null,
   );
+  useEffect(() => {
+    if (initialConversationId || initialMessages.length > 0) return;
+    let handoff: ReturnType<typeof consumeWorkDraftHandoff> = null;
+    try {
+      handoff = consumeWorkDraftHandoff(window.sessionStorage, slug);
+    } catch {
+      return;
+    }
+    if (!handoff) return;
+    setChatMode('work');
+    writeStoredChatMode(null, 'work');
+    setDraftWorkExecutionMode(handoff.executionMode);
+    setPrefill({ text: handoff.text, nonce: Date.now() });
+  }, [initialConversationId, initialMessages.length, slug]);
   const handleTellMeAboutLead = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
@@ -2062,27 +2075,6 @@ export function ChippiWorkspace({
                       </motion.div>
                     );
                   })}
-
-                  {/* Suggested follow-ups — visible only when the conversation
-                      is idle (no thinking, no streaming, no error) and the
-                      last turn was an assistant turn with completed tool
-                      content. Click → fires the chip text as the next user
-                      message. Removes the typing step for the obvious next
-                      move (Claude / ChatGPT pattern). */}
-                  {!showThinking && !turnActive && !agentError && (() => {
-                    const last = messages[messages.length - 1];
-                    if (!last || last.role !== 'assistant' || !last.blocks) return null;
-                    const suggestions = getSuggestionsForTurn(last.blocks);
-                    if (suggestions.length === 0) return null;
-                    return (
-                      <SuggestedActions
-                        suggestions={suggestions}
-                        onSelect={(text) => {
-                          void handleSend(text, [], undefined);
-                        }}
-                      />
-                    );
-                  })()}
 
                   {/* Errors land inline as Chippi assistant messages
                       (see useAgentTask.landChippiError) so the failure mode

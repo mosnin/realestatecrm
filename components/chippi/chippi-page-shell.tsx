@@ -33,7 +33,7 @@ import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
 
 interface ChippiPageShellProps {
   /** Small muted line above the title, e.g. "Drafts." or "Memory." */
-  greeting: string;
+  greeting?: string;
   /** Page title — serif Times. Optional: omit when the content owns the
    *  page's h1 (the brief's morning sentence is its title). */
   title?: string;
@@ -59,6 +59,11 @@ interface ChippiPageShellProps {
    * set it; reading pages keep the plain canvas.
    */
   washed?: boolean;
+  /**
+   * Reading pages keep the canonical max-w-5xl column. Dashboard pages get a
+   * wider, warm editorial canvas and let their primary panel own the title.
+   */
+  layout?: 'reading' | 'dashboard';
 }
 
 export function ChippiPageShell({
@@ -68,24 +73,41 @@ export function ChippiPageShell({
   children,
   variant = 'realtor',
   washed = false,
+  layout = 'reading',
 }: ChippiPageShellProps) {
   void variant; // consumed by callers for route resolution — no visual branch today
+  const hasHeader = Boolean(greeting || title || subtitle);
   return (
-    <div className={cn('h-full overflow-y-auto', washed && 'bg-surface/55 dark:bg-transparent')}>
+    <div
+      className={cn(
+        'h-full overflow-y-auto',
+        washed && 'bg-surface/55 dark:bg-transparent',
+        layout === 'dashboard' && 'chippi-dashboard-canvas',
+      )}
+    >
       {/* Match the Automations page frame: the wider max-w-5xl reading column
           and the space-y-8 section rhythm, so every Chippi non-chat sub-page
           (brief, inbox, activity, …) sits in the same premium People/Deals
           surface rather than a narrow chat-reading column. */}
-      <div className="w-full max-w-5xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-9">
-        <header className="space-y-1.5">
-          <p className={BODY_MUTED}>{greeting}</p>
-          {title && (
-            <h1 className={H1} style={TITLE_FONT}>
-              {title}
-            </h1>
-          )}
-          {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
-        </header>
+      <div
+        className={cn(
+          'w-full mx-auto chat-content-wrap pb-24',
+          layout === 'dashboard'
+            ? 'max-w-[1500px] pt-5 sm:pt-8 space-y-5'
+            : 'max-w-5xl pt-10 sm:pt-14 space-y-9',
+        )}
+      >
+        {hasHeader && (
+          <header className="space-y-1.5">
+            {greeting && <p className={BODY_MUTED}>{greeting}</p>}
+            {title && (
+              <h1 className={H1} style={TITLE_FONT}>
+                {title}
+              </h1>
+            )}
+            {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+          </header>
+        )}
         {children}
       </div>
     </div>

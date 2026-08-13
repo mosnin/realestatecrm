@@ -55,15 +55,15 @@ function statusCopy(status: ToolApprovalStatus): string {
 
 function statusTone(status: ToolApprovalStatus): string {
   if (status === 'pending') {
-    return 'border-amber-500/25 bg-amber-500/[0.07] text-amber-700 dark:text-amber-300';
+    return 'text-amber-700 dark:text-amber-300';
   }
   if (status === 'approving' || status === 'running') {
-    return 'border-foreground/10 bg-foreground/[0.055] text-foreground/70';
+    return 'text-foreground/70';
   }
   if (status === 'approved' || status === 'complete') {
-    return 'border-emerald-500/20 bg-emerald-500/[0.055] text-emerald-700 dark:text-emerald-300';
+    return 'text-emerald-700 dark:text-emerald-300';
   }
-  return 'border-rose-500/20 bg-rose-500/[0.055] text-rose-700 dark:text-rose-300';
+  return 'text-rose-700 dark:text-rose-300';
 }
 
 /**
@@ -118,18 +118,18 @@ export function ToolApproval({
   return (
     <section
       data-beui-surface="tool-approval"
+      data-agent-surface-style="inline"
       data-state={status}
       aria-busy={busy}
       className={cn(
-        'w-full overflow-hidden rounded-2xl border border-border/70 bg-card',
-        'shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:shadow-none',
+        'w-full overflow-hidden border-y border-border/45 bg-transparent',
         className,
       )}
     >
-      <div className="flex items-start gap-3 p-4">
+      <div className="flex items-start gap-3 px-0 py-3.5">
         <span
           aria-hidden="true"
-          className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl border border-border/60 bg-background text-muted-foreground"
+          className="mt-0.5 grid size-6 shrink-0 place-items-center text-muted-foreground"
         >
           <StatusIcon className={cn('size-4', busy && !reduceMotion && 'animate-spin')} />
         </span>
@@ -144,7 +144,7 @@ export function ToolApproval({
             </div>
             <span
               className={cn(
-                'shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em]',
+                'shrink-0 py-0.5 text-[10px] font-semibold uppercase tracking-[0.07em]',
                 statusTone(status),
               )}
             >
@@ -188,7 +188,7 @@ export function ToolApproval({
             transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
             className="overflow-hidden"
           >
-            <div className="mx-4 mb-4 rounded-xl border border-border/55 bg-background/70 p-3">
+            <div className="ml-9 mb-3 border-l border-border/45 py-1 pl-3">
               {children}
             </div>
           </motion.div>
@@ -196,7 +196,7 @@ export function ToolApproval({
       </AnimatePresence>
 
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border/45 px-0 py-3">
           {actions}
         </div>
       ) : null}

@@ -94,12 +94,12 @@ export function workActivityDisclosureStatus(
 
 function statusTone(status: WorkActivityStatus): string {
   if (status === 'failed') {
-    return 'border-rose-500/20 bg-rose-500/[0.045] text-rose-700 dark:text-rose-300';
+    return 'text-rose-700 dark:text-rose-300';
   }
   if (status === 'active') {
-    return 'border-foreground/10 bg-foreground/[0.055] text-foreground/75';
+    return 'text-foreground/75';
   }
-  return 'border-border/70 bg-background/55 text-muted-foreground';
+  return 'text-muted-foreground';
 }
 
 export function WorkActivityTimeline({
@@ -150,7 +150,7 @@ export function WorkActivityTimeline({
         className={className}
       >
 
-        <ol aria-label="Grounded work progress" className="divide-y divide-border/50 px-4">
+        <ol aria-label="Grounded work progress" className="divide-y divide-border/40 px-0">
           <AnimatePresence initial={false} mode="popLayout">
             {visible.map((event, index) => {
               const isLatest = index === visible.length - 1;
@@ -197,7 +197,7 @@ export function WorkActivityTimeline({
 
                 <span
                   className={cn(
-                    'mt-0.5 shrink-0 rounded-full border px-1.5 py-0.5',
+                    'mt-0.5 shrink-0 py-0.5',
                     'text-[9.5px] font-semibold uppercase tracking-[0.08em]',
                     statusTone(event.status),
                   )}

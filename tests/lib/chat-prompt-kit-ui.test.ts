@@ -46,6 +46,8 @@ describe('chat Prompt Kit UI phases', () => {
     expect(toolCall).toContain('status={resultStatus}');
     expect(toolGroup).toContain("import { Steps } from '@/components/ai/prompt-kit';");
     expect(toolGroup).toContain('<Steps state={state} count={blocks.length}>');
+    expect(toolGroup).toContain('toolGroupOutcomeLabel(blocks)');
+    expect(toolGroup).not.toContain("? 'Task completed'");
   });
 
   it('phase 5 provides source primitives without wiring unscoped source rendering into transcripts', () => {
@@ -81,5 +83,9 @@ describe('chat Prompt Kit UI phases', () => {
     expect(thinkingIndicator).toContain("import { ChainOfThought } from '@/components/ai/prompt-kit';");
     expect(thinkingIndicator).toContain("} from '@/components/ai/agent-status';");
     expect(thinkingIndicator).toContain("content={streamingReasoning ?? ''}");
+    const chain = read('components/ai/prompt-kit/chain-of-thought.tsx');
+    expect(chain).toContain('data-agent-surface-style="inline"');
+    expect(chain).toContain('border-l border-border/40 bg-transparent');
+    expect(chain).not.toContain('bg-muted/30');
   });
 });

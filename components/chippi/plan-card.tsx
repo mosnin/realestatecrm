@@ -125,23 +125,24 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
 
   return (
     <motion.div
+      data-agent-surface-style="inline"
       initial={isAnimating ? { opacity: 0, y: 6 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      className="rounded-xl border border-border/70 bg-background overflow-hidden"
+      className="overflow-hidden border-y border-border/45 bg-transparent"
     >
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-3 px-4 pt-4 pb-3 border-b border-border/50">
+      <div className="flex items-start gap-3 border-b border-border/40 px-0 pb-3 pt-3.5">
         {/* Icon wrapper — animates between states */}
         <div className="relative flex-shrink-0 mt-0.5">
           <motion.div
             variants={ICON_VARIANTS}
             animate={iconState}
             className={cn(
-              'w-6 h-6 rounded-md flex items-center justify-center transition-colors duration-300',
+              'flex h-6 w-6 items-center justify-center transition-colors duration-300',
               allVisible
-                ? 'bg-foreground/[0.06] text-foreground'
-                : 'bg-muted text-muted-foreground',
+                ? 'text-foreground'
+                : 'text-muted-foreground',
             )}
           >
             <MessageCircle size={13} />
@@ -156,9 +157,9 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
                 initial="hidden"
                 animate="visible"
                 exit="hidden"
-                className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-foreground flex items-center justify-center"
+                className="absolute -bottom-1 -right-1 flex h-3 w-3 items-center justify-center text-foreground"
               >
-                <Check size={7} strokeWidth={3} className="text-background" />
+                <Check size={8} strokeWidth={2.5} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -174,7 +175,7 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
       </div>
 
       {/* ── Steps ──────────────────────────────────────────────────────── */}
-      <ol className="px-4 py-3 space-y-0">
+      <ol className="space-y-0 px-0 py-2">
         <AnimatePresence initial={false}>
           {steps.slice(0, visibleCount).map((step, index) => (
             <motion.li
@@ -201,7 +202,7 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
                   className={cn(
                     'flex-shrink-0 w-[26px] h-[26px] rounded-full flex items-center justify-center',
                     'text-[11px] font-semibold tabular-nums',
-                    'bg-foreground/[0.08] text-foreground',
+                    'border border-foreground/35 bg-transparent text-foreground',
                     'transition-colors duration-300',
                   )}
                 >
@@ -212,9 +213,9 @@ export function PlanCard({ task, steps, isAnimating = false, activeStepIndex }: 
                   className={cn(
                     'flex-shrink-0 w-[26px] h-[26px] rounded-full flex items-center justify-center',
                     'text-[11px] font-semibold tabular-nums',
-                    'bg-muted text-muted-foreground',
+                    'border border-border/55 bg-transparent text-muted-foreground',
                     'transition-colors duration-300',
-                    allVisible && 'bg-foreground/[0.05] text-foreground/60',
+                    allVisible && 'border-foreground/15 text-foreground/60',
                   )}
                 >
                   {index + 1}

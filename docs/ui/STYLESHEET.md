@@ -41,6 +41,23 @@ If an icon is conveying a *category/type/status*, replace it with the **word**
 - The single sanctioned brand-orange use is `CHIPPI_PILL` (buttons that directly
   invoke Chippi). Nothing else.
 
+### Dashboard atmosphere exception
+
+An authenticated dashboard view may carry **exactly one** low-opacity Chippi
+atmosphere behind its primary orientation region. The atmosphere must use the
+shared, real `AsciiField` canvas source, remain decorative (`aria-hidden`), and
+stay quiet enough that every label, value, link, and focus state meets normal
+contrast. It is not a second content surface and must never sit behind a list or
+table.
+
+- One atmosphere per dashboard view, not one per card or section.
+- Chippi orange is allowed only inside that shared atmosphere and on direct
+  Chippi actions covered by `CHIPPI_PILL`.
+- Do not recreate the field with CSS/div art, a custom SVG, a gradient, a glow,
+  or repeated background images.
+- Dark mode and `prefers-reduced-motion` must remain first-class; the shared
+  field owns its reduced-motion behavior.
+
 ## Row lists (the default for any list of records)
 
 Match People exactly:

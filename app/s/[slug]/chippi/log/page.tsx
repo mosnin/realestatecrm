@@ -12,6 +12,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { PostTourRecorder } from '@/components/chippi/post-tour-recorder';
 
 export const metadata = { title: 'Log a tour — Chippi' };
@@ -44,12 +45,17 @@ export default async function PostTourPage({
   if (!spaceOwner) notFound();
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12">
-      <PostTourRecorder
-        slug={slug}
-        personId={typeof personId === 'string' && personId ? personId : undefined}
-        dealId={typeof dealId === 'string' && dealId ? dealId : undefined}
-      />
-    </div>
+    <ChippiPageShell layout="dashboard">
+      <div
+        className="flex min-h-[calc(100vh-10rem)] items-center justify-center py-6 sm:py-10"
+        data-chippi-secondary-page="tour-log"
+      >
+        <PostTourRecorder
+          slug={slug}
+          personId={typeof personId === 'string' && personId ? personId : undefined}
+          dealId={typeof dealId === 'string' && dealId ? dealId : undefined}
+        />
+      </div>
+    </ChippiPageShell>
   );
 }

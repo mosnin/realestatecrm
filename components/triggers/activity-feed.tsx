@@ -82,56 +82,32 @@ function toolkitName(toolkit: string): string {
   return findIntegration(toolkit)?.name ?? toolkit;
 }
 
-function toolkitIconUrl(toolkit: string): string | undefined {
-  return findIntegration(toolkit)?.iconUrl;
-}
-
-/** A small, on-brand icon for an event's app. Falls back to a letter chip
- *  (same vocabulary as connected-apps-section's AppIcon) when no mark. */
-function EventIcon({ toolkit }: { toolkit: string }) {
-  const url = toolkitIconUrl(toolkit);
-  const name = toolkitName(toolkit);
-  if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" aria-hidden className="w-5 h-5 object-contain flex-shrink-0" />;
-  }
-  return (
-    <span
-      aria-hidden
-      className="w-5 h-5 rounded bg-muted text-muted-foreground inline-flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
-    >
-      {name[0]}
-    </span>
-  );
-}
-
 /** Status chip. 'captured'/'dispatched' read as normal activity; 'skipped'
- *  and 'failed' are quieter / amber so the realtor can tell signal from noise
- *  without it shouting. */
+ *  and 'failed' remain explicit without category color noise. */
 function StatusChip({ status }: { status: IntegrationEventStatus }) {
   const map: Record<IntegrationEventStatus, { label: string; cls: string }> = {
     captured: {
       label: 'Noticed',
-      cls: 'bg-foreground/[0.05] text-muted-foreground',
+      cls: 'border-border text-muted-foreground',
     },
     dispatched: {
       label: 'Drafted',
-      cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+      cls: 'border-border text-muted-foreground',
     },
     skipped: {
       label: 'Passed',
-      cls: 'bg-foreground/[0.05] text-muted-foreground',
+      cls: 'border-border text-muted-foreground',
     },
     failed: {
       label: 'Failed',
-      cls: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400',
+      cls: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-400',
     },
   };
   const { label, cls } = map[status];
   return (
     <span
       className={cn(
-        'inline-flex items-center text-[10px] font-semibold uppercase tracking-wider rounded-full px-1.5 py-0.5 flex-shrink-0',
+        'inline-flex flex-shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide',
         cls,
       )}
     >
@@ -153,11 +129,8 @@ function FeedRow({ event }: { event: ActivityEvent }) {
   // Headline: the event title if we extracted one, else a humanised app line.
   const headline = event.title ?? `${name} activity`;
   return (
-    <li className="group/row flex items-start gap-3 py-3 first:pt-0">
-      <span className="pt-0.5">
-        <EventIcon toolkit={event.toolkit} />
-      </span>
-      <div className="flex-1 min-w-0 space-y-0.5">
+    <li className="group/row -mx-2 flex items-start rounded-md px-2 py-3 transition-colors hover:bg-muted/30">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {name}
@@ -219,7 +192,7 @@ function ManageSection({
   if (rows.length === 0) return null;
 
   return (
-    <section className="space-y-3 pt-4 border-t border-border/60">
+    <section className="space-y-3 border-t border-border/60 pt-6">
       <p className={SECTION_LABEL}>Manage what Chippi watches</p>
       <ul className="divide-y divide-border/60">
         {rows.map(({ connection, triggers }) => {
@@ -228,8 +201,7 @@ function ManageSection({
           const isFailed = state === 'failed';
           const busy = busyConnectionId === connection.id;
           return (
-            <li key={connection.id} className="flex items-center gap-3 py-3 first:pt-0">
-              <EventIcon toolkit={connection.toolkit} />
+            <li key={connection.id} className="group/row -mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/30">
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-foreground font-medium truncate">
                   {toolkitName(connection.toolkit)}
@@ -294,11 +266,12 @@ function FilterChips({
         key={value ?? '__all'}
         type="button"
         onClick={() => onSelect(value)}
+        aria-pressed={selected}
         className={cn(
-          'inline-flex items-center h-7 px-3 rounded-full text-xs font-medium transition-colors',
+          'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors',
           selected
             ? 'bg-foreground text-background'
-            : 'bg-foreground/[0.05] text-muted-foreground hover:text-foreground',
+            : 'border border-border/70 bg-background text-muted-foreground hover:text-foreground',
         )}
       >
         {label}
@@ -443,7 +416,7 @@ export function ActivityFeed({
   // so ../../settings resolves to /s/[slug]/settings.)
   if (!hasConnections && !hasEvents) {
     return (
-      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center space-y-2">
+      <div className="space-y-2 px-5 py-12 text-center">
         <p className="text-sm text-foreground">Connect an app to see activity here.</p>
         <p className="text-xs text-muted-foreground">
           Chippi watches your inbox, calendar, CRM and more — and surfaces what matters.
@@ -459,7 +432,7 @@ export function ActivityFeed({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-secondary-list="connected-app-activity">
       {/* Live overlay — lazy, client-only, self-degrading. Renders nothing
           visible; just prepends new events. Safe when realtime is off. */}
       <ActivityLive spaceId={spaceId} onEvent={handleLiveEvent} />
@@ -473,7 +446,7 @@ export function ActivityFeed({
       {hasEvents ? (
         <>
           {visibleEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+            <div className="px-5 py-10 text-center">
               <p className="text-xs text-muted-foreground">
                 Nothing from {toolkitFilter ? toolkitName(toolkitFilter) : 'this app'} yet.
               </p>
@@ -504,7 +477,7 @@ export function ActivityFeed({
         </>
       ) : (
         // Connected apps, but no events captured yet.
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center">
+        <div className="px-5 py-10 text-center">
           <p className="text-sm text-foreground">Chippi is watching.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Events will appear here as they happen across your connected apps.

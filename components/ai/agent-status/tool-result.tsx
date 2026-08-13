@@ -144,9 +144,13 @@ export function AgentToolResult({
   return (
     <section
       data-beui-surface="tool-result"
+      data-agent-surface-style="inline"
       data-state={status}
       aria-busy={running}
-      className={cn('w-full text-sm', className)}
+      className={cn(
+        'w-full border-y border-border/40 bg-transparent py-0.5 text-sm',
+        className,
+      )}
     >
       <button
         type="button"
@@ -155,9 +159,9 @@ export function AgentToolResult({
         disabled={!hasDetails}
         onClick={() => hasDetails && setExpanded(!expanded)}
         className={cn(
-          'group flex min-h-9 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left outline-none',
-          'focus-visible:ring-2 focus-visible:ring-ring',
-          hasDetails ? 'transition-colors hover:bg-muted/25' : 'cursor-default',
+          'group flex min-h-10 w-full items-center gap-2 px-0 py-2 text-left outline-none',
+          'focus-visible:ring-2 focus-visible:ring-ring/45',
+          hasDetails ? 'transition-colors hover:text-foreground' : 'cursor-default',
         )}
       >
         <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center text-muted-foreground">
@@ -197,22 +201,22 @@ export function AgentToolResult({
             transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
             className="overflow-hidden"
           >
-            <div className="ml-6 mt-1.5 overflow-hidden rounded-xl border border-border/55 bg-muted/35">
+            <div className="ml-6 mt-1.5 overflow-hidden border-l border-border/45 pl-3">
               <div
                 role={running ? 'log' : 'region'}
                 aria-live={running ? 'polite' : undefined}
-                className={cn('overflow-y-auto p-3', contentClassName)}
+                className={cn('overflow-y-auto py-2.5 pr-0', contentClassName)}
                 style={{ maxHeight }}
               >
                 {children}
               </div>
               {copyText || onCopy ? (
-                <div className="flex items-center border-t border-border/50 px-2 py-1">
+                <div className="flex items-center border-t border-border/40 py-1">
                   <button
                     type="button"
                     onClick={() => void copy()}
                     aria-label={copied ? 'Result copied' : 'Copy result'}
-                    className="grid size-7 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className="grid size-7 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                   </button>

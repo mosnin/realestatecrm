@@ -234,7 +234,7 @@ export function ToolCallBlockView({
       && onOpenWorkbench
     ) {
       return (
-        <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+        <div className="mt-2 flex items-center justify-between gap-3 border-y border-border/40 bg-transparent py-2.5">
           <span className="inline-flex items-center gap-2 text-xs text-foreground"><Table2 className="size-3.5" /> Workbook ready</span>
           <button
             type="button"
@@ -381,7 +381,7 @@ export function ToolCallBlockView({
                   <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Arguments
                   </p>
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border/55 bg-background/70 px-2.5 py-2 font-mono text-[11px] text-foreground/80">
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-words border-y border-border/40 bg-transparent py-2 font-mono text-[11px] text-foreground/80">
                     {JSON.stringify(block.args, null, 2)}
                   </pre>
                 </div>
@@ -425,9 +425,7 @@ export function ToolCallBlockView({
           role="status"
           aria-label="Execution receipt"
           className={cn(
-            'mx-3 mt-1.5 flex items-start gap-2 rounded-xl border px-3 py-2',
-            'border-emerald-500/15 bg-emerald-500/[0.035]',
-            'shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:shadow-none',
+            'mt-2 flex items-start gap-2 border-l border-emerald-500/30 bg-transparent py-1 pl-3',
           )}
         >
           <CheckCircle2

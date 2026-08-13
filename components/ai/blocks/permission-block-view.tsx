@@ -19,12 +19,13 @@ export function PermissionBlockView({ block, className }: PermissionBlockViewPro
   const label = block.decision === 'denied' ? 'Denied' : 'Dismissed';
   return (
     <div
+      data-agent-surface-style="inline"
       className={cn(
-        'rounded-xl border border-border bg-muted/20 px-3 py-2 flex items-center gap-2.5',
+        'flex items-center gap-2.5 border-y border-border/40 bg-transparent px-0 py-3',
         className,
       )}
     >
-      <div className="w-6 h-6 rounded-md bg-background flex items-center justify-center flex-shrink-0 text-muted-foreground">
+      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-muted-foreground">
         <Lock size={12} />
       </div>
       <div className="flex-1 min-w-0">

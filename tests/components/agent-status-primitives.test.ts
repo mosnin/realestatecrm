@@ -57,6 +57,9 @@ describe('grounded agent todo primitive', () => {
     expect(boundedTodoProgress(140)).toBe(100);
 
     const html = renderToStaticMarkup(createElement(AgentTodoList, { items }));
+    expect(html).toContain('data-agent-surface-style="inline"');
+    expect(html).toContain('bg-transparent');
+    expect(html).not.toContain('bg-card');
     expect(html).toContain('Inspect the data flow');
     expect(html).toContain('Run checks');
     expect(html).toContain('aria-valuenow="25"');
@@ -79,9 +82,11 @@ describe('BEUI-adapted agent surfaces', () => {
     ));
 
     expect(html).toContain('data-beui-surface="tool-approval"');
+    expect(html).toContain('data-agent-surface-style="inline"');
     expect(html).toContain('data-state="pending"');
     expect(html).toContain('Approval required');
     expect(html).toContain('Subject: Showing tomorrow');
+    expect(html).not.toContain('bg-card');
   });
 
   it('renders bounded tool output without inventing a retry action', () => {
@@ -99,8 +104,10 @@ describe('BEUI-adapted agent surfaces', () => {
     ));
 
     expect(html).toContain('data-beui-surface="tool-result"');
+    expect(html).toContain('data-agent-surface-style="inline"');
     expect(html).toContain('data-state="success"');
     expect(html).toContain('49 pass · 0 fail');
+    expect(html).not.toContain('bg-muted/35');
     expect(html).not.toMatch(/retry/i);
   });
 
@@ -119,7 +126,9 @@ describe('BEUI-adapted agent surfaces', () => {
     }));
 
     expect(approval).toContain('data-beui-surface="approval-card"');
+    expect(approval).toContain('data-agent-surface-style="inline"');
     expect(approval).toContain('Response needed');
+    expect(approval).not.toContain('bg-background');
     expect(image).toContain('data-beui-surface="image-generation"');
     expect(image).toContain('data-state="queued"');
     expect(image).toContain('Waiting to generate');
