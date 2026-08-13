@@ -49,6 +49,10 @@ describe('Today dashboard system release contract', () => {
     expect(today).toContain('data-work-launch="aurora"');
     expect(today).toContain('data-aura-origin');
     expect(today).toContain('stageWorkDraftHandoff');
+    expect(today).toContain(
+      'Starts in Work mode. Chippi runs the goal and keeps you updated.',
+    );
+    expect(today).not.toContain('as a draft');
     expect(workspace).toContain(
       "handleSendRef.current(handoff.text, [], undefined, 'work')",
     );

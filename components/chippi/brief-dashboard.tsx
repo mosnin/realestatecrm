@@ -566,7 +566,7 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
       )}
       <div className="mt-2 flex flex-col gap-1.5 px-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground">
-          Opens in Work mode as a draft. You review it before sending.
+          Starts in Work mode. Chippi runs the goal and keeps you updated.
         </p>
         <button
           type="button"
