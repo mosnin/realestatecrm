@@ -83,7 +83,7 @@ export function SidebarNavItem({
           className={cn(
             'flex-shrink-0 transition-colors',
             isActive
-              ? 'text-background'
+              ? 'text-sidebar-accent-foreground'
               : 'text-foreground/55 group-hover:text-foreground',
           )}
         />
@@ -107,7 +107,7 @@ export function SidebarNavItem({
       ? 'flex items-center justify-center w-10 h-10 mx-auto'
       : 'flex items-center gap-2.5 h-9 pl-3 pr-2.5',
     isActive
-      ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
+      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70'
       : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
   );
 
@@ -123,7 +123,7 @@ export function SidebarNavItem({
               'group relative rounded-md text-[13px] transition-colors duration-150',
               'flex items-center h-9 pl-3 pr-1',
               isActive
-                ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70'
                 : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
             )}
           >
@@ -146,7 +146,7 @@ export function SidebarNavItem({
               className={cn(
                 'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded transition-colors',
                 isActive
-                  ? 'text-background/70 hover:bg-background/10 hover:text-background'
+                  ? 'text-sidebar-accent-foreground/70 hover:bg-sidebar-accent-foreground/[0.06] hover:text-sidebar-accent-foreground'
                   : 'text-muted-foreground/60 hover:bg-foreground/5 hover:text-foreground',
               )}
             >
@@ -198,7 +198,7 @@ export function SidebarNavItem({
                       className={cn(
                         'flex items-center h-7 px-2 rounded text-[12px] transition-colors duration-150',
                         childActive
-                          ? 'bg-foreground text-background font-medium'
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/60'
                           : 'text-foreground/55 hover:text-foreground hover:bg-foreground/[0.025]',
                       )}
                     >

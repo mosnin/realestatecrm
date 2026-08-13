@@ -357,7 +357,7 @@ function FlatNavItem({
         'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px]',
         'transition-[background-color,color,transform] duration-150 hover:translate-x-[1.5px]',
         isActive
-          ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70'
           : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
       )}
       style={{ willChange: 'transform' }}
@@ -375,7 +375,9 @@ function FlatNavItem({
           strokeWidth={isActive ? 2.25 : 1.75}
           className={cn(
             'flex-shrink-0 transition-colors',
-            isActive ? 'text-background' : 'text-foreground/55 group-hover:text-foreground',
+            isActive
+              ? 'text-sidebar-accent-foreground'
+              : 'text-foreground/55 group-hover:text-foreground',
           )}
         />
       )}
