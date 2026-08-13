@@ -16,8 +16,7 @@ export interface ChatSurfaceEndpoints {
  * Keeping these endpoints together prevents the easy-to-miss class of bugs
  * where the broker UI creates a BrokerConversation but later loads history or
  * mutates it through the realtor endpoints (or the inverse). The broker route
- * base is `/broker` because `app/broker/page.tsx` is the canonical broker
- * Chippi home today.
+ * base is `/broker/chippi`; `/broker` is the canonical Today entry.
  */
 export function chatSurfaceEndpoints(surface: ChatSurface, slug: string): ChatSurfaceEndpoints {
   if (surface === 'broker') {
@@ -29,7 +28,7 @@ export function chatSurfaceEndpoints(surface: ChatSurface, slug: string): ChatSu
       // Until a broker-specific resume endpoint exists, this intentionally 404s.
       resumeEndpointBase: '/api/ai/broker-task/resume',
       conversationItemBase: '/api/ai/broker-conversations',
-      routeBase: '/broker',
+      routeBase: '/broker/chippi',
       // The broker API resolves brokerage scope from the Clerk session.
       conversationCreatePayload: {},
     };

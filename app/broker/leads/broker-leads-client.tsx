@@ -24,7 +24,6 @@ import {
   ChevronUp,
   Loader2,
   Trash2,
-  Inbox,
 } from 'lucide-react';
 import {
   Dialog,
@@ -43,6 +42,14 @@ import {
   SECTION_LABEL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import {
+  BROKER_DIVIDED_LIST,
+  BROKER_EMPTY,
+  BROKER_INSET,
+  BROKER_PANEL,
+  BROKER_ROW,
+  BROKER_STATUS,
+} from '@/components/broker/premium';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,22 +101,11 @@ interface Props {
 
 function scorePill(label: string | null) {
   if (!label) return null;
-  const l = label.toLowerCase();
-  // Each temperature carries its tint; the bg deepens a touch when the row is
-  // hovered so the chip warms with the row. Text and label are unchanged.
-  const className =
-    l === 'hot'
-      ? 'text-foreground bg-foreground/[0.06]'
-      : l === 'warm'
-        ? 'text-muted-foreground bg-muted/60'
-        : l === 'cold'
-          ? 'text-muted-foreground bg-muted/60'
-          : 'text-muted-foreground bg-muted/60';
   return (
     <span
       className={cn(
-        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 transition-colors',
-        className,
+        BROKER_STATUS,
+        'flex-shrink-0 transition-colors',
       )}
     >
       {label}
@@ -144,11 +140,6 @@ function relativeTime(iso: string | null) {
 }
 
 function stagePill(stage: AssignedLeadProgress['currentStage']) {
-  const styles: Record<string, string> = {
-    QUALIFICATION: 'text-muted-foreground bg-muted/60',
-    TOUR: 'text-muted-foreground bg-muted/60',
-    APPLICATION: 'text-muted-foreground bg-muted/60',
-  };
   const labels: Record<string, string> = {
     QUALIFICATION: 'Qualifying',
     TOUR: 'Tour',
@@ -157,8 +148,8 @@ function stagePill(stage: AssignedLeadProgress['currentStage']) {
   return (
     <span
       className={cn(
-        'inline-flex text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
-        styles[stage] ?? 'text-muted-foreground bg-muted/60',
+        BROKER_STATUS,
+        'flex-shrink-0',
       )}
     >
       {labels[stage] ?? stage}
@@ -433,7 +424,7 @@ function UnassignedRow({
 
   return (
     <motion.li {...rowEntrance(index, !!reduce)}>
-      <div className="group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-muted/30 transition-colors">
+      <div className={cn(BROKER_ROW, 'items-center')}>
         <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-colors group-hover/row:bg-muted/70 group-hover/row:text-foreground">
           {getInitials(lead.name || lead.email || '?')}
         </div>
@@ -513,7 +504,7 @@ function UnassignedRow({
 
       {showNotes && (
         <div className="pb-3 pl-[calc(32px+0.75rem)]">
-          <div className="rounded-lg bg-muted/30 border border-border/60 p-3">
+          <div className={BROKER_INSET}>
             <LeadNotes contactId={lead.id} />
           </div>
         </div>
@@ -581,7 +572,8 @@ function AssignedRow({
           }
         }}
         className={cn(
-          'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors',
+          BROKER_ROW,
+          'items-center',
           canExpand ? 'cursor-pointer hover:bg-muted/30' : 'hover:bg-muted/30',
         )}
       >
@@ -941,13 +933,12 @@ export function BrokerLeadsClient({
       {/* Fresh-brokerage empty state — no leads at all. Canonical dashed card,
           one sentence, first-person Chippi voice. */}
       {!hasAnyLeads && (
-        <motion.div
+      <motion.div
           initial={reduce ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center"
+          className={BROKER_EMPTY}
         >
-          <Inbox size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
           <p className="text-base text-foreground">No leads yet.</p>
           <p className={cn(BODY_MUTED, 'mt-1.5')}>
             Your intake form will land them here — I&rsquo;ll route them to your team.
@@ -960,14 +951,14 @@ export function BrokerLeadsClient({
           single realtor: unassigned leads belong to no one, so an empty
           queue under a realtor filter is noise. */}
       {hasAnyLeads && realtorFilter === 'all' && (
-        <section className="space-y-2">
+        <section className={cn(BROKER_PANEL, 'space-y-3')}>
           <SectionHeader
             label="Unassigned"
             count={filteredUnassigned.length}
             hint={filteredUnassigned.length > 0 ? 'Route to a real estate agent' : undefined}
           />
           {filteredUnassigned.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <div className={BROKER_EMPTY}>
               <p className="text-sm text-foreground">
                 {isSearching
                   ? 'No matches in the unassigned queue.'
@@ -975,7 +966,7 @@ export function BrokerLeadsClient({
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className={BROKER_DIVIDED_LIST}>
               {filteredUnassigned.map((lead, i) => (
                 <UnassignedRow
                   key={lead.id}
@@ -995,10 +986,10 @@ export function BrokerLeadsClient({
 
       {/* Routed — what your team is working on. Quieter section. */}
       {hasAnyLeads && (
-        <section className="space-y-2">
+        <section className={cn(BROKER_PANEL, 'space-y-3')}>
           <SectionHeader label="Routed" count={filteredAssigned.length} />
           {filteredAssigned.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+            <div className={BROKER_EMPTY}>
               <p className="text-sm text-foreground">
                 {isSearching
                   ? 'No matches in the routed list.'
@@ -1008,7 +999,7 @@ export function BrokerLeadsClient({
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className={BROKER_DIVIDED_LIST}>
               {filteredAssigned.map((lead, i) => (
                 <AssignedRow
                   key={lead.id}

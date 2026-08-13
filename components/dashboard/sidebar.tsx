@@ -33,7 +33,6 @@ import {
   PanelLeftOpen,
   Users,
   UserCircle,
-  Mail,
   LayoutDashboard,
   SlidersHorizontal,
   Briefcase,
@@ -49,11 +48,6 @@ import {
   Activity,
   Upload,
   ArrowLeft,
-  Settings,
-  Key,
-  Shuffle,
-  GitBranch,
-  CreditCard,
   Plus,
   Check,
   Search,
@@ -68,11 +62,14 @@ import {
   TrendingUp,
   Coins,
   CalendarClock,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -116,8 +113,9 @@ interface SidebarProps {
 // More (one glance below — the routes that have existing users but don't
 // earn daily prominence): Realtors, Templates, Team Chat, Announcements,
 // Leaderboard, Analytics, Import/Export. Invitations folds into Members.
-// Settings sub-pages (form-builder, tracking, MCP, auto-assignment, routing
-// rules) live behind /broker/settings's own in-page tab strip.
+// Settings sub-pages live behind the shared Settings accordion. Keeping them
+// in this tree lets the expanded sidebar, compact rail, and mobile drawer all
+// expose the same role-filtered destinations.
 // Broker nav items extend the shared NavItem with the broker-only
 // `adminOnly` flag. Rendered through the shared SidebarNavItem accordion
 // (base=""), so children/exact behave exactly like the realtor nav.
@@ -136,7 +134,7 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       // — that one is the activity feed, not the chat surface; renamed
       // to "Agent activity" below to avoid two nav rows with the same name.
       {
-        href: '/broker',
+        href: '/broker/chippi',
         label: 'Chippi',
         icon: MessageCircle,
         exact: true,
@@ -146,16 +144,16 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
         // Brief and Reviews are real broker routes; "History" points at the
         // chat home (/broker), where the conversation-history drawer lives.
         children: [
-          { href: '/broker/brief', label: 'Brief' },
+          { href: '/broker/brief', label: 'Today' },
           { href: '/broker/reviews', label: 'Inbox' },
-          { href: '/broker', label: 'History', exact: true },
+          { href: '/broker/chippi', label: 'History', exact: true },
         ],
       },
       // The Floor — the single command view (who's reachable, what's waiting,
       // what's stalled, who's asking for judgement). First stop of the day;
       // every deeper surface is one link away from it or one disclosure down.
       { href: '/broker/floor', label: 'The Floor', icon: Radar, exact: false, adminOnly: false },
-      { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: false, adminOnly: false },
+      { href: '/broker/brief', label: 'Today', icon: LayoutDashboard, exact: false, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
       { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
@@ -166,14 +164,17 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
         icon: SlidersHorizontal,
         exact: false,
         adminOnly: true,
-        // Real settings sub-routes (form-builder, auto-assignment, routing
-        // rules, MCP all exist under app/broker/settings/). Dropdown gives
-        // brokers a direct door without first landing on the tab strip.
+        // Union of the former settings-only sidebar and the main Settings
+        // accordion. General is the parent route; every other destination is
+        // a child so no link disappears when settings uses the shared shell.
         children: [
+          { href: '/broker/settings/profile', label: 'Profile' },
+          { href: '/broker/invitations', label: 'Invitations' },
           { href: '/broker/settings/form-builder', label: 'Form builder' },
           { href: '/broker/settings/auto-assignment', label: 'Auto-assignment' },
           { href: '/broker/settings/routing-rules', label: 'Routing rules' },
           { href: '/broker/settings/mcp', label: 'MCP' },
+          { href: '/broker/billing', label: 'Billing' },
         ],
       },
     ],
@@ -211,7 +212,7 @@ export const brokerMemberNavSections: BrokerNavSection[] = [
   {
     label: '',
     items: [
-      { href: '/broker', label: 'My day', icon: LayoutDashboard, exact: true, adminOnly: false },
+      { href: '/broker/brief', label: 'Today', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/my-leads', label: 'My leads', icon: PhoneIncoming, exact: false, adminOnly: false },
       { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
     ],
@@ -221,31 +222,6 @@ export const brokerMemberNavSections: BrokerNavSection[] = [
     items: [
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
-    ],
-  },
-];
-
-const brokerSettingsNavSections = [
-  {
-    label: 'Team',
-    items: [
-      { href: '/broker/settings', label: 'General', icon: Settings, exact: true },
-      { href: '/broker/settings/profile', label: 'Profile', icon: UserCircle, exact: false },
-      { href: '/broker/invitations', label: 'Invitations', icon: Mail, exact: false },
-      { href: '/broker/settings/mcp', label: 'MCP', icon: Key, exact: false },
-    ],
-  },
-  {
-    label: 'Lead management',
-    items: [
-      { href: '/broker/settings/auto-assignment', label: 'Auto-assignment', icon: Shuffle, exact: false },
-      { href: '/broker/settings/routing-rules', label: 'Routing rules', icon: GitBranch, exact: false },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { href: '/broker/billing', label: 'Billing', icon: CreditCard, exact: false },
     ],
   },
 ];
@@ -869,7 +845,7 @@ export function BrokerSidebarConversations({
     const conv = await res.json();
     const boundedLimit = Math.max(1, Math.min(limit, 50));
     setConversations((prev) => (prev ? [conv, ...prev].slice(0, boundedLimit) : [conv]));
-    router.push(`/broker?conversationId=${conv.id}`);
+    router.push(`/broker/chippi?conversationId=${conv.id}`);
     onSelect?.();
   }, [limit, onSelect, router]);
 
@@ -931,7 +907,7 @@ export function BrokerSidebarConversations({
                     )}
                   >
                     <Link
-                      href={`/broker?conversationId=${conv.id}`}
+                      href={`/broker/chippi?conversationId=${conv.id}`}
                       onClick={() => onSelect?.()}
                       className="flex-1 min-w-0 pl-2.5 pr-1 py-1.5"
                     >
@@ -1020,6 +996,98 @@ function SidebarNotificationSlot({ collapsed = false }: { collapsed?: boolean })
   // (e.g. "new release notes", "billing nudge") slots in without moving
   // the user footer up/down.
   return null;
+}
+
+type SidebarRailLink = {
+  href: string;
+  label: string;
+  icon: NavItem['icon'];
+  isActive: boolean;
+  badgeText?: string;
+};
+
+/** Preserve the first occurrence so parent/child aliases never duplicate a
+ * destination inside the compact rail's single More menu. */
+export function dedupeSidebarRailLinks<T extends { href: string }>(links: T[]): T[] {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    if (seen.has(link.href)) return false;
+    seen.add(link.href);
+    return true;
+  });
+}
+
+function RailMoreMenu({ links }: { links: SidebarRailLink[] }) {
+  const items = dedupeSidebarRailLinks(links);
+  if (items.length === 0) return null;
+
+  const isActive = items.some((item) => item.isActive);
+  const hasBadge = items.some((item) => item.badgeText);
+
+  return (
+    <DropdownMenu>
+      <CollapsedTooltip
+        enabled
+        label={hasBadge ? 'More navigation · updates' : 'More navigation'}
+      >
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="More navigation"
+            aria-current={isActive ? 'page' : undefined}
+            className={cn(
+              'group relative mx-auto flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-150',
+              isActive
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground ring-1 ring-inset ring-sidebar-border/70'
+                : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
+            )}
+          >
+            <MoreHorizontal size={16} strokeWidth={1.75} />
+            {hasBadge && (
+              <span
+                aria-hidden
+                className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-sidebar"
+              />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+      </CollapsedTooltip>
+      <DropdownMenuContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="w-64 max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))]"
+      >
+        <DropdownMenuLabel className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+          More
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <DropdownMenuItem key={item.href} asChild>
+              <Link
+                href={item.href}
+                aria-current={item.isActive ? 'page' : undefined}
+                className={cn(
+                  'flex w-full items-center gap-2.5',
+                  item.isActive && 'bg-sidebar-accent text-sidebar-accent-foreground font-medium',
+                )}
+              >
+                <Icon size={14} strokeWidth={item.isActive ? 2.25 : 1.75} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badgeText && (
+                  <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-md bg-foreground/[0.06] px-1 text-[10px] font-medium tabular-nums text-muted-foreground">
+                    {item.badgeText}
+                  </span>
+                )}
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1298,6 +1366,28 @@ function RealtorNav({
     );
   };
 
+  const childRailLinks = (item: NavItem): SidebarRailLink[] =>
+    (item.children ?? []).map((child) => ({
+      href: `${base}${child.href}`,
+      label: `${item.label} · ${child.label}`,
+      icon: item.icon,
+      isActive: isChildActive(child, pathname, base, searchParamsString),
+    }));
+  const hiddenRailItems = [...moreItems, ...realtorMoreNavItems];
+  const railMoreLinks: SidebarRailLink[] = [
+    ...[...aiItems, ...coreItems].flatMap(childRailLinks),
+    ...hiddenRailItems.flatMap((item) => [
+      {
+        href: `${base}${item.href}`,
+        label: item.label,
+        icon: item.icon,
+        isActive: doesItemOwnPath(item, pathname, base),
+        badgeText: getBadgeText(item),
+      },
+      ...childRailLinks(item),
+    ]),
+  ];
+
   return (
     <nav
       className={cn(
@@ -1380,7 +1470,7 @@ function RealtorNav({
             rail mode the header has no room — render the rows flat (the
             rail is already an opt-in power view). */}
         {collapsed ? (
-          moreItems.map(renderItem)
+          <RailMoreMenu links={railMoreLinks} />
         ) : (
           <>
             <button
@@ -1412,7 +1502,7 @@ function RealtorNav({
           Empty today; kept so future additions don't require a layout
           replumb. Only renders when the array has items AND we're not on
           Chippi (the Chippi state owns this region). */}
-      {realtorMoreNavItems.length > 0 && !onChippi && (
+      {realtorMoreNavItems.length > 0 && !collapsed && !onChippi && (
         <div>
           <div className="space-y-0.5">{realtorMoreNavItems.map(renderItem)}</div>
         </div>
@@ -1473,7 +1563,7 @@ export function Sidebar({
   const brokerReducedMotion = useReducedMotion() ?? false;
   const [brokerSidebarView, setBrokerSidebarView] = useChippiSidebarView(
     pathname,
-    '/broker',
+    '/broker/chippi',
   );
   const renderedBrokerSidebarView = brokerCollapsed ? 'menu' : brokerSidebarView;
 
@@ -1509,6 +1599,47 @@ export function Sidebar({
   }, [pathname, brokerageRole]);
   const handleBrokerToggle = (key: string) => () =>
     setBrokerExpandedKey((prev) => (prev === key ? null : key));
+  const canManageBrokerage =
+    brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin';
+  const isVisibleBrokerItem = (item: BrokerNavItem) =>
+    !item.adminOnly || canManageBrokerage;
+  const brokerPrimaryItems = (brokerSections[0]?.items ?? []).filter(isVisibleBrokerItem);
+  const brokerSettingsItem = brokerPrimaryItems.find(
+    (item) => item.href === '/broker/settings',
+  );
+  const brokerCoreItems = brokerPrimaryItems.filter(
+    (item) => item.href !== '/broker/settings',
+  );
+  const brokerSecondaryItems = brokerSections
+    .slice(1)
+    .flatMap((section) => section.items)
+    .filter(isVisibleBrokerItem);
+  const brokerRailVisibleHrefs = new Set([
+    ...brokerCoreItems.map((item) => item.href),
+    ...(brokerSettingsItem ? [brokerSettingsItem.href] : []),
+  ]);
+  const brokerChildRailLinks = (item: BrokerNavItem): SidebarRailLink[] =>
+    (item.children ?? [])
+      .filter((child) => !brokerRailVisibleHrefs.has(child.href))
+      .map((child) => ({
+        href: child.href,
+        label: `${item.label} · ${child.label}`,
+        icon: item.icon,
+        isActive: isChildActive(child, pathname, '', searchParamsString),
+      }));
+  const brokerRailMoreLinks: SidebarRailLink[] = [
+    ...brokerCoreItems.flatMap(brokerChildRailLinks),
+    ...brokerSecondaryItems.flatMap((item) => [
+      {
+        href: item.href,
+        label: item.label,
+        icon: item.icon,
+        isActive: doesItemOwnPath(item, pathname, ''),
+      },
+      ...brokerChildRailLinks(item),
+    ]),
+    ...(brokerSettingsItem ? brokerChildRailLinks(brokerSettingsItem) : []),
+  ];
 
   // Admin console link visibility. The server passes isPlatformAdmin from the
   // DB platformRole; we OR it with the Clerk publicMetadata.role so an admin
@@ -1530,69 +1661,6 @@ export function Sidebar({
   const userEmail = user?.primaryEmailAddress?.emailAddress ?? null;
 
   const isOnBrokerPage = pathname.startsWith('/broker');
-  const isOnBrokerSettings = pathname.startsWith('/broker/settings');
-
-  // ── Broker settings sub-nav ──────────────────────────────────────────────
-  if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
-    return (
-      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col bg-sidebar border border-border/85 rounded-2xl overflow-hidden shrink-0 m-3 shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.2)]', SIDEBAR_WIDTH)}>
-        <div className="px-4 pt-5 pb-3">
-          <BrandLogo className="h-5" alt="Chippi" />
-        </div>
-
-        <div className="px-3 pb-1">
-          <Link
-            href="/broker"
-            className="group flex items-center gap-2 h-9 px-2.5 rounded-md text-[13px] font-medium transition-colors duration-150 text-muted-foreground hover:bg-foreground/[0.025] hover:text-foreground"
-          >
-            <ArrowLeft size={13} strokeWidth={1.75} className="flex-shrink-0" />
-            <span>Back to team</span>
-          </Link>
-        </div>
-
-        <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
-          {brokerSettingsNavSections.map((section) => (
-            <div key={section.label}>
-              <SectionLabel>{section.label}</SectionLabel>
-              {section.items.map((item) => {
-                const isActive = item.exact
-                  ? pathname === item.href
-                  : pathname.startsWith(item.href);
-                return (
-                  <FlatNavItem
-                    key={item.href}
-                    href={item.href}
-                    label={item.label}
-                    icon={item.icon}
-                    isActive={isActive}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        {showAdminLink && (
-          <>
-            <div className="border-t border-border/60" />
-            <AdminConsoleLink />
-          </>
-        )}
-        {/* What's New + user menu chip — same footer slot as the realtor and
-            the main broker sidebar. Settings sub-nav is still an in-app
-            screen, not a separate product, so the same update card and
-            user menu belong here. */}
-        <SidebarWhatsNew />
-        <div className="border-t border-border/50" />
-        <SidebarUserMenu
-          slug={slug}
-          displayName={displayName}
-          email={userEmail}
-          imageUrl={user?.imageUrl}
-        />
-      </aside>
-    );
-  }
 
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
@@ -1653,14 +1721,19 @@ export function Sidebar({
           {/* Broker primary nav — same structural vocabulary as RealtorNav:
               py-2 vertical breathing, space-y-3 between section groups,
               overflow-y-auto so deep section lists don't push the footer off. */}
-          <nav className="flex-1 px-3 py-2 mt-1 overflow-y-auto">
+          <nav
+            className={cn(
+              'flex-1 py-2 mt-1 overflow-y-auto',
+              brokerCollapsed ? 'px-1' : 'px-3',
+            )}
+          >
             <AnimatePresence initial={false} mode="popLayout">
               <motion.div
                 key={renderedBrokerSidebarView}
                 {...chippiSidebarPanelMotion(renderedBrokerSidebarView, brokerReducedMotion)}
                 className="space-y-3"
               >
-            {renderedBrokerSidebarView === 'history' && pathname === '/broker' ? (
+            {renderedBrokerSidebarView === 'history' && pathname === '/broker/chippi' ? (
               <div>
                 <button
                   type="button"
@@ -1674,7 +1747,7 @@ export function Sidebar({
               </div>
             ) : (
               <>
-                {pathname === '/broker' && (
+                {pathname === '/broker/chippi' && (
                   brokerCollapsed ? (
                     <CollapsedTooltip enabled label="Conversation history">
                       <button
@@ -1699,51 +1772,67 @@ export function Sidebar({
                     </button>
                   )
                 )}
-            <div className="space-y-0.5">
-              {brokerSections.map((section) => {
-                const visibleItems = section.items.filter(
-                  (item) =>
-                    !item.adminOnly ||
-                    brokerageRole === 'broker_owner' ||
-                    brokerageRole === 'broker_admin',
-                );
-                if (visibleItems.length === 0) return null;
-                return (
-                  <div key={section.label}>
-                    {!brokerCollapsed && <SectionLabel>{section.label}</SectionLabel>}
-                    {visibleItems.map((item) => {
-                      const isActive = doesItemOwnPath(item, pathname, '');
-                      const hasChildren = !!(item.children && item.children.length > 0);
-                      const highlightBadge =
-                        'highlight' in item &&
-                        (item as any).highlight &&
-                        !isActive ? (
-                          <span className="inline-flex h-2 w-2 rounded-full bg-lead-hot shrink-0" />
-                        ) : undefined;
-                      // Broker hrefs are already absolute, so base="". The
-                      // shared accordion row handles the chip-avatar (isAI),
-                      // chevron dropdown, indented children and active-child
-                      // highlight — identical to the realtor sidebar.
-                      return (
-                        <SidebarNavItem
-                          key={item.href}
-                          item={item}
-                          base=""
-                          collapsed={brokerCollapsed}
-                          isActive={isActive}
-                          isExpanded={hasChildren && brokerExpandedKey === item.href}
-                          isChildActive={(child) =>
-                            isChildActive(child, pathname, '', searchParamsString)
-                          }
-                          onToggle={handleBrokerToggle(item.href)}
-                          badge={highlightBadge}
-                        />
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
+            {brokerCollapsed ? (
+              <div className="space-y-0.5">
+                {brokerCoreItems.map((item) => (
+                  <SidebarNavItem
+                    key={item.href}
+                    item={item}
+                    base=""
+                    collapsed
+                    isActive={doesItemOwnPath(item, pathname, '')}
+                    isExpanded={false}
+                    isChildActive={(child) =>
+                      isChildActive(child, pathname, '', searchParamsString)
+                    }
+                    onToggle={handleBrokerToggle(item.href)}
+                  />
+                ))}
+                <RailMoreMenu links={brokerRailMoreLinks} />
+                {brokerSettingsItem && (
+                  <SidebarNavItem
+                    item={brokerSettingsItem}
+                    base=""
+                    collapsed
+                    isActive={doesItemOwnPath(brokerSettingsItem, pathname, '')}
+                    isExpanded={false}
+                    isChildActive={(child) =>
+                      isChildActive(child, pathname, '', searchParamsString)
+                    }
+                    onToggle={handleBrokerToggle(brokerSettingsItem.href)}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {brokerSections.map((section) => {
+                  const visibleItems = section.items.filter(isVisibleBrokerItem);
+                  if (visibleItems.length === 0) return null;
+                  return (
+                    <div key={section.label}>
+                      <SectionLabel>{section.label}</SectionLabel>
+                      {visibleItems.map((item) => {
+                        const isActive = doesItemOwnPath(item, pathname, '');
+                        const hasChildren = !!item.children?.length;
+                        return (
+                          <SidebarNavItem
+                            key={item.href}
+                            item={item}
+                            base=""
+                            isActive={isActive}
+                            isExpanded={hasChildren && brokerExpandedKey === item.href}
+                            isChildActive={(child) =>
+                              isChildActive(child, pathname, '', searchParamsString)
+                            }
+                            onToggle={handleBrokerToggle(item.href)}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
               </>
             )}
               </motion.div>
@@ -1758,7 +1847,7 @@ export function Sidebar({
           {showAdminLink && (
             <>
               <div className="border-t border-border/60" />
-              <AdminConsoleLink />
+              <AdminConsoleLink collapsed={brokerCollapsed} />
             </>
           )}
           {/* User footer — matches the realtor's SidebarUserMenu chip (avatar +

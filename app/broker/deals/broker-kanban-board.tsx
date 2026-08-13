@@ -225,7 +225,7 @@ export function BrokerKanbanBoard({ columns }: BrokerKanbanBoardProps) {
 
   function handleOpenDeal(deal: BrokerDealItem) {
     const prompt = `Audit the deal "${deal.title}" owned by ${deal.realtorName}. What stage is it at and what needs attention?`;
-    router.push(`/broker?prompt=${encodeURIComponent(prompt)}`);
+    router.push(`/broker/chippi?prompt=${encodeURIComponent(prompt)}`);
   }
 
   // Distinct realtor names present in the board, sorted for a stable menu.

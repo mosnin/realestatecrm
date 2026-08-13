@@ -12,6 +12,7 @@ import { getStripe } from '@/lib/stripe';
 import { SplitReveal } from '@/components/motion';
 import type Stripe from 'stripe';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Billing — Teams — Chippi' };
 
@@ -65,7 +66,7 @@ export default async function BrokerBillingPage() {
   const isBrokerOwner = ctx.membership.role === 'broker_owner';
   if (!isBrokerOwner) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto pb-12">
+      <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="billing">
         <BillingHeader status="The brokerage owner manages billing." />
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-foreground">Billing lives with the owner.</p>
@@ -84,7 +85,7 @@ export default async function BrokerBillingPage() {
   // needs no Space).
   if (!spaceRow && !usingBrokerageEntity) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto pb-12">
+      <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="billing">
         <BillingHeader status="Choose a plan to get your brokerage started." />
         <BrokerageSubscribe annualEnabled={annualEnabled} />
       </div>
@@ -150,7 +151,7 @@ export default async function BrokerBillingPage() {
 
   if (stripeError) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto pb-12">
+      <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="billing">
         <BillingHeader status="Manage your subscription and payment details." />
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-10 text-center">
           <p className="text-sm font-medium text-destructive">
@@ -173,7 +174,7 @@ export default async function BrokerBillingPage() {
     subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
+    <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="billing">
       <BillingHeader status="Manage your subscription and payment details." />
       {!brokerageSubscribed && <BrokerageSubscribe annualEnabled={annualEnabled} />}
       <BillingPage

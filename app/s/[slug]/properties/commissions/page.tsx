@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { CommissionStatCell } from '@/components/properties/commission-stat-cell';
 import { Reveal, StaggerReveal, SplitReveal } from '@/components/motion';
+import { RealtorPage } from '../../_components/realtor-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,7 +111,7 @@ export default async function PropertiesCommissionsPage({
   })();
 
   return (
-    <div className={cn(PAGE_RHYTHM, 'max-w-5xl mx-auto pb-12')}>
+    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
       {/* Header — H1 + Chippi-voiced subtitle naming the loudest money fact.
           The stat strip below is the supporting evidence. Commissions is its
           own destination now (the standalone Properties list has been cut),
@@ -129,7 +130,7 @@ export default async function PropertiesCommissionsPage({
           once on first paint (StaggerReveal on the direct-child grid); each
           focal numeral then counts up on entry (CommissionStatCell →
           AnimatedNumber, reduced-motion aware). */}
-      <StaggerReveal className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70">
+      <StaggerReveal className="chippi-dashboard-panel grid grid-cols-2 overflow-hidden rounded-[1.75rem] divide-x chippi-dashboard-divider md:grid-cols-4">
         <CommissionStatCell
           value={closedNet}
           label="Closed net YTD"
@@ -179,7 +180,7 @@ export default async function PropertiesCommissionsPage({
           )}
         </Section>
       </Reveal>
-    </div>
+    </RealtorPage>
   );
 }
 
@@ -195,8 +196,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border/70 bg-background overflow-hidden">
-      <header className="px-5 py-3 border-b border-border/70 flex items-center gap-2">
+    <section className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem]">
+      <header className="flex items-center gap-2 border-b chippi-dashboard-divider px-5 py-3 sm:px-7">
         <h3 className={H3}>{title}</h3>
         <span className="text-[11px] tabular-nums text-muted-foreground">{count}</span>
       </header>
@@ -224,7 +225,7 @@ function CommissionTable({
     // sits between it and the Link rows (that would break the `divide-y`
     // child selector). Dense-data table: reveal once, never re-animate on
     // scroll, never delay reading or clicking.
-    <StaggerReveal as="div" className="divide-y divide-border/70" distance={8}>
+    <StaggerReveal as="div" className="divide-y chippi-dashboard-divider" distance={8}>
       <div className={cn('hidden sm:grid grid-cols-[minmax(0,2fr)_100px_70px_100px_110px_28px] px-5 py-2 bg-foreground/[0.02]', SECTION_LABEL)}>
         <span>Deal</span>
         <span className="text-right">Value</span>

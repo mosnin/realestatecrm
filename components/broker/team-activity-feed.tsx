@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { timeAgo } from '@/lib/formatting';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '@/lib/motion';
+import { BROKER_DIVIDED_LIST, BROKER_ROW } from '@/components/broker/premium';
 
 interface ActivityItem {
   id: string;
@@ -33,9 +34,9 @@ export function TeamActivityFeed() {
   // geometry (two text lines) so the feed doesn't reflow when the data lands.
   if (loading) {
     return (
-      <ul className="divide-y divide-border/60" aria-hidden>
+      <ul className={BROKER_DIVIDED_LIST} aria-hidden>
         {Array.from({ length: 4 }).map((_, i) => (
-          <li key={i} className="flex items-start gap-3 py-3">
+          <li key={i} className={BROKER_ROW}>
             <div className="flex-1 space-y-1.5 pt-1">
               <div
                 className="h-3 bg-muted/40 animate-pulse rounded"
@@ -59,7 +60,7 @@ export function TeamActivityFeed() {
 
   return (
     <motion.ul
-      className="divide-y divide-border/60"
+      className={BROKER_DIVIDED_LIST}
       variants={STAGGER_CONTAINER}
       initial={reduce ? false : 'initial'}
       animate="enter"
@@ -68,7 +69,7 @@ export function TeamActivityFeed() {
         <motion.li
           key={item.id}
           variants={reduce ? undefined : STAGGER_ITEM}
-          className="group/act flex items-center gap-3 py-3"
+          className={BROKER_ROW}
         >
           <p className="text-sm leading-snug">
             <span className="font-medium">{item.actor}</span>{' '}

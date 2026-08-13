@@ -304,9 +304,8 @@ export function DocumentsPanel() {
       {loading ? (
         <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
       ) : docs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-          <FileText className="mx-auto h-7 w-7 text-muted-foreground/50" />
-          <p className="mt-3 text-sm text-foreground">No documents yet.</p>
+        <div className="chippi-dashboard-panel rounded-[1.75rem] px-5 py-12 text-center">
+          <p className="text-sm text-foreground">No documents yet.</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Write one from scratch, or paste in content you already have.
           </p>
@@ -320,7 +319,7 @@ export function DocumentsPanel() {
           </button>
         </div>
       ) : (
-        <StaggerList stagger={0.03} className="divide-y divide-border/60">
+        <StaggerList stagger={0.03} className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] divide-y chippi-dashboard-divider px-5 sm:px-7">
           {docs.map((doc) => (
             <StaggerItem key={doc.id}>
               <button
@@ -329,9 +328,6 @@ export function DocumentsPanel() {
                 disabled={opening}
                 className="group flex w-full items-center gap-3 py-3 text-left disabled:opacity-60"
               >
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted/50">
-                  <FileText size={15} className="text-muted-foreground" />
-                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">
                     {doc.title}

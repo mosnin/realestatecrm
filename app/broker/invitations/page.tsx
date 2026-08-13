@@ -14,6 +14,7 @@ import { timeAgo } from '@/lib/formatting';
 import { effectiveInvitationStatus } from '@/lib/invitation-status';
 import type { InvitationStatus } from '@/lib/types';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Invitations — Broker Dashboard' };
 
@@ -90,7 +91,7 @@ export default async function BrokerInvitationsPage() {
   })();
 
   return (
-    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
+    <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="invitations">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Invitations.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

@@ -14,14 +14,14 @@ describe('chatSurfaceEndpoints', () => {
     });
   });
 
-  it('routes broker chat through broker-scoped endpoints and canonical /broker URL', () => {
+  it('routes broker chat through broker-scoped endpoints and canonical Chippi URL', () => {
     expect(chatSurfaceEndpoints('broker', 'ignored')).toEqual({
       taskEndpoint: '/api/ai/broker-task',
       conversationsEndpoint: '/api/ai/broker-conversations',
       messagesEndpoint: '/api/ai/broker-messages',
       resumeEndpointBase: '/api/ai/broker-task/resume',
       conversationItemBase: '/api/ai/broker-conversations',
-      routeBase: '/broker',
+      routeBase: '/broker/chippi',
       conversationCreatePayload: {},
     });
   });

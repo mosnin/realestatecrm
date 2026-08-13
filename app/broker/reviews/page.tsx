@@ -9,6 +9,7 @@ import {
   SECTION_RHYTHM,
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 // Server component: fetch the open queue directly via supabase (bypass API
 // round-trip), then hand off to the client for tab-switching.
@@ -123,7 +124,7 @@ export default async function BrokerReviewsPage() {
   })();
 
   return (
-    <div className={`max-w-4xl mx-auto ${SECTION_RHYTHM} pb-56 md:pb-24`}>
+    <div className={`${BROKER_PAGE_READING} max-w-4xl ${SECTION_RHYTHM}`} data-broker-premium-page="reviews">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Reviews.</p>
         <h1 className={H1} style={TITLE_FONT}>

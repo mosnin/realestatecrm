@@ -1,8 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { BROKER_PAGE_READING, BROKER_PANEL_DENSE, BROKER_ROW } from '@/components/broker/premium';
 
 export default function BrokerUsageLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-24 animate-pulse" aria-busy="true">
+    <div className={`${BROKER_PAGE_READING} animate-pulse`} aria-busy="true" data-broker-premium-state="loading">
       <span className="sr-only">Loading…</span>
       {/* Status-sentence header */}
       <header className="space-y-1.5">
@@ -12,9 +13,9 @@ export default function BrokerUsageLoading() {
       </header>
 
       {/* 3-cell totals strip */}
-      <div className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-background px-4 py-4 space-y-1.5">
+          <div key={i} className={`${BROKER_PANEL_DENSE} space-y-1.5`}>
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-7 w-16" />
           </div>
@@ -33,7 +34,7 @@ export default function BrokerUsageLoading() {
         </div>
         <div className="divide-y divide-border/60">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-6 items-center py-3 px-1">
+            <div key={i} className={`${BROKER_ROW} grid grid-cols-[1fr_auto_auto_auto] gap-x-6 items-center`}>
               <Skeleton className="h-3.5 w-36" />
               <Skeleton className="h-3.5 w-16" />
               <Skeleton className="h-3.5 w-12" />
@@ -48,7 +49,7 @@ export default function BrokerUsageLoading() {
         <Skeleton className="h-3.5 w-20" />
         <div className="divide-y divide-border/60">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between gap-4 py-3 px-1">
+            <div key={i} className={`${BROKER_ROW} items-center justify-between gap-4`}>
               <Skeleton className="h-3.5 w-28" />
               <div className="flex items-center gap-4">
                 <Skeleton className="h-3 w-24" />

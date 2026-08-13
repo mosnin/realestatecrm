@@ -22,6 +22,7 @@ import { PAGE_VARIANTS } from '@/lib/motion';
 import { SplitReveal } from '@/components/motion';
 import { PropertyForm } from '@/components/properties/property-form';
 import type { Property } from '@/lib/types';
+import { RealtorPanel } from '../../_components/realtor-page';
 
 export default function NewPropertyPage() {
   const router = useRouter();
@@ -56,7 +57,8 @@ export default function NewPropertyPage() {
       initial="initial"
       animate="enter"
       variants={PAGE_VARIANTS}
-      className={cn('space-y-6 max-w-2xl mx-auto pb-12')}
+      data-realtor-page="today"
+      className={cn('chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full space-y-8 max-w-2xl mx-auto pb-12 pt-3 sm:pt-5')}
     >
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Properties.</p>
@@ -66,12 +68,14 @@ export default function NewPropertyPage() {
         <p className={cn(BODY_MUTED)}>What are you taking to market?</p>
       </header>
 
-      <PropertyForm
-        onCancel={() => router.push(`/s/${slug}/properties`)}
-        onSubmit={handleSubmit}
-        submitting={submitting}
-        submitLabel="Create listing"
-      />
+      <RealtorPanel>
+        <PropertyForm
+          onCancel={() => router.push(`/s/${slug}/properties`)}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          submitLabel="Create listing"
+        />
+      </RealtorPanel>
     </motion.div>
   );
 }

@@ -152,7 +152,7 @@ export default async function InboxPage({
   const selectedName = selected ? nameById.get(selected.contactId) ?? 'Unknown contact' : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-6xl space-y-5 pb-12 pt-3 sm:pt-5">
       <header className="mb-5 space-y-0.5">
         <p className="text-sm text-muted-foreground">Conversations.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -217,7 +217,7 @@ export default async function InboxPage({
                           {relativeTime(thread.lastMessageAt)}
                         </span>
                         {thread.unreadCount > 0 && (
-                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#F25A00] px-1.5 text-[11px] font-semibold tabular-nums text-white">
+                          <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-foreground px-1.5 text-[11px] font-semibold tabular-nums text-background">
                             {thread.unreadCount}
                           </span>
                         )}
@@ -273,8 +273,8 @@ export default async function InboxPage({
                             className={cn(
                               'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm',
                               outbound
-                                ? 'bg-[#F25A00] text-white'
-                                : 'bg-foreground/[0.06] text-foreground',
+                                ? 'bg-foreground text-background'
+                                : 'chippi-dashboard-panel-muted text-foreground',
                             )}
                           >
                             {m.subject && m.channel === 'email' && (

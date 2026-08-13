@@ -219,7 +219,10 @@ export default async function BrokerLayout({ children }: { children: React.React
   }
 
   return (
-    <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+    <div
+      className="app-theme chippi-dashboard-canvas flex h-screen overflow-hidden text-foreground"
+      data-broker-premium-shell="true"
+    >
       {/* First-paint splash — greets the broker by name, shows a brokerage-wide
           snapshot of what's happening across member spaces, then dissolves. */}
       <ChippiSplash
@@ -249,7 +252,7 @@ export default async function BrokerLayout({ children }: { children: React.React
           brokerageMemberships={[{ id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role }]}
         />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <Header slug={slug} spaceName={spaceName} title={spaceName} accountName={brokerFullName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} />
+          <Header slug={slug} spaceName={spaceName} title={spaceName} accountName={brokerFullName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} brokerageRole={ctx.membership.role} />
           {/* Chat-vs-dashboard padding is decided client-side by usePathname()
               inside BrokerMain — NOT by the fragile x-pathname header — so the
               container is always correct and nothing touches the screen edge. */}

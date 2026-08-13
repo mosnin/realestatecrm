@@ -20,7 +20,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { BedDouble, Bath, Ruler, Calendar, ArrowUpRight, ChevronDown } from 'lucide-react';
+import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property } from '@/lib/types';
 import { formatCompact } from '@/lib/formatting';
@@ -96,10 +96,9 @@ function PropertyCard({
       whileHover={reduce ? undefined : { y: -2 }}
       transition={{ duration: DURATION_FAST, ease: EASE_OUT }}
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card',
+        'chippi-dashboard-panel group relative flex h-full flex-col overflow-hidden rounded-[1.75rem]',
         'transition-shadow duration-200',
-        'hover:border-border hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.12)]',
-        'dark:hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]',
+        'hover:shadow-[0_12px_30px_-24px_rgba(0,0,0,0.22)]',
       )}
     >
       {/* ── Cover ─────────────────────────────────────────────────────────
@@ -127,14 +126,6 @@ function PropertyCard({
           <div className="flex h-full w-full flex-col items-center justify-center gap-2">
             <span className="text-[11px] text-muted-foreground/70">No photo yet</span>
           </div>
-        )}
-
-        {/* Legibility scrim — only top, only if there's a photo. */}
-        {cover && (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/30 to-transparent"
-            aria-hidden
-          />
         )}
 
         {/* Status chip floats top-left over the photo; falls back to plain
@@ -247,21 +238,20 @@ function PropertyCard({
                 {hasSpecs && (
                   <div className="flex flex-wrap gap-x-4 gap-y-2">
                     {property.beds != null && (
-                      <SpecChip icon={BedDouble} value={property.beds} label="bed" />
+                      <SpecChip value={property.beds} label="bed" />
                     )}
                     {property.baths != null && (
-                      <SpecChip icon={Bath} value={property.baths} label="bath" />
+                      <SpecChip value={property.baths} label="bath" />
                     )}
                     {property.squareFeet != null && (
                       <SpecChip
-                        icon={Ruler}
                         value={property.squareFeet}
                         suffix=" sqft"
                         label="floor area"
                       />
                     )}
                     {property.yearBuilt != null && (
-                      <SpecChip icon={Calendar} rawValue={String(property.yearBuilt)} label="built" />
+                      <SpecChip rawValue={String(property.yearBuilt)} label="built" />
                     )}
                   </div>
                 )}
@@ -304,22 +294,18 @@ function PropertyCard({
 
 /** A single inline spec: icon + count-up value + quiet label. */
 function SpecChip({
-  icon: Icon,
   value,
   rawValue,
   suffix = '',
   label,
 }: {
-  icon: typeof BedDouble;
   value?: number;
   rawValue?: string;
   suffix?: string;
   label: string;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <Icon size={15} strokeWidth={1.75} className="text-muted-foreground" aria-hidden />
-      <div className="leading-tight">
+    <div className="leading-tight">
         <span className="text-sm font-medium tabular-nums text-foreground">
           {rawValue != null ? (
             rawValue
@@ -332,7 +318,6 @@ function SpecChip({
           )}
         </span>
         <span className="ml-1 text-[11px] text-muted-foreground">{label}</span>
-      </div>
     </div>
   );
 }

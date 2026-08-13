@@ -10,6 +10,7 @@ import {
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Integrations — Teams' };
 
@@ -54,7 +55,7 @@ export default async function BrokerIntegrationsPage({
       : null;
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="integrations">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Integrations.</p>
         <h1 className={H1} style={TITLE_FONT}>

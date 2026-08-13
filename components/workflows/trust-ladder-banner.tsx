@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ShieldCheck, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CAPTION } from '@/lib/typography';
 import {
@@ -78,12 +78,7 @@ export function TrustLadderBanner() {
   if (dismissed || !reason) return null;
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-emerald-400/40 bg-emerald-50/50 px-4 py-3 dark:border-emerald-500/30 dark:bg-emerald-950/20">
-      <ShieldCheck
-        size={18}
-        className="mt-0.5 flex-shrink-0 text-emerald-600 dark:text-emerald-500"
-        aria-hidden
-      />
+    <div className="chippi-dashboard-panel-muted flex items-start gap-3 rounded-2xl px-5 py-4">
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-sm font-medium text-foreground">Your drafts are landing well.</p>
         <p className={cn(CAPTION, 'leading-snug')}>{reason}</p>

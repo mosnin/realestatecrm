@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getBrokerContext } from '@/lib/permissions';
 import { RoutinesManager } from '@/components/routines/routines-manager';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 // Server component: broker-admin only. Renders the shared RoutinesManager
 // pointed at the brokerage-scoped API. Use getBrokerContext (not requireBroker)
@@ -12,7 +13,7 @@ export default async function BrokerRoutinesPage() {
   if (!ctx) redirect('/');
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className={`${BROKER_PAGE_READING} max-w-4xl`} data-broker-premium-page="routines">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Routines.</p>
         <h1

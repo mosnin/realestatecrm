@@ -15,6 +15,7 @@ import {
   type RealtorInfo,
   type PipelineSummary,
 } from './pipeline-client';
+import { BROKER_PAGE_WIDE } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Pipeline — Teams' };
 
@@ -215,7 +216,7 @@ export default async function BrokerPipelinePage() {
   })();
 
   return (
-    <div className="space-y-8 pb-56 md:pb-24">
+    <div className={cn(BROKER_PAGE_WIDE, 'pb-56 md:pb-24')} data-broker-premium-page="pipeline">
       <header className="space-y-1.5">
         <h1 className={cn(H1)} style={TITLE_FONT}>
           <SplitReveal as="span" text="Pipeline" />

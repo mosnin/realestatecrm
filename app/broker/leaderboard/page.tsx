@@ -7,6 +7,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Leaderboard — Teams' };
 
@@ -39,7 +40,7 @@ export default async function LeaderboardPage() {
 
   if (!members?.length) {
     return (
-      <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
+      <div className={BROKER_PAGE_READING} data-broker-premium-page="leaderboard-empty">
         <header className="space-y-1.5">
           <h1 className={cn(H1)} style={TITLE_FONT}>
             <SplitReveal as="span" text="Leaderboard" />
@@ -175,7 +176,7 @@ export default async function LeaderboardPage() {
   })();
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-56 md:pb-24">
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="leaderboard">
       <header className="space-y-1.5">
         <h1 className={cn(H1)} style={TITLE_FONT}>
           <SplitReveal as="span" text="Leaderboard" />

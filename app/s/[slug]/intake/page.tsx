@@ -102,7 +102,7 @@ export default async function IntakeOverviewPage({
   const subtitle = formatIntakeStatus(totalSubmissions, hotLeadCount);
 
   return (
-    <div className={`${PAGE_RHYTHM} max-w-3xl mx-auto pb-12`}>
+    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${PAGE_RHYTHM} max-w-3xl mx-auto pb-12`}>
       {/* Header — H1 + Chippi narration */}
       <header className="space-y-1.5">
         <h1 className={H1} style={TITLE_FONT}>
@@ -156,7 +156,7 @@ export default async function IntakeOverviewPage({
             They&apos;ll show up here the moment someone fills it out.
           </p>
         ) : (
-          <StaggerList className="rounded-xl border border-border/70 bg-background overflow-hidden divide-y divide-border/70">
+          <StaggerList className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] divide-y chippi-dashboard-divider px-5 sm:px-7">
             {recentLeads.map((lead) => {
               const isNew = lead.tags.includes('new-lead');
               const scoreLabel = lead.scoreLabel

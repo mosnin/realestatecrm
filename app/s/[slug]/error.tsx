@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { RotateCcw, CloudOff } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { H3, BODY_MUTED, META } from '@/lib/typography';
 import { cn } from '@/lib/utils';
@@ -14,16 +14,13 @@ export default function WorkspaceError({
   reset: () => void;
 }) {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center px-6">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas flex min-h-[calc(100vh-10rem)] items-center justify-center px-6">
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
         className="text-center max-w-sm"
       >
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
-          <CloudOff size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
-        </div>
         <h2 className={H3}>This didn&apos;t load</h2>
         <p className={cn(BODY_MUTED, 'mt-1.5')}>
           Something glitched on the way in. It&apos;s almost always a passing thing —

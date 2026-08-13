@@ -1,6 +1,5 @@
-import { cn } from '@/lib/utils';
-import { PAGE_MAX } from '@/lib/typography';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RealtorPage } from '../_components/realtor-page';
 
 /**
  * Loading skeleton for the property wall. Mirrors the real grid's geometry —
@@ -9,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export default function PropertiesLoading() {
   return (
-    <div className={cn('space-y-8 mx-auto pb-12', PAGE_MAX)}>
+    <RealtorPage width="wide" className="animate-pulse">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
@@ -25,7 +24,7 @@ export default function PropertiesLoading() {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card"
+            className="chippi-dashboard-panel flex flex-col overflow-hidden rounded-[1.75rem]"
           >
             <Skeleton className="aspect-[4/3] w-full rounded-none" />
             <div className="space-y-3 p-4">
@@ -39,6 +38,6 @@ export default function PropertiesLoading() {
           </div>
         ))}
       </div>
-    </div>
+    </RealtorPage>
   );
 }

@@ -1,8 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { BROKER_PAGE_READING, BROKER_PANEL, BROKER_ROW } from '@/components/broker/premium';
 
 export default function BrokerMembersLoading() {
   return (
-    <div className="space-y-6 max-w-3xl pb-56 md:pb-24" aria-busy="true">
+    <div className={`${BROKER_PAGE_READING} max-w-3xl`} aria-busy="true" data-broker-premium-state="loading">
       <span className="sr-only">Loading…</span>
       <header className="space-y-1.5">
         <Skeleton className="h-4 w-20" />
@@ -10,9 +11,9 @@ export default function BrokerMembersLoading() {
         <Skeleton className="h-4 w-72" />
       </header>
       <Skeleton className="h-9 w-64" />
-      <ul className="divide-y divide-border/60">
+      <ul className={BROKER_PANEL}>
         {[1, 2, 3, 4, 5].map((i) => (
-          <li key={i} className="flex items-center gap-3 py-3">
+          <li key={i} className={`${BROKER_ROW} items-center gap-3`}>
             <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
             <div className="flex-1 min-w-0 space-y-1.5">
               <Skeleton className="h-3.5 w-40" />

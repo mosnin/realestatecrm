@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getInitials } from '@/lib/formatting';
 import { SplitReveal, StaggerReveal } from '@/components/motion';
+import { BROKER_EMPTY, BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'My Leads — Chippi' };
 
@@ -32,7 +33,7 @@ export default async function MyLeadsPage() {
 
   if (!space) {
     return (
-      <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
+      <div className={cn(BROKER_PAGE_READING, 'pb-56 md:pb-24')} data-broker-premium-page="my-leads-empty">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Your routed leads.</p>
           <h1 className={H1} style={TITLE_FONT}>
@@ -40,8 +41,7 @@ export default async function MyLeadsPage() {
           </h1>
           <p className={BODY_MUTED}>{brokerage.name} hasn&rsquo;t routed anything yet.</p>
         </header>
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-          <Briefcase size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+        <div className={BROKER_EMPTY}>
           <p className="text-base text-foreground">Finish your workspace.</p>
           <p className={cn(BODY_MUTED, 'mt-1.5')}>
             <Link
@@ -121,7 +121,7 @@ export default async function MyLeadsPage() {
   })();
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
+    <div className={cn(BROKER_PAGE_READING, 'pb-56 md:pb-24')} data-broker-premium-page="my-leads">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Your routed leads.</p>
         <h1 className={H1} style={TITLE_FONT}>

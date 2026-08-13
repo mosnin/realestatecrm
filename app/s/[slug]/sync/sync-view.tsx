@@ -134,7 +134,7 @@ export function SyncView({ slug }: SyncViewProps) {
   }
 
   return (
-    <div className="w-full mx-auto max-w-5xl pb-12 pt-10 sm:pt-14 space-y-8">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full mx-auto max-w-5xl pb-12 pt-3 sm:pt-5 space-y-8">
       {/* ── Page header ── */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Smart sync.</p>

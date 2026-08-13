@@ -1,23 +1,28 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Inbox, MessageSquareHeart, TrendingUp } from 'lucide-react';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { rosterForBrokerage } from '@/lib/messaging';
 import { FloorRoster, type FloorMember } from '@/components/broker/floor-roster';
 import {
-  SurfaceCard,
   SurfaceCardHeader,
   AccentBarLabel,
   InsightStrip,
-  SURFACE_CARD,
-  ACCENT_CARD_PILL,
 } from '@/components/ui/surface-card';
 import { H1, TITLE_FONT } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
+import {
+  BROKER_CONTROL_QUIET,
+  BROKER_DIVIDED_LIST,
+  BROKER_EMPTY,
+  BROKER_PAGE_WIDE,
+  BROKER_PANEL,
+  BROKER_PANEL_DENSE,
+  BROKER_ROW,
+} from '@/components/broker/premium';
 
 /**
  * /broker/floor — The Floor: the brokerage's single command view.
@@ -143,7 +148,7 @@ export default async function BrokerFloorPage() {
   const moreSuffix = (total: number, shown: number) => (total > shown ? ` · ${total - shown} more` : '');
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 pb-12">
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-6xl')} data-broker-premium-page="floor">
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{ctx.brokerage.name}.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -158,8 +163,8 @@ export default async function BrokerFloorPage() {
             key={k.label}
             href={k.href}
             className={cn(
-              SURFACE_CARD,
-              'group block p-5 transition-shadow duration-150 hover:shadow-[0_1px_2px_rgb(17_17_19/0.04),0_16px_36px_-20px_rgb(17_17_19/0.18)]',
+              BROKER_PANEL_DENSE,
+              'group block transition-colors duration-150 hover:bg-dashboard-paper-muted',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
             )}
           >
@@ -187,39 +192,34 @@ export default async function BrokerFloorPage() {
 
         <div className="space-y-4">
           {/* 4. The coaching queue — the floor's most alive surface. */}
-          <SurfaceCard accent={coachingAlive} className="p-0 sm:p-0 overflow-hidden">
+          <section className={cn(BROKER_PANEL, 'overflow-hidden')}>
             <div className="p-6 sm:p-7">
               <SurfaceCardHeader
                 title="Coaching queue"
-                onAccent={coachingAlive}
                 action={
                   <Link
                     href="/broker/reviews"
-                    className={
-                      coachingAlive
-                        ? ACCENT_CARD_PILL
-                        : 'text-xs text-muted-foreground transition-colors hover:text-foreground'
-                    }
+                    className={BROKER_CONTROL_QUIET}
                   >
                     All reviews →
                   </Link>
                 }
               />
               {openReviews.length === 0 ? (
-                <CalmEmpty icon={<MessageSquareHeart size={20} strokeWidth={1.5} />}>
+                <CalmEmpty>
                   No open reviews — nobody is waiting on your judgement.
                 </CalmEmpty>
               ) : (
                 <>
-                  <ul className="mt-4 space-y-1.5">
+                  <ul className={cn(BROKER_DIVIDED_LIST, 'mt-4')}>
                     {openReviews.map((r) => (
                       <li key={r.id}>
                         <Link
                           href={`/broker/reviews/${r.id}`}
-                          className="block rounded-2xl bg-white/10 px-4 py-3 transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                          className={cn(BROKER_ROW, 'block')}
                         >
-                          <p className="truncate text-[13px] text-white">{r.reason}</p>
-                          <p className="mt-0.5 text-[11px] text-white/75">
+                          <p className="truncate text-[13px] text-foreground">{r.reason}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
                             {agentName(r.requestingUserId)} · waiting {timeAgo(r.createdAt)}
                           </p>
                         </Link>
@@ -229,7 +229,7 @@ export default async function BrokerFloorPage() {
                   {oldestReviewAgo && (
                     <Link
                       href="/broker/reviews"
-                      className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white/20 px-4 py-3 text-sm text-white transition-colors hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                      className={cn(BROKER_ROW, 'mt-4 items-center text-sm')}
                     >
                       <span className="flex-1 min-w-0 truncate">
                         Oldest waiting {oldestReviewAgo}
@@ -241,30 +241,30 @@ export default async function BrokerFloorPage() {
                 </>
               )}
             </div>
-          </SurfaceCard>
+          </section>
 
           {/* 3. What's stalled. */}
-          <SurfaceCard>
+          <section className={BROKER_PANEL}>
             <SurfaceCardHeader
               title="Stalled deals"
               action={
                 <Link
                   href="/broker/deals"
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  className={BROKER_CONTROL_QUIET}
                 >
                   All deals →
                 </Link>
               }
             />
             {stalledDeals.length === 0 ? (
-              <CalmEmpty icon={<TrendingUp size={20} strokeWidth={1.5} />}>
+              <CalmEmpty>
                 Nothing stalled — every active deal moved in the last {STALLED_AFTER_DAYS} days.
               </CalmEmpty>
             ) : (
               <>
-                <ul className="mt-4 divide-y divide-border/50">
+                <ul className={cn(BROKER_DIVIDED_LIST, 'mt-4')}>
                   {stalledDeals.map((d) => (
-                    <li key={d.id} className="py-3 first:pt-0">
+                    <li key={d.id} className={BROKER_ROW}>
                       <p className="truncate text-[13px] text-foreground">
                         {d.title || 'Untitled deal'}
                         {d.value != null && (
@@ -287,30 +287,30 @@ export default async function BrokerFloorPage() {
                 )}
               </>
             )}
-          </SurfaceCard>
+          </section>
 
           {/* 2. Leads nobody touched. */}
-          <SurfaceCard>
+          <section className={BROKER_PANEL}>
             <SurfaceCardHeader
               title="Untouched leads"
               action={
                 <Link
                   href="/broker/leads"
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  className={BROKER_CONTROL_QUIET}
                 >
                   All leads →
                 </Link>
               }
             />
             {untouchedLeads.length === 0 ? (
-              <CalmEmpty icon={<Inbox size={20} strokeWidth={1.5} />}>
+              <CalmEmpty>
                 Every new lead has been contacted. That&rsquo;s the whole job.
               </CalmEmpty>
             ) : (
               <>
-                <ul className="mt-4 divide-y divide-border/50">
+                <ul className={cn(BROKER_DIVIDED_LIST, 'mt-4')}>
                   {untouchedLeads.map((l) => (
-                    <li key={l.id} className="py-3 first:pt-0">
+                    <li key={l.id} className={BROKER_ROW}>
                       <p className="truncate text-[13px] text-foreground">{l.name}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {agentBySpace.get(l.spaceId) ?? 'Unrouted'} · arrived {timeAgo(l.createdAt)}, never contacted
@@ -326,7 +326,7 @@ export default async function BrokerFloorPage() {
                 )}
               </>
             )}
-          </SurfaceCard>
+          </section>
         </div>
       </div>
     </div>
@@ -338,15 +338,9 @@ export default async function BrokerFloorPage() {
  * copy. Used when a list card has nothing waiting (all of which are good news
  * on the Floor), so the surface reads settled rather than broken.
  */
-function CalmEmpty({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+function CalmEmpty({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-4 flex flex-col items-center py-6 text-center">
-      <span
-        aria-hidden
-        className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.04] text-muted-foreground/60"
-      >
-        {icon}
-      </span>
+    <div className={cn(BROKER_EMPTY, 'mt-4')}>
       <p className="max-w-xs text-[13px] text-muted-foreground">{children}</p>
     </div>
   );

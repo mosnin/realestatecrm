@@ -23,6 +23,7 @@ import {
   CHIPPI_PILL,
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Real estate agent Detail — Teams' };
 
@@ -156,10 +157,10 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     if (wonDeals > 0) bits.push(`${wonDeals} won`);
     return bits.length > 0 ? bits.join(', ') : 'quiet, nothing notable yet';
   })();
-  const coachHref = `/broker?prompt=${encodeURIComponent(
+  const coachHref = `/broker/chippi?prompt=${encodeURIComponent(
     `Help me coach ${displayName}. Here's what I'm seeing: ${coachSummary}. Draft a 1:1 agenda and a nudge I can send.`,
   )}`;
-  const auditHref = `/broker?prompt=${encodeURIComponent(
+  const auditHref = `/broker/chippi?prompt=${encodeURIComponent(
     `Audit ${displayName}'s pipeline. ${activeDeals} active ${activeDeals === 1 ? 'deal' : 'deals'} worth ${formatCompact(pipelineValue)}. Which deals are stuck or need attention, and what should they do next?`,
   )}`;
 
@@ -182,7 +183,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="realtor-detail">
       {/* Back link */}
       <Link
         href="/broker/realtors"

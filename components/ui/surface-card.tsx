@@ -4,10 +4,10 @@
  * One shared vocabulary for every card-like surface on the realtor and
  * brokerage dashboards, translated from the owner's reference design:
  *
- *   - compact 16px radius, precise hairline, shallow editorial elevation
+ *   - open 28px radius, quiet edge, shallow editorial elevation
  *   - warm paper surfaces on a lightly inset canvas, generous padding
  *   - quiet medium-weight card titles with a restrained control at top-right
- *   - small stat cards with a short vertical accent bar beside the label
+ *   - small stat cards with quiet uppercase labels
  *   - statuses as small rounded-full bg-muted pills
  *   - ONE graphite accent card per view (the "most alive" card)
  *   - a dot-matrix coverage viz + bottom "insight strip" pill for charts
@@ -27,13 +27,16 @@ import { cn } from '@/lib/utils';
 
 /* ─── Class constants (compose onto arbitrary elements) ─────────────────── */
 
-/** The base card: warm paper, exact hairline, compact radius, shallow lift. */
+/**
+ * The base card is the same open warm-paper panel used on Today. Keeping this
+ * alias lets older pages inherit the canonical system while their data and
+ * interaction code stays untouched.
+ */
 export const SURFACE_CARD =
-  'rounded-2xl border border-border/85 bg-card text-card-foreground ' +
-  'shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.22)]';
+  'chippi-dashboard-panel rounded-[1.75rem] border border-transparent text-card-foreground';
 
 /** Generous default padding for a surface card. */
-export const SURFACE_CARD_PAD = 'p-6 sm:p-7';
+export const SURFACE_CARD_PAD = 'p-6 sm:p-8';
 
 /**
  * Open editorial dashboard panel. This is intentionally borderless and a
@@ -141,10 +144,6 @@ export function AccentBarLabel({
 }) {
   return (
     <span className={cn('flex items-center gap-2 min-w-0', className)}>
-      <span
-        aria-hidden
-        className="h-3.5 w-px shrink-0 rounded-full bg-foreground/65"
-      />
       <span className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {children}
       </span>
@@ -340,7 +339,7 @@ export function DotMatrix({
                   aria-hidden
                   className={cn(
                     'h-2.5 w-2.5 rounded-full',
-                    i < filled ? 'bg-[#F25A00]' : 'bg-muted-foreground/20',
+                    i < filled ? 'bg-foreground' : 'bg-muted-foreground/20',
                   )}
                 />
               ))}

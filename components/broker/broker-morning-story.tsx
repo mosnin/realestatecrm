@@ -78,7 +78,7 @@ export function BrokerMorningStory() {
     return (
       <div className="space-y-4">
         <h1
-          className="text-[2.25rem] sm:text-[2.5rem] tracking-tight text-foreground leading-tight"
+          className="text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           &nbsp;
@@ -126,7 +126,7 @@ export function BrokerMorningStory() {
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight block text-left',
+            'block max-w-4xl text-left text-[2.65rem] leading-[0.98] tracking-[-0.035em] sm:text-[3.65rem] lg:text-[4.5rem]',
             'text-foreground hover:opacity-80 transition-opacity cursor-pointer',
           )}
           style={{ fontFamily: 'var(--font-title)' }}
@@ -139,7 +139,7 @@ export function BrokerMorningStory() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="text-[2.25rem] sm:text-[2.5rem] tracking-tight leading-tight text-foreground"
+          className="max-w-4xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
           style={{ fontFamily: 'var(--font-title)' }}
         >
           {headlineNode}
@@ -169,7 +169,7 @@ function StatsRow({
   loading?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-4 text-[11px] tabular-nums text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-3 text-[11px] tabular-nums text-muted-foreground sm:gap-4">
       <Stat label="real estate agents" value={stats.realtors} loading={loading} />
       <Divider />
       <Stat label="active deals" value={stats.activeDeals} loading={loading} />

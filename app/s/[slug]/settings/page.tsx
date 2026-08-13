@@ -179,7 +179,7 @@ export default async function SettingsPage({
   }
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
+    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       {/* Page header */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
@@ -238,15 +238,6 @@ export default async function SettingsPage({
             );
           })}
         </div>
-        {/* Edge fade masks — signal "there's more off-screen" on mobile. */}
-        <div
-          aria-hidden
-          className="md:hidden pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"
-        />
-        <div
-          aria-hidden
-          className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
-        />
       </nav>
 
       {/* Workspace — space name, slug, and danger zone. Nothing else; this

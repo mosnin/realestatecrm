@@ -67,7 +67,7 @@ export default async function FilesPage({
   const statusSentence = formatFilesStatus(count, totalBytes);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 space-y-6">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-5xl space-y-8 pb-12 pt-3 sm:pt-5">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Files.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

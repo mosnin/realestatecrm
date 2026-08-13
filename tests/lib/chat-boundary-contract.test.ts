@@ -110,7 +110,7 @@ describe('chat data-boundary contract', () => {
   });
 
   it('scopes server-rendered broker URL conversation hydration by brokerageId', () => {
-    const body = source('app/broker/page.tsx');
+    const body = source('app/broker/chippi/page.tsx');
     const urlHydrationRead = body.match(/\.from\('BrokerConversation'\)[\s\S]*?\.maybeSingle\(\)/)?.[0] ?? '';
 
     expect(urlHydrationRead).toContain(".eq('id', urlConversationId)");

@@ -2,6 +2,7 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { MembersClient } from './members-client';
+import { BROKER_PAGE_WIDE } from '@/components/broker/premium';
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
@@ -42,10 +43,12 @@ export default async function BrokerMembersPage() {
   }));
 
   return (
-    <MembersClient
-      members={members}
-      brokerageName={ctx.brokerage.name}
-      currentUserRole={ctx.membership.role}
-    />
+    <div className={BROKER_PAGE_WIDE} data-broker-premium-page="members">
+      <MembersClient
+        members={members}
+        brokerageName={ctx.brokerage.name}
+        currentUserRole={ctx.membership.role}
+      />
+    </div>
   );
 }

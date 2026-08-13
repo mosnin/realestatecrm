@@ -1,8 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { BROKER_PAGE_WIDE, BROKER_PANEL, BROKER_ROW } from '@/components/broker/premium';
 
 export default function BrokerPeopleLoading() {
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-12 animate-pulse" aria-busy="true">
+    <div className={`${BROKER_PAGE_WIDE} animate-pulse`} aria-busy="true" data-broker-premium-state="loading">
       <span className="sr-only">Loading…</span>
       {/* Header + search bar row */}
       <div className="flex items-center justify-between">
@@ -18,9 +19,9 @@ export default function BrokerPeopleLoading() {
       </div>
 
       {/* Divide-y contact rows */}
-      <div className="divide-y divide-border/60">
+      <div className={BROKER_PANEL}>
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-4 py-3">
+          <div key={i} className={`${BROKER_ROW} items-center gap-4`}>
             <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
             <div className="flex-1 min-w-0 space-y-1.5">
               <Skeleton className="h-3.5 w-40" />

@@ -1,8 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { BROKER_PAGE_READING, BROKER_PANEL_DENSE, BROKER_ROW } from '@/components/broker/premium';
 
 export default function BrokerForecastLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-pulse" aria-busy="true">
+    <div className={`${BROKER_PAGE_READING} animate-pulse`} aria-busy="true" data-broker-premium-state="loading">
       <span className="sr-only">Loading…</span>
       {/* Status-sentence header */}
       <header className="space-y-1.5">
@@ -19,9 +20,9 @@ export default function BrokerForecastLoading() {
       </div>
 
       {/* 3-cell stat strip */}
-      <div className="grid grid-cols-3 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-background px-4 py-4 space-y-1.5">
+          <div key={i} className={`${BROKER_PANEL_DENSE} space-y-1.5`}>
             <Skeleton className="h-6 w-20" />
             <Skeleton className="h-3 w-24" />
           </div>
@@ -33,7 +34,7 @@ export default function BrokerForecastLoading() {
         <Skeleton className="h-3.5 w-32" />
         <div className="divide-y divide-border/60">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-start justify-between gap-4 py-4">
+            <div key={i} className={`${BROKER_ROW} justify-between gap-4`}>
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-32" />

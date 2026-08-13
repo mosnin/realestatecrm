@@ -1,15 +1,16 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { Building2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
-import { H1, TITLE_FONT, BODY_MUTED, PAGE_MAX, PRIMARY_PILL } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import type { Property } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { PropertyListGrid } from '@/components/properties/property-list-grid';
 import { AreaIqLauncher } from '@/components/properties/area-iq-launcher';
 import { Reveal, SplitReveal } from '@/components/motion';
+import { RealtorEmptyState, RealtorPage } from '../_components/realtor-page';
 
 export default async function PropertiesPage({
   params,
@@ -43,20 +44,17 @@ export default async function PropertiesPage({
 
   if (fetchError) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className={cn(BODY_MUTED)}>
-            We couldn&apos;t load your properties. This is usually temporary.
-          </p>
-          <a
-            href={`/s/${slug}/properties`}
-            className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background hover:bg-foreground/90"
-          >
-            Try again
-          </a>
-        </div>
-      </div>
+      <RealtorPage width="content" className="flex items-center justify-center">
+        <RealtorEmptyState
+          title="Your properties didn't load."
+          description="Your listings are safe. This is usually temporary."
+          action={
+            <a href={`/s/${slug}/properties`} className={PRIMARY_PILL}>
+              Try again
+            </a>
+          }
+        />
+      </RealtorPage>
     );
   }
 
@@ -72,7 +70,7 @@ export default async function PropertiesPage({
           (activeCount > 0 ? ` · ${activeCount} active` : '');
 
   return (
-    <div className={cn('space-y-8 mx-auto pb-12', PAGE_MAX)}>
+    <RealtorPage width="wide">
       {/* Page header — status-sentence pattern: muted greeting → serif h1
           → one-sentence status. Add-listing CTA sits inline; primary
           action lives where the realtor's eye lands after the title. */}
@@ -98,19 +96,17 @@ export default async function PropertiesPage({
 
       {/* Empty state — calm fact, not a directive. */}
       {properties.length === 0 ? (
-        <Reveal variant="rise" className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-16 text-center">
-          <Building2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
-          <p className="text-sm text-foreground">Quiet — no properties yet.</p>
-          <p className={cn('text-xs mt-1', BODY_MUTED)}>
-            Add your first listing to start the register.
-          </p>
-          <Link
-            href={`/s/${slug}/properties/new`}
-            className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5 mt-4')}
-          >
-            <Plus size={14} aria-hidden />
-            Add property
-          </Link>
+        <Reveal variant="rise">
+          <RealtorEmptyState
+            title="Quiet — no properties yet."
+            description="Add your first listing to start the register."
+            action={
+              <Link href={`/s/${slug}/properties/new`} className={PRIMARY_PILL}>
+                <Plus size={14} aria-hidden />
+                Add property
+              </Link>
+            }
+          />
         </Reveal>
       ) : (
         /* The listing wall — a responsive card grid with strong photo
@@ -123,6 +119,6 @@ export default async function PropertiesPage({
            avoid animating the same cards twice. */
         <PropertyListGrid slug={slug} properties={properties} />
       )}
-    </div>
+    </RealtorPage>
   );
 }

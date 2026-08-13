@@ -101,7 +101,7 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
   const { theme, toggleTheme } = useTheme();
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
-  const mobileChatRoot = showBrokerMobileNavOnly ? '/broker' : `${base}/chippi`;
+  const mobileChatRoot = showBrokerMobileNavOnly ? '/broker/chippi' : `${base}/chippi`;
   const isOnChatRoot = pathname === mobileChatRoot;
   const [chippiSidebarView, setChippiSidebarView] = useChippiSidebarView(
     pathname,

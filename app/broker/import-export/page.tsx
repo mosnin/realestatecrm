@@ -2,6 +2,7 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import ImportExportClient from './import-export-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata = { title: 'Import / Export — Teams' };
 
@@ -37,5 +38,9 @@ export default async function ImportExportPage() {
     }
   }
 
-  return <ImportExportClient totalLeads={totalLeads} />;
+  return (
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="import-export">
+      <ImportExportClient totalLeads={totalLeads} />
+    </div>
+  );
 }

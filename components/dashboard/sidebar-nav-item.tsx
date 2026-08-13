@@ -91,6 +91,14 @@ export function SidebarNavItem({
 
       {!collapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
       {!collapsed && badge}
+      {collapsed && badgeText && (
+        <span
+          aria-hidden
+          className="absolute right-0.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground tabular-nums ring-2 ring-sidebar"
+        >
+          {badgeText}
+        </span>
+      )}
     </>
   );
 

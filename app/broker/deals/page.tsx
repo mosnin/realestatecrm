@@ -16,6 +16,7 @@ import { BrokerKanbanBoard } from './broker-kanban-board';
 import type { BrokerDealItem } from './broker-deal-card';
 import type { BrokerKanbanColumn } from './broker-kanban-board';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_WIDE } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Deals — Brokerage' };
 
@@ -307,7 +308,7 @@ export default async function BrokerDealsPage() {
   })();
 
   return (
-    <div className={cn('max-w-[1500px] mx-auto pb-12', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_WIDE, SECTION_RHYTHM)} data-broker-premium-page="deals">
       {/* Status-sentence header — per STYLESHEET.md §The status-sentence pattern */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Brokerage.</p>

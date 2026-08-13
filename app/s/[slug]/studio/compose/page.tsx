@@ -3,7 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { ComposePanel } from './compose-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { PageTransition } from '@/components/motion/page-transition';
+import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export default async function StudioComposePage({
   if (!space) notFound();
 
   return (
-    <PageTransition className={cn('mx-auto max-w-5xl px-6 py-8', PAGE_RHYTHM)}>
+    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Studio.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -25,7 +25,9 @@ export default async function StudioComposePage({
         </h1>
         <p className={BODY_MUTED}>Write a social caption for a photo.</p>
       </header>
-      <ComposePanel />
-    </PageTransition>
+      <RealtorPanel>
+        <ComposePanel />
+      </RealtorPanel>
+    </RealtorPage>
   );
 }

@@ -1249,7 +1249,13 @@ export function ChippiWorkspace({
     setChatMode('work');
     writeStoredChatMode(null, 'work');
     setDraftWorkExecutionMode(handoff.executionMode);
-    setPrefill({ text: handoff.text, nonce: Date.now() });
+    // Today is a direct Work launcher, not another drafting surface. Submit
+    // the consumed handoff through the same durable acceptance path as the
+    // composer. If acceptance fails, restore the exact goal to the composer
+    // so nothing is lost and the realtor can retry.
+    void handleSendRef.current(handoff.text, [], undefined, 'work').then((accepted) => {
+      if (!accepted) setPrefill({ text: handoff.text, nonce: Date.now() });
+    });
   }, [initialConversationId, initialMessages.length, slug]);
   const handleTellMeAboutLead = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });

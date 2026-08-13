@@ -12,6 +12,7 @@ import {
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'General settings — Teams' };
 
@@ -37,7 +38,7 @@ export default async function BrokerSettingsPage() {
     : `${brokerage.name} — read-only for your role.`;
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-general">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import TemplatesClient from './templates-client';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Templates — Teams' };
 
@@ -20,7 +21,7 @@ export default async function TemplatesPage() {
     ctx.membership.role === 'broker_owner' || ctx.membership.role === 'broker_admin';
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-56 md:pb-24">
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="templates">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Templates.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

@@ -8,6 +8,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Real estate agents — Teams' };
 
@@ -303,7 +304,7 @@ export default async function BrokerRealtorsPage() {
   })();
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-56 md:pb-24">
+    <div className={cn(BROKER_PAGE_READING, 'pb-56 md:pb-24')} data-broker-premium-page="realtors">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Real estate agents.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

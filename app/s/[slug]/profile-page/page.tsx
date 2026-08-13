@@ -28,7 +28,7 @@ export default async function ProfilePageEditor({
   if (!space) notFound();
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
+    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Profile.</p>
         <SplitReveal

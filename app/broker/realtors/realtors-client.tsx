@@ -236,7 +236,7 @@ function buildCoachHref(r: RealtorRow): string {
   const displayName = r.name ?? r.email;
   const summary = coachHealthSummary(r);
   const prompt = `Help me coach ${displayName}. Here's what I'm seeing: ${summary}. Draft a 1:1 agenda and a nudge I can send.`;
-  return `/broker?prompt=${encodeURIComponent(prompt)}`;
+  return `/broker/chippi?prompt=${encodeURIComponent(prompt)}`;
 }
 
 export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {

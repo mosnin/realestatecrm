@@ -8,16 +8,13 @@ import { cn } from '@/lib/utils';
 
 export default function DealsError({ reset }: { error: Error; reset: () => void }) {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center px-6">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas flex min-h-[calc(100vh-10rem)] items-center justify-center px-6">
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
         className="text-center max-w-sm"
       >
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
-          <TrendingUp size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
-        </div>
         <h2 className={H3}>Your pipeline didn&apos;t load</h2>
         <p className={cn(BODY_MUTED, 'mt-1.5')}>
           The board hiccupped on its way in. Your deals are safe — this is almost

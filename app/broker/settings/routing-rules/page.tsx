@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { DealRoutingRuleRow } from '@/lib/routing-rule-schema';
 import RulesClient from './rules-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata = { title: 'Routing rules — Teams' };
 
@@ -90,11 +91,13 @@ export default async function RoutingRulesPage() {
     ctx.membership.role === 'broker_owner' || ctx.membership.role === 'broker_admin';
 
   return (
-    <RulesClient
-      initialRules={initialRules}
-      members={members}
-      fallbackMethod={fallbackMethod}
-      canEdit={canEdit}
-    />
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="settings-routing-rules">
+      <RulesClient
+        initialRules={initialRules}
+        members={members}
+        fallbackMethod={fallbackMethod}
+        canEdit={canEdit}
+      />
+    </div>
   );
 }

@@ -171,7 +171,7 @@ export default function NewDealPage() {
     : null;
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)] max-w-lg mx-auto px-4 py-6">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas flex flex-col min-h-[calc(100vh-10rem)] max-w-lg mx-auto py-3 sm:py-5">
       {/* Top bar */}
       <div className="flex items-center gap-3 mb-6">
         <button

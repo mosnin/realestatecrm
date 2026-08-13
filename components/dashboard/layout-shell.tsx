@@ -19,9 +19,10 @@ interface LayoutShellProps {
  */
 export function LayoutShell({ slug, children, liveNotifications }: LayoutShellProps) {
   const pathname = usePathname() ?? '';
-  const isChippiRoute = pathname.startsWith(`/s/${slug}/chippi`);
+  const chippiRoot = `/s/${slug}/chippi`;
+  const isChippiChat = pathname === chippiRoot;
 
-  if (isChippiRoute) {
+  if (isChippiChat) {
     return (
       <main className="flex-1 min-h-0 flex flex-col bg-background text-foreground pb-[env(safe-area-inset-bottom)] md:pb-0">
         <SupabaseRealtimeBridge />
@@ -32,11 +33,14 @@ export function LayoutShell({ slug, children, liveNotifications }: LayoutShellPr
   }
 
   return (
-    <main className="flex-1 overflow-y-auto flex flex-col bg-background text-foreground">
+    <main
+      data-premium-dashboard
+      className="chippi-dashboard-canvas flex-1 overflow-y-auto flex flex-col text-foreground"
+    >
       {/* The ChippiBar overlays the bottom 80-100px of the viewport; pb-28
           on the content gives it just enough clearance without padding the
           page out to 160px. */}
-      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-7 pb-28')}>
+      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-8 pb-28')}>
         <SupabaseRealtimeBridge />
         {liveNotifications}
         <PageTransition>{children}</PageTransition>

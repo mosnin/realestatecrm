@@ -13,8 +13,10 @@ describe('dashboard reference aesthetic contract', () => {
     expect(globals).toContain('--card: #fbfbfa;');
     expect(globals).toContain('--border: #dededb;');
 
-    expect(surfaces).toContain('rounded-2xl border border-border/85 bg-card');
-    expect(surfaces).toContain('0_6px_18px_-16px');
+    expect(surfaces).toContain(
+      "chippi-dashboard-panel rounded-[1.75rem] border border-transparent",
+    );
+    expect(globals).toContain('0 16px 40px -32px');
     expect(surfaces).not.toContain('bg-gradient-to-br from-[#FF9500]');
   });
 

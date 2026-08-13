@@ -31,6 +31,7 @@ import {
   STAT_NUMBER_COMPACT,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import { SplitReveal } from '@/components/motion';
 import { BarChart2 } from 'lucide-react';
@@ -206,7 +207,7 @@ export default async function BrokerUsagePage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className={cn('max-w-5xl mx-auto pb-56 md:pb-24', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="usage">
 
       {/* Status-sentence header — per STYLESHEET §The status-sentence pattern */}
       <header className="space-y-1.5">

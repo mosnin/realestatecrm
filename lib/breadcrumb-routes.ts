@@ -21,7 +21,8 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/team', label: 'Team' },
   { path: '/profile', label: 'Profile' },
   // Broker routes
-  { path: '/broker/brief', label: 'Brief' },
+  { path: '/broker/chippi', label: 'Chippi' },
+  { path: '/broker/brief', label: 'Today' },
   { path: '/broker/forecast', label: 'Forecast' },
   { path: '/broker/people', label: 'People' },
   { path: '/broker/deals', label: 'Deals' },
@@ -45,7 +46,7 @@ export const BREADCRUMB_ROUTES: Array<{ path: string; label: string; exact?: boo
   { path: '/broker/settings/mcp', label: 'MCP' },
   { path: '/broker/settings/profile', label: 'Profile' },
   { path: '/broker/settings', label: 'Settings' },
-  { path: '/broker', label: 'Chippi', exact: true },
+  { path: '/broker', label: 'Today', exact: true },
 ];
 
 /**

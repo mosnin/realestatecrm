@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { CommissionsClient, type LedgerRow } from './commissions-client';
 import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Commissions — Teams' };
 
@@ -143,7 +144,7 @@ export default async function BrokerCommissionsPage() {
       : `${rowCount} ${rowCount === 1 ? 'deal' : 'deals'} on the ledger, snapshotted at close.`;
 
   return (
-    <div className={`max-w-5xl mx-auto ${SECTION_RHYTHM} w-full pb-12`}>
+    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="commissions">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>
         <h1 className={H1} style={TITLE_FONT}>

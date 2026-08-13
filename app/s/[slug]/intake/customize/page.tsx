@@ -249,7 +249,7 @@ export default function IntakeCustomizePage() {
     // where everything fits. On smaller screens the preview drops below
     // the builder; the "Open in new tab" link at the top of the preview
     // is the escape hatch when the realtor wants a dedicated window.
-    <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_480px] gap-6 max-w-[1600px] pb-12">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-6 max-w-[1600px] pb-12 pt-3 sm:pt-5 2xl:grid-cols-[minmax(0,1fr)_480px]">
       {/* Left column — scrolls with the page */}
       <div className="min-w-0 space-y-6">
         {/* Header — H1 + Chippi narration */}

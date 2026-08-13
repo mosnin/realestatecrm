@@ -49,6 +49,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { ProfitabilityClient } from './profitability-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Profitability -- Brokerage' };
 
@@ -156,7 +157,7 @@ export default async function BrokerProfitabilityPage() {
   const isEmpty = totals.gci === 0 && totals.dealsClosed === 0;
 
   return (
-    <div className={cn('max-w-5xl mx-auto pb-56 md:pb-24', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="profitability">
       {/* Status-sentence header -- per STYLESHEET the-status-sentence-pattern */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>

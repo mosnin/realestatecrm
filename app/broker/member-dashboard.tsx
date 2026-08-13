@@ -1,16 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
-import { HOT_LEAD_THRESHOLD, WARM_LEAD_THRESHOLD } from '@/lib/constants';
 import { pluralize } from '@/lib/formatting';
 import {
-  PhoneIncoming,
-  PhoneOutgoing,
-  Briefcase,
-  CheckCircle2,
   ArrowRight,
-  Clock,
-  AlertTriangle,
-  Megaphone,
 } from 'lucide-react';
 import Link from 'next/link';
 import { BODY_MUTED, H1, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
@@ -19,6 +11,17 @@ import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
 import { SplitReveal } from '@/components/motion';
+import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
+import {
+  BROKER_DIVIDED_LIST,
+  BROKER_EMPTY,
+  BROKER_HERO,
+  BROKER_PAGE_READING,
+  BROKER_PAGE_WIDE,
+  BROKER_PANEL,
+  BROKER_ROW,
+  BROKER_STATUS,
+} from '@/components/broker/premium';
 
 type MemberDashboardProps = {
   ctx: {
@@ -50,7 +53,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
 
   if (!space) {
     return (
-      <div className="space-y-6 w-full">
+      <div className={BROKER_PAGE_READING} data-broker-premium-page="member-today-empty">
         <header className="space-y-1.5">
           <p className={cn(BODY_MUTED)}>Today.</p>
           <h1 className={cn(H1)} style={TITLE_FONT}>
@@ -60,8 +63,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
             {`${brokerage.name} · finish your workspace to start tracking leads.`}
           </p>
         </header>
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-          <Briefcase size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+        <div className={BROKER_EMPTY}>
           <p className="text-sm text-foreground">Set up your workspace.</p>
           <p className={cn('text-xs mt-1', BODY_MUTED)}>
             <Link href="/setup" className="underline-offset-2 hover:underline">
@@ -210,14 +212,8 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   function getScoreBadge(scoreLabel: string | null, leadScore: number | null) {
     if (!scoreLabel && leadScore == null) return null;
     const label = scoreLabel ?? `${leadScore}`;
-    const color =
-      scoreLabel === 'Hot' || (leadScore && leadScore >= HOT_LEAD_THRESHOLD)
-        ? 'text-foreground bg-foreground/[0.06]'
-        : scoreLabel === 'Warm' || (leadScore && leadScore >= WARM_LEAD_THRESHOLD)
-          ? 'text-muted-foreground bg-muted'
-          : 'text-muted-foreground bg-muted';
     return (
-      <span className={`inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 ${color}`}>
+      <span className={BROKER_STATUS}>
         {label}
       </span>
     );
@@ -244,17 +240,33 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   })();
 
   return (
-    <div className="space-y-6 w-full">
+    <div className={BROKER_PAGE_WIDE} data-broker-premium-page="member-today">
       {/* ── Header — canonical three-line status-sentence pattern.
           Muted greeting → serif H1 → one-sentence status. Same shape
           every other broker page uses. ── */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Today.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          <SplitReveal as="span" text={`Welcome back, ${firstName}`} />
-        </h1>
-        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
-      </header>
+      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[24rem] sm:min-h-[28rem]')}>
+        <div
+          aria-hidden="true"
+          data-chippi-atmosphere="ascii-field"
+          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
+        >
+          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
+        </div>
+        <header className="relative z-10">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
+            CHIPPI // TODAY
+          </p>
+          <h1
+            className="mt-10 max-w-4xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
+            style={TITLE_FONT}
+          >
+            <SplitReveal as="span" text={`Welcome back, ${firstName}`} />
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-foreground/80 sm:text-lg">
+            {statusSentence}
+          </p>
+        </header>
+      </BriefReveal>
 
       {/* ── Stats row — hairline-divider snapshot, mirrors deal-quick-panel.
           Foreground for values, muted for labels. Icons stay for scanning
@@ -265,19 +277,19 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
         className="grid grid-cols-2 sm:grid-cols-4 gap-4"
       >
         {[
-          { label: 'Leads assigned', value: assignedCount, icon: PhoneIncoming },
-          { label: 'Leads contacted', value: contactedCount, icon: PhoneOutgoing },
-          { label: 'Active deals', value: activeDealsCount, icon: Briefcase },
-          { label: 'Deals closed', value: wonDealsCount, icon: CheckCircle2 },
-        ].map(({ label, value, icon: Icon }) => (
-          <BriefKpiTile key={label} label={label} value={value} icon={Icon} dim={value === 0} />
+          { label: 'Leads assigned', value: assignedCount },
+          { label: 'Leads contacted', value: contactedCount },
+          { label: 'Active deals', value: activeDealsCount },
+          { label: 'Deals closed', value: wonDealsCount },
+        ].map(({ label, value }) => (
+          <BriefKpiTile key={label} label={label} value={value} dim={value === 0} />
         ))}
       </BriefReveal>
 
       {/* ── Two-column layout: Recent leads + Overdue follow-ups ── */}
       <BriefReveal delay={0.08} as="div" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent assigned leads */}
-        <div className="space-y-3">
+        <section className={cn(BROKER_PANEL, 'space-y-3')}>
           <div className="flex items-center justify-between">
             <h2 className={SECTION_LABEL}>Recent assigned leads</h2>
             <Link
@@ -293,20 +305,19 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
           </div>
 
           {recentLeads.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-              <PhoneIncoming size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+            <div className={BROKER_EMPTY}>
               <p className="text-sm text-foreground">No assigned leads yet.</p>
               <p className={cn('text-xs mt-1', BODY_MUTED)}>
                 Leads assigned by your team will land here.
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className={BROKER_DIVIDED_LIST}>
               {recentLeads.map((lead) => (
                 <li key={lead.id}>
                   <Link
                     href={spaceSlug ? `/s/${spaceSlug}/leads/${lead.id}` : '#'}
-                    className="group/lead flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+                    className={cn(BROKER_ROW, 'items-center')}
                   >
                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 transition-colors group-hover/lead:bg-foreground/[0.07]">
                       <span className="text-xs font-semibold text-muted-foreground transition-colors group-hover/lead:text-foreground">
@@ -330,22 +341,21 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
               ))}
             </ul>
           )}
-        </div>
+        </section>
 
         {/* Overdue follow-ups */}
-        <div className="space-y-3">
+        <section className={cn(BROKER_PANEL, 'space-y-3')}>
           <h2 className={SECTION_LABEL}>Overdue follow-ups</h2>
 
           {overdueFollowUps.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-              <CheckCircle2 size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+            <div className={BROKER_EMPTY}>
               <p className="text-sm text-foreground">All caught up.</p>
               <p className={cn('text-xs mt-1', BODY_MUTED)}>
                 No overdue follow-ups right now.
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60">
+            <ul className={BROKER_DIVIDED_LIST}>
               {overdueFollowUps.map((contact) => {
                 const followUp = new Date(contact.followUpAt);
                 const isOverdue = followUp < todayStart;
@@ -354,15 +364,8 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
                   <li key={contact.id}>
                     <Link
                       href={spaceSlug ? `/s/${spaceSlug}/leads/${contact.id}` : '#'}
-                      className="group/fu flex items-center gap-3 py-3 -mx-2 px-2 rounded-md hover:bg-muted/30 transition-colors"
+                      className={cn(BROKER_ROW, 'items-center')}
                     >
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 transition-colors group-hover/fu:bg-foreground/[0.07]">
-                        {isOverdue ? (
-                          <AlertTriangle size={14} className="text-muted-foreground transition-colors group-hover/fu:text-foreground" />
-                        ) : (
-                          <Clock size={14} className="text-muted-foreground transition-colors group-hover/fu:text-foreground" />
-                        )}
-                      </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{contact.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
@@ -370,11 +373,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0 ${
-                          isOverdue
-                            ? 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-500/15'
-                            : 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
-                        }`}
+                        className={cn(BROKER_STATUS, 'flex-shrink-0')}
                       >
                         {isOverdue
                           ? `Overdue ${followUp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -386,27 +385,26 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
               })}
             </ul>
           )}
-        </div>
+        </section>
       </BriefReveal>
 
       {/* ── Latest announcements ── */}
-      <BriefReveal delay={0.12} as="div" className="space-y-3">
+      <BriefReveal delay={0.12} as="section" className={cn(BROKER_PANEL, 'space-y-3')}>
         <div className="flex items-center justify-between">
           <h2 className={SECTION_LABEL}>Announcements</h2>
         </div>
 
         {announcements.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
-            <Megaphone size={28} className="mx-auto mb-3 text-muted-foreground/60" aria-hidden />
+          <div className={BROKER_EMPTY}>
             <p className="text-sm text-foreground">No announcements.</p>
             <p className={cn('text-xs mt-1', BODY_MUTED)}>
               Notes from your team will appear here.
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/60">
+          <ul className={BROKER_DIVIDED_LIST}>
             {announcements.map((note) => (
-              <li key={note.id} className="py-3">
+              <li key={note.id} className={BROKER_ROW}>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm font-semibold text-foreground">
                     {note.title.replace(/^\[ANN\]\s*/, '')}

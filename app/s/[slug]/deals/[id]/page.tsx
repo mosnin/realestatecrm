@@ -189,11 +189,8 @@ export default async function DealDetailPage({
   } catch (err) {
     console.error('[deal-detail] DB queries failed', err);
     return (
-      <div className="flex min-h-[50vh] items-center justify-center px-6">
+      <div data-realtor-page="today" className="chippi-dashboard-canvas flex min-h-[calc(100vh-10rem)] items-center justify-center px-6">
         <Reveal variant="rise" className="text-center max-w-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/[0.04]">
-            <TrendingUp size={20} strokeWidth={1.5} className="text-muted-foreground/60" />
-          </div>
           <h1 className={H3}>This deal didn&apos;t load</h1>
           <p className={cn(BODY_MUTED, 'mt-1.5')}>
             The connection hiccupped on the way in. Nothing was lost — this is almost
@@ -288,7 +285,7 @@ export default async function DealDetailPage({
   const ownerInitials = getInitials(ownerName);
 
   return (
-    <div className={cn(PAGE_MAX, 'mx-auto space-y-8 pb-12')}>
+    <div data-realtor-page="today" className={cn(PAGE_MAX, 'chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] space-y-8 pb-12 pt-3 sm:pt-5')}>
       {/* Quiet back link — mirrors the People detail's "ArrowLeft People"
           breadcrumb. The card-wrapped breadcrumb in the old design was loud
           chrome for a navigation primitive. */}

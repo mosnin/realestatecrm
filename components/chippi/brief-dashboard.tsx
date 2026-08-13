@@ -9,7 +9,7 @@
  * seeded or estimated: composeBriefDashboard owns every value on first paint.
  */
 
-import React, { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, ArrowUpRight, ChevronDown } from 'lucide-react';
@@ -27,6 +27,7 @@ import { AnimatedNumber } from '@/components/motion';
 import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 import { Button } from '@/components/ui/button';
 import { DASHBOARD_ROW } from '@/components/ui/surface-card';
+import { AuroraGlow } from '@/components/effects/aurora-glow';
 import { BriefCell, useBriefMotionEnabled } from './brief-motion';
 import { stageWorkDraftHandoff } from '@/lib/chippi/work-draft-handoff';
 import type { BriefDashboard as DashboardData } from '@/lib/briefing/dashboard';
@@ -457,6 +458,8 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
   const [exampleIndex, setExampleIndex] = useState(0);
   const [task, setTask] = useState('');
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [launching, setLaunching] = useState(false);
+  const launchTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (examples.length < 2) return;
@@ -466,6 +469,13 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
     }, 5200);
     return () => window.clearInterval(interval);
   }, [examples]);
+
+  useEffect(
+    () => () => {
+      if (launchTimer.current !== null) window.clearTimeout(launchTimer.current);
+    },
+    [],
+  );
 
   const activeExample = examples[exampleIndex] ?? examples[0];
 
@@ -484,7 +494,44 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
       setHandoffError('Chippi could not carry that goal into Work yet. Your text is still here — try again.');
       return;
     }
-    window.location.assign(`/s/${slug}/chippi`);
+    setLaunching(true);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    launchTimer.current = window.setTimeout(
+      () => window.location.assign(`/s/${slug}/chippi`),
+      reducedMotion ? 180 : 780,
+    );
+  }
+
+  if (launching) {
+    return (
+      <div className="mt-7 max-w-3xl" data-work-launch="aurora">
+        <AuroraGlow
+          active
+          pulseKey={1}
+          palette="spectrum"
+          className="min-h-[72px] rounded-2xl shadow-[0_14px_36px_-24px_rgba(0,0,0,0.85)]"
+        >
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-[72px] items-center justify-between gap-4 px-5 py-3"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Kicking off Work</p>
+              <p className="mt-0.5 truncate text-xs text-white/65">
+                Opening Chippi and submitting your goal…
+              </p>
+            </div>
+            <span
+              data-aura-origin
+              className="inline-flex h-9 shrink-0 items-center rounded-full border border-white/15 bg-white/10 px-4 text-xs font-medium text-white"
+            >
+              Starting
+            </span>
+          </div>
+        </AuroraGlow>
+      </div>
+    );
   }
 
   return (

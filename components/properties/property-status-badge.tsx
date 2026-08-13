@@ -13,7 +13,6 @@
  *   - components/properties/property-detail-client.tsx  (detail page header)
  *   - components/deals/deal-property-picker.tsx  (linked-property row)
  */
-import { CircleDot, Clock, Check, Archive, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PROPERTY_LISTING_STATUS_OPTIONS } from '@/lib/properties';
 import type { PropertyListingStatus } from '@/lib/types';
@@ -23,33 +22,20 @@ interface Props {
   className?: string;
 }
 
-function iconFor(status: PropertyListingStatus) {
-  switch (status) {
-    case 'active':     return CircleDot;
-    case 'pending':    return Clock;
-    case 'sold':       return Check;
-    case 'owned':      return Archive;
-    case 'off_market': return EyeOff;
-    default:           return CircleDot;
-  }
-}
-
 function labelFor(status: PropertyListingStatus): string {
   return PROPERTY_LISTING_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
 }
 
 export function PropertyStatusBadge({ status, className }: Props) {
-  const Icon = iconFor(status);
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5',
+        'inline-flex items-center rounded-full px-2.5 py-0.5',
         'text-[11px] font-medium',
         'bg-muted text-muted-foreground',
         className,
       )}
     >
-      <Icon size={11} aria-hidden />
       {labelFor(status)}
     </span>
   );

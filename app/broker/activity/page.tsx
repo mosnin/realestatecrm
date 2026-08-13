@@ -3,6 +3,7 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { ActivityClient, type ActivityRow } from './activity-client';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 // Server component: fetch the first page of AuditLog rows scoped to this
 // brokerage, then hand off to the client for filter/pagination. Mirrors the
@@ -136,7 +137,7 @@ export default async function BrokerActivityPage() {
   }));
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className={`${BROKER_PAGE_READING} max-w-4xl`} data-broker-premium-page="activity">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Activity.</p>
         <h1

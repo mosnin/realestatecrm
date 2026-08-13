@@ -209,7 +209,7 @@ export function FilesPanel() {
     >
       {/* Quota gauge */}
       {quota && (
-        <div className="rounded-xl border border-border/60 bg-card p-4">
+        <div className="chippi-dashboard-panel-muted rounded-2xl p-5">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {formatBytes(quota.usedBytes)} of {quota.label} used

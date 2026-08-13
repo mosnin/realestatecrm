@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { notFound, redirect } from 'next/navigation';
 import type { ReviewRow } from '../reviews-client';
 import { ReviewDetailClient, type ReviewComment } from './review-detail-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -121,6 +122,8 @@ export default async function BrokerReviewDetailPage({ params }: PageProps) {
   };
 
   return (
-    <ReviewDetailClient review={review} comments={comments} role={ctx.membership.role} />
+    <div className={`${BROKER_PAGE_READING} max-w-4xl`} data-broker-premium-page="review-detail">
+      <ReviewDetailClient review={review} comments={comments} role={ctx.membership.role} />
+    </div>
   );
 }

@@ -34,6 +34,7 @@ import {
 import { fetchSpeedToLead } from '@/lib/analytics/speed-to-lead-data';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 import { AnalyticsBreakdowns } from './breakdowns';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 import {
   buildLeadSourceBreakdown,
   buildWinLossByReason,
@@ -214,7 +215,7 @@ export default async function BrokerAnalyticsPage() {
   );
 
   return (
-    <div className={cn('max-w-5xl mx-auto pb-56 md:pb-24', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="analytics">
 
       {/* Status-sentence header -- per STYLESHEET the-status-sentence-pattern */}
       <header className="space-y-1.5">

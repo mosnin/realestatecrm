@@ -547,7 +547,7 @@ export function BrokerPeopleTable() {
 // Mirrors ContactRow in contact-table.tsx exactly — same avatar, name + stage
 // pill, email·phone truncating line, ScoreChip, follow-up pill — with one
 // broker-only addition: a Realtor byline under the contact's name/email line.
-// Row click drills into /broker?prompt=... (Chippi prefilled about this lead).
+// Row click drills into /broker/chippi?prompt=... (Chippi prefilled about this lead).
 
 function BrokerContactRow({
   contact,
@@ -578,7 +578,7 @@ function BrokerContactRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
     >
-      <Link href={`/broker?prompt=${drillPrompt}`} className={rowClassName}>
+      <Link href={`/broker/chippi?prompt=${drillPrompt}`} className={rowClassName}>
         {/* Avatar */}
         <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
           {getInitials(contact.name)}

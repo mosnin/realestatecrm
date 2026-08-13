@@ -21,7 +21,7 @@ export default async function DocumentsPage({
   if (!space) notFound();
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 pb-12">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-4xl pb-12 pt-3 sm:pt-5">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Documents.</p>
         <h1

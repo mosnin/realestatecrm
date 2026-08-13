@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 import { FormBuilder } from '@/components/form-builder';
 import { FormPreview } from '@/components/form-builder/form-preview';
 import { TEMPLATES } from '@/components/form-builder/templates';
@@ -240,7 +241,7 @@ export default function BrokerFormBuilderPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse max-w-3xl mx-auto">
+      <div className={`${BROKER_PAGE_READING} max-w-3xl animate-pulse`} data-broker-premium-state="loading">
         <div className="h-8 bg-muted rounded-lg w-40" />
         <div className="h-64 bg-muted rounded-lg" />
       </div>
@@ -250,7 +251,7 @@ export default function BrokerFormBuilderPage() {
   const activeFormName = activeLeadType === 'rental' ? 'Rental application' : 'Buyer inquiry';
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-56 md:pb-24">
+    <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="settings-form-builder">
       {/* ── Header ── */}
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">

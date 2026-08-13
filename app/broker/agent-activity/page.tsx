@@ -3,6 +3,7 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { AgentActivityClient, type RealtorRollup, type ResponseShape } from './agent-activity-client';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 const DEFAULT_WINDOW_DAYS = 30;
 const ROLLUP_LOG_CAP = 5000;
@@ -156,7 +157,7 @@ export default async function BrokerAgentActivityPage() {
   const initial = await rollupForBrokerage(ctx.brokerage.id, DEFAULT_WINDOW_DAYS);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-56 md:pb-24">
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="agent-activity">
       <header className="space-y-1.5">
         <p className="text-sm text-muted-foreground">Chippi.</p>
         <h1

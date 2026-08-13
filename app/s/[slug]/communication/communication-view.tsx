@@ -42,8 +42,8 @@ export function CommunicationView({
         : 'Reading from your inbox.';
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-8 max-w-3xl">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full">
+      <div className="w-full mx-auto pb-56 pt-3 md:pb-24 sm:pt-5 space-y-8 max-w-3xl">
         <header className="space-y-1.5 min-w-0">
           <p className={BODY_MUTED}>Communication.</p>
           <h1 className={H1} style={TITLE_FONT}>

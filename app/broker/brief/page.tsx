@@ -3,28 +3,19 @@ import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { redirect } from 'next/navigation';
 import {
-  Building2,
-  Briefcase,
-  Inbox,
   ChevronRight,
   ArrowRight,
   ArrowUpRight,
-  Mail,
-  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCompact, formatCurrency } from '@/lib/formatting';
-import { SECTION_LABEL, TITLE_FONT, META, STAT_NUMBER_COMPACT } from '@/lib/typography';
+import { CHIPPI_PILL, SECTION_LABEL, TITLE_FONT, META, STAT_NUMBER_COMPACT } from '@/lib/typography';
 import {
-  ACCENT_CARD,
-  ACCENT_CARD_PILL,
   AccentBarLabel,
   AddRow,
   CARD_TITLE,
   InsightStrip,
   StatusPill,
-  SURFACE_CARD,
-  SURFACE_CARD_PAD,
 } from '@/components/ui/surface-card';
 import { cn } from '@/lib/utils';
 import { dealHealth } from '@/lib/deals/health';
@@ -39,6 +30,16 @@ import {
   type DraftStatsRow,
 } from '@/lib/draft-stats';
 import { MemberDashboard } from '../member-dashboard';
+import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
+import {
+  BROKER_DIVIDED_LIST,
+  BROKER_EMPTY,
+  BROKER_HERO,
+  BROKER_INSET,
+  BROKER_PAGE_WIDE,
+  BROKER_PANEL,
+  BROKER_ROW,
+} from '@/components/broker/premium';
 
 // ── Revenue forecast helpers (mirrors app/broker/forecast/page.tsx) ──────────
 //
@@ -456,53 +457,58 @@ export default async function BrokerBriefPage() {
     });
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 pb-12">
+    <div className={BROKER_PAGE_WIDE} data-broker-premium-page="today">
       {/* Header — canonical three-line pattern. Muted greeting (with the
           team name as the calm anchor), serif Times h1 from BrokerMorningStory
           carrying Chippi's chief-of-staff sentence, and the small hairline
           stats row inside the story handles the context numbers. No second
           muted line — two stat surfaces stacked read as noise. */}
-      <header className="space-y-1.5 pb-3">
-        <p className="text-sm text-muted-foreground">
-          {getGreeting()}. {brokerage.name}.
-        </p>
-        <BrokerMorningStory />
-      </header>
+      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[30rem] sm:min-h-[34rem]')}>
+        <div
+          aria-hidden="true"
+          data-chippi-atmosphere="ascii-field"
+          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
+        >
+          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
+        </div>
+        <header className="relative z-10 min-h-[24rem] sm:min-h-[27rem]">
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
+                CHIPPI // TODAY
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+            <p className="mt-10 text-sm text-muted-foreground">
+              {getGreeting()}. {brokerage.name}.
+            </p>
+            <div className="mt-3">
+              <BrokerMorningStory />
+            </div>
+          </div>
+        </header>
+      </BriefReveal>
 
       {/* Chippi — the focal entry, and the view's ONE solid accent card.
           The broker's chief of staff is the home of this page, not its
           fourth section: serif name and one line of what it does in white
           ink on the agent-orange surface, with a translucent white pill
           into /broker/chippi. */}
-      <BriefReveal delay={0.02} as="div">
-        <Link
-          href="/broker"
-          className={cn(
-            'group/chippi block transition-opacity hover:opacity-95',
-            ACCENT_CARD,
-            SURFACE_CARD_PAD,
-          )}
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex-1 min-w-0 space-y-1">
-              <p
-                className="text-[21px] leading-snug tracking-tight text-white"
-                style={TITLE_FONT}
-              >
-                Talk to Chippi
-              </p>
-              <p className="text-sm text-white/85">
-                Ask about team health, reassign a lead, flag a deal, send an announcement.
-              </p>
-            </div>
-            <span className={cn(ACCENT_CARD_PILL, 'flex-shrink-0')}>
-              Open
-              <ArrowUpRight
-                size={15}
-                className="transition-transform duration-200 group-hover/chippi:translate-x-0.5 group-hover/chippi:-translate-y-0.5"
-              />
-            </span>
-          </div>
+      <BriefReveal delay={0.02} className={cn(BROKER_PANEL, 'flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between')}>
+        <div className="min-w-0 max-w-2xl space-y-1.5">
+          <p className={SECTION_LABEL}>Chippi</p>
+          <h2 className="text-[1.65rem] leading-tight tracking-tight text-foreground" style={TITLE_FONT}>
+            Talk to Chippi
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Ask about team health, reassign a lead, flag a deal, send an announcement.
+          </p>
+        </div>
+        <Link href="/broker/chippi" className={cn(CHIPPI_PILL, 'shrink-0')}>
+          Open
+          <ArrowUpRight size={14} aria-hidden />
         </Link>
       </BriefReveal>
 
@@ -510,8 +516,7 @@ export default async function BrokerBriefPage() {
           Neutral icon: this is a settings affordance, not Chippi speaking,
           so orange would be unearned. */}
       {!hasSettings && (
-        <section className={cn(SURFACE_CARD, 'px-5 py-4 flex items-start gap-3')}>
-          <Building2 size={14} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+        <section className={cn(BROKER_INSET, 'flex items-start gap-3')}>
           <div className="flex-1 space-y-0.5">
             <p className="text-sm font-medium">Finish setting up your team</p>
             <p className="text-[13px] text-muted-foreground">
@@ -606,7 +611,7 @@ export default async function BrokerBriefPage() {
           deal to watch. Computation mirrors app/broker/forecast/page.tsx.
           The projected figure and the won/in-flight strip count up on entry
           (AnimatedNumber, reduced-motion aware) — the loudest money beat. */}
-      <BriefReveal delay={0.12} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <BriefReveal delay={0.12} className={BROKER_PANEL}>
         <div className="flex items-center justify-between gap-3">
           <h2 className={CARD_TITLE}>Revenue</h2>
           <Link
@@ -640,7 +645,7 @@ export default async function BrokerBriefPage() {
 
             {/* Won + in flight — quiet inner tiles on the card */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-muted/50 px-4 py-3">
+              <div className={BROKER_INSET}>
                 <p className={SECTION_LABEL}>Won so far</p>
                 <p
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
@@ -649,7 +654,7 @@ export default async function BrokerBriefPage() {
                   {formatCompact(revWonGci)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-muted/50 px-4 py-3">
+              <div className={BROKER_INSET}>
                 <p className={SECTION_LABEL}>In flight (weighted)</p>
                 <p
                   className="text-[17px] leading-snug tracking-tight tabular-nums text-foreground mt-1"
@@ -675,7 +680,6 @@ export default async function BrokerBriefPage() {
             {revPaceSentence && (
               <InsightStrip
                 href="/broker/forecast"
-                icon={<TrendingUp size={14} aria-hidden />}
                 className="mt-1"
               >
                 {revPaceSentence}
@@ -687,7 +691,7 @@ export default async function BrokerBriefPage() {
 
       {/* Speed to lead — only when slaEnabled is on */}
       {slaEnabled && (
-        <BriefReveal delay={0.14} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <BriefReveal delay={0.14} className={BROKER_PANEL}>
           <div className="flex items-center gap-3">
             <h2 className={CARD_TITLE}>Speed to lead</h2>
           </div>
@@ -716,7 +720,7 @@ export default async function BrokerBriefPage() {
 
       {/* Pending invitations — only when there are some */}
       {pendingInvitations.length > 0 && (
-        <BriefReveal delay={0.16} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+        <BriefReveal delay={0.16} className={BROKER_PANEL}>
           <div className="flex items-center gap-3 pb-1">
             <h2 className={CARD_TITLE}>Pending invitations</h2>
             <StatusPill className="tabular-nums">{pendingInvitations.length}</StatusPill>
@@ -731,7 +735,7 @@ export default async function BrokerBriefPage() {
               />
             </Link>
           </div>
-          <ul className="divide-y divide-border/60">
+          <ul className={BROKER_DIVIDED_LIST}>
             {pendingInvitations.map((inv) => {
               const role =
                 inv.roleToAssign === 'broker_owner'
@@ -740,8 +744,7 @@ export default async function BrokerBriefPage() {
                     ? 'Admin'
                     : 'Real estate agent';
               return (
-                <li key={inv.id} className="py-3 flex items-center gap-3 text-sm">
-                  <Mail size={13} className="text-muted-foreground flex-shrink-0" />
+                <li key={inv.id} className={cn(BROKER_ROW, 'items-center text-sm')}>
                   <span className="font-medium text-foreground truncate">{inv.email}</span>
                   <StatusPill>{role}</StatusPill>
                   <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
@@ -755,7 +758,7 @@ export default async function BrokerBriefPage() {
       )}
 
       {/* The swarm — your team today */}
-      <BriefReveal delay={0.18} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <BriefReveal delay={0.18} className={BROKER_PANEL}>
         <div className="flex items-center gap-3 pb-1">
           <h2 className={CARD_TITLE}>Your team</h2>
           {activeMembers > 0 && (
@@ -774,15 +777,14 @@ export default async function BrokerBriefPage() {
         </div>
 
         {memberRows.length === 0 ? (
-          <div className="mt-4 rounded-2xl bg-muted/40 px-5 py-10 text-center">
-            <Building2 size={26} className="mx-auto mb-3 text-muted-foreground/55" aria-hidden />
+          <div className={cn(BROKER_EMPTY, 'mt-4')}>
             <p className="text-sm text-foreground">Your team, in here.</p>
             <p className="text-xs text-muted-foreground mt-1">
               Invite your first real estate agent and their work will land in this view.
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/60">
+          <ul className={BROKER_DIVIDED_LIST}>
             {memberRows.map(({ member, leads, deals, drafts, apps }) => {
               const name = member.User?.name ?? 'Unnamed real estate agent';
               const initial = name.charAt(0).toUpperCase();
@@ -803,7 +805,7 @@ export default async function BrokerBriefPage() {
                 <li key={member.id}>
                   <Link
                     href={href}
-                    className="group/row flex items-center gap-3 py-3 -mx-2 px-2 rounded-lg hover:bg-muted/30 transition-colors"
+                    className={cn(BROKER_ROW, 'items-center')}
                   >
                     <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0 text-sm font-semibold text-muted-foreground transition-colors group-hover/row:bg-foreground/[0.07] group-hover/row:text-foreground">
                       {initial}
@@ -820,8 +822,7 @@ export default async function BrokerBriefPage() {
                       </div>
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
                         {deals.count > 0 && (
-                          <span className="inline-flex items-center gap-1 tabular-nums whitespace-nowrap">
-                            <Briefcase size={10} />
+                          <span className="tabular-nums whitespace-nowrap">
                             {deals.count} deal{deals.count === 1 ? '' : 's'} · ${formatCompact(deals.value)}
                           </span>
                         )}
@@ -836,8 +837,7 @@ export default async function BrokerBriefPage() {
                           </span>
                         )}
                         {drafts > 0 && (
-                          <span className="inline-flex items-center gap-1 text-foreground tabular-nums font-medium whitespace-nowrap">
-                            <Inbox size={10} />
+                          <span className="text-foreground tabular-nums font-medium whitespace-nowrap">
                             {drafts} draft{drafts === 1 ? '' : 's'} pending
                           </span>
                         )}
@@ -872,7 +872,7 @@ export default async function BrokerBriefPage() {
       </BriefReveal>
 
       {/* What the team did — proof of work across the swarm */}
-      <BriefReveal delay={0.22} className={cn(SURFACE_CARD, SURFACE_CARD_PAD)}>
+      <BriefReveal delay={0.22} className={BROKER_PANEL}>
         <div className="flex items-center gap-3">
           <h2 className={CARD_TITLE}>What the team did</h2>
         </div>

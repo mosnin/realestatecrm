@@ -14,8 +14,10 @@ type FollowUpsViewProps = ComponentProps<typeof FollowUpsView>;
 
 export function FollowUpsReveal(props: FollowUpsViewProps) {
   return (
-    <Reveal variant="rise">
-      <FollowUpsView {...props} />
-    </Reveal>
+    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full pb-12 pt-3 sm:pt-5">
+      <Reveal variant="rise">
+        <FollowUpsView {...props} />
+      </Reveal>
+    </div>
   );
 }

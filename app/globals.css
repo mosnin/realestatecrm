@@ -387,6 +387,37 @@
 .chippi-dashboard-atmosphere {
   opacity: var(--dashboard-atmosphere-opacity);
 }
+
+/* Every authenticated dashboard route participates in the Today system.
+   Feature pages keep their real working layouts (tables, calendars, kanban,
+   editors), while their shared shadcn/SurfaceCard regions inherit the same
+   open paper, generous radius, and quiet elevation. */
+[data-premium-dashboard] {
+  background: var(--dashboard-canvas);
+}
+[data-premium-dashboard] [data-slot='card'],
+[data-premium-dashboard] [data-slot='surface-card'] {
+  background: var(--dashboard-paper);
+  border-color: transparent;
+  border-radius: 1.75rem;
+  box-shadow:
+    0 1px 2px rgba(17, 17, 19, 0.035),
+    0 16px 40px -32px rgba(17, 17, 19, 0.32);
+}
+[data-premium-dashboard] [data-slot='card-header'] {
+  padding-inline: 1.5rem;
+}
+[data-premium-dashboard] [data-slot='card-content'],
+[data-premium-dashboard] [data-slot='card-footer'] {
+  padding-inline: 1.5rem;
+}
+@media (min-width: 640px) {
+  [data-premium-dashboard] [data-slot='card-header'],
+  [data-premium-dashboard] [data-slot='card-content'],
+  [data-premium-dashboard] [data-slot='card-footer'] {
+    padding-inline: 2rem;
+  }
+}
 @media (min-width: 640px) {
   .chat-content-wrap {
     padding-left: 1.5rem;

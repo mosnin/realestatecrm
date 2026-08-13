@@ -2,7 +2,8 @@
 
 import type { DraftStats } from '@/lib/draft-stats';
 import { AnimatedNumber } from '@/components/motion/animated-number';
-import { AccentBarLabel, SURFACE_CARD } from '@/components/ui/surface-card';
+import { AccentBarLabel } from '@/components/ui/surface-card';
+import { BROKER_PANEL } from '@/components/broker/premium';
 import { cn } from '@/lib/utils';
 
 /**
@@ -25,7 +26,7 @@ import { cn } from '@/lib/utils';
  */
 export function DraftImpactCard({ stats }: { stats: DraftStats }) {
   return (
-    <section className={cn(SURFACE_CARD, 'p-5 sm:p-6 space-y-1.5')}>
+    <section className={cn(BROKER_PANEL, 'space-y-1.5')} data-broker-surface="draft-impact">
       <AccentBarLabel>Draft impact</AccentBarLabel>
       <DraftImpactBody stats={stats} />
     </section>

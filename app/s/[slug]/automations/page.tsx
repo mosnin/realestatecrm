@@ -8,6 +8,7 @@ import { RoutinesManager } from '@/components/routines/routines-manager';
 import { TrustLadderBanner } from '@/components/workflows/trust-ladder-banner';
 import { AutomationsIntro } from '@/components/workflows/automations-intro';
 import { BODY_MUTED, H1, TITLE_FONT, SECTION_LABEL, CAPTION } from '@/lib/typography';
+import { RealtorPage } from '../_components/realtor-page';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Automations — Chippi' };
@@ -54,7 +55,7 @@ export default async function AutomationsPage({
   // same column and let only the builder/canvas working surfaces span the
   // full 1500px LayoutShell frame.
   return (
-    <div className="space-y-8 pb-12">
+    <RealtorPage width="full" className="space-y-10">
       <header className="mx-auto w-full max-w-5xl space-y-1.5">
         <p className={BODY_MUTED}>Automations.</p>
         <h1 className={H1} style={TITLE_FONT}>
@@ -96,6 +97,6 @@ export default async function AutomationsPage({
 
       {/* First-visit feature tour — self-dismissing, persisted per browser. */}
       <AutomationsIntro />
-    </div>
+    </RealtorPage>
   );
 }

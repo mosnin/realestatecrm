@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { SECTION_LABEL, CAPTION } from '@/lib/typography';
 import { Button } from '@/components/ui/button';
-import { Plug, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { RealtorEmptyState, RealtorPanel, RealtorRowList } from '../../_components/realtor-page';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Automation Settings — Chippi' };
@@ -46,8 +47,9 @@ export default async function AutomationSettingsPage({
       greeting="Configuration."
       title="Automation settings"
       subtitle="Control what apps your automations can act on."
+      layout="dashboard"
     >
-      <div className="space-y-8 max-w-2xl">
+      <RealtorPanel className="max-w-2xl space-y-8" as="div">
         <section className="space-y-4">
           <div className="space-y-1">
             <h2 className={SECTION_LABEL}>Connected apps</h2>
@@ -57,25 +59,26 @@ export default async function AutomationSettingsPage({
           </div>
 
           {activeConnections.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-8 text-center space-y-3">
-              <Plug size={20} className="mx-auto text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">No apps connected yet.</p>
-              <p className={CAPTION}>
-                Connect Gmail, Slack, your CRM, and more to unlock event-based automations.
-              </p>
-              <Button asChild size="sm" variant="outline" className="mt-2">
-                <Link href={`/s/${slug}/chippi/integrations`}>
-                  Connect an app
-                  <ArrowRight size={13} className="ml-1" />
-                </Link>
-              </Button>
-            </div>
+            <RealtorEmptyState
+              className="chippi-dashboard-panel-muted py-10 shadow-none"
+              title="No apps connected yet."
+              description="Connect Gmail, Slack, your CRM, and more to unlock event-based automations."
+              action={
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/s/${slug}/chippi/integrations`}>
+                    Connect an app
+                    <ArrowRight size={13} className="ml-1" />
+                  </Link>
+                </Button>
+              }
+            />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <RealtorRowList className="bg-transparent px-0 shadow-none">
               {activeConnections.map((conn) => (
                 <div
                   key={conn.id}
-                  className="flex items-center justify-between rounded-lg border border-border/60 bg-card px-4 py-3"
+                  className="flex items-center justify-between gap-4 px-1 py-3.5"
                 >
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium capitalize">
@@ -91,11 +94,12 @@ export default async function AutomationSettingsPage({
                       </p>
                     )}
                   </div>
-                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                     Connected
                   </span>
                 </div>
               ))}
+              </RealtorRowList>
               <div className="pt-1">
                 <Button asChild size="sm" variant="ghost">
                   <Link href={`/s/${slug}/chippi/integrations`}>
@@ -107,7 +111,7 @@ export default async function AutomationSettingsPage({
             </div>
           )}
         </section>
-      </div>
+      </RealtorPanel>
     </ChippiPageShell>
   );
 }

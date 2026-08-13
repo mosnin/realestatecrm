@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { BROKER_PAGE_WIDE, BROKER_PANEL } from '@/components/broker/premium';
 
 /**
  * Loading skeleton for the broker deals board. Geometry mirrors the real
@@ -8,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export default function BrokerDealsLoading() {
   return (
-    <div className="space-y-6 max-w-[1500px] mx-auto pb-12 animate-pulse" aria-busy="true">
+    <div className={`${BROKER_PAGE_WIDE} animate-pulse`} aria-busy="true" data-broker-premium-state="loading">
       <span className="sr-only">Loading…</span>
       {/* Status-sentence header — eyebrow, serif title, status line. */}
       <header className="space-y-1.5">
@@ -29,7 +30,7 @@ export default function BrokerDealsLoading() {
               </div>
               <Skeleton className="h-3 w-10" />
             </div>
-            <div className="rounded-lg border border-border/70 bg-foreground/[0.02] p-2 space-y-2">
+            <div className={`${BROKER_PANEL} space-y-2 p-2`}>
               <Skeleton className="h-24 w-full rounded-md" />
               <Skeleton className="h-24 w-full rounded-md" />
               <Skeleton className="h-20 w-full rounded-md" />

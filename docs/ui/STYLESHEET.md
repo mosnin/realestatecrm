@@ -1,10 +1,11 @@
-# Chippi UI Stylesheet — the People/Deals reference
+# Chippi UI Stylesheet — the Today reference
 
-The **People** and **Deals** pages on the realtor dashboard are the canonical
-look. Every other surface — realtor and brokerage — matches them. When in doubt,
-open `components/contacts/contact-table.tsx` (People) and copy its vocabulary.
-The token scale lives in `lib/typography.ts`; this file is the *layout + surface*
-companion.
+The live **Today** page (`/s/[slug]/chippi/brief`) is the canonical look. Every
+authenticated surface — realtor and brokerage — uses its warm canvas, editorial
+hierarchy, open paper regions, generous spacing, quiet hairline rows, and pill
+controls. People and Deals remain the record-list and kanban behavior references;
+they no longer define a separate visual system. The token scale lives in
+`lib/typography.ts`; `DESIGN.md` defines the full product contract.
 
 Goal: a **premium, Apple-calm** surface. Quiet, monochrome, text-first. The eye
 lands on content, not chrome.
@@ -60,7 +61,7 @@ table.
 
 ## Row lists (the default for any list of records)
 
-Match People exactly:
+Match Today&apos;s ranked-move rhythm and People&apos;s record behavior:
 
 ```tsx
 <ul className="divide-y divide-border/60">
@@ -84,11 +85,11 @@ Match People exactly:
   (Cards are fine only for a genuine *gallery of choices*, e.g. a template
   picker, and even then they are plain bordered `bg-card` with **no** icon header.)
 
-## Page frame (match People/Deals)
+## Page frame (match Today)
 
 ```tsx
-<div className="space-y-8 pb-12">
-  <header className="mx-auto w-full max-w-5xl space-y-1.5">
+<div className="chippi-dashboard-canvas space-y-8 pb-12">
+  <header className="w-full space-y-1.5">
     <p className={BODY_MUTED}>Section.</p>
     <h1 className={H1} style={TITLE_FONT}>Page title</h1>
     <p className={BODY_MUTED}>One quiet subtitle line.</p>
@@ -98,6 +99,8 @@ Match People exactly:
 </div>
 ```
 
+- Dashboard regions use `DASHBOARD_SURFACE`, `DASHBOARD_INSET`, and
+  `DASHBOARD_ROW`. Compatibility `SurfaceCard` uses the same panel vocabulary.
 - Section labels: `SECTION_LABEL` (11px uppercase muted), not an icon + heading.
 - Spacing: sections `space-y-8`, within-section `space-y-3`, rows `py-3`. Avoid
   `py-5`/`py-6` "airy" list spacing — that reads as unstructured, not premium.
@@ -118,5 +121,7 @@ and `CHIPPI_PILL` only for direct-Chippi actions.
 
 Applying this file: sweep every content surface (automations, activity, inbox,
 property/deal/contact detail panels, brokerage dashboard) and strip decorative
-icons + gradients + category colors, converting them to the row/pill/text
-vocabulary above. Sidebar and navigation keep their icons.
+icons + gradients + category colors, converting them to the Today
+panel/row/pill/text vocabulary above. Sidebar and navigation keep their icons;
+the desktop sidebar collapses into the shared 56px nav strip defined in
+`DESIGN.md`.

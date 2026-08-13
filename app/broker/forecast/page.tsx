@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Revenue Forecast — Brokerage' };
 
@@ -483,7 +484,7 @@ export default async function BrokerForecastPage() {
   const hasAnything = wonCount > 0 || activeCount > 0;
 
   return (
-    <div className={cn('max-w-5xl mx-auto pb-12', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="forecast">
       {/* Status-sentence header */}
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerage.name}.</p>
@@ -568,7 +569,7 @@ export default async function BrokerForecastPage() {
               <ul className="divide-y divide-border/60">
                 {swingPool.map((deal) => {
                   const chippiPrompt = `What can we do to close "${deal.title}" (${deal.realtorName}) this month?`;
-                  const chippiHref = `/broker?prompt=${encodeURIComponent(chippiPrompt)}`;
+                  const chippiHref = `/broker/chippi?prompt=${encodeURIComponent(chippiPrompt)}`;
                   const healthMeta = HEALTH_META[deal.health];
 
                   return (
@@ -789,7 +790,7 @@ function EmptyPage({
   monthName: string;
 }) {
   return (
-    <div className={cn('max-w-5xl mx-auto pb-12', SECTION_RHYTHM)}>
+    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="forecast-empty">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>{brokerageName}.</p>
         <h1 className={H1} style={TITLE_FONT}>

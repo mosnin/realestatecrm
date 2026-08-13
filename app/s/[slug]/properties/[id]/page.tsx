@@ -8,6 +8,7 @@ import { normalizeArea } from '@/lib/areas';
 import { getAreaReport } from '@/lib/area-report-store';
 import type { Property, AreaReport } from '@/lib/types';
 import { PropertyDetailClient } from '@/components/properties/property-detail-client';
+import { RealtorPage } from '../../_components/realtor-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +67,7 @@ export default async function PropertyDetailPage({
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <RealtorPage width="content" className="space-y-6">
       {/* Breadcrumb — the detail page is no longer an orphan child of /deals.
           Matches the contact-detail breadcrumb pattern: muted "back" link
           with chevron, in muted-foreground. */}
@@ -91,6 +92,6 @@ export default async function PropertyDetailPage({
         linkedDeals={(deals ?? []) as { id: string; title: string; status: string; value: number | null; closeDate: string | null }[]}
         linkedTours={(tours ?? []) as { id: string; guestName: string; startsAt: string; status: string }[]}
       />
-    </div>
+    </RealtorPage>
   );
 }

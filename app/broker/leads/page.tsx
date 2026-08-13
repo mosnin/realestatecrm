@@ -7,6 +7,7 @@ import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Leads — Teams' };
 
@@ -265,7 +266,7 @@ export default async function BrokerLeadsPage() {
   })();
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className={BROKER_PAGE_READING} data-broker-premium-page="leads">
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Leads.</p>
         <h1 className={cn(H1)} style={TITLE_FONT}>

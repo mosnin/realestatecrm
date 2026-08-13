@@ -19,7 +19,7 @@ describe('Workspace Run vertical contract', () => {
     expect(read('components/chippi/right-panel-tabs.tsx')).toContain("'workspace'");
     expect(read('lib/chippi/workspace-run-flag.ts')).toContain('CHIPPI_WORKSPACE_RUNS_SPACE_IDS');
     expect(read('app/s/[slug]/chippi/page.tsx')).toContain('workspaceRunsEnabled={isWorkspaceRunsEnabledForSpace(space.id)}');
-    expect(read('app/broker/page.tsx')).toContain('workspaceRunsEnabled={false}');
+    expect(read('app/broker/chippi/page.tsx')).toContain('workspaceRunsEnabled={false}');
     expect(read('components/chippi/chippi-workspace.tsx')).toContain(
       "workspaceRunsEnabled && input.name === 'continue_workspace_run'",
     );

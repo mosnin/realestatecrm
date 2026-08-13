@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, ExternalLink, Briefcase, CalendarDays, Share2,
-  BedDouble, Bath, Ruler, Tag, ChevronRight, Sparkles, BarChart3,
+  ChevronRight, Sparkles, BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property, AreaReport } from '@/lib/types';
@@ -92,16 +92,16 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
 
   const numericStats = [
     property.beds != null
-      ? { icon: BedDouble, value: property.beds, label: pluralize(property.beds, 'Bed', 'Beds') }
+      ? { value: property.beds, label: pluralize(property.beds, 'Bed', 'Beds') }
       : null,
     property.baths != null
-      ? { icon: Bath, value: property.baths, label: pluralize(property.baths, 'Bath', 'Baths') }
+      ? { value: property.baths, label: pluralize(property.baths, 'Bath', 'Baths') }
       : null,
     property.squareFeet != null
-      ? { icon: Ruler, value: property.squareFeet, label: 'Sq ft', fmt: (n: number) => Math.round(n).toLocaleString() }
+      ? { value: property.squareFeet, label: 'Sq ft', fmt: (n: number) => Math.round(n).toLocaleString() }
       : null,
     property.listPrice != null
-      ? { icon: Tag, value: property.listPrice, label: 'List price', fmt: formatCompact }
+      ? { value: property.listPrice, label: 'List price', fmt: formatCompact }
       : null,
   ].filter((s): s is NonNullable<typeof s> => s !== null);
 
@@ -140,7 +140,7 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'grid gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70',
+            'chippi-dashboard-panel grid overflow-hidden rounded-[1.75rem] divide-x chippi-dashboard-divider',
             numericStats.length >= 4
               ? 'grid-cols-2 sm:grid-cols-4'
               : numericStats.length === 3
@@ -151,9 +151,8 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
           )}
         >
           {numericStats.map((s) => (
-            <div key={s.label} className="bg-card p-4 sm:p-5">
-              <dt className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                <s.icon size={12} strokeWidth={1.75} aria-hidden />
+            <div key={s.label} className="p-4 sm:p-5">
+              <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 {s.label}
               </dt>
               <dd className="mt-1.5 text-[25px] leading-none tracking-tight tabular-nums text-foreground" style={TITLE_FONT}>
@@ -237,7 +236,6 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
       <div className="space-y-8 border-t border-border/60 pt-6">
         <LinkedSection
           title="Linked deals"
-          icon={Briefcase}
           empty="No deals linked to this property yet."
           items={linkedDeals.map((d) => ({
             key: d.id,
@@ -252,7 +250,6 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
         />
         <LinkedSection
           title="Tours"
-          icon={CalendarDays}
           empty="No tours have been scheduled here yet."
           items={linkedTours.map((t) => {
             const d = new Date(t.startsAt);
@@ -303,19 +300,16 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 function LinkedSection({
   title,
-  icon: Icon,
   items,
   empty,
 }: {
   title: string;
-  icon: typeof Briefcase;
   items: { key: string; href: string; primary: string; secondary: string }[];
   empty: string;
 }) {
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <Icon size={12} className="text-muted-foreground" aria-hidden />
         <h2 className={cn(SECTION_LABEL)}>{title}</h2>
         <span className="text-[11px] tabular-nums text-muted-foreground">
           {items.length}

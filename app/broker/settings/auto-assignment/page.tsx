@@ -19,6 +19,7 @@ import {
   PRIMARY_PILL,
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 type AssignmentMethod = 'manual' | 'round_robin' | 'score_based';
 
@@ -158,7 +159,7 @@ export default function BrokerSettingsAutoAssignmentPage() {
     : 'Auto-assignment is paused. Leads stay where they land.';
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-auto-assignment">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>

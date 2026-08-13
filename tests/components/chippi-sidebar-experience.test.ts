@@ -11,8 +11,8 @@ describe('Chippi single-sidebar experience', () => {
   it('defaults only the exact chat root to conversation history', () => {
     expect(defaultChippiSidebarView('/s/acme/chippi', '/s/acme/chippi')).toBe('history');
     expect(defaultChippiSidebarView('/s/acme/chippi/brief', '/s/acme/chippi')).toBe('menu');
-    expect(defaultChippiSidebarView('/broker', '/broker')).toBe('history');
-    expect(defaultChippiSidebarView('/broker/deals', '/broker')).toBe('menu');
+    expect(defaultChippiSidebarView('/broker/chippi', '/broker/chippi')).toBe('history');
+    expect(defaultChippiSidebarView('/broker/deals', '/broker/chippi')).toBe('menu');
   });
 
   it('uses a 10px, 180ms transition and removes travel for reduced motion', () => {

@@ -12,13 +12,13 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-// IA: /broker = Chippi home (center affordance). Four side items split
+// IA: /broker/brief = Today; /broker/chippi = Chippi (center affordance).
 // 2-left / 2-right so the Chippi avatar sits dead-center, exactly like the
 // realtor bar (People · Deals · [Chippi] · Calendar · Settings). Broker
 // destinations differ; the structure is identical.
 //   Brief · Leads · [Chippi] · Realtors · Pipeline
 const brokerSideItems = [
-  { href: '/broker/brief', label: 'Brief', icon: LayoutDashboard, exact: true },
+  { href: '/broker/brief', label: 'Today', icon: LayoutDashboard, exact: true },
   { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false },
   { href: '/broker/realtors', label: 'Real estate agents', icon: UserCircle, exact: false },
   { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false },
@@ -145,7 +145,7 @@ function BrokerMobileNav({ pathname }: { pathname: string }) {
           isActive={isActive(item.href, item.exact)}
         />
       ))}
-      <ChippiTab href="/broker" isActive={pathname === '/broker'} />
+      <ChippiTab href="/broker/chippi" isActive={pathname === '/broker/chippi'} />
       {brokerSideItems.slice(2).map((item) => (
         <SideTab
           key={item.href}

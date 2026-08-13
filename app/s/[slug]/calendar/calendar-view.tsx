@@ -398,14 +398,14 @@ export function CalendarView({
   const wide = view === 'month' || view === 'week';
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full">
       <div
         className={cn(
           // Bottom padding clears the mobile chat bar (~90px) + the floating
           // bottom nav (~90px) — without it the last week of the month grid
           // disappears behind that chrome. Desktop has neither, so pb-24 is
           // enough above the safe-area inset.
-          'w-full mx-auto chat-content-wrap pt-10 sm:pt-14 pb-56 md:pb-24 space-y-8',
+          'w-full mx-auto pb-56 pt-3 md:pb-24 sm:pt-5 space-y-8',
           wide ? 'max-w-6xl' : 'max-w-3xl',
         )}
       >

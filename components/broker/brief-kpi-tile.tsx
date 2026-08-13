@@ -26,7 +26,8 @@
 import type { ReactNode } from 'react';
 import { AnimatedNumber } from '@/components/motion/animated-number';
 import { TITLE_FONT } from '@/lib/typography';
-import { AccentBarLabel, SURFACE_CARD } from '@/components/ui/surface-card';
+import { AccentBarLabel } from '@/components/ui/surface-card';
+import { BROKER_PANEL_DENSE } from '@/components/broker/premium';
 import { cn } from '@/lib/utils';
 
 interface BriefKpiTileProps {
@@ -52,17 +53,13 @@ export function BriefKpiTile({
   format,
   display,
   sub,
-  icon: Icon,
   dim,
   className,
 }: BriefKpiTileProps) {
   return (
-    <div className={cn(SURFACE_CARD, 'p-5 sm:p-6', className)}>
+    <div className={cn(BROKER_PANEL_DENSE, 'h-full', className)} data-broker-surface="metric">
       <AccentBarLabel>
-        <span className={cn(Icon && 'inline-flex items-center gap-1.5')}>
-          {Icon && <Icon size={11} className="text-muted-foreground" aria-hidden />}
-          {label}
-        </span>
+        <span>{label}</span>
       </AccentBarLabel>
       <p
         className={cn(

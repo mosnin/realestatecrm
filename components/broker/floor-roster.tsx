@@ -18,6 +18,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { useMessagingRealtime } from '@/hooks/use-messaging';
+import {
+  BROKER_CONTROL,
+  BROKER_DIVIDED_LIST,
+  BROKER_PANEL,
+  BROKER_ROW,
+} from '@/components/broker/premium';
 
 export interface FloorMember {
   userId: string;
@@ -74,19 +80,19 @@ export function FloorRoster({
   const onlineCount = members.filter((m) => online.has(m.userId)).length;
 
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="flex items-baseline justify-between border-b border-border px-5 py-3.5">
+    <section className={cn(BROKER_PANEL, 'p-0 sm:p-0')} data-broker-surface="floor-roster">
+      <div className="flex items-baseline justify-between border-b chippi-dashboard-divider px-5 py-4 sm:px-7">
         <h2 className="text-sm font-semibold text-foreground">Your floor</h2>
         <span className="text-xs tabular-nums text-muted-foreground">
           {onlineCount} of {members.length} online
         </span>
       </div>
-      <ul className="divide-y divide-border/60">
+      <ul className={cn(BROKER_DIVIDED_LIST, 'px-5 pb-2 sm:px-7')}>
         {sorted.map((m) => {
           const isOnline = online.has(m.userId);
           const isMe = m.userId === meId;
           return (
-            <li key={m.userId} className="flex items-center gap-3 px-5 py-3">
+            <li key={m.userId} className={cn(BROKER_ROW, 'items-center')}>
               <div className="relative shrink-0">
                 <Avatar className="h-8 w-8">
                   {m.avatar && <AvatarImage src={m.avatar} alt="" />}
@@ -119,7 +125,7 @@ export function FloorRoster({
               {!isMe && (
                 <Link
                   href="/broker/messages"
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[12px] text-foreground transition-colors hover:bg-accent"
+                  className={cn(BROKER_CONTROL, 'min-h-8 gap-1.5 px-3 text-xs')}
                 >
                   <MessagesSquare className="h-3.5 w-3.5" />
                   Message
@@ -129,6 +135,6 @@ export function FloorRoster({
           );
         })}
       </ul>
-    </div>
+    </section>
   );
 }

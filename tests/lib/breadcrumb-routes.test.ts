@@ -35,8 +35,10 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('/broker/settings')).toBe('Settings');
   });
 
-  it('resolves the broker root to Chippi (exact)', () => {
-    expect(getBreadcrumbLabel('/broker')).toBe('Chippi');
+  it('resolves broker Today and Chippi as separate destinations', () => {
+    expect(getBreadcrumbLabel('/broker')).toBe('Today');
+    expect(getBreadcrumbLabel('/broker/brief')).toBe('Today');
+    expect(getBreadcrumbLabel('/broker/chippi')).toBe('Chippi');
   });
 
   it('strips a base path before matching', () => {

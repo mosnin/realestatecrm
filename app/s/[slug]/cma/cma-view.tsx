@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Building2, Link2, Trash2 } from 'lucide-react';
+import { Link2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -265,7 +265,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 pb-12 space-y-12">
+    <main data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] max-w-3xl mx-auto pb-12 pt-3 sm:pt-5 space-y-12">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="space-y-1.5">
         <p className={cn(BODY_MUTED)}>Comparative market analysis.</p>
@@ -278,7 +278,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
       </header>
 
       {/* ── Builder ────────────────────────────────────────────────────── */}
-      <Reveal variant="rise" className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-4">
+      <Reveal variant="rise" className="chippi-dashboard-panel rounded-[1.75rem] px-5 py-5 sm:px-7 sm:py-7 space-y-4">
         <div className="space-y-1.5">
           <label htmlFor="cma-subject" className="text-sm font-medium text-foreground">
             Subject property
@@ -356,7 +356,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
             </div>
           )}
 
-          <div className="rounded-xl border border-border/70 bg-card px-6 py-6 text-center space-y-1.5">
+          <div className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 text-center space-y-1.5">
             <p className={cn(SECTION_LABEL)}>Suggested list-price range</p>
             {preview.payload.stats.suggestedLow != null &&
             preview.payload.stats.suggestedHigh != null ? (
@@ -428,19 +428,16 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
         <p className={cn(SECTION_LABEL)}>Your reports</p>
 
         {loadingReports ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="chippi-dashboard-panel-muted rounded-2xl px-5 py-10 text-center">
             <p className={cn(BODY, 'text-muted-foreground')}>Loading&hellip;</p>
           </div>
         ) : reports.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
-            <div className="mx-auto w-10 h-10 rounded-lg bg-foreground/[0.04] flex items-center justify-center mb-3">
-              <Building2 size={16} strokeWidth={1.75} className="text-muted-foreground" />
-            </div>
+          <div className="chippi-dashboard-panel rounded-[1.75rem] px-5 py-10 text-center">
             <p className={cn(BODY)}>No reports yet.</p>
             <p className={cn(CAPTION, 'mt-1')}>Build your first analysis above.</p>
           </div>
         ) : (
-          <StaggerList key={reports.length} className="divide-y divide-border/60">
+          <StaggerList key={reports.length} className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] divide-y chippi-dashboard-divider px-5 sm:px-7">
             {reports.map((r) => (
               <StaggerItem key={r.id}>
                 <div className="flex items-center gap-3 py-3">

@@ -11,6 +11,7 @@ import {
 } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
+import { BROKER_PAGE_READING } from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'MCP — Broker Settings' };
 
@@ -23,7 +24,7 @@ export default async function BrokerSettingsMcpPage() {
 
   if (!canEdit) {
     return (
-      <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+      <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-mcp-readonly">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Settings.</p>
           <h1 className={H1} style={TITLE_FONT}>
@@ -48,7 +49,7 @@ export default async function BrokerSettingsMcpPage() {
 
   if (!brokerSpaceSlug) {
     return (
-      <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+      <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-mcp-empty">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>Settings.</p>
           <h1 className={H1} style={TITLE_FONT}>
@@ -69,7 +70,7 @@ export default async function BrokerSettingsMcpPage() {
   }
 
   return (
-    <div className={`${SECTION_RHYTHM} ${READING_MAX} pb-56 md:pb-24`}>
+    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-mcp">
       <header className="space-y-1.5">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
