@@ -61,7 +61,7 @@ export default async function ChippiIntegrationsPage({
     <ChippiPageShell
       greeting="Plugins."
       title="The tools I act through."
-      subtitle="Connect apps, add your own plugins, and save skills. I never send without your tap."
+      subtitle="Connect apps, add your own plugins, and save skills. I use them to complete the actions you request."
     >
       <div className="space-y-10">
         <ConnectedAppsSection slug={slug} callbackResult={callbackResult} />

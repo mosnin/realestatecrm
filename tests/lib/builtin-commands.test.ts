@@ -14,10 +14,11 @@ describe('BUILTIN_COMMANDS', () => {
     expect(goal!.title.length).toBeGreaterThan(0);
     expect(goal!.description.length).toBeGreaterThan(0);
     expect(goal!.prompt.length).toBeGreaterThan(20);
+    expect(goal!.mode).toBe('work');
   });
 
-  it('every PROMPT command expands with a selectable placeholder (action commands are exempt)', () => {
-    for (const cmd of BUILTIN_COMMANDS.filter((c) => !c.action)) {
+  it('every command expands in the composer with a selectable placeholder', () => {
+    for (const cmd of BUILTIN_COMMANDS) {
       const { text, selStart, selEnd } = expandSkillPrompt(cmd.prompt);
       expect(text).not.toContain('{');
       expect(text).not.toContain('}');
@@ -26,11 +27,9 @@ describe('BUILTIN_COMMANDS', () => {
     }
   });
 
-  it('action commands declare an action and skip prompt injection', () => {
-    for (const cmd of BUILTIN_COMMANDS.filter((c) => c.action)) {
-      expect(cmd.action!.length).toBeGreaterThan(0);
-      expect(cmd.prompt).toBe('');
-    }
+  it('does not expose a modal work-session command', () => {
+    expect(BUILTIN_COMMANDS.map((command) => command.slug)).not.toContain('work');
+    expect(BUILTIN_COMMANDS.some((command) => command.prompt.length === 0)).toBe(false);
   });
 
   it('slugs are unique and lowercase (menu + icon-map keys)', () => {

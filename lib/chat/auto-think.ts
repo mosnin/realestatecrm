@@ -13,9 +13,9 @@
  *      OpenRouter's unified `reasoning` extension on chat completions.
  *
  * Surfaces differ in their floor, not their ceiling:
- *   - the DIRECT path (Q&A, no tools) floors at 'none' — a phone-number
+ *   - the DIRECT path (Q&A, no tools) is Fast mode and floors at 'none' — a phone-number
  *     lookup must keep its sub-second time-to-first-token;
- *   - the AGENT path (tools, plans, multi-step) floors at 'low' — acting
+ *   - the AGENT/Work path floors at 'low' — acting
  *     turns always get some deliberation, matching the Modal/Python agent.
  *
  * Reasoning deltas stream to the client as `reasoning_delta` events, so an

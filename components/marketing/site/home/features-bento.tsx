@@ -14,7 +14,7 @@ import { ImagePlus } from 'lucide-react';
 const CELLS = [
   {
     slot: 'drafts',
-    title: 'Drafts in your voice.',
+    title: 'Replies sent in your voice.',
     sub: 'Every reply written and waiting\nbefore you even open the thread.',
   },
   {

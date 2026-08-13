@@ -195,13 +195,13 @@
   --sidebar-ring: rgba(241, 243, 245, 0.15);
 }
 
-/* ── App theme: cooler off-white canvas, white sidebar, neutral accents ── */
+/* ── App theme: warm paper canvas, inset surfaces, neutral accents ── */
 .app-theme {
-  --background: #fafafa;
-  --surface: #f4f4f5;
+  --background: #f7f7f5;
+  --surface: #f1f1ef;
   --foreground: #111113;
 
-  --card: #ffffff;
+  --card: #fbfbfa;
   --card-foreground: #111113;
 
   --popover: #ffffff;
@@ -210,32 +210,32 @@
   --primary: #111113;
   --primary-foreground: #ffffff;
 
-  --secondary: #f0f0f1;
+  --secondary: #f1f1ef;
   --secondary-foreground: #111113;
 
-  --muted: #f0f0f1;
+  --muted: #f1f1ef;
   --muted-foreground: #6b6f76;
 
-  --accent: #f0f0f1;
+  --accent: #f1f1ef;
   --accent-foreground: #111113;
 
   --destructive: #b91c1c;
 
-  --border: #e7e7e9;
-  --input: #e7e7e9;
+  --border: #dededb;
+  --input: #dededb;
   --ring: rgba(17, 17, 19, 0.12);
 
   --brand: #ff964f;
   --brand-foreground: #ffffff;
   --brand-subtle: #fff4eb;
 
-  --sidebar: #ffffff;
+  --sidebar: #fbfbfa;
   --sidebar-foreground: #111113;
   --sidebar-primary: #111113;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f0f1;
+  --sidebar-accent: #f1f1ef;
   --sidebar-accent-foreground: #111113;
-  --sidebar-border: #e7e7e9;
+  --sidebar-border: #dededb;
   --sidebar-ring: rgba(17, 17, 19, 0.12);
 }
 .dark .app-theme,
@@ -1373,6 +1373,57 @@
  * ────────────────────────────────────────────────────────────────────────── */
 .chippi-composer-shell {
   position: relative;
+}
+
+/* Liquid continuity is limited to the rare Chat/Work choice and voice state.
+   The labels remain ordinary DOM above these flat paper silhouettes. */
+:root {
+  --chippi-liquid-selected: color-mix(in srgb, currentColor 6%, transparent);
+  --chippi-liquid-paper: var(--background);
+  --chippi-liquid-border: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.chippi-mode-liquid-surface {
+  background: transparent;
+  transform: translateX(0);
+  transition: transform 220ms cubic-bezier(0.77, 0, 0.175, 1);
+  will-change: transform;
+}
+
+.chippi-mode-liquid[data-mode='work'] .chippi-mode-liquid-surface {
+  transform: translateX(4rem);
+}
+
+/* Radix ToggleGroup owns the selector semantics; the controlled checked value
+   remains the single styling authority for each plain-text item. */
+.chippi-mode-toggle-item[aria-checked='true'] {
+  color: var(--foreground);
+}
+
+.chippi-mode-toggle-item[aria-checked='false'] {
+  color: var(--muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chippi-mode-liquid > svg,
+  .chippi-voice-state-liquid > svg {
+    display: none !important;
+  }
+
+  .chippi-mode-liquid-surface {
+    background: var(--chippi-liquid-selected);
+    transition: none !important;
+    will-change: auto;
+  }
+
+  .chippi-voice-state-liquid > span > span {
+    border: 1px solid var(--chippi-liquid-border);
+    background: var(--chippi-liquid-paper);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    filter: none !important;
+    transform: none !important;
+    transition: color 200ms ease !important;
+  }
 }
 
 /* ── The Island (.chippi-island-*) ─────────────────────────────────────────

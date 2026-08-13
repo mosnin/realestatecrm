@@ -1,167 +1,161 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
+import crypto from 'crypto';
+import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { getSpaceForUser, getSpaceFromSlug } from '@/lib/space';
+import {
+  realtimeVoiceGatewayEnabled,
+  realtimeVoiceGatewayReady,
+} from '@/lib/realtime/voice-feature';
+import {
+  buildVoiceRealtimeSessionConfig,
+  failClosedVoiceWorkspaceContinuationEligibility,
+  resolveVoiceWorkExecutionMode,
+} from '@/lib/realtime/voice-delegation';
 import { supabase } from '@/lib/supabase';
+import { isRealtorConversation } from '@/lib/chat/conversation-access';
+import { isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
+import { logger } from '@/lib/logger';
+import { isRealtimeVoiceFloorManagerEnabled } from '@/lib/realtime/floor-manager-flag';
+import { swarmLaunchConfigured } from '@/lib/swarm-launch';
+import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
+import { userOwnsSpace } from '@/lib/space';
 
 export const runtime = 'nodejs';
 
+const MAX_SDP_BYTES = 200_000;
+
 /**
- * POST /api/ai/realtime-session
- * Mints an ephemeral OpenAI Realtime token and returns it with workspace context
- * for the session instructions. The browser uses this token to connect
- * directly to OpenAI's Realtime API via WebRTC.
+ * POST /api/ai/realtime-session?slug=...&conversationId=...
+ *
+ * Unified WebRTC gateway: the browser sends its SDP offer to Chippi; Chippi
+ * creates the OpenAI Realtime call with the server credential and returns
+ * only the SDP answer. No standard or ephemeral provider credential crosses
+ * into browser JavaScript.
  */
 export async function POST(req: Request) {
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
-  const { userId } = authResult;
-
-  const { allowed } = await checkRateLimit(`realtime:session:${userId}`, 2, 60);
-  if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
-
-  const { slug } = await req.json();
-  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
-
-  // Verify that the requested slug belongs to the authenticated user's own space.
-  // Without this check any authenticated user could obtain a full-context session
-  // for another user's workspace by supplying their slug.
-  const [space, userSpace] = await Promise.all([
-    getSpaceFromSlug(slug),
-    getSpaceForUser(userId),
-  ]);
-  if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
-  if (!userSpace || userSpace.id !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!realtimeVoiceGatewayEnabled()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (!realtimeVoiceGatewayReady()) {
+    return NextResponse.json({ error: 'Voice mode is not configured.' }, { status: 503 });
   }
 
-  // Build workspace context for the voice session
-  const [{ data: contacts }, { data: deals }, { data: notes }, { data: tours }, calResult] = await Promise.all([
-    supabase
-      .from('Contact')
-      .select('id, name, type, leadType, email, phone, budget, leadScore, scoreLabel, notes, tags, followUpAt')
-      .eq('spaceId', space.id)
-      .order('createdAt', { ascending: false })
-      .limit(50),
-    supabase
-      .from('Deal')
-      .select('id, title, value, priority, status, address, DealStage(name)')
-      .eq('spaceId', space.id)
-      .order('createdAt', { ascending: false })
-      .limit(30),
-    supabase
-      .from('Note')
-      .select('title, content')
-      .eq('spaceId', space.id)
-      .order('updatedAt', { ascending: false })
-      .limit(10),
-    supabase
-      .from('Tour')
-      .select('guestName, propertyAddress, startsAt, status')
-      .eq('spaceId', space.id)
-      .in('status', ['scheduled', 'confirmed'])
-      .gte('startsAt', new Date().toISOString())
-      .order('startsAt', { ascending: true })
-      .limit(15),
-    (async () => {
-      try {
-        const res = await supabase
-          .from('CalendarEvent')
-          .select('title, date, time, description')
-          .eq('spaceId', space.id)
-          .gte('date', new Date().toISOString().slice(0, 10))
-          .order('date', { ascending: true })
-          .limit(10);
-        return res;
-      } catch {
-        return { data: [] as any[] };
-      }
-    })(),
-  ]);
+  const url = new URL(req.url);
+  const slug = url.searchParams.get('slug')?.trim() ?? '';
+  const conversationId = url.searchParams.get('conversationId')?.trim() ?? '';
+  if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const contactCtx = (contacts ?? []).map((c: any) =>
-    `- ${c.name} (${(c.leadType ?? 'rental').toUpperCase()}) | ${c.type} | Score: ${c.scoreLabel ?? 'unscored'} | ${c.phone ?? ''} | ${c.email ?? ''} | Budget: ${c.budget != null ? `$${c.budget}` : 'N/A'}${c.followUpAt ? ` | Follow-up: ${new Date(c.followUpAt).toLocaleDateString()}` : ''}`
-  ).join('\n');
+  const auth = await requireSpaceOwner(slug);
+  if (auth instanceof NextResponse) return auth;
 
-  const dealCtx = (deals ?? []).map((d: any) =>
-    `- ${d.title} | Stage: ${d.DealStage?.name ?? 'N/A'} | Value: ${d.value != null ? `$${d.value}` : 'N/A'} | ${d.address ?? ''}`
-  ).join('\n');
+  // `requireSpaceOwner` also admits broker owners/admins into managed member
+  // spaces. Realtor voice is a personal-space capability, so re-establish the
+  // exact Clerk-user -> Space ownership binding and fail closed on uncertainty.
+  try {
+    if (!(await userOwnsSpace(auth.space.id, auth.userId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Could not verify voice access.' }, { status: 503 });
+  }
 
-  const noteCtx = (notes ?? []).map((n: any) =>
-    `- "${n.title}": ${(n.content ?? '').slice(0, 150)}${(n.content ?? '').length > 150 ? '...' : ''}`
-  ).join('\n');
+  let attachedConversationId: string | null = null;
+  let attachedConversationMode: 'chat' | 'work' | null = null;
+  let workExecutionMode: WorkExecutionMode = 'review';
+  if (conversationId) {
+    const { data, error } = await supabase
+      .from('Conversation')
+      .select('id, spaceId, title, mode, executionMode')
+      .eq('id', conversationId)
+      .eq('spaceId', auth.space.id)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: 'Could not verify conversation.' }, { status: 500 });
+    if (!isRealtorConversation(data, auth.space.id)) {
+      return NextResponse.json({ error: 'Conversation not found.' }, { status: 404 });
+    }
+    attachedConversationId = conversationId;
+    attachedConversationMode = data.mode === 'chat' || data.mode === 'work' ? data.mode : null;
+    workExecutionMode = resolveVoiceWorkExecutionMode(data.executionMode);
+  }
+  const workspaceContinuationEligible = await failClosedVoiceWorkspaceContinuationEligibility(
+    () => isConversationWorkspaceContinuationEligible(auth.space.id, attachedConversationId),
+    (error) => logger.warn('[realtime-session] workspace continuation eligibility unavailable', {
+      spaceId: auth.space.id,
+      conversationId: attachedConversationId,
+    }, error),
+  );
 
-  const tourCtx = (tours ?? []).map((t: any) =>
-    `- ${t.guestName} | ${t.propertyAddress ?? 'No address'} | ${new Date(t.startsAt).toLocaleDateString()} | ${t.status}`
-  ).join('\n');
+  const { allowed } = await checkRateLimit(`realtime:session:${auth.userId}`, 6, 60);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many voice sessions. Try again shortly.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
 
-  const calCtx = ((calResult?.data ?? []) as any[]).map((e: any) =>
-    `- ${e.title} | ${e.date}${e.time ? ` at ${e.time}` : ''}`
-  ).join('\n');
+  const offer = await req.text();
+  if (!offer.trim().startsWith('v=0') || Buffer.byteLength(offer, 'utf8') > MAX_SDP_BYTES) {
+    return NextResponse.json({ error: 'Invalid WebRTC offer.' }, { status: 400 });
+  }
 
-  const followUpCtx = (contacts ?? []).filter((c: any) => c.followUpAt).slice(0, 10).map((c: any) =>
-    `- ${c.name} | Due: ${new Date(c.followUpAt).toLocaleDateString()} | ${c.phone ?? c.email ?? ''}`
-  ).join('\n');
-
-  const instructions = [
-    `You are Chippi, the realtor's agentic workspace assistant for "${space.name}".`,
-    `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}.`,
-    `You help the agent manage their rental and buyer leads, deals, tours, notes, calendar, and follow-ups through natural conversation.`,
-    `Buyer stages: Lead → Pre-Approved → Showings → Offer → Under Contract → Closing. Rental stages: Qualification → Tour → Application.`,
-    `Be concise and conversational — you're speaking, not writing. Keep responses under 3 sentences unless asked for detail.`,
-    `Only reference data from the workspace context below. Never fabricate names, numbers, or details.`,
-    `When asked about "recent" data, reference contacts and deals with the most recent createdAt dates.`,
-    ``,
-    contactCtx ? `Contacts:\n${contactCtx}` : 'No contacts yet.',
-    ``,
-    dealCtx ? `Deals:\n${dealCtx}` : 'No deals yet.',
-    ``,
-    tourCtx ? `Upcoming Tours:\n${tourCtx}` : '',
-    followUpCtx ? `\nFollow-ups Due:\n${followUpCtx}` : '',
-    noteCtx ? `\nNotes:\n${noteCtx}` : '',
-    calCtx ? `\nCalendar Events:\n${calCtx}` : '',
-  ].filter(Boolean).join('\n');
-
-  // Mint ephemeral token from OpenAI
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 });
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Voice mode is not configured.' }, { status: 503 });
+  }
+
+  const form = new FormData();
+  form.set('sdp', offer);
+  form.set(
+    'session',
+    JSON.stringify(
+      buildVoiceRealtimeSessionConfig({
+        workspaceName: auth.space.name,
+        conversationAttached: Boolean(attachedConversationId),
+        workspaceContinuationEligible,
+        specialistSpawnEligible:
+          swarmLaunchConfigured() &&
+          (!attachedConversationId || attachedConversationMode === 'work'),
+        floorManagerEligible: Boolean(attachedConversationId) && isRealtimeVoiceFloorManagerEnabled(),
+        workExecutionMode,
+      }),
+    ),
+  );
 
   try {
-    const tokenRes = await fetch('https://api.openai.com/v1/realtime/sessions', {
+    const upstream = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'OpenAI-Safety-Identifier': crypto
+          .createHash('sha256')
+          .update(`chippi:${auth.userId}`)
+          .digest('hex'),
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-realtime-preview-2024-12-17',
-        voice: 'coral',
-        instructions,
-        modalities: ['audio', 'text'],
-        turn_detection: { type: 'server_vad' },
-        input_audio_format: 'pcm16',
-        output_audio_format: 'pcm16',
-      }),
+      body: form,
+      signal: AbortSignal.timeout(15_000),
     });
-
-    if (!tokenRes.ok) {
-      const err = await tokenRes.text();
-      console.error('[realtime-session] OpenAI token error:', err);
-      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
+    const answer = await upstream.text();
+    if (!upstream.ok || !answer.trim().startsWith('v=0')) {
+      console.error('[realtime-session] Realtime call creation failed', {
+        status: upstream.status,
+      });
+      return NextResponse.json({ error: 'Could not start voice mode.' }, { status: 502 });
     }
 
-    const data = await tokenRes.json();
-    const token = data.client_secret?.value;
-    if (!token) {
-      console.error('[realtime-session] OpenAI returned no client_secret.value:', JSON.stringify(data));
-      return NextResponse.json({ error: 'Session token missing in OpenAI response' }, { status: 500 });
-    }
-    return NextResponse.json({
-      token,
-      expiresAt: data.client_secret?.expires_at ?? null,
+    const headers = new Headers({
+      'Content-Type': 'application/sdp',
+      'Cache-Control': 'no-store',
     });
-  } catch (err) {
-    console.error('[realtime-session] error:', err);
-    return NextResponse.json({ error: 'Session creation failed' }, { status: 500 });
+    const location = upstream.headers.get('Location');
+    if (location) {
+      const callId = location.split('/').filter(Boolean).pop();
+      if (callId) headers.set('X-Chippi-Realtime-Call-Id', callId);
+    }
+    return new Response(answer, { status: 200, headers });
+  } catch (error) {
+    console.error('[realtime-session] Realtime gateway error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json({ error: 'Could not start voice mode.' }, { status: 502 });
   }
 }

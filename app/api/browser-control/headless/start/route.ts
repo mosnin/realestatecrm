@@ -6,10 +6,10 @@
  * which is the normal caller — the chat agent doesn't need to hit this
  * route directly, but it's exposed for the settings UI / manual testing).
  *
- * This route only creates the DB session row + queue target; it does NOT
- * itself launch a Modal headless worker. See this track's deploy flags —
- * nothing yet triggers the worker to start polling POST /headless/poll for
- * this session; that's a separate (agent/**, Modal deploy) piece of work.
+ * After obtaining the single active DB session, this route starts (or reuses)
+ * its bounded Modal worker. The feature remains unavailable until the lease
+ * migration and dedicated worker configuration are deployed and the tenant is
+ * explicitly entitled.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +17,9 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { getCurrentDbUser } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { startHeadlessSession } from '@/lib/browser-control/session';
+import { endHeadlessSession, startHeadlessSession } from '@/lib/browser-control/session';
+import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
+import { ensureHeadlessResearchWorker } from '@/lib/browser-control/headless-worker';
 
 export async function POST(_req: NextRequest) {
   const authResult = await requireAuth();
@@ -27,6 +29,9 @@ export async function POST(_req: NextRequest) {
   const [space, dbUser] = await Promise.all([getSpaceForUser(userId), getCurrentDbUser()]);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
   if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (!isResearchWorkspaceEnabledForSpace(space.id)) {
+    return NextResponse.json({ error: 'Cloud research workspace is unavailable.' }, { status: 404 });
+  }
 
   // Generous enough for normal use (routing auto-starts one per task/action
   // when needed) while bounding a runaway loop of session churn.
@@ -36,11 +41,24 @@ export async function POST(_req: NextRequest) {
   }
 
   const session = await startHeadlessSession({ spaceId: space.id, userId: dbUser.id });
+  const launch = await ensureHeadlessResearchWorker(session.id);
+  if (!launch.ok) {
+    await endHeadlessSession(session.id, { spaceId: space.id }).catch(() => {});
+    return NextResponse.json(
+      { error: 'Cloud research browser is unavailable. No work was queued.' },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({
     sessionId: session.id,
     source: session.source,
-    status: session.status,
+    // A row exists before the Modal worker has proved it is alive. Do not
+    // present that as an active browser: `/status` becomes active only after
+    // the first fenced worker heartbeat is observed.
+    state: 'launching',
+    status: 'launching',
     startedAt: session.startedAt,
+    workerStarted: launch.started,
   });
 }

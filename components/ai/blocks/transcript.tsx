@@ -8,6 +8,7 @@ import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
 import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
 import { SubagentTaskBlockView } from './subagent-task-block-view';
+import { WorkSessionBlockView } from './work-session-block-view';
 import { ReasoningBlockView } from './reasoning-block-view';
 import { PermissionBlockView } from './permission-block-view';
 import { PermissionPromptView, type PermissionPromptData } from './permission-prompt-view';
@@ -25,6 +26,9 @@ interface TranscriptProps {
    * emitting deltas; omit or false for saved history.
    */
   streaming?: boolean;
+  /** Disable text announcements when a grounded activity surface in the same
+   * assistant row already owns the live region. */
+  announceText?: boolean;
   /**
    * Tool callIds that are currently in-flight (the model called them in
    * this turn but the handler hasn't resolved yet). Lets the block view
@@ -59,6 +63,8 @@ interface TranscriptProps {
    *  picker). The workspace forwards the text as the realtor's next
    *  message. Omit on read-only history surfaces. */
   onUserIntent?: (text: string) => void;
+  /** Opens a durable workbook artifact from a live or historical tool result. */
+  onOpenWorkbench?: (artifactId: string) => void;
   /**
    * Optimistic object URLs for just-sent attachments, keyed by attachment id.
    * Lets a freshly-sent image thumbnail render instantly without waiting on a
@@ -80,10 +86,12 @@ export function Transcript({
   role,
   messageId,
   streaming,
+  announceText = true,
   liveCallIds,
   pendingApproval,
   approvalCelebration,
   onUserIntent,
+  onOpenWorkbench,
   localUrls,
   className,
 }: TranscriptProps) {
@@ -114,6 +122,7 @@ export function Transcript({
     | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
     | { kind: 'subagent'; block: ToolCallBlock }
     | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> }
+    | { kind: 'work-session'; block: Extract<MessageBlock, { type: 'work_session' }> }
     | {
         kind: 'attachments';
         blocks: Array<Extract<MessageBlock, { type: 'attachment' }>>;
@@ -140,6 +149,10 @@ export function Transcript({
     }
     if (block.type === 'subagent_task') {
       items.push({ kind: 'subagent-task', block });
+      continue;
+    }
+    if (block.type === 'work_session') {
+      items.push({ kind: 'work-session', block });
       continue;
     }
     if (block.type === 'tool_call') {
@@ -184,6 +197,7 @@ export function Transcript({
                 role={role}
                 markdownId={messageId ? `${messageId}-${item.originalIndex}` : undefined}
                 streaming={item.originalIndex === lastTextIndex}
+                announce={announceText}
               />
             );
           case 'tool-single':
@@ -193,6 +207,7 @@ export function Transcript({
                 block={item.block}
                 live={liveCallIds?.has(item.block.callId)}
                 onUserIntent={onUserIntent}
+                onOpenWorkbench={onOpenWorkbench}
               />
             );
           case 'tool-group':
@@ -216,6 +231,13 @@ export function Transcript({
             return (
               <SubagentTaskBlockView
                 key={`subagent-task-${item.block.runId}`}
+                block={item.block}
+              />
+            );
+          case 'work-session':
+            return (
+              <WorkSessionBlockView
+                key={`work-session-${item.block.sessionId}`}
                 block={item.block}
               />
             );

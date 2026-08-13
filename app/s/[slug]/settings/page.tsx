@@ -313,7 +313,9 @@ export default async function SettingsPage({
               Gmail, Outlook, Slack, HubSpot, and the rest. Connect them so
               Chippi can act on your behalf through your own accounts.
             </p>
-            <p className={BODY_MUTED}>Chippi never sends without your tap.</p>
+            <p className={BODY_MUTED}>
+              Chippi uses your connected accounts to complete the actions you request and records each result.
+            </p>
             <ConnectedAppsSection
               slug={slug}
               callbackResult={

@@ -2,7 +2,7 @@ import 'server-only';
 /**
  * Work-session dispatch — how a session advances from an API route.
  *
- * Priority order, most durable first:
+ * Exactly one rail is selected by configuration:
  *   1. Cloudflare queue (WORKER_URL + WORKER_SECRET): enqueue a worker task —
  *      the worker advances the session ONE STEP PER QUEUED JOB and re-enqueues
  *      until done (lib/jobs/tasks.ts), so every step gets its own retry
@@ -11,25 +11,32 @@ import 'server-only';
  *   3. Inline via next/server after() — previews and bare envs: same engine,
  *      same state machine, just without cross-invocation durability.
  *
- * One contract everywhere: "advance this session id". enqueueWorkerTask
- * returns null (never throws, never lies) when the queue is unconfigured or
- * unreachable, so a dead worker falls through to the next path instead of
- * stranding the session.
+ * One contract everywhere: "advance this session id". When Cloudflare is
+ * configured, an enqueue failure is surfaced and NEVER falls through to a
+ * second rail: a timeout can occur after remote acceptance, and dual dispatch
+ * would race the same session. Fallbacks are selected only when Cloudflare is
+ * unconfigured.
  */
 
 import { after } from 'next/server';
 import { inngest } from '@/lib/inngest/client';
 import { logger } from '@/lib/logger';
-import { enqueueWorkerTask } from '@/lib/queue';
+import { enqueueWorkerTask, workerQueueConfigured } from '@/lib/queue';
 import { planSession, executeSession } from './engine';
 
 function inngestConfigured(): boolean {
-  return Boolean(process.env.INNGEST_EVENT_KEY);
+  return Boolean(
+    process.env.INNGEST_EVENT_KEY?.trim() &&
+      process.env.INNGEST_SIGNING_KEY?.trim(),
+  );
 }
 
 /** Plan phase; when planning lands in 'running' (just_go), execution follows. */
 export async function kickPlan(sessionId: string): Promise<void> {
-  if (await enqueueWorkerTask('work-session-plan', { sessionId })) return;
+  if (workerQueueConfigured()) {
+    if (await enqueueWorkerTask('work-session-plan', { sessionId })) return;
+    throw new Error('Cloudflare queue did not accept work-session-plan.');
+  }
   if (inngestConfigured()) {
     await inngest.send({ name: 'work-session/plan', data: { sessionId } });
     return;
@@ -46,7 +53,10 @@ export async function kickPlan(sessionId: string): Promise<void> {
 
 /** Execute phase (after approval, or resumed after an answered question). */
 export async function kickExecute(sessionId: string): Promise<void> {
-  if (await enqueueWorkerTask('work-session-advance', { sessionId })) return;
+  if (workerQueueConfigured()) {
+    if (await enqueueWorkerTask('work-session-advance', { sessionId })) return;
+    throw new Error('Cloudflare queue did not accept work-session-advance.');
+  }
   if (inngestConfigured()) {
     await inngest.send({ name: 'work-session/execute', data: { sessionId } });
     return;

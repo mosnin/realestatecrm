@@ -19,8 +19,10 @@ import {
   handleComposioTrigger,
   workSessionPlan,
   workSessionExecute,
+  workspaceRunTaskExecute,
 } from '@/lib/inngest/functions';
 import { cronFunctions } from '@/lib/inngest/cron-functions';
+import { inngestCronFallbackEnabled } from '@/lib/inngest/cron-fallback';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -32,8 +34,9 @@ export const { GET, POST, PUT } = serve({
     handleComposioTrigger,
     workSessionPlan,
     workSessionExecute,
+    workspaceRunTaskExecute,
     // Cron mirrors — opt-in only (see header note); Vercel cron is the
     // production scheduler.
-    ...(process.env.INNGEST_CRONS_ENABLED ? cronFunctions : []),
+    ...(inngestCronFallbackEnabled() ? cronFunctions : []),
   ],
 });

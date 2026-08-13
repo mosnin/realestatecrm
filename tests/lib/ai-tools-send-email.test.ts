@@ -210,6 +210,29 @@ describe('sendEmailTool handler — idempotency key', () => {
     expect(first.display).toBe('success');
     expect(second.display).toBe('success');
   });
+
+  it('uses and forwards the durable action key instead of deriving it from message content', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+    };
+    const ctx = makeCtx();
+    ctx.executionIdempotencyKey = 'work-session-action-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+    await sendEmailTool.handler(
+      { toEmail: 'durable@example.com', subject: 'First content', body: 'First body.' },
+      ctx,
+    );
+    await sendEmailTool.handler(
+      { toEmail: 'durable@example.com', subject: 'Changed content', body: 'Changed body.' },
+      ctx,
+    );
+
+    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailFromCRMMock).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'work-session-action-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
+    );
+  });
 });
 
 describe('sendEmailTool handler — errors', () => {
@@ -226,5 +249,41 @@ describe('sendEmailTool handler — errors', () => {
     );
     expect(result.summary).toMatch(/Send failed.*Resend quota exhausted/);
     expect(result.display).toBe('error');
+  });
+
+  it('throws a durable delivery failure so the leased executor can retry it', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: null },
+    };
+    sendEmailFromCRMMock.mockRejectedValueOnce(new Error('Resend temporarily unavailable'));
+    const ctx = makeCtx();
+    ctx.executionIdempotencyKey = 'work-session-action-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    await expect(sendEmailTool.handler(
+      { toEmail: 'durable-error@example.com', subject: 'Hi', body: 'Hi.' },
+      ctx,
+    )).rejects.toThrow(/Resend temporarily unavailable/);
+  });
+
+  it('returns a typed terminal receipt instead of retrying a known provider rejection', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: null },
+    };
+    sendEmailFromCRMMock.mockRejectedValueOnce(Object.assign(
+      new Error('same key used with changed payload'),
+      { durableDisposition: 'reconciliation_required' },
+    ));
+    const ctx = makeCtx();
+    ctx.executionIdempotencyKey = 'work-session-action-cccccccccccccccccccccccccccccccc';
+
+    await expect(sendEmailTool.handler(
+      { toEmail: 'durable-conflict@example.com', subject: 'Hi', body: 'Hi.' },
+      ctx,
+    )).resolves.toMatchObject({
+      display: 'error',
+      durableExecutionDisposition: 'reconciliation_required',
+    });
   });
 });

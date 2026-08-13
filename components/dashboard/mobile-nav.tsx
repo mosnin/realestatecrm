@@ -64,7 +64,7 @@ function SideTab({
         className={cn(
           'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
           isActive
-            ? 'bg-foreground/[0.08] text-foreground'
+            ? 'bg-foreground text-background shadow-[0_1px_2px_rgb(17_17_19/0.18)]'
             : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -111,8 +111,8 @@ function BarShell({ children }: { children: React.ReactNode }) {
       className={cn(
         'md:hidden fixed left-3 right-3 z-50',
         'rounded-full flex items-stretch',
-        'bg-card border border-border',
-        'shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
+        'bg-card border border-border/90',
+        'shadow-[0_2px_10px_rgba(17,17,19,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)]',
       )}
       style={{
         height: BAR_HEIGHT,

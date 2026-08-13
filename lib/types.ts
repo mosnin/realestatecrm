@@ -766,6 +766,13 @@ export type Conversation = {
   title: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Chosen by the first user turn and immutable for the conversation. */
+  mode?: 'chat' | 'work' | null;
+  /** Work-only execution posture. Mutable without changing conversation type. */
+  executionMode?: 'review' | 'autonomous' | null;
+  workGoal?: string | null;
+  workGoalStatus?: 'active' | 'achieved' | 'cancelled' | null;
+  workGoalVersion?: number | null;
   /** Last message content truncated to 60 chars, or null if no messages yet. */
   preview?: string | null;
 };
@@ -783,6 +790,13 @@ export type ChatConversation = {
   title: string;
   createdAt: Date | string;
   updatedAt: Date | string;
+  /** Chosen by the first user turn and immutable for the conversation. */
+  mode?: 'chat' | 'work' | null;
+  /** Work-only execution posture. */
+  executionMode?: 'review' | 'autonomous' | null;
+  workGoal?: string | null;
+  workGoalStatus?: 'active' | 'achieved' | 'cancelled' | null;
+  workGoalVersion?: number | null;
   /** Last message content truncated to 60 chars, or null if no messages yet. */
   preview?: string | null;
   spaceId?: string;

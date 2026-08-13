@@ -27,12 +27,16 @@
  */
 
 import { ALL_TOOLS } from './tools';
+import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import type { ToolDefinition } from './types';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 /**
  * Always loaded. The verbs that answer the everyday turn: find/list a person
- * or deal, glance at the pipeline, draft a message, leave a note, set a
- * follow-up, recall history, read an attachment. ~12 schemas instead of ~50.
+ * or deal, glance at the pipeline, leave a note, set a follow-up, recall
+ * history, read an attachment. Drafting is intentionally intent-gated: a
+ * draft tool must never compete with a real send on an explicit send turn.
  */
 export const CORE_TOOL_NAMES: readonly string[] = [
   'find_person',
@@ -43,8 +47,6 @@ export const CORE_TOOL_NAMES: readonly string[] = [
   'find_deal',
   'note_on_deal',
   'pipeline_summary',
-  'draft_email',
-  'draft_sms',
   'recall_history',
   'read_attachment',
 ];
@@ -86,16 +88,20 @@ export const TOOLSETS: Record<string, readonly string[]> = {
     'find_property',
     'research_area',
     'find_comparable_properties',
+    'analyze_property_values',
     'add_property',
     'update_property_status',
     'delete_property',
     'note_on_property',
   ],
   calendar: ['check_availability', 'block_time', 'propose_tour_times'],
+  drafting: ['draft_email', 'draft_sms'],
   comms: ['send_email', 'send_sms', 'send_property_packet', 'log_email_sent', 'log_sms_sent'],
+  automations: ['create_automation'],
   pipeline: ['workspace_stats', 'find_quiet_hot_persons', 'find_overdue_followups'],
   brokerage: ['summarize_realtor', 'analyze_realtor', 'assign_lead_to_realtor', 'request_deal_review'],
-  files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document'],
+  files: ['list_files', 'read_file', 'attach_file_to_property', 'read_spreadsheet', 'summarize_document', 'open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'],
+  studio: ['generate_studio_image'],
   planning: ['create_plan'],
 
   // `control_browser` (single action) + `browser_task` (bounded multi-step
@@ -126,10 +132,13 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['tours', /\b(tour|showing|visit|walk-?through|open house|weather|forecast|rain|temperature|delete|remove)\b/i],
   ['properties', /\b(propert\w*|listing\w*|home|house|unit|comp|comparable|address|mls|delete|remove|area|neighbo\w*|zip|district|school\w*|walkab\w*|walk score|safety|crime|amenit\w*|market|commute)\b/i],
   ['calendar', /\b(calendar|availab\w*|book|slot|appointment|busy|free|block|agenda)\b/i],
+  ['drafting', /\b(draft|compose|write(?:\s+me)?|prepare)\b[\s\S]{0,80}\b(email|text|sms|message|reply)\b/i],
   ['comms', /\b(send|email|sms|text|message|packet|reply|forward|reach|outreach|blast)\b/i],
+  ['automations', /\b(automation|automate|workflow|every\s+time|whenever|on\s+autopilot)\b/i],
   ['pipeline', /\b(pipeline|quiet|overdue|stuck|stalled|at[\s-]?risk|priority|leak|stats|statistics|numbers|metrics|kpis?|dashboard|snapshot|how am i doing|how'?s business)\b/i],
   ['brokerage', /\b(broker|team|realtor|agent|roster|assign|review|performance|production)\b/i],
-  ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|summarize)\b/i],
+  ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|workbench|summarize|normaliz(?:e|ing|ation)|deduplicat(?:e|ing|ion)|remove\s+duplicate\s+rows?|trim(?:ming)?\s+whitespace|rename\s+(?:a\s+)?column|add\s+(?:a\s+)?(?:[a-z][\w -]{0,48}\s+)?column|tag\s+(?:every\s+)?(?:row|sheet)|phone\s+numbers?)\b/i],
+  ['studio', /\b(?:generate|create|make|design)\b[\s\S]{0,70}\b(?:image|graphic|visual|flyer|social\s+post|listing\s+photo)\b|\b(?:image|graphic|visual|flyer|social\s+post)\b[\s\S]{0,50}\b(?:generate|create|make|design)\b/i],
   ['planning', /\b(plan|sweep|everyone|all (?:my|hot|the)|prepare me|batch)\b/i],
   [
     'browser',
@@ -137,11 +146,158 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ],
 ];
 
+const EXPLICIT_DRAFT_INTENT =
+  /\b(draft|compose|write(?:\s+me)?|prepare)\b[\s\S]{0,80}\b(email|text|sms|message|reply)\b/i;
+const EXPLICIT_SEND_INTENT =
+  /\b(send|email(?:s|ed|ing)?|text(?:s|ed|ing)?|sms|reply|forward)\b|\bmessage(?:s|d|ing)?\s+(?:a|the|this|that|my|our|all|every|each|new|lead|client|contact|buyer|seller|prospect|them|him|her)\b/i;
+const AUTOMATION_INTENT =
+  /\b(automation|automate|workflow|every\s+time|whenever|on\s+autopilot)\b/i;
+const CONTACT_CREATION_INTENT =
+  /\b(?:add|create|save|log)\s+(?:(?:a|the|this|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b|\b(?:add|create|save)\b[\s\S]{0,40}\bas\s+(?:(?:a|the|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b/i;
+const DURABLE_WORK_INTENT =
+  /\b(research|report|audit|deep[\s-]?dive|comprehensive|multi[\s-]?file|terminal|workspace|deliverable|compare\s+(?:multiple|several|three|\d+)\s+(?:sites|sources|listings))\b/i;
+
+/**
+ * Work mode executes mutations without the legacy approval pause, so the
+ * model must not receive a whole mutation family for one explicit verb. These
+ * rules turn a concrete request into the exact mutating tools that can satisfy
+ * it. Read-only tools remain available for grounding and entity resolution.
+ *
+ * Automation creation has priority: text such as "create an automation that
+ * emails every new lead" describes the automation's behavior, not three
+ * independent mutations (create contact + send email + create automation).
+ */
+const AUTOMATION_CREATION_INTENT =
+  /\b(?:create|build|make|add|set[\s-]?up|configure|automate)\b[\s\S]{0,70}\b(?:automation|workflow)\b|\b(?:automation|workflow)\b[\s\S]{0,40}\b(?:create|build|make|add|set[\s-]?up|configure)\b/i;
+const PROPERTY_VALUE_ANALYSIS_INTENT =
+  /\b(?:analy[sz]e|estimate|evaluate|valuation|cma)\b[\s\S]{0,90}\b(?:propert\w*|home|house|listing|address|value|price|comp(?:arable)?s?)\b|\b(?:property|home|house|listing)\s+(?:value|valuation|price|comps?)\b/i;
+const EMAIL_SEND_INTENT =
+  /\bsend\b[\s\S]{0,60}\b(?:an?\s+)?email\b|^\s*(?:please\s+)?email\s+(?!address(?:es)?\b)|\b(?:please|can\s+you|could\s+you|will\s+you|go\s+ahead\s+and)\s+email\s+(?!address(?:es)?\b)|\b(?:reply|forward)\b[\s\S]{0,60}\bemail\b/i;
+const SMS_SEND_INTENT =
+  /\bsend\b[\s\S]{0,60}\b(?:an?\s+)?(?:sms|text(?:\s+message)?)\b|^\s*(?:please\s+)?text\b|\b(?:please|can\s+you|could\s+you|will\s+you|go\s+ahead\s+and)\s+text\b/i;
+const PROPERTY_PACKET_SEND_INTENT =
+  /\bsend\b[\s\S]{0,60}\b(?:property|listing)\s+packet\b/i;
+const IMAGE_GENERATION_INTENT =
+  /\b(?:generate|create|make|design)\b[\s\S]{0,70}\b(?:image|graphic|visual|flyer|social\s+post|listing\s+photo)\b|\b(?:image|graphic|visual|flyer|social\s+post)\b[\s\S]{0,50}\b(?:generate|create|make|design)\b/i;
+const EXPLICIT_BROWSER_CONTROL_INTENT =
+  /\b(?:use|open|control|drive|navigate|browse|search|check|visit|go\s+to|fill(?:\s+out|\s+in)?)\b[\s\S]{0,80}\b(?:browser|website|web\s?page|url|zillow|redfin|trulia|realtor\.com)\b|\b(?:browser|website|web\s?page|url|zillow|redfin|trulia|realtor\.com)\b[\s\S]{0,50}\b(?:open|navigate|browse|search|check|visit|fill)\b/i;
+
+const DESTRUCTIVE_WORK_TOOL_NAMES = new Set<string>([
+  'archive_person',
+  'merge_persons',
+  'delete_contact',
+  'delete_deal',
+  'cancel_tour',
+  'delete_tour',
+  'delete_property',
+]);
+
+const DESTRUCTIVE_WORK_INTENTS: ReadonlyArray<readonly [string, RegExp]> = [
+  [
+    'delete_contact',
+    /\b(?:delete|permanently\s+remove)\b[\s\S]{0,50}\b(?:contact|person|lead|buyer|seller|prospect|client)\b/i,
+  ],
+  [
+    'archive_person',
+    /\barchive\b[\s\S]{0,50}\b(?:contact|person|lead|buyer|seller|prospect|client)\b/i,
+  ],
+  [
+    'merge_persons',
+    /\bmerge\b[\s\S]{0,60}\b(?:contacts?|people|persons?|leads?|buyers?|sellers?|prospects?|clients?)\b/i,
+  ],
+  ['delete_deal', /\b(?:delete|permanently\s+remove)\b[\s\S]{0,50}\bdeal\b/i],
+  ['cancel_tour', /\bcancel\b[\s\S]{0,50}\b(?:tour|showing|visit|walk-?through)\b/i],
+  [
+    'delete_tour',
+    /\b(?:delete|permanently\s+remove)\b[\s\S]{0,50}\b(?:tour|showing|visit|walk-?through)\b/i,
+  ],
+  [
+    'delete_property',
+    /\b(?:delete|permanently\s+remove)\b[\s\S]{0,50}\b(?:property|listing|home|house|unit)\b/i,
+  ],
+];
+
+/**
+ * Null means there is no single explicit mutation contract for this turn.
+ * An empty set means the explicit request is read-only and therefore should
+ * expose no mutator. A non-empty set is the exact mutation allowlist.
+ */
+function selectWorkMutationScope(message: string): Set<string> | null {
+  const text = message ?? '';
+
+  if (AUTOMATION_CREATION_INTENT.test(text)) {
+    return new Set(['create_automation']);
+  }
+
+  const allowed = new Set<string>();
+  let scoped = false;
+
+  if (CONTACT_CREATION_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('add_person');
+  }
+  if (PROPERTY_VALUE_ANALYSIS_INTENT.test(text)) {
+    scoped = true;
+  }
+  if (!EXPLICIT_DRAFT_INTENT.test(text) && EXPLICIT_SEND_INTENT.test(text)) {
+    if (EMAIL_SEND_INTENT.test(text)) {
+      scoped = true;
+      allowed.add('send_email');
+    }
+    if (SMS_SEND_INTENT.test(text)) {
+      scoped = true;
+      allowed.add('send_sms');
+    }
+    if (PROPERTY_PACKET_SEND_INTENT.test(text)) {
+      scoped = true;
+      allowed.add('send_property_packet');
+    }
+  }
+  if (EXPLICIT_BROWSER_CONTROL_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('control_browser');
+    allowed.add('browser_task');
+  }
+  if (IMAGE_GENERATION_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('generate_studio_image');
+  }
+
+  for (const [toolName, pattern] of DESTRUCTIVE_WORK_INTENTS) {
+    if (!pattern.test(text)) continue;
+    scoped = true;
+    allowed.add(toolName);
+  }
+
+  return scoped ? allowed : null;
+}
+
+/**
+ * Exact mutators that may execute directly for this message. The intersection
+ * with the already-selected catalog prevents an intent regex from granting a
+ * capability that was not actually exposed to the agent on this turn.
+ */
+export function selectDirectExecutionToolNames(
+  message: string,
+  selectedTools: readonly ToolDefinition[],
+): string[] {
+  const mutationScope = selectWorkMutationScope(message);
+  if (!mutationScope) return [];
+  return selectedTools
+    .filter(
+      (tool) => tool.requiresApproval !== false && mutationScope.has(tool.name),
+    )
+    .map((tool) => tool.name);
+}
+
 /** Tools not assigned to CORE or any TOOLSET — always loaded so nothing is lost. */
 function orphanNames(): string[] {
   const assigned = new Set<string>([...CORE_TOOL_NAMES]);
   for (const names of Object.values(TOOLSETS)) for (const n of names) assigned.add(n);
-  return ALL_TOOLS.map((t) => t.name).filter((n) => !assigned.has(n));
+  // Capability-gated tools must never become unconditional catalog orphans.
+  return ALL_TOOLS.map((t) => t.name).filter(
+    (n) => !assigned.has(n) && n !== 'continue_workspace_run' && n !== 'start_work_session',
+  );
 }
 
 /** Toolset names a message implies. Empty when only core is needed. */
@@ -151,6 +307,10 @@ export function selectToolsets(message: string): string[] {
   for (const [name, re] of TOOLSET_PATTERNS) {
     if (re.test(text)) selected.add(name);
   }
+  // Keep tool exposure and the TS-native route on the same natural-language
+  // contract. The route still requires the server-side feature/tenant gate;
+  // selecting this existing browser toolset alone never enables cloud work.
+  if (isResearchWorkspaceIntent(text)) selected.add('browser');
   return [...selected];
 }
 
@@ -158,10 +318,76 @@ export function selectToolsets(message: string): string[] {
  * The domain tools to hand the chat agent for THIS message: CORE + any
  * implied toolsets + orphans. A subset of ALL_TOOLS, deduped, order-preserved.
  */
-export function getChatTools(message: string): ToolDefinition[] {
+export function getChatTools(
+  message: string,
+  capabilities: { workspaceContinuationEligible?: boolean; workMode?: boolean } = {},
+): ToolDefinition[] {
   const wanted = new Set<string>([...CORE_TOOL_NAMES, ...orphanNames()]);
   for (const ts of selectToolsets(message)) {
     for (const n of TOOLSETS[ts] ?? []) wanted.add(n);
   }
-  return ALL_TOOLS.filter((t) => wanted.has(t.name));
+
+  const text = message ?? '';
+  const isDraftRequest = EXPLICIT_DRAFT_INTENT.test(text);
+  const isSendRequest = !isDraftRequest && EXPLICIT_SEND_INTENT.test(text);
+  const isAutomationRequest = AUTOMATION_INTENT.test(text);
+  const isContactCreation = CONTACT_CREATION_INTENT.test(text);
+  const isImageGeneration = IMAGE_GENERATION_INTENT.test(text);
+
+  // Intent is enforced in the catalog, not left to model preference. Explicit
+  // drafting and sending are mutually exclusive, while automation creation
+  // cannot fall through to a one-off message tool.
+  if (isDraftRequest) {
+    wanted.delete('send_email');
+    wanted.delete('send_sms');
+    wanted.delete('send_property_packet');
+  }
+  if (isSendRequest || isContactCreation) {
+    wanted.delete('draft_email');
+    wanted.delete('draft_sms');
+  }
+  if (isAutomationRequest) {
+    wanted.delete('draft_email');
+    wanted.delete('draft_sms');
+    wanted.delete('send_email');
+    wanted.delete('send_sms');
+    wanted.delete('send_property_packet');
+  }
+
+  if (capabilities.workMode) {
+    // Work can begin as a quick action and grow into a multi-step turn after
+    // the first lookup. Keep the small, side-effect-free planning schema
+    // available for every Work turn so the prompt can require a real PlanCard
+    // before genuinely multi-step execution without relying on brittle words
+    // such as "plan" or "batch" in the user's request.
+    wanted.add('create_plan');
+
+    const mutationScope = selectWorkMutationScope(text);
+
+    // Destructive tools are never incidental Work-mode siblings. They enter
+    // the catalog only when the user explicitly names that destructive verb
+    // and entity (for example, "delete the contact").
+    for (const toolName of DESTRUCTIVE_WORK_TOOL_NAMES) {
+      if (!mutationScope?.has(toolName)) wanted.delete(toolName);
+    }
+
+    // For a concrete Work-mode action, retain all useful reads but expose only
+    // the mutation(s) selected above. This is catalog scoping, not a draft or
+    // approval fallback: the requested mutation still executes directly.
+    if (mutationScope) {
+      for (const tool of ALL_TOOLS) {
+        if (tool.requiresApproval !== false && !mutationScope.has(tool.name)) {
+          wanted.delete(tool.name);
+        }
+      }
+      for (const toolName of mutationScope) wanted.add(toolName);
+    }
+  }
+
+  if (capabilities.workspaceContinuationEligible && isWorkspaceRunContinuationIntent(message)) wanted.add('continue_workspace_run');
+  const isSimpleMutation = isSendRequest || isAutomationRequest || isContactCreation || isImageGeneration;
+  if (capabilities.workMode && !isSimpleMutation && DURABLE_WORK_INTENT.test(text)) {
+    wanted.add('start_work_session');
+  }
+  return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));
 }

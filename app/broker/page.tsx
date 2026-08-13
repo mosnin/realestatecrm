@@ -100,6 +100,10 @@ export default async function BrokerHomePage({
         initialConversations={conversations}
         initialConversationId={initialConversationId}
         initialPrefill={initialPrefill}
+        // Browser research is scoped to an individual Space. The brokerage
+        // surface deliberately has no implicit member-space fallback.
+        researchEnabled={false}
+        workspaceRunsEnabled={false}
       />
     </div>
   );

@@ -6,8 +6,9 @@
  *
  * What it does:
  *   1. Creates a SwarmRun row (status 'queued') for the realtor's space.
- *   2. Fires the Modal swarm runner (MODAL_SWARM_URL) fire-and-forget — the
- *      SAME infra `/api/swarm` uses. The sub-agents run on Modal on gpt-5-mini.
+ *   2. Enqueues a token-fenced Cloudflare task. The worker invokes the same
+ *      authenticated Modal runtime used by `/api/swarm`; provider/model routing
+ *      is selected by the specialist runtime configuration.
  *   3. Returns the run handle (runId + goal) so the chat UI can render a LIVE
  *      task card that subscribes to /api/swarm/[runId]/stream and updates as
  *      the sub-agents plan → work → complete.
@@ -26,10 +27,9 @@
  */
 
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
-import { after } from 'next/server';
+import { createAndEnqueueSwarmRun } from '@/lib/swarm-launch';
 import { defineTool, type ToolContext } from '../types';
 
 const parameters = z.object({
@@ -117,56 +117,29 @@ export function buildDelegateTaskTool() {
         };
       }
 
-      const modalSwarmUrl = process.env.MODAL_SWARM_URL;
-      if (!modalSwarmUrl) {
-        logger.error('[delegate_task] MODAL_SWARM_URL not set — cannot spawn sub-agent', {
-          spaceId: ctx.space.id,
-        });
+      const launch = await createAndEnqueueSwarmRun({
+        spaceId: ctx.space.id,
+        goal,
+        conversationId: ctx.conversationId,
+      });
+      if (launch.state === 'concurrent') {
         return {
-          summary:
-            'Error: the deep-task backend isn’t configured, so I’ll handle this directly instead.',
+          summary: 'Error: another specialist task is already active in this workspace.',
           display: 'error',
         };
       }
-
-      // Create the SwarmRun the UI will watch. Same shape /api/swarm uses.
-      const { data: run, error: insertError } = await supabase
-        .from('SwarmRun')
-        .insert({ spaceId: ctx.space.id, goal, status: 'queued' })
-        .select('id')
-        .single();
-
-      if (insertError || !run) {
-        logger.error('[delegate_task] SwarmRun insert failed', { spaceId: ctx.space.id }, insertError);
+      if (launch.state === 'unavailable' || launch.state === 'failed') {
+        logger.error('[delegate_task] durable SwarmRun launch failed', {
+          spaceId: ctx.space.id,
+          state: launch.state,
+          error: launch.error,
+        });
         return {
           summary: 'Error: I couldn’t start the delegated task. I’ll try to handle it directly.',
           display: 'error',
         };
       }
-
-      const runId = run.id as string;
-
-      // Fire-and-forget to Modal. Do NOT await — the chat turn must not block
-      // on the sub-agent. The UI's stream subscription carries progress.
-      const triggerTask = fetch(modalSwarmUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          secret: process.env.AGENT_INTERNAL_SECRET ?? '',
-          swarmRunId: runId,
-          goal,
-          spaceId: ctx.space.id,
-          // The orchestrator decomposes the goal itself; no preset custom agents.
-          customAgents: [],
-        }),
-      }).catch((err) => {
-        logger.error('[delegate_task] Modal swarm trigger failed', { spaceId: ctx.space.id, runId }, err);
-      });
-      try {
-        after(() => triggerTask);
-      } catch {
-        // Unit tests and non-Next workers may not have a request context.
-      }
+      const runId = launch.runId;
 
       const shortGoal = goal.length > 120 ? `${goal.slice(0, 117)}…` : goal;
       return {

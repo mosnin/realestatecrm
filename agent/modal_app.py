@@ -32,10 +32,12 @@ Sandbox economics — why we stay on Modal (audit, 2026-Q2):
 
 from __future__ import annotations
 
-import modal
+import os
 import re
-import structlog
 from pathlib import Path
+
+import modal
+import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -135,7 +137,7 @@ image = (
     .add_local_dir(_AGENT_DIR, remote_path="/app")
 )
 
-app = modal.App("chippi-agent", image=image)
+app = modal.App(os.environ.get("CHIPPI_MODAL_APP_NAME", "chippi-agent"), image=image)
 
 secrets = [modal.Secret.from_name("chippi-secrets")]
 
@@ -242,6 +244,14 @@ async def run_now_webhook(item: dict) -> dict:
             else {}
         )
 
+        # Routine and sweep dispatchers already write a UUID ledger id before
+        # invoking Modal. Preserve it for policy-grant correlation rather than
+        # silently replacing it in the worker. Older trigger/manual callers
+        # may omit it; the autonomous context remains read-only at action
+        # boundaries in that compatibility case.
+        raw_run_id = item.get("run_id")
+        run_id = raw_run_id.strip() if isinstance(raw_run_id, str) else ""
+
         from db import supabase
         from schemas import AgentSettings, Space
         from orchestrator import run_agent_for_space
@@ -262,6 +272,7 @@ async def run_now_webhook(item: dict) -> dict:
             instruction=instruction or None,
             owner_clerk_id=user_id or None,
             trigger_source=trigger_source or None,
+            run_id=run_id or None,
         )
         return {"ok": True, "space_id": space_id}
 
@@ -272,7 +283,7 @@ async def run_now_webhook(item: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Web endpoint — swarm execution (called fire-and-forget by /api/swarm)
+# Web endpoint — durable swarm launch acceptance + background execution
 # ---------------------------------------------------------------------------
 
 @app.function(
@@ -282,30 +293,102 @@ async def run_now_webhook(item: dict) -> dict:
     max_containers=10,
     enable_memory_snapshot=True,
 )
+async def run_swarm_worker(payload: dict) -> None:
+    """Execute one already-accepted, database-fenced swarm attempt."""
+    from swarm_orchestrator import run_swarm
+
+    await run_swarm(payload)
+
+
+@app.function(
+    image=image,
+    secrets=[modal.Secret.from_name("chippi-secrets")],
+    timeout=60,
+    max_containers=10,
+    enable_memory_snapshot=True,
+)
 @modal.fastapi_endpoint(method="POST", label="run-swarm")
 async def run_swarm_endpoint(payload: dict) -> dict:
-    """Modal endpoint for swarm execution. Called fire-and-forget by /api/swarm.
+    """Accept a launch token exactly once, then spawn its bounded worker.
 
-    Secured with AGENT_INTERNAL_SECRET — same as run_now_webhook and
-    chat_turn. The swarm runner writes SwarmRun/SwarmMember/SwarmEvent rows
-    and burns LLM tokens for whatever spaceId the payload names, so an
-    unauthenticated caller could run billable swarms against any workspace.
+    Same-token HTTP redelivery after an unknown network result returns a
+    duplicate receipt and never spawns a second billable worker.
     """
     import os
+    import uuid
+    from fastapi.responses import JSONResponse
 
     expected = os.environ.get("AGENT_INTERNAL_SECRET", "")
     secret = (payload.get("secret") or "")
     if not expected or secret != expected:
-        from fastapi.responses import JSONResponse
         return JSONResponse({"status": "failed", "error": "Unauthorized"}, status_code=401)
 
-    from swarm_orchestrator import run_swarm
+    allowed_keys = {
+        "secret", "swarmRunId", "spaceId", "launchToken", "goal", "customAgents"
+    }
+    if set(payload) != allowed_keys:
+        return JSONResponse({"status": "failed", "error": "Invalid payload"}, status_code=400)
+
+    swarm_run_id = payload.get("swarmRunId")
+    space_id = payload.get("spaceId")
+    launch_token = payload.get("launchToken")
+    goal = payload.get("goal")
+    custom_agents = payload.get("customAgents")
     try:
-        await run_swarm(payload)
-        return {"status": "completed"}
+        uuid.UUID(swarm_run_id)
+        uuid.UUID(launch_token)
+    except (ValueError, TypeError, AttributeError):
+        return JSONResponse({"status": "failed", "error": "Invalid launch identity"}, status_code=400)
+    if (
+        not isinstance(space_id, str) or not 1 <= len(space_id.strip()) <= 200
+        or not isinstance(goal, str) or not 1 <= len(goal.strip()) <= 2000
+        or not isinstance(custom_agents, list) or len(custom_agents) > 50
+    ):
+        return JSONResponse({"status": "failed", "error": "Invalid payload"}, status_code=400)
+    for agent in custom_agents:
+        if (
+            not isinstance(agent, dict)
+            or set(agent) != {"id", "name", "systemPrompt"}
+            or not isinstance(agent.get("id"), str)
+            or not isinstance(agent.get("name"), str)
+            or not isinstance(agent.get("systemPrompt"), str)
+            or not 1 <= len(agent["id"]) <= 200
+            or not 1 <= len(agent["name"]) <= 200
+            or len(agent["systemPrompt"]) > 10_000
+        ):
+            return JSONResponse({"status": "failed", "error": "Invalid custom agent"}, status_code=400)
+
+    from db import supabase
+    try:
+        db = await supabase()
+        receipt = await db.rpc(
+            "accept_swarm_launch",
+            {
+                "p_run_id": swarm_run_id,
+                "p_space_id": space_id,
+                "p_launch_token": launch_token,
+            },
+        ).execute()
+        row = receipt.data[0] if receipt.data else {}
+        acceptance = row.get("accept_swarm_launch") if isinstance(row, dict) else None
+        if acceptance != "accepted":
+            return {"status": acceptance or "rejected", "swarmRunId": swarm_run_id}
+
+        clean_payload = {
+            "swarmRunId": swarm_run_id,
+            "spaceId": space_id.strip(),
+            "launchToken": launch_token,
+            "goal": goal.strip(),
+            "customAgents": custom_agents,
+        }
+        await run_swarm_worker.spawn.aio(clean_payload)
+        return {"status": "accepted", "swarmRunId": swarm_run_id}
     except Exception as exc:
-        logger.error("run_swarm_endpoint_error", error=str(exc))
-        return {"status": "failed", "error": str(exc)}
+        logger.error("run_swarm_endpoint_error", error=mask_secrets(str(exc)))
+        return JSONResponse(
+            {"status": "failed", "error": "Swarm launch acceptance failed"},
+            status_code=503,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -443,6 +526,15 @@ async def chat_turn(item: dict):
     space = Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"])
     resolved_model = resolve_chat_model(agent_settings.chat_model)
 
+    # Preserve the legacy conversation-derived stream key, but never feed a
+    # non-UUID value into a signed capability claim.  A fresh UUID is an
+    # authority correlation id for this chat execution only; it is not shown
+    # to the client and cannot grant a capability outside this exact context.
+    try:
+        policy_run_id = str(uuid.UUID(conversation_id)) if conversation_id else str(uuid.uuid4())
+    except (ValueError, TypeError, AttributeError):
+        policy_run_id = str(uuid.uuid4())
+
     ctx = AgentContext.from_settings(
         agent_settings,
         run_id=conversation_id or f"chat-{uuid.uuid4()}",
@@ -450,6 +542,8 @@ async def chat_turn(item: dict):
         user_id=user_id,
         brokerage_id=brokerage_id,
         broker_role=broker_role,
+        run_mode="interactive",
+        run_policy_run_id=policy_run_id,
     )
 
     # ── helpers ──────────────────────────────────────────────────────────────────────────

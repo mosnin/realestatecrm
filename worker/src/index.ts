@@ -25,7 +25,7 @@
  */
 
 import { RECURRING_JOBS } from './schedule';
-import { cronMatchesInWindow } from './cron-match';
+import { latestCronMatchInWindow } from './cron-match';
 
 export interface Env {
   JOBS: Queue<JobMessage>;
@@ -47,9 +47,10 @@ const TICK_INTERVAL_MS = 5 * 60_000;
 /** Cap catch-up after a long outage so one tick can't enqueue a storm. */
 const MAX_CATCHUP_MS = 6 * 60 * 60_000;
 const WATERMARK_KEY = 'master-tick-watermark';
+const COMPLETED_TICK_PREFIX = 'master-tick-completed:';
 
 export type JobMessage =
-  | { type: 'tick'; id: string; path: string }
+  | { type: 'tick'; id: string; path: string; occurrence: string }
   | { type: 'task'; task: string; payload: unknown };
 
 const json = (body: unknown, status = 200) =>
@@ -71,15 +72,25 @@ async function processMessage(env: Env, msg: JobMessage): Promise<void> {
     await callApp(
       env,
       msg.path,
-      { method: 'GET', headers: { Authorization: `Bearer ${env.CRON_SECRET}` } },
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${env.CRON_SECRET}`,
+          'x-chippi-cron-occurrence': msg.occurrence,
+        },
+      },
       `tick:${msg.id}`,
     );
     console.log(`[worker] tick ${msg.id} ok`);
     return;
   }
+  const taskPath =
+    msg.task === 'swarm-run-launch' || msg.task === 'swarm-run-timeout'
+      ? '/api/internal/swarm-runs/launch'
+      : '/api/worker/execute';
   await callApp(
     env,
-    '/api/worker/execute',
+    taskPath,
     {
       method: 'POST',
       headers: {
@@ -129,13 +140,55 @@ async function readWatermark(env: Env, now: Date): Promise<Date> {
   }
 }
 
-async function writeWatermark(env: Env, at: Date): Promise<void> {
-  if (!env.STATE) return;
+async function writeWatermark(env: Env, at: Date): Promise<boolean> {
+  if (!env.STATE) return true;
   try {
     await env.STATE.put(WATERMARK_KEY, at.toISOString());
+    return true;
   } catch {
-    /* best-effort: a missed write just means a slightly wider next window */
+    return false;
   }
+}
+
+function completedTickKey(occurrence: Date, jobId: string): string {
+  return `${COMPLETED_TICK_PREFIX}${occurrence.toISOString()}:${jobId}`;
+}
+
+async function wasTickEnqueued(env: Env, occurrence: Date, jobId: string): Promise<boolean> {
+  if (!env.STATE) return false;
+  try {
+    return Boolean(await env.STATE.get(completedTickKey(occurrence, jobId)));
+  } catch {
+    // KV read failures must not drop work. The app routes remain responsible
+    // for business-level idempotency if this conservative retry duplicates.
+    return false;
+  }
+}
+
+async function rememberTickEnqueued(env: Env, occurrence: Date, jobId: string): Promise<boolean> {
+  if (!env.STATE) return true;
+  try {
+    await env.STATE.put(completedTickKey(occurrence, jobId), '1', {
+      expirationTtl: Math.ceil(MAX_CATCHUP_MS / 1_000) + 3_600,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function forgetTickReceipts(
+  env: Env,
+  due: ReadonlyArray<{ jobDef: (typeof RECURRING_JOBS)[number]; occurrence: Date }>,
+): Promise<void> {
+  if (!env.STATE) return;
+  await Promise.all(due.map(async ({ jobDef, occurrence }) => {
+    try {
+      await env.STATE!.delete(completedTickKey(occurrence, jobDef.id));
+    } catch {
+      /* TTL cleanup is sufficient if KV deletion is temporarily unavailable. */
+    }
+  }));
 }
 
 export default {
@@ -150,16 +203,33 @@ export default {
     // Window since the last processed tick — recovers delayed AND (with KV)
     // skipped triggers instead of silently dropping a day's daily jobs.
     const from = await readWatermark(env, now);
-    const due = RECURRING_JOBS.filter((jobDef) => cronMatchesInWindow(jobDef.pattern, from, now));
+    const due = RECURRING_JOBS.flatMap((jobDef) => {
+      const occurrence = latestCronMatchInWindow(jobDef.pattern, from, now);
+      return occurrence ? [{ jobDef, occurrence }] : [];
+    });
 
     // Each enqueue is isolated: one failing send must not drop its siblings
     // (they share a tick, and a daily job gets no second chance today).
     let enqueued = 0;
+    let alreadyEnqueued = 0;
     const failed: string[] = [];
-    for (const jobDef of due) {
+    for (const { jobDef, occurrence } of due) {
+      if (await wasTickEnqueued(env, occurrence, jobDef.id)) {
+        alreadyEnqueued++;
+        continue;
+      }
       try {
-        await env.JOBS.send({ type: 'tick', id: jobDef.id, path: jobDef.path });
-        enqueued++;
+        await env.JOBS.send({
+          type: 'tick',
+          id: jobDef.id,
+          path: jobDef.path,
+          occurrence: occurrence.toISOString(),
+        });
+        if (await rememberTickEnqueued(env, occurrence, jobDef.id)) enqueued++;
+        else {
+          failed.push(jobDef.id);
+          console.error(`[worker] receipt write failed for ${jobDef.id}; leaving the watermark open`);
+        }
       } catch (err) {
         failed.push(jobDef.id);
         console.error(`[worker] enqueue failed for ${jobDef.id}:`, err instanceof Error ? err.message : err);
@@ -168,11 +238,23 @@ export default {
 
     // Only advance the watermark when everything due was enqueued — a partial
     // tick leaves the window open so the next firing retries the stragglers.
-    if (failed.length === 0) await writeWatermark(env, now);
+    if (failed.length === 0) {
+      const watermarkWritten = await writeWatermark(env, now);
+      if (watermarkWritten) {
+        await forgetTickReceipts(env, due);
+      } else {
+        // Retain per-occurrence receipts when the watermark cannot advance.
+        // The next trigger will reopen this window but skip the queue sends
+        // already proven successful instead of duplicating every sibling.
+        failed.push('watermark');
+        console.error('[worker] watermark write failed; retaining tick receipts');
+      }
+    }
 
     console.log(
       `[worker] master tick ${now.toISOString()} (window from ${from.toISOString()}) — ` +
         `enqueued ${enqueued}/${due.length} due of ${RECURRING_JOBS.length}` +
+        (alreadyEnqueued ? ` (${alreadyEnqueued} already receipted)` : '') +
         (failed.length ? ` — FAILED: ${failed.join(', ')}` : ''),
     );
   },

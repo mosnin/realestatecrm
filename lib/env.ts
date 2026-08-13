@@ -74,6 +74,8 @@ const optionalSchema = z.object({
 
   // Cron protection
   CRON_SECRET: z.string().optional(),
+  CRON_WORKSPACE_RUN_RECOVERY_DISABLED: z.string().optional(),
+  CRON_CONVERSATION_TURN_RECOVERY_DISABLED: z.string().optional(),
 
   // LLM routing
   OPENROUTER_API_KEY: z.string().optional(),
@@ -115,6 +117,8 @@ const optionalSchema = z.object({
   AGENT_INTERNAL_SECRET: z.string().optional(),
   AGENT_IMMEDIATE_EVENTS: z.string().optional(),
   CHIPPI_CHAT_RUNTIME: z.string().optional(),
+  CHIPPI_CHAT_MODEL: z.string().optional(),
+  CHIPPI_REASONING_EFFORT: z.string().optional(),
 
   // Composio integrations
   COMPOSIO_API_KEY: z.string().optional(),
@@ -135,6 +139,7 @@ const optionalSchema = z.object({
   // App URLs / flags
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED: z.string().optional(),
 
   // Credit metering kill switch (lib/billing/meter.ts). Enforcement is ON by
   // default; set CREDITS_ENFORCED=false to disable the credit gate entirely
@@ -187,12 +192,50 @@ const optionalSchema = z.object({
   // dispatch + work sessions); SDK reads env
   INNGEST_EVENT_KEY: z.string().optional(),
   INNGEST_SIGNING_KEY: z.string().optional(),
+  INNGEST_CRONS_ENABLED: z.string().optional(),
+  INNGEST_CRONS_DISABLED: z.string().optional(),
 
   // Cloudflare background worker (worker/, docs/WORKER.md): job offload +
   // recurring jobs run on Cloudflare Queues; Redis serves the app cache
   WORKER_URL: z.string().optional(),                 // lib/queue.ts → the Worker's /enqueue + /health
   WORKER_SECRET: z.string().optional(),              // app/api/worker/execute + enqueue auth
   REDIS_URL: z.string().optional(),                  // lib/redis-cache.ts
+
+  // Realtime Voice. The server flag is intentionally not NEXT_PUBLIC: the UI
+  // receives only the readiness result. Specialist controls have a second,
+  // independently default-off rollout gate.
+  REALTIME_VOICE_GATEWAY_ENABLED: z.string().optional(),
+  CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED: z.string().optional(),
+
+  // Research Workspace. Both public/server switches plus an explicit Space
+  // allowlist must agree before the browser UI or Modal launch path is exposed.
+  CHIPPI_RESEARCH_WORKSPACE_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED: z.string().optional(),
+  CHIPPI_RESEARCH_WORKSPACE_SPACE_IDS: z.string().optional(),
+  MODAL_HEADLESS_BROWSER_URL: z.string().optional(),
+  CHIPPI_BROWSER_WORKER_SECRET: z.string().optional(),
+
+  // Managed Workspace Runs and their private terminal/follow-up slice. Every
+  // switch is optional and default-off; missing runtime configuration is
+  // surfaced as a warning only after an operator opts into the feature.
+  CHIPPI_WORKSPACE_RUNS_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED: z.string().optional(),
+  CHIPPI_WORKSPACE_RUNS_SPACE_IDS: z.string().optional(),
+  CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED: z.string().optional(),
+  CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED: z.string().optional(),
+  CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS: z.string().optional(),
+  CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED: z.string().optional(),
+  MODAL_WORKSPACE_RUN_URL: z.string().optional(),
+  MODAL_WORKSPACE_RUN_TASK_URL: z.string().optional(),
+  CHIPPI_WORKSPACE_MODAL_SECRET: z.string().optional(),
+  CHIPPI_WORKSPACE_CALLBACK_SECRET: z.string().optional(),
+
+  // Durable trusted-execution rollout and reversible kill switches.
+  AGENT_RUN_POLICY_MODE: z.string().optional(),
+  AGENT_RUN_POLICY_SECRET: z.string().optional(),
+  DURABLE_SCHEDULE_OCCURRENCES_ENABLED: z.string().optional(),
+  WORK_SESSION_ACTIONS_DISABLED: z.string().optional(),
 
   // Briefing email sender domain
   BRIEF_EMAIL_DOMAIN: z.string().optional(),         // lib/briefing/delivery.ts
@@ -211,11 +254,34 @@ const envSchema = requiredSchema.merge(optionalSchema);
 export type Env = z.infer<typeof envSchema>;
 
 /**
- * Optional groups worth a boot-time warning when entirely unset. These are not
- * fatal — preview/CI runs legitimately lack them — but an operator running a
- * real deploy almost certainly wants them, so we surface a single clear note.
+ * Optional groups worth a boot-time warning when absent or partially wired.
+ * These are not fatal — preview/CI runs legitimately lack them — and restored
+ * feature groups stay silent until an operator opts into their rollout flag.
  */
-const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
+type WarnGroup = {
+  label: string;
+  keys: Array<keyof Env>;
+  /** Default warns only when the whole group is absent; true also catches a partial pair/set. */
+  requireAll?: boolean;
+  /** Feature-gated groups stay silent until an operator opts into that feature. */
+  when?: (env: Env) => boolean;
+};
+
+function isSet(env: Env, key: keyof Env): boolean {
+  const value = env[key];
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValue(env: Env, key: keyof Env, expected: string): boolean {
+  return env[key]?.trim().toLowerCase() === expected;
+}
+
+function envWarn(message: string): void {
+  // eslint-disable-next-line no-console
+  console.warn(message);
+}
+
+const warnGroups: WarnGroup[] = [
   { label: 'Stripe billing', keys: ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] },
   {
     label: 'Stripe plan/top-up prices',
@@ -224,10 +290,15 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
       'STRIPE_PRICE_TOPUP_STARTER', 'STRIPE_PRICE_TOPUP_GROWTH', 'STRIPE_PRICE_TOPUP_POWER',
     ],
   },
-  { label: 'Upstash rate limiting', keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'] },
+  {
+    label: 'Upstash rate limiting and scheduler-heartbeat evidence',
+    keys: ['KV_REST_API_URL', 'KV_REST_API_TOKEN'],
+    requireAll: true,
+  },
   {
     label: 'Property Analyze web research — the "Analyze" action is inert without BOTH',
     keys: ['TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
+    requireAll: true,
   },
   // Cutover-critical secrets that boot GREEN when missing but then fail
   // silently: without CRON_SECRET every cron route 401s — the Inngest cron
@@ -237,7 +308,7 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
   // without them, but warned individually so a real deploy notices.
   {
     label:
-      'Cron auth — the Inngest cron functions authenticate to the cron routes with CRON_SECRET; every scheduled tick 401s without it',
+      'Cron auth — the Cloudflare Worker (or explicit Inngest fallback) authenticates to cron routes with CRON_SECRET; every scheduled tick 401s without it',
     keys: ['CRON_SECRET'],
   },
   {
@@ -258,12 +329,14 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     keys: ['MODAL_CHAT_URL'],
   },
   {
-    label: 'Inngest background jobs — scheduled crons and Composio trigger events never fire without the Inngest keys',
+    label: 'Inngest event jobs and optional cron fallback — delivery never runs without both Inngest keys',
     keys: ['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'],
+    requireAll: true,
   },
   {
     label: 'Cloudflare background worker — recurring jobs and task offload are inert without WORKER_URL + WORKER_SECRET (deploy worker/, see docs/WORKER.md)',
     keys: ['WORKER_URL', 'WORKER_SECRET'],
+    requireAll: true,
   },
   {
     label: 'Redis cache — lib/redis-cache.ts runs cold (every read is a miss) without REDIS_URL',
@@ -273,7 +346,296 @@ const warnGroups: Array<{ label: string; keys: Array<keyof Env> }> = [
     label: 'Composio integrations — connecting apps and receiving triggers needs COMPOSIO_API_KEY',
     keys: ['COMPOSIO_API_KEY'],
   },
+  {
+    label: 'Realtime Voice — OpenAI transport is required after the gateway is enabled',
+    keys: ['REALTIME_VOICE_GATEWAY_ENABLED', 'OPENAI_API_KEY'],
+    requireAll: true,
+    when: (env) => isValue(env, 'REALTIME_VOICE_GATEWAY_ENABLED', '1'),
+  },
+  {
+    label: 'Realtime Voice floor manager — specialist controls require the Voice gateway',
+    keys: ['CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED', 'REALTIME_VOICE_GATEWAY_ENABLED'],
+    requireAll: true,
+    when: (env) => isValue(env, 'CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED', 'true'),
+  },
+  {
+    label: 'Research Workspace — server/client flags, allowlist, and the dedicated Modal browser must be configured together',
+    keys: [
+      'CHIPPI_RESEARCH_WORKSPACE_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED',
+      'CHIPPI_RESEARCH_WORKSPACE_SPACE_IDS',
+      'MODAL_HEADLESS_BROWSER_URL',
+      'CHIPPI_BROWSER_WORKER_SECRET',
+    ],
+    requireAll: true,
+    when: (env) =>
+      isValue(env, 'CHIPPI_RESEARCH_WORKSPACE_ENABLED', 'true') ||
+      isValue(env, 'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED', 'true'),
+  },
+  {
+    label: 'Managed Workspace Runs — rollout flags, allowlist, Modal runtime, callback auth, and private object storage must be configured together',
+    keys: [
+      'CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'CHIPPI_WORKSPACE_RUNS_SPACE_IDS',
+      'MODAL_WORKSPACE_RUN_URL',
+      'CHIPPI_WORKSPACE_MODAL_SECRET',
+      'CHIPPI_WORKSPACE_CALLBACK_SECRET',
+      'WASABI_ACCESS_KEY_ID',
+      'WASABI_SECRET_ACCESS_KEY',
+      'WASABI_BUCKET',
+      'WASABI_ENDPOINT',
+      'WASABI_REGION',
+    ],
+    requireAll: true,
+    when: (env) =>
+      isValue(env, 'CHIPPI_WORKSPACE_RUNS_ENABLED', 'true') ||
+      isValue(env, 'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED', 'true'),
+  },
+  {
+    label: 'Workspace Run recovery — recovery requires the base rollout and cron authentication',
+    keys: [
+      'CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED',
+      'CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'CRON_SECRET',
+    ],
+    requireAll: true,
+    when: (env) => isValue(env, 'CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED', 'true'),
+  },
+  {
+    label: 'Workspace private terminal/follow-ups — rollout flags, allowlist, and task runtime must be configured together',
+    keys: [
+      'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+      'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS',
+      'CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED',
+      'MODAL_WORKSPACE_RUN_TASK_URL',
+    ],
+    requireAll: true,
+    when: (env) =>
+      isValue(env, 'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', 'true') ||
+      isValue(env, 'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', 'true'),
+  },
+  {
+    label: 'Workspace task recovery — scanner requires the follow-up rollout and cron authentication',
+    keys: [
+      'CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED',
+      'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+      'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+      'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_SPACE_IDS',
+      'CRON_SECRET',
+    ],
+    requireAll: true,
+    when: (env) => isValue(env, 'CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED', 'true'),
+  },
+  {
+    label: 'Enforced agent run policy — the shared signing secret must be present in both Vercel and Modal',
+    keys: ['AGENT_RUN_POLICY_MODE', 'AGENT_RUN_POLICY_SECRET'],
+    requireAll: true,
+    when: (env) => env.AGENT_RUN_POLICY_MODE?.trim().toLowerCase() === 'enforce',
+  },
 ];
+
+function warnConditionalInvariants(env: Env): void {
+  const allowedValues: Array<{ key: keyof Env; allowed: string[] }> = [
+    { key: 'REALTIME_VOICE_GATEWAY_ENABLED', allowed: ['0', '1'] },
+    { key: 'CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', allowed: ['false', 'true'] },
+    { key: 'CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
+    { key: 'CHIPPI_WORKSPACE_RUNS_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED', allowed: ['false', 'true'] },
+    { key: 'CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED', allowed: ['false', 'true'] },
+    { key: 'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', allowed: ['false', 'true'] },
+    { key: 'CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED', allowed: ['false', 'true'] },
+    { key: 'AGENT_RUN_POLICY_MODE', allowed: ['shadow', 'enforce'] },
+    { key: 'DURABLE_SCHEDULE_OCCURRENCES_ENABLED', allowed: ['0', '1', 'false', 'true'] },
+    { key: 'CHIPPI_CHAT_RUNTIME', allowed: ['ts', 'modal'] },
+    { key: 'CHIPPI_REASONING_EFFORT', allowed: ['low', 'medium', 'high'] },
+  ];
+  for (const { key, allowed } of allowedValues) {
+    if (!isSet(env, key)) continue;
+    const normalized = env[key]?.trim().toLowerCase() ?? '';
+    if (!allowed.includes(normalized)) {
+      envWarn(
+        `[env] ${key} has an unsupported value; expected one of: ${allowed.join(', ')}.`,
+      );
+    }
+  }
+
+  const workerReady = isSet(env, 'WORKER_URL') && isSet(env, 'WORKER_SECRET');
+  const inngestDispatchReady =
+    isSet(env, 'INNGEST_EVENT_KEY') && isSet(env, 'INNGEST_SIGNING_KEY');
+  const voiceEnabled = isValue(env, 'REALTIME_VOICE_GATEWAY_ENABLED', '1');
+  const floorManagerEnabled = isValue(
+    env,
+    'CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED',
+    'true',
+  );
+  const researchServerEnabled = isValue(env, 'CHIPPI_RESEARCH_WORKSPACE_ENABLED', 'true');
+  const researchClientEnabled = isValue(
+    env,
+    'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED',
+    'true',
+  );
+  const workspaceServerEnabled = isValue(env, 'CHIPPI_WORKSPACE_RUNS_ENABLED', 'true');
+  const workspaceClientEnabled = isValue(
+    env,
+    'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED',
+    'true',
+  );
+  const workspaceEnabled = workspaceServerEnabled || workspaceClientEnabled;
+  const followUpsServerEnabled = isValue(
+    env,
+    'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+    'true',
+  );
+  const followUpsClientEnabled = isValue(
+    env,
+    'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED',
+    'true',
+  );
+
+  if ((voiceEnabled || workspaceEnabled) && !workerReady && !inngestDispatchReady) {
+    envWarn(
+      '[env] Durable Work Session dispatch is unavailable. Configure WORKER_URL + WORKER_SECRET ' +
+        'for the primary Cloudflare rail, or INNGEST_EVENT_KEY + INNGEST_SIGNING_KEY for the legacy fallback.',
+    );
+  }
+
+  if (floorManagerEnabled && !voiceEnabled) {
+    envWarn(
+      '[env] CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED=true has no effect until REALTIME_VOICE_GATEWAY_ENABLED=1.',
+    );
+  }
+
+  if (researchServerEnabled !== researchClientEnabled) {
+    envWarn(
+      '[env] Research Workspace rollout is split: CHIPPI_RESEARCH_WORKSPACE_ENABLED and ' +
+        'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED must both be true or both be false.',
+    );
+  }
+
+  if (workspaceServerEnabled !== workspaceClientEnabled) {
+    envWarn(
+      '[env] Managed Workspace rollout is split: CHIPPI_WORKSPACE_RUNS_ENABLED and ' +
+        'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUNS_ENABLED must both be true or both be false.',
+    );
+  }
+
+  if (followUpsServerEnabled !== followUpsClientEnabled) {
+    envWarn(
+      '[env] Workspace follow-up rollout is split: CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED and ' +
+        'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED must both be true or both be false.',
+    );
+  }
+
+  if (
+    (followUpsServerEnabled || followUpsClientEnabled) &&
+    !(workspaceServerEnabled && workspaceClientEnabled)
+  ) {
+    envWarn(
+      '[env] Workspace follow-ups require the base Managed Workspace server and client flags to both be true.',
+    );
+  }
+
+  if (
+    isValue(env, 'CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED', 'true') &&
+    !(workspaceServerEnabled && workspaceClientEnabled)
+  ) {
+    envWarn(
+      '[env] CHIPPI_WORKSPACE_RUN_RECOVERY_ENABLED=true has no effect until both base Managed Workspace flags are true.',
+    );
+  }
+
+  if (
+    isValue(env, 'CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED', 'true')
+    && !(followUpsServerEnabled && followUpsClientEnabled)
+  ) {
+    envWarn(
+      '[env] CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED=true has no effect until both Workspace follow-up flags are true.',
+    );
+  }
+
+  if (workerReady && env.INNGEST_CRONS_ENABLED?.trim() === '1') {
+    envWarn(
+      '[env] Scheduler conflict: INNGEST_CRONS_ENABLED must be UNSET while the Cloudflare Worker ' +
+        'is configured. Cloudflare remains authoritative and the Inngest cron mirror will not register.',
+    );
+  }
+
+  if (isSet(env, 'INNGEST_CRONS_ENABLED')) {
+    if (env.INNGEST_CRONS_ENABLED?.trim() !== '1') {
+      envWarn(
+        '[env] INNGEST_CRONS_ENABLED requires exact value 1 for an intentional fallback; otherwise UNSET it.',
+      );
+    } else {
+      const missing = (['INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY'] as const).filter(
+        (key) => !isSet(env, key),
+      );
+      if (missing.length) {
+        envWarn(
+          `[env] Inngest cron fallback is enabled but incomplete (missing: ${missing.join(', ')}).`,
+        );
+      }
+    }
+  }
+
+  if (
+    env.AGENT_RUN_POLICY_MODE?.trim().toLowerCase() === 'enforce' &&
+    (env.AGENT_RUN_POLICY_SECRET?.length ?? 0) < 32
+  ) {
+    envWarn(
+      '[env] AGENT_RUN_POLICY_MODE=enforce requires AGENT_RUN_POLICY_SECRET with at least 32 characters.',
+    );
+  }
+
+  if (
+    ['1', 'true'].includes(
+      env.DURABLE_SCHEDULE_OCCURRENCES_ENABLED?.trim().toLowerCase() ?? '',
+    )
+  ) {
+    envWarn(
+      '[env] DURABLE_SCHEDULE_OCCURRENCES_ENABLED is construction-only: no durable occurrence executor is wired, so 1/true has no runtime effect. Keep it false until selective claim with versioned input, atomic loop-state persistence, an audited unattended executor, opaque leases, and provider idempotency are accepted.',
+    );
+  }
+
+  if (
+    isSet(env, 'WORK_SESSION_ACTIONS_DISABLED') &&
+    env.WORK_SESSION_ACTIONS_DISABLED !== '1'
+  ) {
+    envWarn(
+      '[env] WORK_SESSION_ACTIONS_DISABLED treats every non-empty value as enabled; use 1 to disable or UNSET it to enable actions.',
+    );
+  }
+
+  if (isSet(env, 'INNGEST_CRONS_DISABLED') && env.INNGEST_CRONS_DISABLED !== '1') {
+    envWarn(
+      '[env] INNGEST_CRONS_DISABLED treats every non-empty value as enabled; use 1 to disable or UNSET it.',
+    );
+  }
+
+  if (
+    isSet(env, 'CRON_WORKSPACE_RUN_RECOVERY_DISABLED') &&
+    env.CRON_WORKSPACE_RUN_RECOVERY_DISABLED !== '1'
+  ) {
+    envWarn(
+      '[env] CRON_WORKSPACE_RUN_RECOVERY_DISABLED requires exact value 1 to disable recovery; otherwise UNSET it.',
+    );
+  }
+
+  if (
+    isSet(env, 'CRON_CONVERSATION_TURN_RECOVERY_DISABLED') &&
+    env.CRON_CONVERSATION_TURN_RECOVERY_DISABLED !== '1'
+  ) {
+    envWarn(
+      '[env] CRON_CONVERSATION_TURN_RECOVERY_DISABLED requires exact value 1 to disable recovery; otherwise UNSET it.',
+    );
+  }
+}
 
 function validateEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
@@ -295,15 +657,20 @@ function validateEnv(): Env {
 
   // Non-fatal warnings for unset optional feature groups.
   for (const group of warnGroups) {
-    const allUnset = group.keys.every((k) => !env[k]);
-    if (allUnset) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[env] ${group.label} is not configured (${group.keys.join(', ')}). ` +
-          'That feature will be inert until these are set.'
+    if (group.when && !group.when(env)) continue;
+    const missing = group.keys.filter((key) => !isSet(env, key));
+    const shouldWarn = group.requireAll
+      ? missing.length > 0
+      : missing.length === group.keys.length;
+    if (shouldWarn) {
+      envWarn(
+        `[env] ${group.label} is not configured (missing: ${missing.join(', ')}). ` +
+          'That feature will be inert until the missing configuration is set.'
       );
     }
   }
+
+  warnConditionalInvariants(env);
 
   return env;
 }

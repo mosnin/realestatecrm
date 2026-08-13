@@ -34,13 +34,15 @@ vi.mock('@/lib/inngest/client', () => ({
 // The receiver uses three methods: set (with nx), incr, expire. We track
 // each one so the dedupe-claim and rate-cap branches are testable.
 
-const { redisSetMock, redisIncrMock, redisExpireMock, redisDelMock } = vi.hoisted(() => ({
+const { isRedisConfiguredMock, redisSetMock, redisIncrMock, redisExpireMock, redisDelMock } = vi.hoisted(() => ({
+  isRedisConfiguredMock: vi.fn(() => true),
   redisSetMock: vi.fn(),
   redisIncrMock: vi.fn(),
   redisExpireMock: vi.fn(async () => 1),
   redisDelMock: vi.fn(async () => 1),
 }));
 vi.mock('@/lib/redis', () => ({
+  isRedisConfigured: isRedisConfiguredMock,
   redis: {
     set: redisSetMock,
     incr: redisIncrMock,
@@ -109,6 +111,8 @@ beforeEach(() => {
   redisExpireMock.mockResolvedValue(1);
   redisDelMock.mockReset();
   redisDelMock.mockResolvedValue(1);
+  isRedisConfiguredMock.mockReset();
+  isRedisConfiguredMock.mockReturnValue(true);
   process.env.COMPOSIO_WEBHOOK_SECRET = 'whsec_test';
 });
 
@@ -132,6 +136,18 @@ describe('composio webhook receiver', () => {
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
     expect(inngestSendMock).not.toHaveBeenCalled();
+  });
+
+  it('returns retryable 503 instead of treating missing Redis as a duplicate', async () => {
+    verifyMock.mockResolvedValueOnce(verifiedPayload());
+    isRedisConfiguredMock.mockReturnValueOnce(false);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Retry-After')).toBe('30');
+    expect(inngestSendMock).not.toHaveBeenCalled();
+    expect(redisSetMock).not.toHaveBeenCalled();
   });
 
   it('returns 200 and fires Inngest on a fresh, verified, under-cap delivery', async () => {
@@ -180,6 +196,29 @@ describe('composio webhook receiver', () => {
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
+    expect(inngestSendMock).not.toHaveBeenCalled();
+  });
+
+  it('releases the delivery claim when Redis incr fails after dedupe', async () => {
+    verifyMock.mockResolvedValueOnce(verifiedPayload());
+    redisIncrMock.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(503);
+    expect(redisDelMock).toHaveBeenCalledWith('composio:webhook:seen:msg_abc');
+    expect(inngestSendMock).not.toHaveBeenCalled();
+  });
+
+  it('releases the delivery claim when the rate-window expiry write fails', async () => {
+    verifyMock.mockResolvedValueOnce(verifiedPayload());
+    redisIncrMock.mockResolvedValueOnce(1);
+    redisExpireMock.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(503);
+    expect(redisDelMock).toHaveBeenCalledWith('composio:webhook:seen:msg_abc');
     expect(inngestSendMock).not.toHaveBeenCalled();
   });
 

@@ -39,9 +39,9 @@ const STEPS = [
   },
   {
     title: 'You choose the autonomy',
-    short_description: 'Draft-first by default',
+    short_description: 'Choose draft or automatic',
     full_description:
-      'Every send can require your approval. Draft mode queues messages for review; automatic mode sends on its own once you trust the recipe. You can change your mind per workflow, any time.',
+      'Automatic mode completes sends and connected-app actions when the trigger fires. Choose Draft mode only when you want a compose-and-review step. You can change the setting per workflow, any time.',
   },
   {
     title: 'Test before it goes live',

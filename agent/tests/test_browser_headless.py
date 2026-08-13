@@ -13,6 +13,7 @@ Run from `agent/` with:
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -25,7 +26,12 @@ _AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _AGENT_DIR not in sys.path:
     sys.path.insert(0, _AGENT_DIR)
 
-from browser_headless import execute_action, poll_and_execute  # noqa: E402
+from browser_headless import (  # noqa: E402
+    _headless_action_allowed,
+    _open_anonymous_browser_page,
+    execute_action,
+    poll_and_execute,
+)
 
 # pytest-asyncio's asyncio_mode = "auto" (see agent/pyproject.toml) collects
 # every `async def test_*` here without needing per-test markers.
@@ -48,6 +54,10 @@ class FakeLocator:
         self.page.calls.append(("locator_click", self.selector))
         if self.selector in self.page.unclickable_selectors:
             raise TimeoutError(f"not clickable: {self.selector}")
+
+    async def evaluate(self, script):
+        self.page.calls.append(("locator_evaluate", self.selector))
+        return self.page.target_info
 
 
 class FakeMouse:
@@ -89,6 +99,7 @@ class FakePage:
         raise_on_goto: Exception | None = None,
         raise_on_screenshot: Exception | None = None,
         raise_on_evaluate: Exception | None = None,
+        target_info: dict | None = None,
     ):
         self.url = url
         self._title = title
@@ -99,6 +110,15 @@ class FakePage:
         self.raise_on_goto = raise_on_goto
         self.raise_on_screenshot = raise_on_screenshot
         self.raise_on_evaluate = raise_on_evaluate
+        self.target_info = target_info or {
+            "tag": "a",
+            "type": "",
+            "text": "Continue",
+            "hasForm": False,
+            "formAction": "",
+            "href": "https://public.example.com/next",
+            "download": False,
+        }
         self.calls: list[tuple] = []
         self.mouse = FakeMouse(self)
         self.keyboard = FakeKeyboard(self)
@@ -137,6 +157,32 @@ class ThrowingLocatorPage(FakePage):
         raise RuntimeError("boom: locator() blew up")
 
 
+class FakeWebSocketRoute:
+    def __init__(self, url: str):
+        self.url = url
+        self.closed = False
+
+    async def close(self):
+        self.closed = True
+
+
+class FakeAnonymousContext:
+    def __init__(self):
+        self.calls: list[str] = []
+        self.web_socket_handler: Any = None
+
+    async def route(self, _pattern: str, _handler: Any):
+        self.calls.append("route")
+
+    async def route_web_socket(self, _pattern: str, handler: Any):
+        self.calls.append("route_web_socket")
+        self.web_socket_handler = handler
+
+    async def new_page(self):
+        self.calls.append("new_page")
+        return FakePage()
+
+
 def fake_resolver(mapping: dict[str, list[str]]):
     """Injectable `resolve_addr` — never touches real DNS. Any host not in
     `mapping` raises, mirroring a resolution failure."""
@@ -150,8 +196,33 @@ def fake_resolver(mapping: dict[str, list[str]]):
 
 
 PUBLIC_RESOLVER = fake_resolver(
-    {"example.com": ["93.184.216.34"], "nope.invalid": ["93.184.216.34"], "x.test": ["93.184.216.34"]}
+    {
+        "example.com": ["93.184.216.34"],
+        "nope.invalid": ["93.184.216.34"],
+        "x.test": ["93.184.216.34"],
+    }
 )
+
+
+# ── anonymous browser context ───────────────────────────────────────────
+
+
+async def test_anonymous_context_blocks_every_websocket_before_page_creation():
+    context = FakeAnonymousContext()
+
+    await _open_anonymous_browser_page(context, PUBLIC_RESOLVER)
+
+    assert context.calls == ["route", "route_web_socket", "new_page"]
+    assert context.web_socket_handler is not None
+    for url in (
+        "ws://public.example.com/live",
+        "wss://public.example.com/live",
+        "ws://127.0.0.1/private",
+        "wss://metadata.internal/stream",
+    ):
+        route = FakeWebSocketRoute(url)
+        await context.web_socket_handler(route)
+        assert route.closed is True
 
 
 # ── execute_action: navigate ────────────────────────────────────────────
@@ -326,6 +397,119 @@ async def test_click_without_coords_or_selector_errors():
     result = await execute_action({"type": "click"}, page)
     assert result["ok"] is False
     assert "selector" in result["error"]
+
+
+async def test_headless_policy_denies_all_typing_and_keys_before_execution():
+    page = FakePage()
+    for text in ("email@example.com", "login", "username", "password"):
+        allowed, _ = await _headless_action_allowed(
+            {"type": "type", "text": text, "selector": "#search"}, page
+        )
+        assert allowed is False
+    for key in ("Enter", "Tab", "Escape", "Backspace", "ArrowDown", "ArrowUp"):
+        allowed, _ = await _headless_action_allowed({"type": "press", "key": key}, page)
+        assert allowed is False
+
+
+async def test_headless_policy_only_allows_inspected_safe_public_anchor_and_rewrites_to_navigate():
+    page = FakePage(
+        target_info={
+            "tag": "a",
+            "type": "",
+            "text": "Continue",
+            "hasForm": False,
+            "formAction": "",
+            "href": "https://public.example.com/next",
+            "download": False,
+        }
+    )
+    action = {"type": "click", "selector": "#continue"}
+    allowed, _ = await _headless_action_allowed(action, page)
+    assert allowed is True
+    assert action == {"type": "navigate", "url": "https://public.example.com/next"}
+    assert not any(call[0] == "locator_click" for call in page.calls)
+
+
+async def test_headless_policy_rejects_deceptive_or_non_public_targets():
+    bad_targets = [
+        {
+            "tag": "a",
+            "text": "Continue delete",
+            "href": "https://public.example.com/",
+            "hasForm": False,
+            "download": False,
+        },
+        {
+            "tag": "a",
+            "text": "Continue",
+            "href": "javascript:alert(1)",
+            "hasForm": False,
+            "download": False,
+        },
+        {
+            "tag": "a",
+            "text": "Continue",
+            "href": "mailto:a@example.com",
+            "hasForm": False,
+            "download": False,
+        },
+        {
+            "tag": "a",
+            "text": "Continue",
+            "href": "data:text/plain,x",
+            "hasForm": False,
+            "download": False,
+        },
+        {
+            "tag": "a",
+            "text": "Continue",
+            "href": "https://public.example.com/",
+            "hasForm": True,
+            "download": False,
+        },
+        {
+            "tag": "a",
+            "text": "Continue",
+            "href": "https://public.example.com/",
+            "hasForm": False,
+            "download": True,
+        },
+        {
+            "tag": "button",
+            "text": "Continue",
+            "href": "https://public.example.com/",
+            "hasForm": False,
+            "download": False,
+        },
+    ]
+    for target in bad_targets:
+        page = FakePage(target_info={"type": "", "formAction": "", **target})
+        allowed, _ = await _headless_action_allowed({"type": "click", "selector": "#delete"}, page)
+        assert allowed is False
+
+
+async def test_inspected_link_is_revalidated_before_navigation_fetch():
+    """An ordinary-looking anchor can still point at localhost. The policy
+    rewrite must pass through execute_action's network boundary before goto."""
+    page = FakePage(
+        target_info={
+            "tag": "a",
+            "type": "",
+            "text": "Open report",
+            "hasForm": False,
+            "formAction": "",
+            "href": "https://localhost/private",
+            "download": False,
+        }
+    )
+    action = {"type": "click", "selector": "#report"}
+    allowed, _ = await _headless_action_allowed(action, page)
+    assert allowed is True
+    result = await execute_action(
+        action, page, resolve_addr=fake_resolver({"localhost": ["127.0.0.1"]})
+    )
+    assert result["ok"] is False
+    assert not any(call[0] == "goto" for call in page.calls)
 
 
 # ── execute_action: type ────────────────────────────────────────────────
@@ -542,7 +726,9 @@ def make_fake_browser_factory(page: FakePage):
 async def test_poll_and_execute_runs_actions_in_fifo_order():
     page = FakePage()
     action_1 = {"type": "navigate", "url": "https://x.test/1"}
-    action_2 = {"type": "click", "x": 1, "y": 2}
+    # Coordinate clicks are deliberately unavailable to the anonymous public
+    # research worker; a harmless wait still exercises FIFO dispatch.
+    action_2 = {"type": "wait", "ms": 1}
     http_post = FakeHttpPost(
         [
             {"action": {"id": "a1", "sessionId": "s1", "input": action_1}, "stop": False},
@@ -564,8 +750,7 @@ async def test_poll_and_execute_runs_actions_in_fifo_order():
 
     assert summary == {"stopped_reason": "stop", "actions_executed": 2}
     goto_index = next(i for i, c in enumerate(page.calls) if c[0] == "goto")
-    click_index = next(i for i, c in enumerate(page.calls) if c[0] == "mouse_click")
-    assert goto_index < click_index  # FIFO — a1 executed strictly before a2
+    assert goto_index >= 0  # a1 executed before the second FIFO response
     assert factory.opened == {"enter": 1, "exit": 1}  # browser opened once, closed once
 
 
@@ -626,6 +811,7 @@ async def test_poll_and_execute_sends_secret_and_completed_result():
     first_url, first_body, first_headers = http_post.call_log[0]
     assert first_url == "https://app.test/api/browser-control/headless/poll"
     assert first_headers["Authorization"] == "Bearer secret-abc"
+    assert "x-vercel-protection-bypass" not in first_headers
     assert first_body["sessionId"] == "s1"
     assert "completed" not in first_body  # nothing finished yet on the first poll
 
@@ -633,6 +819,27 @@ async def test_poll_and_execute_sends_secret_and_completed_result():
     assert second_body["completed"]["actionId"] == "a1"
     assert second_body["completed"]["result"]["ok"] is True
     assert "frame" in second_body  # screenshot captured after the action
+
+
+async def test_poll_and_execute_sends_optional_vercel_bypass_on_every_poll():
+    page = FakePage()
+    http_post = FakeHttpPost([{"action": None, "stop": True}])
+
+    await poll_and_execute(
+        "https://protected-staging.example",
+        "browser-worker-secret",
+        "s1",
+        worker_lease_token="lease-1",
+        vercel_bypass_secret="bypass-secret",
+        http_post=http_post,
+        browser_factory=make_fake_browser_factory(page),
+        sleep=lambda s: _noop(),
+    )
+
+    _, body, headers = http_post.call_log[0]
+    assert body == {"sessionId": "s1", "workerLeaseToken": "lease-1"}
+    assert headers["Authorization"] == "Bearer browser-worker-secret"
+    assert headers["x-vercel-protection-bypass"] == "bypass-secret"
 
 
 async def test_poll_and_execute_stops_without_running_further_actions():
@@ -713,6 +920,7 @@ async def test_poll_and_execute_retries_transport_errors_and_bounds_via_max_iter
         browser_factory=factory,
         sleep=fake_sleep,
         error_delay_s=4.0,
+        max_consecutive_poll_errors=10,
         max_iterations=3,
     )
 
@@ -720,6 +928,113 @@ async def test_poll_and_execute_retries_transport_errors_and_bounds_via_max_iter
     assert summary["actions_executed"] == 0
     assert sleeps.count(4.0) == 3
     assert factory.opened == {"enter": 1, "exit": 1}  # browser still cleaned up on bail-out
+
+
+async def test_poll_and_execute_stops_after_short_consecutive_transport_error_threshold():
+    """A broken control plane must not consume the worker's 15-minute budget."""
+    page = FakePage()
+    polls = {"count": 0}
+
+    async def always_failing_post(url, body, headers):
+        polls["count"] += 1
+        raise ConnectionError("network unreachable")
+
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    summary = await poll_and_execute(
+        "https://app.test",
+        "secret",
+        "s1",
+        http_post=always_failing_post,
+        browser_factory=make_fake_browser_factory(page),
+        sleep=fake_sleep,
+        error_delay_s=0.01,
+        max_consecutive_poll_errors=3,
+    )
+
+    assert summary == {"stopped_reason": "poll_error_threshold", "actions_executed": 0}
+    assert polls["count"] == 3
+    assert sleeps == [0.01, 0.01]
+
+
+async def test_poll_and_execute_stop_cancels_an_inflight_action_without_late_completion():
+    """Stop must win over a 15-second navigation/wait action within the
+    active heartbeat interval; the cancelled action is never completed."""
+    page = FakePage()
+    action_started = asyncio.Event()
+    action_cancelled = asyncio.Event()
+
+    async def long_action_sleep(seconds):
+        action_started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            action_cancelled.set()
+            raise
+
+    http_post = FakeHttpPost(
+        [
+            {
+                "action": {"id": "a1", "sessionId": "s1", "input": {"type": "wait", "ms": 15_000}},
+                "stop": False,
+            },
+            {"action": None, "stop": True},
+        ]
+    )
+
+    summary = await poll_and_execute(
+        "https://app.test",
+        "secret",
+        "s1",
+        worker_lease_token="lease-1",
+        vercel_bypass_secret="bypass-secret",
+        http_post=http_post,
+        browser_factory=make_fake_browser_factory(page),
+        sleep=long_action_sleep,
+        active_action_poll_interval_s=0.001,
+    )
+
+    assert action_started.is_set()
+    assert action_cancelled.is_set()
+    assert summary == {"stopped_reason": "stop", "actions_executed": 0}
+    assert len(http_post.call_log) == 2
+    assert all(body["sessionId"] == "s1" for _, body, _ in http_post.call_log)
+    assert all(body["workerLeaseToken"] == "lease-1" for _, body, _ in http_post.call_log)
+    assert all(
+        headers["x-vercel-protection-bypass"] == "bypass-secret"
+        for _, _, headers in http_post.call_log
+    )
+    assert "completed" not in http_post.call_log[1][1]
+
+
+async def test_poll_and_execute_completes_action_normally_while_heartbeat_is_enabled():
+    """The cancellation watchdog is inert for a normal fast action."""
+    page = FakePage()
+    http_post = FakeHttpPost(
+        [
+            {
+                "action": {"id": "a1", "sessionId": "s1", "input": {"type": "wait", "ms": 0}},
+                "stop": False,
+            },
+            {"action": None, "stop": True},
+        ]
+    )
+
+    summary = await poll_and_execute(
+        "https://app.test",
+        "secret",
+        "s1",
+        http_post=http_post,
+        browser_factory=make_fake_browser_factory(page),
+        sleep=lambda _seconds: _noop(),
+        active_action_poll_interval_s=0.001,
+    )
+
+    assert summary == {"stopped_reason": "stop", "actions_executed": 1}
+    assert http_post.call_log[1][1]["completed"]["actionId"] == "a1"
 
 
 async def test_poll_and_execute_max_iterations_caps_a_never_stopping_server():

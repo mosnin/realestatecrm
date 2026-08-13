@@ -58,12 +58,14 @@ vi.mock('@/lib/integrations/events', () => ({
   setEventStatus: setEventStatusMock,
 }));
 
-const { redisSetMock, redisIncrMock, redisExpireMock } = vi.hoisted(() => ({
+const { isRedisConfiguredMock, redisSetMock, redisIncrMock, redisExpireMock } = vi.hoisted(() => ({
+  isRedisConfiguredMock: vi.fn(() => true),
   redisSetMock: vi.fn(),
   redisIncrMock: vi.fn(),
   redisExpireMock: vi.fn(async () => 1),
 }));
 vi.mock('@/lib/redis', () => ({
+  isRedisConfigured: isRedisConfiguredMock,
   redis: { set: redisSetMock, incr: redisIncrMock, expire: redisExpireMock },
 }));
 
@@ -151,6 +153,7 @@ beforeEach(() => {
   // daily count = 1, dispatch returns DRAFT, capture succeeds.
   redisSetMock.mockResolvedValue('OK');
   redisIncrMock.mockResolvedValue(1);
+  isRedisConfiguredMock.mockReturnValue(true);
   findByComposioIdMock.mockResolvedValue(activeConnection());
   findTriggerMock.mockResolvedValue(activeTrigger());
   dispatchMock.mockResolvedValue({ dispatched: 'DRAFT' });

@@ -7,7 +7,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { sourceLabel, liveViewEmptyStateMessage } from '@/components/chippi/browser-control-panel';
+import {
+  browserActionVisualState,
+  clearsResearchWorkspaceForStatus,
+  researchSessionLabel,
+  sourceLabel,
+  liveViewEmptyStateMessage,
+} from '@/components/chippi/browser-control-panel';
 
 describe('sourceLabel', () => {
   it('labels an extension session as the realtor\'s own browser', () => {
@@ -67,5 +73,48 @@ describe('liveViewEmptyStateMessage', () => {
   it('error state wins even when frameChecked is also true', () => {
     const msg = liveViewEmptyStateMessage({ source: 'headless', frameChecked: true, frameError: true });
     expect(msg).toBe("Couldn't load the live view.");
+  });
+});
+
+describe('browserActionVisualState', () => {
+  const action = {
+    id: 'action_1',
+    type: 'navigate' as const,
+    summary: 'Opening a public listing page',
+    timestamp: '2026-07-29T00:00:00.000Z',
+    ok: false,
+  };
+
+  it('does not turn queued work into a failure merely because it has no result yet', () => {
+    expect(browserActionVisualState({ ...action, status: 'queued' })).toEqual({
+      status: 'queued', pending: true, failed: false,
+    });
+  });
+
+  it('renders a terminal browser error as a failure', () => {
+    expect(browserActionVisualState({ ...action, status: 'error' })).toEqual({
+      status: 'error', pending: false, failed: true,
+    });
+  });
+});
+
+describe('researchSessionLabel', () => {
+  it('shows the exact lifecycle state instead of treating any session row as active', () => {
+    expect(researchSessionLabel('launching')).toBe('Launching');
+    expect(researchSessionLabel('active')).toBe('Active');
+    expect(researchSessionLabel('error')).toBe('Error');
+    expect(researchSessionLabel('stopped')).toBe('Stopped');
+    expect(researchSessionLabel(undefined)).toBe('Not running');
+  });
+});
+
+describe('clearsResearchWorkspaceForStatus', () => {
+  it('removes last-known research state when access is revoked', () => {
+    expect(clearsResearchWorkspaceForStatus(403)).toBe(true);
+    expect(clearsResearchWorkspaceForStatus(404)).toBe(true);
+  });
+
+  it('does not erase state for a transient server failure', () => {
+    expect(clearsResearchWorkspaceForStatus(500)).toBe(false);
   });
 });

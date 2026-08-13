@@ -199,7 +199,7 @@ const DOES = [
   {
     kicker: 'Hand-off',
     title: 'Routes to Chippi',
-    body: 'The moment a lead arrives, the reply is drafted in your voice and waiting for your tap.',
+    body: 'The moment a lead arrives, Chippi grounds the context and can send the reply you request in your voice.',
   },
 ];
 

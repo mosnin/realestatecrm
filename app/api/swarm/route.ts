@@ -1,5 +1,5 @@
 /**
- * POST /api/swarm  — create a SwarmRun and fire-and-forget to the Modal swarm runner
+ * POST /api/swarm  — atomically claim a SwarmRun and enqueue its fenced Modal launch
  * GET  /api/swarm?spaceId=... — list the last 20 swarm runs for a space
  */
 
@@ -12,6 +12,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { z } from 'zod';
 import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
+import { createAndEnqueueSwarmRun, swarmLaunchConfigured } from '@/lib/swarm-launch';
 
 /** Shape guard for a swarm run. The 2000-char goal limit and "required"
  *  ordering are preserved below; this bounds the field types and caps the
@@ -68,18 +69,12 @@ export async function GET(req: NextRequest) {
 }
 
 // ── POST /api/swarm ───────────────────────────────────────────────────────────
-// Create a SwarmRun row (status: 'queued') and trigger the Modal swarm runner.
+// Create a token-fenced SwarmRun and dispatch it through the durable queue.
 
 interface PostBody {
   spaceId?: string;
   goal?: string;
   customAgentIds?: string[];
-}
-
-interface CustomAgentRow {
-  id: string;
-  name: string;
-  systemPrompt: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -124,6 +119,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
+  // Validate the complete Modal boundary before creating a durable row. A
+  // queued row without a callable, authenticated runtime cannot ever advance.
+  if (!swarmLaunchConfigured()) {
+    console.error('[swarm/POST] durable swarm runtime is not configured correctly');
+    return NextResponse.json({ error: 'Swarm runtime is not configured' }, { status: 503 });
+  }
+
   // Daily token budget — the chat route enforces this, but swarm dispatch (a
   // multi-agent run, the costliest path) did not, so a space already over its
   // cap could launch unlimited swarms. Gate it the same way. Fails open on a DB
@@ -143,58 +145,25 @@ export async function POST(req: NextRequest) {
     console.error('[swarm/POST] budget check failed — continuing', err);
   }
 
-  // Fetch custom agents if IDs were provided.
-  let agents: CustomAgentRow[] = [];
-  if (customAgentIds.length > 0) {
-    const { data: agentRows, error: agentError } = await supabase
-      .from('CustomAgent')
-      .select('id, name, systemPrompt')
-      .in('id', customAgentIds)
-      .eq('spaceId', space.id)
-      .eq('isActive', true);
-
-    if (agentError) {
-      console.error('[swarm/POST] custom agent fetch error:', agentError);
-      return NextResponse.json({ error: 'Failed to fetch custom agents' }, { status: 500 });
-    }
-
-    agents = (agentRows ?? []) as CustomAgentRow[];
+  const launch = await createAndEnqueueSwarmRun({
+    spaceId: space.id,
+    goal,
+    customAgentIds,
+  });
+  if (launch.state === 'concurrent') {
+    return NextResponse.json({ error: launch.error }, { status: 409 });
   }
-
-  // Insert the SwarmRun row.
-  const { data: run, error: insertError } = await supabase
-    .from('SwarmRun')
-    .insert({ spaceId: space.id, goal, status: 'queued' })
-    .select()
-    .single();
-
-  if (insertError || !run) {
-    console.error('[swarm/POST] insert error:', insertError);
-    return NextResponse.json({ error: 'Failed to create swarm run' }, { status: 500 });
+  if (launch.state === 'unavailable') {
+    return NextResponse.json({ error: launch.error }, { status: 503 });
   }
-
-  // Fire-and-forget to Modal swarm runner.
-  const swarmUrl = process.env.MODAL_SWARM_URL;
-  if (swarmUrl) {
-    fetch(swarmUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        secret: process.env.AGENT_INTERNAL_SECRET,
-        swarmRunId: run.id,
-        goal,
-        spaceId: space.id,
-        customAgents: agents.map((a) => ({
-          id: a.id,
-          name: a.name,
-          systemPrompt: a.systemPrompt,
-        })),
-      }),
-    }).catch((err) => console.error('[swarm] trigger failed', err));
-    // Do NOT await — fire and forget
+  if (launch.state === 'failed') {
+    return NextResponse.json({ error: launch.error }, { status: 500 });
   }
-
-  return NextResponse.json({ swarmRunId: run.id }, { status: 201 });
+  return NextResponse.json(
+    {
+      swarmRunId: launch.runId,
+      delivery: launch.state === 'queued' ? 'queued' : 'unconfirmed_recovery_armed',
+    },
+    { status: launch.state === 'queued' ? 201 : 202 },
+  );
 }

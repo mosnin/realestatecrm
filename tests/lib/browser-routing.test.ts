@@ -20,6 +20,38 @@ function makeFakeSupabase() {
   const tables: Record<string, Row[]> = {};
   const table = (name: string) => (tables[name] ??= []);
 
+  async function rpc(name: string, args: Record<string, unknown>) {
+    if (name === 'stop_headless_browser_session') {
+      const session = table('BrowserSession').find((row) => row.id === args.p_session_id && row.spaceId === args.p_space_id && row.source === 'headless');
+      if (!session) return { data: false, error: null };
+      session.status = 'ended';
+      return { data: true, error: null };
+    }
+    if (name !== 'start_headless_browser_session') {
+      return { data: null, error: new Error(`Unexpected RPC: ${name}`) };
+    }
+
+    const existing = table('BrowserSession').find((row) => (
+      row.spaceId === args.p_space_id
+      && row.userId === args.p_user_id
+      && row.source === 'headless'
+      && row.status === 'active'
+    ));
+    if (existing) return { data: existing.id, error: null };
+
+    table('BrowserSession').push({
+      id: args.p_session_id,
+      spaceId: args.p_space_id,
+      userId: args.p_user_id,
+      linkId: null,
+      status: 'active',
+      source: 'headless',
+      startedAt: args.p_started_at,
+      endedAt: null,
+    });
+    return { data: args.p_session_id, error: null };
+  }
+
   function from(name: string) {
     let op: 'select' | 'insert' | 'update' | 'delete' | null = null;
     let insertRows: Row[] = [];
@@ -34,6 +66,7 @@ function makeFakeSupabase() {
       update: (values: Row) => { op = 'update'; updateValues = values; return api; },
       delete: () => { op = 'delete'; return api; },
       eq: (col: string, val: unknown) => { filters.push((r) => r[col] === val); return api; },
+      in: (col: string, values: unknown[]) => { filters.push((r) => values.includes(r[col])); return api; },
       is: (col: string, val: unknown) => { filters.push((r) => (val === null ? r[col] == null : r[col] === val)); return api; },
       lt: (col: string, val: unknown) => { filters.push((r) => (r[col] as string) < (val as string)); return api; },
       order: (col: string, opts?: { ascending?: boolean }) => { orderBy = { col, asc: opts?.ascending !== false }; return api; },
@@ -73,7 +106,7 @@ function makeFakeSupabase() {
     return api;
   }
 
-  return { from, __tables: tables };
+  return { from, rpc, __tables: tables };
 }
 
 const fake = makeFakeSupabase();
@@ -85,6 +118,7 @@ import {
   getHeadlessSessionById,
   recordHeadlessActionResult,
   getActiveSession,
+  enqueueActionForSession,
 } from '@/lib/browser-control/session';
 import { resolveBrowserRuntime, needsLoggedInBrowser } from '@/lib/browser-control';
 
@@ -108,6 +142,9 @@ function seedSession(overrides: Partial<Row> = {}) {
 
 beforeEach(() => {
   for (const key of Object.keys(fake.__tables)) fake.__tables[key].length = 0;
+  process.env.CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'true';
+  process.env.NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'true';
+  process.env.CHIPPI_RESEARCH_WORKSPACE_SPACE_IDS = 'space_1';
 });
 
 // ── needsLoggedInBrowser ─────────────────────────────────────────────────
@@ -134,6 +171,60 @@ describe('needsLoggedInBrowser', () => {
 // ── resolveBrowserRuntime ────────────────────────────────────────────────
 
 describe('resolveBrowserRuntime', () => {
+  it('preserves the current-main public headless start when Research Workspace is off', async () => {
+    process.env.CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'false';
+    process.env.NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'false';
+    process.env.CHIPPI_RESEARCH_WORKSPACE_SPACE_IDS = '';
+
+    const result = await resolveBrowserRuntime({
+      spaceId: 'space_1',
+      userId: 'user_1',
+      intentText: 'search zillow for public listings',
+      // This preference belongs to the additive Research Workspace and must be
+      // inert while that per-space rollout is off.
+      preferHeadlessForPublic: true,
+    });
+
+    expect('source' in result && result.source).toBe('headless');
+    expect('researchWorkspaceDisabled' in result).toBe(false);
+    expect(fake.__tables.BrowserSession).toHaveLength(1);
+    expect(fake.__tables.BrowserSession[0].source).toBe('headless');
+  });
+
+  it('preserves the current-main public headless reuse when Research Workspace is off', async () => {
+    process.env.CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'false';
+    process.env.NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED = 'false';
+    process.env.CHIPPI_RESEARCH_WORKSPACE_SPACE_IDS = '';
+    seedSession({ id: 'legacy-headless', source: 'headless', linkId: null });
+
+    const result = await resolveBrowserRuntime({
+      spaceId: 'space_1',
+      userId: 'user_1',
+      intentText: 'read a public county records page',
+      preferHeadlessForPublic: true,
+    });
+
+    expect('source' in result && result.source).toBe('headless');
+    if ('source' in result) expect(result.session.id).toBe('legacy-headless');
+    expect('researchWorkspaceDisabled' in result).toBe(false);
+    expect(fake.__tables.BrowserSession).toHaveLength(1);
+  });
+
+  it('applies Research Workspace headless preference only for an entitled space', async () => {
+    seedSession({ id: 'personal-browser', source: 'extension' });
+
+    const result = await resolveBrowserRuntime({
+      spaceId: 'space_1',
+      userId: 'user_1',
+      intentText: 'research public listing history',
+      preferHeadlessForPublic: true,
+    });
+
+    expect('source' in result && result.source).toBe('headless');
+    if ('source' in result) expect(result.session.id).not.toBe('personal-browser');
+    expect(fake.__tables.BrowserSession.filter((row) => row.source === 'headless')).toHaveLength(1);
+  });
+
   it('prefers a CONNECTED extension session even when the intent text reads as needing login', async () => {
     seedSession({ source: 'extension' });
     const result = await resolveBrowserRuntime({
@@ -142,12 +233,22 @@ describe('resolveBrowserRuntime', () => {
       intentText: 'check my gmail inbox',
     });
     expect('needsExtension' in result).toBe(false);
-    if (!('needsExtension' in result)) {
+    if ('source' in result) {
       expect(result.source).toBe('extension');
       expect(result.session.id).toBe('sess_1');
     }
     // No headless session was started.
     expect(fake.__tables.BrowserSession).toHaveLength(1);
+  });
+
+  it('uses a valid extension for login-required work even when a newer cloud session exists', async () => {
+    seedSession({ id: 'extension', source: 'extension', startedAt: '2026-07-01T00:00:00.000Z', lastPolledAt: new Date().toISOString() });
+    seedSession({ id: 'headless', source: 'headless', linkId: null, startedAt: '2026-07-02T00:00:00.000Z', lastPolledAt: new Date().toISOString() });
+    const result = await resolveBrowserRuntime({
+      spaceId: 'space_1', userId: 'user_1', intentText: 'check my gmail inbox',
+    });
+    expect('source' in result && result.source).toBe('extension');
+    if ('source' in result) expect(result.session.id).toBe('extension');
   });
 
   it('reuses an already-active headless session instead of starting a new one', async () => {
@@ -158,7 +259,7 @@ describe('resolveBrowserRuntime', () => {
       intentText: 'search zillow for listings',
     });
     expect('needsExtension' in result).toBe(false);
-    if (!('needsExtension' in result)) {
+    if ('source' in result) {
       expect(result.source).toBe('headless');
       expect(result.session.id).toBe('sess_headless');
     }
@@ -184,7 +285,7 @@ describe('resolveBrowserRuntime', () => {
       intentText: 'search zillow for 3-bed homes in Austin',
     });
     expect('needsExtension' in result).toBe(false);
-    if (!('needsExtension' in result)) {
+    if ('source' in result) {
       expect(result.source).toBe('headless');
     }
     expect(fake.__tables.BrowserSession).toHaveLength(1);
@@ -252,6 +353,41 @@ describe('endHeadlessSession', () => {
     seedSession({ id: 'sess_h', source: 'headless', linkId: null, spaceId: 'space_victim' });
     await endHeadlessSession('sess_h', { spaceId: 'space_attacker' });
     expect(fake.__tables.BrowserSession[0].status).toBe('active');
+  });
+});
+
+// ── immutable resolved-session queue authority ───────────────────────────
+
+describe('enqueueActionForSession', () => {
+  it('denies an unsafe headless action before inserting any durable queue row', async () => {
+    seedSession({ id: 'sess_headless', source: 'headless', linkId: null });
+
+    const result = await enqueueActionForSession({
+      spaceId: 'space_1',
+      userId: 'user_1',
+      sessionId: 'sess_headless',
+      input: { type: 'type', selector: '#search', text: 'must not queue' },
+    });
+
+    expect(result).toEqual({ error: 'headless_action_blocked' });
+    expect(fake.__tables.BrowserAction ?? []).toHaveLength(0);
+  });
+
+  it('does not change extension behavior for the equivalent action', async () => {
+    seedSession({ id: 'sess_extension', source: 'extension' });
+
+    const result = await enqueueActionForSession({
+      spaceId: 'space_1',
+      userId: 'user_1',
+      sessionId: 'sess_extension',
+      input: { type: 'type', selector: '#search', text: 'allowed in paired browser' },
+    });
+
+    expect('actionId' in result).toBe(true);
+    expect(fake.__tables.BrowserAction).toHaveLength(1);
+    expect(fake.__tables.BrowserAction[0]).toMatchObject({
+      sessionId: 'sess_extension', type: 'type', status: 'queued',
+    });
   });
 });
 

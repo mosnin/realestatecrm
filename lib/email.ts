@@ -409,6 +409,8 @@ export interface SendEmailFromCRMParams {
   /** Required for consumer sends — the gate is per-space. */
   spaceId?: string;
   contactId?: string | null;
+  /** Stable action key forwarded to Resend's provider idempotency header. */
+  idempotencyKey?: string;
 }
 
 /**
@@ -419,6 +421,7 @@ export interface SendEmailFromCRMParams {
  */
 export class ComplianceBlockedError extends Error {
   readonly reason: string;
+  readonly durableDisposition = 'terminal_failure' as const;
   constructor(reason: string, detail: string) {
     super(detail);
     this.name = 'ComplianceBlockedError';
@@ -434,17 +437,42 @@ export class ComplianceBlockedError extends Error {
  * emails Resend rejected — realtors were told their messages went out when
  * they didn't. That's fiduciary harm.
  *
- * Misconfiguration (no RESEND_API_KEY in dev) is the one exception: we log
- * and return without throwing so local dev doesn't blow up. Production
- * always has the key set; if it's missing in prod, the warn log surfaces it.
+ * Missing provider configuration remains tolerated for ordinary local-dev
+ * callers. Durable callers must fail closed rather than record a false send.
  */
 export class EmailSendError extends Error {
   readonly cause?: unknown;
-  constructor(message: string, cause?: unknown) {
+  readonly durableDisposition: 'retryable' | 'terminal_failure' | 'reconciliation_required';
+  constructor(
+    message: string,
+    cause?: unknown,
+    durableDisposition: 'retryable' | 'terminal_failure' | 'reconciliation_required' = 'retryable',
+  ) {
     super(message);
     this.name = 'EmailSendError';
     this.cause = cause;
+    this.durableDisposition = durableDisposition;
   }
+}
+
+function resendFailureDisposition(
+  error: unknown,
+): EmailSendError['durableDisposition'] {
+  const name = typeof error === 'object' && error && 'name' in error
+    ? String((error as { name: unknown }).name)
+    : '';
+  if (name === 'invalid_idempotent_request') return 'reconciliation_required';
+  if (name === 'concurrent_idempotent_requests'
+    || name === 'rate_limit_exceeded'
+    || name === 'application_error'
+    || name === 'internal_server_error'
+  ) {
+    return 'retryable';
+  }
+  // A structured 4xx provider rejection means no request was accepted. It is
+  // not helped by retrying the same payload/key. Unknown transport throws are
+  // handled separately below and remain retryable under provider idempotency.
+  return 'terminal_failure';
 }
 
 export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<void> {
@@ -482,7 +510,24 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
     }
   }
 
-  if (!process.env.RESEND_API_KEY) { logger.warn('[email] RESEND_API_KEY not set — skipping'); return; }
+  if (params.idempotencyKey && !/^work-session-action-[0-9a-f]{32}$/.test(params.idempotencyKey)) {
+    throw new EmailSendError(
+      'Invalid durable email idempotency key.',
+      undefined,
+      'terminal_failure',
+    );
+  }
+  if (!process.env.RESEND_API_KEY) {
+    if (params.idempotencyKey) {
+      throw new EmailSendError(
+        'RESEND_API_KEY is required for durable email execution.',
+        undefined,
+        'terminal_failure',
+      );
+    }
+    logger.warn('[email] RESEND_API_KEY not set — skipping');
+    return;
+  }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM = getFromAddress();
@@ -511,7 +556,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   const safeSubject = subject.replace(/[\r\n\t]/g, ' ').slice(0, 200);
   let result: Awaited<ReturnType<typeof resend.emails.send>>;
   try {
-    result = await resend.emails.send({
+    const payload = {
       from: `${fromName.replace(/[\r\n\t<>"]/g, ' ').slice(0, 100)} <${FROM}>`,
       to: toEmail,
       replyTo: replyTo ?? undefined,
@@ -524,7 +569,10 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
             contentType: a.contentType,
           }))
         : undefined,
-    });
+    };
+    result = params.idempotencyKey
+      ? await resend.emails.send(payload, { idempotencyKey: params.idempotencyKey })
+      : await resend.emails.send(payload);
   } catch (err) {
     logger.error('[email] CRM email transport failed', { to: redactEmail(toEmail) }, err);
     throw new EmailSendError(
@@ -539,7 +587,11 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
       typeof result.error === 'object' && result.error && 'message' in result.error
         ? String((result.error as { message: unknown }).message)
         : 'Resend rejected the send';
-    throw new EmailSendError(errMessage, result.error);
+    throw new EmailSendError(
+      errMessage,
+      result.error,
+      resendFailureDisposition(result.error),
+    );
   }
 
   logger.info('[email] CRM email sent', { to: redactEmail(toEmail), messageId: result.data?.id });

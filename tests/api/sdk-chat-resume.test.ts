@@ -7,7 +7,7 @@
  *   - 404 when CHIPPI_CHAT_RUNTIME=modal (paused runs only originate in the
  *     in-process TS runtime, so the resume endpoint is meaningless there).
  *   - 404 when no row.
- *   - 403 when the row belongs to another user.
+ *   - 404 when the row belongs to another user (uniform existence response).
  *   - 409 when the row is already resumed/cancelled/expired.
  *   - 410 when expiresAt is past.
  *   - Happy path: marks the row resumed, calls streamTsResumeTurn with
@@ -33,10 +33,31 @@ const { streamResumeMock } = vi.hoisted(() => ({
       }),
   ),
 }));
+const { assertEnabledMock } = vi.hoisted(() => ({ assertEnabledMock: vi.fn(async () => undefined) }));
+const { workbenchEnabledMock } = vi.hoisted(() => ({ workbenchEnabledMock: vi.fn(() => true) }));
 vi.mock('@/lib/ai-tools/sdk-chat-stream', () => ({
   streamTsChatTurn: vi.fn(),
   streamTsResumeTurn: streamResumeMock,
 }));
+vi.mock('@/lib/agent/kill-switch', () => ({ assertSpaceEnabled: assertEnabledMock }));
+vi.mock('@/lib/chippi/workbench-flag', () => ({ isWorkbenchEnabled: workbenchEnabledMock }));
+vi.mock('@/lib/chat/turn-control', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/chat/turn-control')>('@/lib/chat/turn-control');
+  return {
+    ...actual,
+    resumePausedConversationTurnV2: vi.fn(async (_client: unknown, input: {
+      turnId: string;
+      spaceId: string;
+    }) => ({
+      id: input.turnId,
+      spaceId: input.spaceId,
+      conversationId: 'conv_1',
+      attemptToken: 'attempt-resume-1',
+      status: 'running',
+    })),
+    finishConversationTurnV2: vi.fn(async () => ({ id: 'turn_1', status: 'completed' })),
+  };
+});
 
 // Per-table queue so we can return different rows for AgentPausedRun
 // vs Space. Hoisted because vi.mock factories are pulled to the top.
@@ -87,6 +108,8 @@ beforeEach(() => {
   // per-test to exercise the mismatch path.
   tableQueue.User = [{ data: { id: 'u_1' } }];
   updateMock.mockResolvedValue({ data: [{ id: 'run_1' }], error: null });
+  assertEnabledMock.mockResolvedValue(undefined);
+  workbenchEnabledMock.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -111,6 +134,8 @@ interface PausedRow {
   conversationId: string;
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
+  attachmentManifest: Array<{ id: string; filename: string }>;
+  activeWorkbookContext?: unknown;
   status: string;
   expiresAt: string;
 }
@@ -123,16 +148,32 @@ const ROW: PausedRow = {
   approvals: [
     { callId: 'call_xyz', toolName: 'send_email', arguments: { to: 'a@b.c' }, summary: 'Email a@b.c' },
   ],
+  attachmentManifest: [],
   status: 'pending',
   expiresAt: new Date(Date.now() + 3600_000).toISOString(),
 };
 const SPACE = { id: 's_1', slug: 'jane', name: 'Jane Realty', ownerId: 'u_1' };
+const ACTIVE_WORKBOOK = { artifactId: 'artifact-1', versionNumber: 1, title: 'buyers.csv' };
+const TRANSFORM_APPROVAL = {
+  callId: 'transform-call',
+  toolName: 'apply_workbook_transformation',
+  arguments: {
+    artifactId: 'artifact-1', workbookTitle: 'buyers.csv', sourceVersionId: 'version-1', sourceVersionNumber: 1,
+    expectedContentHash: 'a'.repeat(64), operations: [{ type: 'normalize_email', column: 'Email' },],
+  },
+  summary: 'Create a new version of buyers.csv',
+};
 
 function queueRow(row: PausedRow | null) {
   tableQueue.AgentPausedRun = [{ data: row }];
+  if (row?.conversationId) tableQueue.Conversation = [{ data: { mode: 'chat' } }];
 }
 function queueSpace(space: typeof SPACE | null) {
   tableQueue.Space = [{ data: space }];
+}
+function queueWorkbook(artifact: unknown = { id: 'artifact-1', title: 'buyers.csv', artifactType: 'workbook', currentVersionId: 'version-1' }, version: unknown = { id: 'version-1', versionNumber: 1 }) {
+  tableQueue.Artifact = [{ data: artifact }];
+  tableQueue.ArtifactVersion = [{ data: version }];
 }
 
 describe('POST /api/ai/task/resume/[pausedRunId] — flag gate', () => {
@@ -174,10 +215,10 @@ describe('POST /api/ai/task/resume/[pausedRunId] — auth + scoping', () => {
     expect(res.status).toBe(404);
   });
 
-  it('403 when the row belongs to a different user', async () => {
+  it('404 when the row belongs to a different user', async () => {
     queueRow({ ...ROW, userId: 'user_other' });
     const res = await POST(makeReq({ approved: true }), params('run_1'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   it('409 when the row is already resumed', async () => {
@@ -219,7 +260,7 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
       serializedState: string;
       callId: string;
       decision: { approved: boolean; message?: string };
-      ctx: { userId: string; space: { id: string } };
+      ctx: { userId: string; space: { id: string }; workMode?: boolean };
       conversationId: string;
     };
     expect(call.serializedState).toBe('serialized-state-blob');
@@ -227,7 +268,27 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
     expect(call.decision).toEqual({ approved: true });
     expect(call.ctx.userId).toBe('user_clerk_123');
     expect(call.ctx.space.id).toBe('s_1');
+    expect(call.ctx.workMode).toBe(false);
     expect(call.conversationId).toBe('conv_1');
+  });
+
+  it('restores persisted Work mode so resumed connected-app writes fail closed without hidden approvals', async () => {
+    queueRow(ROW);
+    tableQueue.Conversation = [{ data: { mode: 'work' } }];
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { ctx: { workMode?: boolean } };
+    expect(call.ctx.workMode).toBe(true);
+  });
+
+  it('fails closed when the persisted conversation mode cannot be restored', async () => {
+    queueRow(ROW);
+    tableQueue.Conversation = [{ data: null, error: { message: 'lookup failed' } }];
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
   });
 
   it('passes the rejection message through when approved=false', async () => {
@@ -241,6 +302,61 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
       decision: { approved: boolean; message?: string };
     };
     expect(call.decision).toEqual({ approved: false, message: 'wrong recipient' });
+  });
+
+  it('stops a paused run when the workspace is disabled after the pause', async () => {
+    queueRow(ROW);
+    queueSpace(SPACE);
+    assertEnabledMock.mockRejectedValueOnce(new Error('disabled'));
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(403);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('allows only the persisted Workbench approval to resume under a Modal global runtime', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { ctx: { attachmentIds?: string[]; attachmentManifest?: Array<{ id: string; filename: string }> } };
+    expect(call.ctx.attachmentIds).toEqual(['attachment-1']);
+    expect(call.ctx.attachmentManifest).toEqual([{ id: 'attachment-1', filename: 'buyers.csv' }]);
+  });
+
+  it('rejects an approved Workbench call when its id or filename is not in the persisted manifest', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-other', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(400);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a wrong approved filename even when the attachment id is manifest-authorized', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'swapped.csv' }, summary: 'Open swapped.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(400);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Workbench is disabled after its pause', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [{ id: 'attachment-1', filename: 'buyers.csv' }] });
+    queueSpace(SPACE);
+    workbenchEnabledMock.mockReturnValue(false);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(404);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+  });
+
+  it('permits denial of a legacy Workbench pause that has no manifest', async () => {
+    queueRow({ ...ROW, approvals: [{ callId: 'workbench-call', toolName: 'open_spreadsheet_in_workbench', arguments: { attachmentId: 'attachment-1', attachmentFilename: 'buyers.csv' }, summary: 'Open buyers.csv' }], attachmentManifest: [] });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: false, message: 'do not open it' }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { decision: unknown; ctx: { attachmentIds?: string[] } };
+    expect(call.decision).toEqual({ approved: false, message: 'do not open it' });
+    expect(call.ctx.attachmentIds).toBeUndefined();
   });
 
   it('uses the explicit callId when the body provides one (multi-pending case)', async () => {
@@ -258,5 +374,48 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
     );
     const call = streamResumeMock.mock.calls[0]?.[0] as unknown as { callId: string };
     expect(call.callId).toBe('call_second');
+  });
+
+  it('restores the server-derived active workbook identity for an approved transform', async () => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    queueWorkbook();
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    const call = streamResumeMock.mock.calls[0]?.[0] as { ctx: { activeWorkbook?: unknown } };
+    expect(call.ctx.activeWorkbook).toEqual(ACTIVE_WORKBOOK);
+  });
+
+  it.each([
+    undefined,
+    { artifactId: 'artifact-1', versionNumber: 1 },
+    { artifactId: 'artifact-1', versionNumber: '1', title: 'buyers.csv' },
+    { artifactId: 'artifact-1', versionNumber: 1, title: 'buyers.csv', injected: true },
+  ])('fails closed before resuming an approved transform without a valid persisted context', async (activeWorkbookContext) => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects same-tenant substitution when approval args disagree with the persisted workbook', async () => {
+    queueRow({ ...ROW, approvals: [{ ...TRANSFORM_APPROVAL, arguments: { ...TRANSFORM_APPROVAL.arguments, artifactId: 'artifact-2', workbookTitle: 'other.csv' } }], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a persisted context whose tenant-scoped workbook or version no longer matches', async () => {
+    queueRow({ ...ROW, approvals: [TRANSFORM_APPROVAL], activeWorkbookContext: ACTIVE_WORKBOOK });
+    queueSpace(SPACE);
+    queueWorkbook({ id: 'artifact-1', title: 'renamed.csv', artifactType: 'workbook', currentVersionId: 'version-1' });
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(409);
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

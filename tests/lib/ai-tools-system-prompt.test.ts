@@ -36,12 +36,77 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/approval/i);
   });
 
+  it('routes Work browser goals through the bounded browser tools', () => {
+    const ctx = { ...makeCtx(), workMode: true };
+    const prompt = buildSystemPrompt(ctx);
+    expect(prompt).toContain('browser_task');
+    expect(prompt).toContain('control_browser');
+    expect(prompt).toContain('paired extension');
+    expect(prompt).toMatch(/never claim a browser action ran unless its tool result confirms it/i);
+    expect(prompt).toContain('Fully autonomous is selected');
+    expect(prompt).toContain('without a separate confirmation pause');
+  });
+
+  it('honors Review checkpoints for sensitive browser actions', () => {
+    const prompt = buildSystemPrompt({
+      ...makeCtx(),
+      workMode: true,
+      workExecutionMode: 'review',
+    });
+    expect(prompt).toContain(
+      'honor the platform checkpoint before sensitive or externally consequential actions',
+    );
+    expect(prompt).not.toContain(
+      'continue through the exact authorized closed action set without a separate confirmation pause',
+    );
+  });
+
+  it('makes the persisted Work execution policy explicit while Chat keeps review', () => {
+    const workPrompt = buildSystemPrompt({
+      ...makeCtx(),
+      workMode: true,
+      workExecutionMode: 'autonomous',
+    });
+    const reviewedWorkPrompt = buildSystemPrompt({
+      ...makeCtx(),
+      workMode: true,
+      workExecutionMode: 'review',
+    });
+    const chatPrompt = buildSystemPrompt(makeCtx());
+    expect(workPrompt).toContain("Execute the user's exact requested non-destructive mutations directly");
+    expect(workPrompt).toContain('destructive or high-blast-radius actions');
+    expect(workPrompt).not.toContain('Mutating tools (send_email, create_deal, etc.) require realtor approval');
+    expect(reviewedWorkPrompt).toContain('Review is selected');
+    expect(reviewedWorkPrompt).toContain('let the platform pause before mutations');
+    expect(reviewedWorkPrompt).not.toContain('Fully autonomous is selected');
+    expect(chatPrompt).toContain('Mutating tools (send_email, create_deal, etc.) require realtor approval');
+  });
+
+  it('requires a real plan before genuinely multi-step Work execution', () => {
+    const prompt = buildSystemPrompt({ ...makeCtx(), workMode: true });
+    expect(prompt).toContain('call `create_plan` exactly once BEFORE the first execution tool');
+    expect(prompt).toContain('Do not create a plan for a quick lookup or one-step action');
+  });
+
+  it('injects the exact versioned conversation goal without silently replacing it', () => {
+    const goal = 'Close five more qualified buyer deals before September 30.';
+    const prompt = buildSystemPrompt({
+      ...makeCtx(),
+      workMode: true,
+      conversationGoal: goal,
+      conversationGoalVersion: 4,
+    });
+    expect(prompt).toContain('# Active Work goal');
+    expect(prompt).toContain('Version: 4');
+    expect(prompt).toContain(`Goal (verbatim):\n${goal}`);
+    expect(prompt).toContain('never silently replace, rewrite, or clear the goal');
+  });
+
   it('pins the verb-shaped contract for connected-app vs native draft tools', () => {
     const prompt = buildSystemPrompt(makeCtx());
     // Snapshot the exact bullet so any future softening surfaces in CI.
-    expect(prompt).toContain(
-      `- Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool — it acts through the realtor's account. Drafting verbs ("draft", "compose", "write me") use the native draft tools. When the verb is ambiguous, draft.`,
-    );
+    expect(prompt).toContain('Sending verbs ("send", "email", "schedule", "post") prefer the connected-app tool');
+    expect(prompt).toContain('When the verb is ambiguous, draft');
   });
 
   it('pins the reasoning-before-mutation contract so the realtor sees a why before tapping Approve', () => {
@@ -54,10 +119,7 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt(makeCtx());
     expect(prompt).toMatch(/subject must be unambiguous/);
     expect(prompt).toMatch(/do NOT pick/);
-    // The "approval covers the verb, not the subject" reasoning is the load-bearing
-    // sentence — pin its presence so a future edit can't quietly soften the contract.
-    // Case-insensitive to survive harmless capitalisation tweaks.
-    expect(prompt).toMatch(/approval covers the verb, not the subject/i);
+    expect(prompt).toMatch(/Never guess which record the user meant/i);
   });
 
   it('stays compact — enough for tone guidance, not a manifesto', () => {

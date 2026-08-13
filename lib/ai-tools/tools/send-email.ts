@@ -214,18 +214,19 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       }
     }
 
-    // Idempotency key must distinguish genuinely-different messages while still
-    // collapsing true retries (identical recipient + subject + body) into one
-    // send. Keying on (spaceId, email, subject) alone wrongly treats two
-    // different same-subject emails to the same person (e.g. two "Following up"
-    // notes) as duplicates and silently drops all but the first. Fold a stable
-    // hash of the normalized body into the key so different bodies each send,
-    // while a byte-for-byte retry still dedupes.
+    // Interactive idempotency must distinguish genuinely-different messages
+    // while collapsing a byte-for-byte retry, so its local key includes a body
+    // hash. A durable execution already has an immutable database action id;
+    // that server-issued identity must win regardless of message content.
+    const durableIdempotencyKey = ctx.executionIdempotencyKey;
     const bodyHash = crypto
       .createHash('sha256')
       .update(args.body.trim())
       .digest('hex');
-    const idemKey = makeIdempotencyKey(
+    // Interactive retries retain their content-derived local key. A leased
+    // durable action uses its immutable row-derived key both here and at the
+    // provider, so a crash never changes retry identity.
+    const idemKey = durableIdempotencyKey ?? makeIdempotencyKey(
       'send_email',
       ctx.space.id,
       resolvedEmail,
@@ -246,6 +247,7 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
           body: args.body,
           replyTo: args.replyTo,
           attachments: resolvedAttachments,
+          idempotencyKey: durableIdempotencyKey,
         }),
       );
     } catch (err) {
@@ -254,6 +256,19 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
         { spaceId: ctx.space.id, to: resolvedEmail },
         err,
       );
+      if (durableIdempotencyKey) {
+        const disposition = typeof err === 'object' && err && 'durableDisposition' in err
+          ? (err as { durableDisposition?: unknown }).durableDisposition
+          : 'retryable';
+        if (disposition === 'terminal_failure' || disposition === 'reconciliation_required') {
+          return {
+            summary: `Send failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+            display: 'error',
+            durableExecutionDisposition: disposition,
+          };
+        }
+        throw err;
+      }
       return {
         summary: `Send failed: ${err instanceof Error ? err.message : 'unknown error'}`,
         display: 'error',
@@ -268,12 +283,17 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     if (resolvedContactId) {
       try {
         const { error: auditErr } = await supabase.from('ContactActivity').insert({
-          id: crypto.randomUUID(),
+          id: durableIdempotencyKey
+            ? `work-session-email-activity-${crypto.createHash('sha256').update(durableIdempotencyKey).digest('hex').slice(0, 32)}`
+            : crypto.randomUUID(),
           spaceId: ctx.space.id,
           contactId: resolvedContactId,
           type: 'email',
           content: `AI-assisted: ${args.subject}`,
-          metadata: { via: 'on_demand_agent' },
+          metadata: {
+            via: 'on_demand_agent',
+            ...(durableIdempotencyKey ? { executionIdempotencyKey: durableIdempotencyKey } : {}),
+          },
         });
         if (auditErr) {
           logger.warn(

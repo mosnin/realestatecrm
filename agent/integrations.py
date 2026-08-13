@@ -31,6 +31,7 @@ import structlog
 from config import settings
 from db import supabase
 from integrations_curated import CURATED_ACTIONS, curated_slugs_for
+from security.run_policy import action_headers, integration_action_capability, is_unattended_write
 
 logger = structlog.get_logger()
 
@@ -313,6 +314,20 @@ def _build_curated_tool(
             tool_name=name,
             arg_keys=list(arguments.keys()) if isinstance(arguments, dict) else [],
         )
+        runtime_context = getattr(ctx, "context", None)
+        capability = integration_action_capability(slug)
+        if is_unattended_write(getattr(runtime_context, "run_mode", "interactive"), capability):
+            return json.dumps({
+                "ok": False,
+                "error": (
+                    "This unattended run may only read connected integrations. "
+                    "Create a proposal for review before performing that action."
+                ),
+                "code": "RUN_POLICY_DENIED",
+            })
+        headers = {"Authorization": f"Bearer {secret}"}
+        if runtime_context is not None:
+            headers.update(action_headers(runtime_context, capability))
         try:
             async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT, follow_redirects=True) as client:
                 resp = await client.post(
@@ -323,7 +338,7 @@ def _build_curated_tool(
                         "slug": slug,
                         "arguments": arguments,
                     },
-                    headers={"Authorization": f"Bearer {secret}"},
+                    headers=headers,
                 )
         except Exception as err:  # noqa: BLE001
             logger.warning(

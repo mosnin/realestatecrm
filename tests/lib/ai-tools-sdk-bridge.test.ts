@@ -9,11 +9,12 @@
  * an `invoke(runCtx, jsonString)` method on the resulting tool.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { Agent, RunContext, RunState } from '@openai/agents';
 import { defineTool } from '@/lib/ai-tools/types';
 import type { ToolContext } from '@/lib/ai-tools/types';
+import { buildChatAgent } from '@/lib/ai-tools/sdk-chat';
 import {
   toSdkTool,
   summariseInterruption,
@@ -22,6 +23,19 @@ import {
   restoreRunState,
   applyApprovalDecision,
 } from '@/lib/ai-tools/sdk-bridge';
+
+const { checkRateLimitMock } = vi.hoisted(() => ({
+  checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
+}));
+
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: checkRateLimitMock,
+}));
+
+beforeEach(() => {
+  checkRateLimitMock.mockReset();
+  checkRateLimitMock.mockResolvedValue({ allowed: true });
+});
 
 function makeCtx(): ToolContext {
   return {
@@ -78,6 +92,127 @@ describe('toSdkTool', () => {
     expect(approves).toBe(true);
   });
 
+  it('does not treat Work mode alone as blanket mutation authorization', async () => {
+    const def = defineTool({
+      name: 'work_mutation',
+      description: 'complete the requested mutation',
+      parameters: z.object({ id: z.string() }),
+      requiresApproval: true,
+      summariseCall: (args) => `Mutate ${args.id}`,
+      rateLimit: { max: 10, windowSeconds: 60 },
+      handler: async () => ({ summary: 'mutated' }),
+    });
+
+    const sdk = toSdkTool(def, { ...makeCtx(), workMode: true });
+    await expect(sdk.needsApproval(new RunContext(), { id: 'x' })).resolves.toBe(true);
+  });
+
+  it('runs only an explicitly granted Work-mode mutation without another prompt', async () => {
+    const def = defineTool({
+      name: 'send_email',
+      description: 'send an email',
+      parameters: z.object({ to: z.string() }),
+      requiresApproval: true,
+      riskLevel: 'high',
+      summariseCall: (args) => `Email ${args.to}`,
+      rateLimit: { max: 10, windowSeconds: 60 },
+      handler: async () => ({ summary: 'sent' }),
+    });
+
+    const sdk = toSdkTool(def, {
+      ...makeCtx(),
+      workMode: true,
+      directExecutionToolNames: ['send_email'],
+    });
+    await expect(sdk.needsApproval(new RunContext(), { to: 'jane@example.com' })).resolves.toBe(
+      false,
+    );
+  });
+
+  it('keeps exact Work mutations gated when the conversation policy is Review', async () => {
+    const def = defineTool({
+      name: 'send_email',
+      description: 'send an email',
+      parameters: z.object({ to: z.string() }),
+      requiresApproval: true,
+      riskLevel: 'high',
+      summariseCall: (args) => `Email ${args.to}`,
+      rateLimit: { max: 10, windowSeconds: 60 },
+      handler: async () => ({ summary: 'sent' }),
+    });
+
+    const sdk = toSdkTool(def, {
+      ...makeCtx(),
+      workMode: true,
+      workExecutionMode: 'review',
+      directExecutionToolNames: ['send_email'],
+    });
+    await expect(sdk.needsApproval(new RunContext(), { to: 'jane@example.com' })).resolves.toBe(
+      true,
+    );
+  });
+
+  it('never lets Fully autonomous bypass an irreversible tool checkpoint', async () => {
+    const def = defineTool({
+      name: 'delete_contact',
+      description: 'delete a contact',
+      parameters: z.object({ id: z.string() }),
+      requiresApproval: true,
+      riskLevel: 'destructive',
+      summariseCall: (args) => `Delete ${args.id}`,
+      rateLimit: { max: 10, windowSeconds: 60 },
+      handler: async () => ({ summary: 'deleted' }),
+    });
+
+    const sdk = toSdkTool(def, {
+      ...makeCtx(),
+      workMode: true,
+      workExecutionMode: 'autonomous',
+      directExecutionToolNames: ['delete_contact'],
+    });
+    await expect(sdk.needsApproval(new RunContext(), { id: 'p_1' })).resolves.toBe(true);
+  });
+
+  it('keeps an unrelated destructive tool gated when a different Work action is granted', async () => {
+    const def = defineTool({
+      name: 'delete_contact',
+      description: 'delete a contact',
+      parameters: z.object({ id: z.string() }),
+      requiresApproval: true,
+      riskLevel: 'destructive',
+      summariseCall: (args) => `Delete ${args.id}`,
+      rateLimit: { max: 10, windowSeconds: 60 },
+      handler: async () => ({ summary: 'deleted' }),
+    });
+
+    const sdk = toSdkTool(def, {
+      ...makeCtx(),
+      workMode: true,
+      directExecutionToolNames: ['add_person'],
+    });
+    await expect(sdk.needsApproval(new RunContext(), { id: 'p_1' })).resolves.toBe(true);
+  });
+
+  it('derives the Work execution grant from the exact current user message', async () => {
+    const agent = buildChatAgent(
+      { ...makeCtx(), workMode: true, directExecutionToolNames: ['delete_contact'] },
+      {
+        model: 'gpt-5-mini',
+        instructions: 'Test agent.',
+        userMessage: 'Send an email to Jane about tomorrow.',
+      },
+    );
+    const sendEmail = agent.tools.find((candidate) => candidate.name === 'send_email');
+    const deleteContact = agent.tools.find((candidate) => candidate.name === 'delete_contact');
+
+    expect(sendEmail).toBeDefined();
+    expect(deleteContact).toBeUndefined();
+    await expect(
+      (sendEmail as { needsApproval: (ctx: RunContext, input: unknown) => Promise<boolean> })
+        .needsApproval(new RunContext(), { to: 'jane@example.com' }),
+    ).resolves.toBe(false);
+  });
+
   it("forwards args + ctx to shouldApprove for requiresApproval:'maybe'", async () => {
     const shouldApprove = vi.fn(() => false);
     const def = defineTool({
@@ -115,6 +250,29 @@ describe('toSdkTool', () => {
 
     expect(handler).toHaveBeenCalledWith({ name: 'Jane' }, ctx);
     expect(out).toBe('found Jane Chen');
+  });
+
+  it('enforces the tool rate limit before invoking the handler', async () => {
+    const handler = vi.fn(async () => ({ summary: 'sent' }));
+    const def = defineTool({
+      name: 'limited_mutation',
+      description: 'perform a rate-limited mutation',
+      parameters: z.object({ id: z.string() }),
+      requiresApproval: true,
+      summariseCall: (args) => `Mutate ${args.id}`,
+      rateLimit: { max: 2, windowSeconds: 60 },
+      handler,
+    });
+    checkRateLimitMock.mockResolvedValueOnce({ allowed: false });
+
+    const sdk = toSdkTool(def, makeCtx());
+    const out = await sdk.invoke(new RunContext(), JSON.stringify({ id: 'x' }));
+
+    expect(checkRateLimitMock).toHaveBeenCalledWith('ai:tool:limited_mutation:u_1', 2, 60);
+    expect(handler).not.toHaveBeenCalled();
+    expect(out).toBe(
+      'Error: Rate limit reached for "limited_mutation" (2 per minute). Try again later.',
+    );
   });
 
   it('invoke() prefixes "Error: " when the handler returns display:"error" so the model recognises the failure', async () => {
@@ -159,7 +317,6 @@ describe('toSdkTool', () => {
       parameters: z.object({}),
       requiresApproval: false,
       handler: async () => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw 'something exploded';
       },
     });

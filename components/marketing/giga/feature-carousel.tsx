@@ -84,7 +84,7 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Approve a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal advances, every action written down in plain language.',
+      'Ask Chippi to book a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal advances, every action written down in plain language.',
     image: '/marketing/product/integrations.jpg',
     imageAlt: 'Chippi advancing a deal in the pipeline board',
   },

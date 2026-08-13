@@ -34,7 +34,88 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/ai-tools/persistence', () => ({
   saveUserMessage: vi.fn(async () => ({ messageId: 'msg_user_1' })),
   saveAssistantMessage: vi.fn(async () => ({ messageId: 'msg_asst_1' })),
+  saveConversationTurnAssistantMessage: vi.fn(async (input: {
+    turnId: string;
+    attemptToken: string;
+    outcome: { status: 'paused' | 'completed' | 'failed' | 'cancelled'; reason: string };
+  }) => ({
+    turnId: input.turnId,
+    attemptToken: input.attemptToken,
+    messageId: 'msg_asst_1',
+    requestedStatus: input.outcome.status,
+    terminalStatus: input.outcome.status,
+    terminalReason: input.outcome.reason,
+    createdAt: new Date().toISOString(),
+  })),
 }));
+
+// Durable turn authority is exercised by its own SQL/route contract suite.
+// These router tests isolate the chat branch selection, so keep the turn
+// lifecycle deterministic without teaching the generic Supabase chain every
+// ConversationTurn RPC shape.
+vi.mock('@/lib/chat/turn-control', () => {
+  const row = (input: {
+    turnId: string;
+    spaceId: string;
+    conversationId: string;
+    message: string;
+    clientRequestId: string;
+    attachmentIds?: string[];
+  }) => ({
+    id: input.turnId,
+    spaceId: input.spaceId,
+    conversationId: input.conversationId,
+    mode: 'chat',
+    source: 'typed',
+    clientRequestId: input.clientRequestId,
+    message: input.message,
+    attachmentIds: input.attachmentIds ?? [],
+    attachments: [],
+    priority: 0,
+    enqueueSeq: 1,
+    status: 'running',
+    attemptToken: 'attempt-test-1',
+    attempts: 1,
+    leaseExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+    cancelRequestedAt: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    terminalReason: null,
+    lastError: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  return {
+    enqueueConversationTurn: vi.fn(async (_client: unknown, input: Parameters<typeof row>[0]) => row(input)),
+    claimConversationTurnV2: vi.fn(async (_client: unknown, input: Parameters<typeof row>[0]) => row(input)),
+    finishConversationTurnV2: vi.fn(async (_client: unknown, input: {
+      turnId: string;
+      spaceId: string;
+      conversationId: string;
+      outcome: { status: string; reason: string; error?: string };
+    }) => ({
+      ...row({
+        turnId: input.turnId,
+        spaceId: input.spaceId,
+        conversationId: input.conversationId,
+        message: 'settled',
+        clientRequestId: `settled:${input.turnId}`,
+      }),
+      status: input.outcome.status,
+      terminalReason: input.outcome.reason,
+      lastError: input.outcome.error ?? null,
+      finishedAt: new Date().toISOString(),
+    })),
+    startConversationTurnLeaseGuardian: vi.fn(() => ({
+      assertActive: vi.fn(),
+      renewNow: vi.fn().mockResolvedValue(undefined),
+      prepareToCommit: vi.fn().mockResolvedValue(undefined),
+      commitSucceeded: vi.fn(),
+      hasLostAuthority: vi.fn(() => false),
+      stop: vi.fn(),
+    })),
+  };
+});
 
 // Telemetry — fire-and-forget; just no-op everything.
 vi.mock('@/lib/telemetry', () => ({
@@ -50,7 +131,7 @@ vi.mock('@/lib/telemetry', () => ({
 // fresh conversation is minted. Set it to inject a specific row — e.g. a
 // reserved broker/team title — to exercise the #303 write-path isolation guard.
 const { convLookup } = vi.hoisted(() => ({
-  convLookup: { row: undefined as undefined | { id: string; spaceId: string; title: string } },
+  convLookup: { row: undefined as undefined | { id: string; spaceId: string; title: string; mode?: 'chat' | 'work' | null } },
 }));
 
 // Supabase: minimal chainable mock for resolveConversation + loadHistory +
@@ -74,7 +155,15 @@ vi.mock('@/lib/supabase', () => {
       Promise.resolve(terminal).then(resolve);
     return obj;
   }
-  return { supabase: { from: vi.fn(() => chain()) } };
+  return {
+    supabase: {
+      from: vi.fn(() => chain()),
+      rpc: vi.fn(async (_name: string, args: { p_mode: 'chat' | 'work' }) => ({
+        data: convLookup.row?.mode ?? args.p_mode,
+        error: null,
+      })),
+    },
+  };
 });
 
 // resolveToolContext is the heart of auth+space — mock it whole.
@@ -119,9 +208,15 @@ const fetchMock = vi.fn();
 
 // Import AFTER the mocks.
 import { POST } from '@/app/api/ai/task/route';
-import { saveUserMessage } from '@/lib/ai-tools/persistence';
+import {
+  saveConversationTurnAssistantMessage,
+  saveUserMessage,
+} from '@/lib/ai-tools/persistence';
+import { finishConversationTurnV2 } from '@/lib/chat/turn-control';
 
 const mockedSaveUser = vi.mocked(saveUserMessage);
+const mockedSaveAssistant = vi.mocked(saveConversationTurnAssistantMessage);
+const mockedFinishTurn = vi.mocked(finishConversationTurnV2);
 
 const ORIGINAL_RUNTIME = process.env.CHIPPI_CHAT_RUNTIME;
 const ORIGINAL_MODAL_URL = process.env.MODAL_CHAT_URL;
@@ -131,6 +226,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Restore the saveUserMessage mock implementation after clearAllMocks.
   mockedSaveUser.mockResolvedValue({ messageId: 'msg_user_1' });
+  mockedSaveAssistant.mockImplementation(async (input) => ({
+    turnId: input.turnId,
+    attemptToken: input.attemptToken,
+    messageId: 'msg_asst_1',
+    requestedStatus: input.outcome.status,
+    terminalStatus: input.outcome.status,
+    terminalReason: input.outcome.reason,
+    createdAt: new Date().toISOString(),
+  }));
   convLookup.row = undefined;
   // Default to unset — every test sets explicitly.
   delete process.env.CHIPPI_CHAT_RUNTIME;
@@ -203,6 +307,31 @@ describe('POST /api/ai/task — reserved-title conversationId is not reused (iso
     const call = tsStreamMock.mock.calls[0][0] as { conversationId: string };
     expect(call.conversationId).toBe('realtor_conv_1');
   });
+
+  it('keeps an established Work conversation in Work when a stale client sends mode:chat', async () => {
+    convLookup.row = {
+      id: 'work_conv_1',
+      spaceId: 's_1',
+      title: 'Long-form goal',
+      mode: 'work',
+    };
+    await POST(makeRequest({ message: "what's a CMA?", conversationId: 'work_conv_1', mode: 'chat' }));
+    const call = tsStreamMock.mock.calls[0][0] as { ctx: { workMode?: boolean } };
+    expect(call.ctx.workMode).toBe(true);
+    expect(directStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps an established Chat conversation in Chat when a stale client sends mode:work', async () => {
+    convLookup.row = {
+      id: 'chat_conv_1',
+      spaceId: 's_1',
+      title: 'Quick question',
+      mode: 'chat',
+    };
+    await POST(makeRequest({ message: 'what is a cap rate?', conversationId: 'chat_conv_1', mode: 'work' }));
+    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/ai/task — input validation', () => {
@@ -247,6 +376,67 @@ describe('POST /api/ai/task — agent branch (in-process TS is the default)', ()
     expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(tsStreamMock).not.toHaveBeenCalled();
+  });
+
+  it('fails the durable turn instead of emitting complete when Modal output cannot be persisted', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    mockedSaveAssistant.mockRejectedValueOnce(new Error('database unavailable'));
+    fetchMock.mockResolvedValueOnce(new Response(
+      'data: {"type":"done","final_text":"The specialist report is ready."}\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+
+    const response = await POST(makeRequest());
+    const frames = (await response.text())
+      .split('\n\n')
+      .map((chunk) => chunk.replace(/^data: /, '').trim())
+      .filter(Boolean)
+      .map((raw) => JSON.parse(raw) as Record<string, unknown>);
+
+    expect(frames.some((frame) => frame.type === 'turn_complete')).toBe(false);
+    expect(frames.at(-1)).toMatchObject({ type: 'error', code: 'persistence' });
+    expect(mockedFinishTurn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        outcome: expect.objectContaining({ status: 'failed', reason: 'persistence' }),
+      }),
+    );
+  });
+
+  it('accepts only the first Modal terminal frame across duplicate and trailing chunks', async () => {
+    process.env.CHIPPI_CHAT_RUNTIME = 'modal';
+    process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
+    const encoder = new TextEncoder();
+    fetchMock.mockResolvedValueOnce(new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(
+            'data: {"type":"done","final_text":"The report is ready."}\n\n'
+            + 'data: {"type":"done","final_text":"duplicate"}\n\n',
+          ));
+          controller.enqueue(encoder.encode(
+            'data: {"type":"error","message":"late contradictory frame"}\n\n',
+          ));
+          controller.close();
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+
+    const response = await POST(makeRequest());
+    const frames = (await response.text())
+      .split('\n\n')
+      .map((chunk) => chunk.replace(/^data: /, '').trim())
+      .filter(Boolean)
+      .map((raw) => JSON.parse(raw) as Record<string, unknown>);
+
+    expect(frames.filter((frame) => frame.type === 'turn_complete')).toEqual([
+      expect.objectContaining({ reason: 'complete' }),
+    ]);
+    expect(frames.some((frame) => frame.type === 'error')).toBe(false);
+    expect(mockedSaveAssistant).toHaveBeenCalledTimes(1);
+    expect(mockedFinishTurn).not.toHaveBeenCalled();
   });
 
   it('returns 503 when CHIPPI_CHAT_RUNTIME=modal but MODAL_CHAT_URL is not configured', async () => {
@@ -339,16 +529,16 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('explicit mode:agent forces Modal even for a generic question', async () => {
+  it('legacy mode:agent resolves to the unified Work runtime even for a generic question', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     process.env.MODAL_CHAT_URL = 'https://modal.example/chat';
-    // "what's a CMA?" is generic Q&A the heuristic router would keep on the
-    // direct path. The explicit Agent pick sends it to Modal (the mandatory
-    // acting runtime) so the realtor's chosen runtime is honored.
+    // "agent" is the legacy wire alias for Work. Work stays on the unified TS
+    // runtime where durable-work and browser tools are registered; Modal is an
+    // execution backend reached through those tools, not a separate mode.
     await POST(makeRequest({ message: "what's a CMA?", mode: 'agent' }));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(directStreamMock).not.toHaveBeenCalled();
-    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
   });
 
   it('mode:agent degrades to the in-process TS agent when MODAL_CHAT_URL is unset', async () => {

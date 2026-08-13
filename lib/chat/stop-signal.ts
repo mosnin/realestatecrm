@@ -19,20 +19,21 @@
  */
 
 import { redis, isRedisConfigured } from '@/lib/redis';
+import { supabase } from '@/lib/supabase';
 
 const STOP_TTL_SECONDS = 600;
 /** Minimum interval between Redis polls from a streaming loop. */
 export const STOP_POLL_INTERVAL_MS = 750;
 
-function stopKey(conversationId: string): string {
-  return `chat-stop:${conversationId}`;
+function stopKey(turnId: string): string {
+  return `chat-stop:turn:${turnId}`;
 }
 
-/** Mark the active turn on this conversation as stop-requested. */
-export async function requestChatStop(conversationId: string): Promise<boolean> {
+/** Accelerate a stop already durably recorded for this exact turn. */
+export async function requestChatStop(turnId: string): Promise<boolean> {
   if (!isRedisConfigured()) return false;
   try {
-    await redis.set(stopKey(conversationId), '1', { ex: STOP_TTL_SECONDS });
+    await redis.set(stopKey(turnId), '1', { ex: STOP_TTL_SECONDS });
     return true;
   } catch {
     return false;
@@ -51,10 +52,10 @@ export async function requestChatStop(conversationId: string): Promise<boolean> 
  * Called once per turn, before any path starts streaming, so a stop can only
  * ever apply to the turn it was requested during.
  */
-export async function clearChatStop(conversationId: string): Promise<void> {
+export async function clearChatStop(turnId: string): Promise<void> {
   if (!isRedisConfigured()) return;
   try {
-    await redis.del(stopKey(conversationId));
+    await redis.del(stopKey(turnId));
   } catch {
     /* best-effort — a stale flag is a UX bug, not a correctness one */
   }
@@ -64,11 +65,22 @@ export async function clearChatStop(conversationId: string): Promise<void> {
  * True when a stop was requested for this conversation. Consumes the flag
  * so it can't bleed into the NEXT turn on the same conversation.
  */
-export async function consumeChatStop(conversationId: string): Promise<boolean> {
-  if (!isRedisConfigured()) return false;
+export async function consumeChatStop(turnId: string): Promise<boolean> {
   try {
-    const val = await redis.getdel(stopKey(conversationId));
-    return val !== null && val !== undefined;
+    if (isRedisConfigured()) {
+      const val = await redis.getdel(stopKey(turnId));
+      if (val !== null && val !== undefined) return true;
+    }
+    // PostgreSQL is authoritative. Redis is only a low-latency wake-up; a
+    // restart, eviction, or cross-instance request must not erase Stop.
+    const { data } = await supabase
+      .from('ConversationTurn')
+      .select('id')
+      .eq('id', turnId)
+      .eq('status', 'running')
+      .not('cancelRequestedAt', 'is', null)
+      .maybeSingle();
+    return Boolean(data);
   } catch {
     return false;
   }
@@ -79,7 +91,7 @@ export async function consumeChatStop(conversationId: string): Promise<boolean> 
  * only touches Redis every STOP_POLL_INTERVAL_MS. Once it reports true it
  * stays true (the flag was consumed).
  */
-export function createStopPoller(conversationId: string): () => Promise<boolean> {
+export function createStopPoller(turnId: string): () => Promise<boolean> {
   let stopped = false;
   let lastCheck = 0;
   let inFlight: Promise<boolean> | null = null;
@@ -89,7 +101,7 @@ export function createStopPoller(conversationId: string): () => Promise<boolean>
     if (now - lastCheck < STOP_POLL_INTERVAL_MS) return false;
     lastCheck = now;
     if (!inFlight) {
-      inFlight = consumeChatStop(conversationId).finally(() => {
+      inFlight = consumeChatStop(turnId).finally(() => {
         inFlight = null;
       });
       const result = await inFlight;

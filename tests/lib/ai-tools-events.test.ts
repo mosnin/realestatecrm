@@ -55,6 +55,25 @@ describe('encodeEvent / decodeEvent', () => {
     expect(wire.startsWith('event: permission_required\n')).toBe(true);
   });
 
+  it('round-trips a bounded Work activity receipt with durable correlations', () => {
+    const ev: AgentEvent = {
+      type: 'work_activity',
+      seq: 7,
+      ts: '2026-04-22T00:00:02.000Z',
+      workId: 'work_0123456789abcdef01234567',
+      phase: 'specialist',
+      status: 'active',
+      label: 'Specialist team started',
+      toolCallId: 'call_delegate_1',
+      toolName: 'delegate_task',
+      subagentRunId: 'swarm_run_1',
+    };
+    const wire = new TextDecoder().decode(encodeEvent(ev));
+    const dataLine = wire.split('\n').find((l) => l.startsWith('data: '))!.slice(6);
+    expect(wire.startsWith('event: work_activity\n')).toBe(true);
+    expect(decodeEvent(dataLine)).toEqual(ev);
+  });
+
   it('rejects malformed events', () => {
     expect(() => decodeEvent('null')).toThrow(/not an object/);
     expect(() => decodeEvent('{"seq": 1}')).toThrow(/missing type/);

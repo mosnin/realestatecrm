@@ -6,8 +6,8 @@ Two verbs from the Focus Update's "Chippi does, never links":
   realtor's brokerage — "tell Sarah the Henderson tour moved to 3pm."
 - create_automation: silently build a standing workflow from a sentence —
   "text every new Zillow lead within 5 minutes." The workflow is created
-  ENABLED but with autonomy=draft (it stages drafts, never sends), so a
-  silently-built automation can never silently message a client.
+  ENABLED with autonomy=auto. Explicit send instructions create executable
+  scheduled-message actions; explicit draft instructions still create drafts.
 
 Both call internal Next.js endpoints (AGENT_INTERNAL_SECRET-authed) so the
 write path, permission checks, and rate limits stay identical to the human
@@ -23,12 +23,17 @@ from agents import RunContextWrapper, function_tool
 
 from config import settings
 from security.context import AgentContext
+from security.run_policy import action_headers, is_unattended_write
 from tools.base import rate_limited
 
 _TIMEOUT = 30.0
 
 
-async def _post_internal(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+async def _post_internal(
+    path: str,
+    payload: dict[str, Any],
+    run_policy_headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """POST to an internal endpoint; normalize transport + HTTP errors into
     {"error": ...} dicts the agent can read back to the realtor."""
     base_url = (settings.app_url or "").rstrip("/")
@@ -38,10 +43,12 @@ async def _post_internal(path: str, payload: dict[str, Any]) -> dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+            headers = {"Authorization": f"Bearer {secret}"}
+            headers.update(run_policy_headers or {})
             resp = await client.post(
                 f"{base_url}{path}",
                 json=payload,
-                headers={"Authorization": f"Bearer {secret}"},
+                headers=headers,
             )
     except Exception as exc:  # noqa: BLE001 — surface to the agent, never throw
         return {"error": f"request failed: {exc}"}
@@ -77,6 +84,11 @@ async def message_teammate(
     clean_message = (message or "").strip()
     if not clean_recipient or not clean_message:
         return {"error": "recipient and message are required"}
+    if is_unattended_write(ctx.context.run_mode, "team_message:send"):
+        return {
+            "error": "Unattended runs must propose team messages for review.",
+            "code": "RUN_POLICY_DENIED",
+        }
 
     data = await _post_internal(
         "/api/internal/messages/send",
@@ -85,6 +97,7 @@ async def message_teammate(
             "recipient": clean_recipient,
             "message": clean_message,
         },
+        action_headers(ctx.context, "team_message:send"),
     )
     if "error" in data:
         return data
@@ -103,7 +116,7 @@ async def create_automation(
     ctx: RunContextWrapper[AgentContext],
     description: str,
 ) -> dict[str, Any]:
-    """Build a standing automation (workflow) from a plain-English description. It runs on autopilot but only ever DRAFTS messages for the realtor's approval."""
+    """Build and enable a standing automation from a plain-English description. Explicit send instructions execute; explicit draft instructions draft."""
     # description: what should happen and when, e.g. "when a new lead comes in,
     # draft a text within 5 minutes and set a follow-up task for tomorrow".
     clean = (description or "").strip()
@@ -124,6 +137,6 @@ async def create_automation(
         "name": wf.get("name"),
         "trigger": wf.get("trigger"),
         "action_count": wf.get("actionCount"),
-        # Surface the safety contract so the agent explains it honestly.
-        "autonomy": "draft — it stages messages for approval, never sends on its own",
+        "autonomy": wf.get("autonomy") or "auto",
+        "enabled": bool(wf.get("enabled", True)),
     }

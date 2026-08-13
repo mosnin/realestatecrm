@@ -20,6 +20,11 @@ import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { extractConversationMemories } from '@/lib/agent-memory/extract';
+import {
+  commitConversationTurnAssistantV2,
+  type ConversationTurnAssistantCommitRecord,
+  type TurnTerminalOutcome,
+} from '@/lib/chat/turn-control';
 import { coalesceTextBlocks, type MessageBlock } from './blocks';
 
 export interface SaveUserMessageInput {
@@ -115,6 +120,32 @@ export interface SaveAssistantMessageInput {
   blocks: MessageBlock[];
 }
 
+function prepareAssistantMessage(blocks: MessageBlock[]): {
+  blocks: MessageBlock[];
+  content: string;
+} {
+  const merged = coalesceTextBlocks(blocks);
+  const content = merged
+    .filter((b): b is Extract<MessageBlock, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.content)
+    .join('\n')
+    .trim();
+  return { blocks: merged, content: content || '(tool-only turn)' };
+}
+
+function scheduleConversationMemoryExtraction(
+  spaceId: string,
+  conversationId: string | null,
+  content: string,
+): void {
+  if (!conversationId || !content || content === '(tool-only turn)') return;
+  try {
+    after(() => extractConversationMemories({ spaceId, conversationId }));
+  } catch {
+    /* no request context (script/test) — skip background extraction */
+  }
+}
+
 /**
  * Save the assistant's blocks as a new Message row.
  *
@@ -128,12 +159,7 @@ export interface SaveAssistantMessageInput {
 export async function saveAssistantMessage(
   input: SaveAssistantMessageInput,
 ): Promise<{ messageId: string }> {
-  const merged = coalesceTextBlocks(input.blocks);
-  const content = merged
-    .filter((b): b is Extract<MessageBlock, { type: 'text' }> => b.type === 'text')
-    .map((b) => b.content)
-    .join('\n')
-    .trim();
+  const prepared = prepareAssistantMessage(input.blocks);
 
   const id = crypto.randomUUID();
   const { error } = await supabase.from('Message').insert({
@@ -145,8 +171,8 @@ export async function saveAssistantMessage(
     // store something. An empty-text assistant message (pure tool calls)
     // falls back to a short placeholder so legacy readers don't render a
     // blank row.
-    content: content || '(tool-only turn)',
-    blocks: merged as unknown as Record<string, unknown>[],
+    content: prepared.content,
+    blocks: prepared.blocks as unknown as Record<string, unknown>[],
   });
   if (error) {
     logger.error('[tools.persistence] saveAssistantMessage failed', { spaceId: input.spaceId }, error);
@@ -158,16 +184,59 @@ export async function saveAssistantMessage(
   // best-effort. Skip pure tool-only turns — there's no substance to learn
   // from, and it saves an LLM call. after() needs a request context (the chat
   // routes always have one); guarded so a non-request caller just skips.
-  const conversationId = input.conversationId;
-  if (conversationId && content && content !== '(tool-only turn)') {
+  scheduleConversationMemoryExtraction(input.spaceId, input.conversationId, prepared.content);
+
+  return { messageId: id };
+}
+
+export interface SaveConversationTurnAssistantInput extends SaveAssistantMessageInput {
+  conversationId: string;
+  turnId: string;
+  attemptToken: string;
+  outcome: TurnTerminalOutcome;
+  pauseLeaseSeconds?: number;
+}
+
+/**
+ * Token-fenced transcript barrier for durable Chat/Work turns.
+ *
+ * The same server-issued message id is reused for one bounded retry. If the
+ * first RPC committed and only its response was lost, PostgreSQL returns the
+ * existing attempt receipt; it never inserts a second Message.
+ */
+export async function saveConversationTurnAssistantMessage(
+  input: SaveConversationTurnAssistantInput,
+): Promise<ConversationTurnAssistantCommitRecord> {
+  const prepared = prepareAssistantMessage(input.blocks);
+  const messageId = crypto.randomUUID();
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      after(() =>
-        extractConversationMemories({ spaceId: input.spaceId, conversationId }),
-      );
-    } catch {
-      /* no request context (script/test) — skip background extraction */
+      const receipt = await commitConversationTurnAssistantV2(supabase, {
+        turnId: input.turnId,
+        spaceId: input.spaceId,
+        conversationId: input.conversationId,
+        attemptToken: input.attemptToken,
+        messageId,
+        content: prepared.content,
+        blocks: prepared.blocks as unknown as Record<string, unknown>[],
+        outcome: input.outcome,
+        pauseLeaseSeconds: input.pauseLeaseSeconds,
+      });
+      scheduleConversationMemoryExtraction(input.spaceId, input.conversationId, prepared.content);
+      return receipt;
+    } catch (error) {
+      lastError = error;
     }
   }
 
-  return { messageId: id };
+  logger.error('[tools.persistence] atomic assistant commit failed', {
+    spaceId: input.spaceId,
+    conversationId: input.conversationId,
+    turnId: input.turnId,
+  }, lastError);
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to atomically persist assistant message.');
 }

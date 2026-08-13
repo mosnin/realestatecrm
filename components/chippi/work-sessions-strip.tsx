@@ -7,26 +7,31 @@
  * The WorkSession row IS the progress feed: initial load over REST, then
  * Supabase Realtime postgres_changes keeps every card current — plan steps
  * tick from pending → running → done while the realtor does something else,
- * approval and check-in questions appear inline, and a finished session
- * offers its deliverable. Finished cards are dismissable (local hide);
+ * genuine check-in questions appear inline, and a finished session offers its
+ * deliverable. Legacy approval-only sessions are quarantined as stopped and
+ * cannot be resumed from this surface. Finished cards are dismissable (local hide);
  * active ones are not — work in flight should stay visible.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, Check, X, Circle, CircleDashed, FileText, Sparkles, ChevronDown,
+  Loader2, CircleDashed, FileText, Sparkles, ChevronDown,
 } from 'lucide-react';
+import {
+  AgentTodoList,
+  type AgentTodoItem,
+} from '@/components/ai/agent-status';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useRealtime } from '@/hooks/use-realtime';
-import type { PlanStep, WorkSessionRow } from '@/lib/work-sessions/types';
+import type { WorkSessionRow } from '@/lib/work-sessions/types';
 
-const ACTIVE = new Set(['planning', 'awaiting_approval', 'awaiting_input', 'running']);
+const ACTIVE = new Set(['planning', 'awaiting_input', 'running']);
 
 const STATUS_LABEL: Record<string, string> = {
   planning: 'Planning…',
-  awaiting_approval: 'Plan ready — waiting on you',
+  awaiting_approval: 'Stopped — not executed',
   awaiting_input: 'Has a question for you',
   running: 'Working…',
   completed: 'Done',
@@ -34,7 +39,16 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: string }) {
+export function WorkSessionsStrip({
+  slug,
+  spaceId,
+  hiddenSessionIds,
+}: {
+  slug: string;
+  spaceId: string;
+  /** Sessions already rendered inline in the open conversation. */
+  hiddenSessionIds?: ReadonlySet<string>;
+}) {
   const [sessions, setSessions] = useState<WorkSessionRow[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -73,17 +87,18 @@ export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: st
       (a, b) => Number(ACTIVE.has(b.status)) - Number(ACTIVE.has(a.status)),
     );
     // Every active session + the most recent finished one (until dismissed).
-    const active = sorted.filter((s) => ACTIVE.has(s.status));
-    const finished = sorted.find((s) => !ACTIVE.has(s.status) && !dismissed.has(s.id));
+    const eligible = sorted.filter((s) => !hiddenSessionIds?.has(s.id));
+    const active = eligible.filter((s) => ACTIVE.has(s.status));
+    const finished = eligible.find((s) => !ACTIVE.has(s.status) && !dismissed.has(s.id));
     return finished ? [...active, finished] : active;
-  }, [sessions, dismissed]);
+  }, [sessions, dismissed, hiddenSessionIds]);
 
   if (visible.length === 0) return null;
 
   return (
     <div className="mb-2 space-y-2">
       {visible.map((s) => (
-        <SessionCard
+        <WorkSessionCard
           key={s.id}
           session={s}
           slug={slug}
@@ -96,14 +111,7 @@ export function WorkSessionsStrip({ slug, spaceId }: { slug: string; spaceId: st
   );
 }
 
-function StepIcon({ status }: { status: PlanStep['status'] }) {
-  if (status === 'done') return <Check size={12} className="text-foreground" strokeWidth={2.5} />;
-  if (status === 'running') return <Loader2 size={12} className="animate-spin text-foreground" />;
-  if (status === 'skipped') return <X size={12} className="text-muted-foreground/60" />;
-  return <Circle size={8} className="mt-0.5 text-muted-foreground/40" />;
-}
-
-function SessionCard({
+export function WorkSessionCard({
   session, slug, onDismiss,
 }: {
   session: WorkSessionRow;
@@ -114,7 +122,7 @@ function SessionCard({
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function act(action: 'approve' | 'cancel' | 'answer') {
+  async function act(action: 'cancel' | 'answer') {
     setBusy(true);
     try {
       await fetch(`/api/work-sessions/${session.id}?slug=${encodeURIComponent(slug)}`, {
@@ -130,6 +138,21 @@ function SessionCard({
 
   const isActive = ACTIVE.has(session.status);
   const doneCount = session.plan.filter((p) => p.status === 'done').length;
+  const planItems = useMemo<AgentTodoItem[]>(
+    () => session.plan.map((step) => ({
+      id: step.id,
+      title: step.title,
+      status:
+        step.status === 'done'
+          ? 'completed'
+          : step.status === 'running'
+            ? 'in-progress'
+            : step.status === 'skipped'
+              ? 'cancelled'
+              : 'pending',
+    })),
+    [session.plan],
+  );
 
   return (
     <div className="rounded-xl border border-border bg-card px-3.5 py-3 text-left shadow-sm">
@@ -166,33 +189,23 @@ function SessionCard({
         <div className="mt-2.5 space-y-2.5 border-t border-border/60 pt-2.5">
           {/* Plan steps, ticking live. */}
           {session.plan.length > 0 && (
-            <ul className="space-y-1">
-              {session.plan.map((step) => (
-                <li key={step.id} className="flex items-center gap-2 text-[12px]">
-                  <span className="flex w-4 justify-center">{<StepIcon status={step.status} />}</span>
-                  <span
-                    className={cn(
-                      step.status === 'done' ? 'text-muted-foreground' : 'text-foreground',
-                      step.status === 'skipped' && 'text-muted-foreground/60 line-through',
-                    )}
-                  >
-                    {step.title}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <AgentTodoList
+              items={planItems}
+              title="Work plan"
+              defaultOpen
+              collapseOnComplete
+              className="border-0 bg-transparent shadow-none"
+            />
           )}
 
-          {/* Approval gate. */}
+          {/* Legacy approval-only runs are deliberately terminal in the UI.
+              Work mode now treats the user's goal as authorization; an old
+              run that stopped at this state did not execute and cannot be
+              revived through the removed human-review path. */}
           {session.status === 'awaiting_approval' && (
-            <div className="flex items-center gap-2">
-              <Button size="xs" onClick={() => void act('approve')} disabled={busy}>
-                Approve plan
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => void act('cancel')} disabled={busy}>
-                Cancel
-              </Button>
-            </div>
+            <p className="text-[12px] text-muted-foreground">
+              This legacy run stopped before executing. Start a new Work conversation to run the goal directly.
+            </p>
           )}
 
           {/* Check-in question. */}
@@ -237,7 +250,7 @@ function SessionCard({
 
           {/* Card controls. */}
           <div className="flex justify-end gap-2">
-            {isActive && session.status !== 'awaiting_approval' && (
+            {isActive && (
               <Button size="xs" variant="ghost" onClick={() => void act('cancel')} disabled={busy}>
                 Cancel session
               </Button>

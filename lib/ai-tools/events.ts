@@ -26,7 +26,8 @@ export type AgentEvent =
   | TurnCompleteEvent
   | ErrorEvent
   | SystemEvent
-  | StatusEvent;
+  | StatusEvent
+  | WorkActivityEvent;
 
 interface BaseEvent {
   seq: number;
@@ -43,6 +44,48 @@ interface BaseEvent {
 export interface StatusEvent extends BaseEvent {
   type: 'status';
   label: string;
+}
+
+/**
+ * Normalized, machine-readable progress for a Work turn.
+ *
+ * This is deliberately an activity receipt, not model-authored narration.
+ * The server emits a phase only when the corresponding runtime boundary is
+ * reached. Existing rich events (`plan_created`, tool call blocks, and the
+ * specialist card) remain the detailed UI; this compact stream lets the chat
+ * arrange those real events into one coherent live timeline.
+ */
+export type WorkActivityPhase =
+  | 'request'
+  | 'context'
+  | 'provider'
+  | 'plan'
+  | 'tool'
+  | 'specialist'
+  | 'terminal';
+
+export type WorkActivityStatus =
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'paused'
+  | 'cancelled';
+
+export interface WorkActivityEvent extends BaseEvent {
+  type: 'work_activity';
+  /** Stable for every event in this streamed turn. */
+  workId: string;
+  phase: WorkActivityPhase;
+  status: WorkActivityStatus;
+  /** Server-authored and bounded to 160 characters. */
+  label: string;
+  /** Durable SDK call correlation for plan/tool/specialist activity. */
+  toolCallId?: string;
+  toolName?: string;
+  /** Durable SwarmRun id once delegate_task has actually returned one. */
+  subagentRunId?: string;
+  /** Present when create_plan supplied a steps array. */
+  planStepCount?: number;
 }
 
 /** A token of the assistant's reply text. Client appends to the current text block. */

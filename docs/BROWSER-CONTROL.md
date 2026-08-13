@@ -178,10 +178,20 @@ by the `(spaceId, userId)` resolved from that authenticated identity.
   something it cannot actually do and reporting a misleading result.
 - **Headless worker auth**: `agent/browser_headless.py`'s poll loop
   authenticates to `POST /api/browser-control/headless/poll` with
-  `Authorization: Bearer <AGENT_INTERNAL_SECRET>` — the existing internal-
-  service-to-service convention (mirrors `agent/tools/streaming.py`,
-  `agent/tools/plugins.py`), **not** the per-user extension token, since a
-  headless worker is an internal Chippi service, not a paired user device.
+  `Authorization: Bearer <CHIPPI_BROWSER_WORKER_SECRET>`, a dedicated
+  browser-worker secret rather than the per-user extension token or broad
+  agent-service credentials. The worker is an internal Chippi service, not a
+  paired user device.
+- **Protected staging origin**: keep the existing browser origin/worker-bearer
+  secret unchanged. For a protected staging origin, set optional
+  `CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME` to a separate one-value secret
+  containing `CHIPPI_BROWSER_VERCEL_BYPASS_SECRET`. When it is absent, the
+  worker uses an empty placeholder. The entrypoint uses `modal.is_local()`
+  plus remote placeholders to keep the worker at two dependencies without
+  assigning that bypass secret to the public launch endpoint. When the value
+  is present, the worker sends it as
+  `x-vercel-protection-bypass` on every poll and completion while retaining
+  `Authorization: Bearer <CHIPPI_BROWSER_WORKER_SECRET>`.
 - **Kill switch is local-first**: the extension's kill switch detaches
   `chrome.debugger` and hides its UI **immediately and locally**, independent
   of network state, then separately reports `killed: true` on its next poll
@@ -189,9 +199,10 @@ by the `(spaceId, userId)` resolved from that authenticated identity.
   extension even if the network is down. See "Kill switch → server
   semantics" in `extension/README.md` for the exact flag lifecycle.
 - **Rate limiting**: pairing-code issuance (10/10min/user) and headless
-  session starts (30/60s/user) are both rate-limited against
-  enumeration/churn abuse; `/frame` polling is deliberately *not* tightly
-  limited since a live oversight panel polling ~1/s is expected traffic.
+  session starts (30/60s/user) are rate-limited against enumeration/churn
+  abuse. Research status and frame reads are each capped at 90/min/user; the
+  internal headless poll is capped at 120/min/session and rejects bodies over
+  1 MB. The former allows a live oversight panel while still bounding abuse.
 - **`chrome.debugger`'s own visibility**: Chrome shows its native
   "`<Extension>` is debugging this browser" infobar for the whole time the
   debugger is attached — this cannot be suppressed and is not something
@@ -214,32 +225,26 @@ by the `(spaceId, userId)` resolved from that authenticated identity.
   route-handler tests per this repo's testing policy (CLAUDE.md: no
   `readFileSync`-source-grep tests).
 
-**NOT verified — needs a human doing it against real infrastructure, listed
-in ascending order of "how badly this blocks the feature":**
+**Deploy-gated or not yet verified against real infrastructure, listed in
+ascending order of "how badly this blocks the feature":**
 
-1. **Migrations not applied to prod.** `supabase/migrations/20260901000000`
-   through `20260903000000` (browser-control tables + frames + headless
-   source column) must be applied via the `docs/RELEASE.md` workflow before
-   any of this can run against production. See the "Activation checklist"
-   in `docs/RELEASE.md`.
-2. **The headless worker is not wired into Modal at all.**
-   `agent/browser_headless.py` is deliberately **not imported** by
-   `agent/modal_app.py`. `agent/pyproject.toml` does not list `playwright`.
-   The Modal `image` in `modal_app.py` has no `playwright install`. There is
-   no `@app.function` that runs `poll_and_execute`. This is spelled out
-   in-file under "Modal wiring (NOT wired in)" at the bottom of
-   `browser_headless.py`.
-3. **Even after that wiring exists, nothing spawns it.**
-   `POST /api/browser-control/headless/start` creates the `BrowserSession`
-   DB row and says so explicitly in its own docstring: "This route only
-   creates the DB session row + queue target; it does NOT itself launch a
-   Modal headless worker... nothing yet triggers the worker to start
-   polling." So today, a headless session can be *started* (the row exists,
-   `resolveBrowserRuntime` will happily route work to it) but nothing ever
-   picks up its queued actions — they'll sit until `ACTION_TTL_SECONDS`
-   (120s) expires them. This is a **code change**, not a config/migration
-   step, and is out of scope for this docs pass — flagging it here so
-   whoever picks it up doesn't assume the deploy steps below are sufficient.
+1. **Research lease migration not applied by this integration.** The additive
+   `20260913000000_chippi_research_workspace_leases.sql` migration must be
+   reviewed and applied through the release workflow before the new Research
+   Workspace can be enabled. Existing browser-control production state is not
+   evidence that this new lease boundary is active.
+2. **The Research Workspace worker is wired but not activated.**
+   `agent/browser_modal_app.py` is a dedicated least-privilege Modal app with
+   a Playwright image, bounded worker function, and launch endpoint. The web app
+   obtains a fenced lease before launch, and
+   `POST /api/browser-control/headless/start` starts or reuses that worker.
+   This remains feature-off until the new lease migration, an isolated Modal
+   staging app, its dedicated two-value secret, and a tenant allowlist are
+   configured and verified.
+3. **An authenticated staging Research Workspace journey** — launch, first
+   heartbeat, live frame, multi-source result, reload, and Stop — has not yet
+   been completed. Passing unit tests and a Modal launch response are not
+   evidence that the customer journey works.
 4. **A real Chrome pairing round-trip** — loading the unpacked extension,
    generating a code in the app, redeeming it, and watching a real poll
    loop execute a real CDP action — has not been done end-to-end.
@@ -262,10 +267,11 @@ the extension-specific detail behind points 4–6.
 | `lib/browser-control/session.ts` | Session/queue lifecycle, `enqueueAction`/`awaitActionResult`, staleness detection. |
 | `lib/browser-control/index.ts` | Barrel + `resolveBrowserRuntime` (extension-vs-headless routing) + `needsLoggedInBrowser`. |
 | `extension/lib/executor.js` | The extension-side pure CDP executor. |
-| `agent/browser_headless.py` | The headless-side pure Playwright executor + poll loop (not yet wired into Modal — see above). |
+| `agent/browser_headless.py` | The headless-side pure Playwright executor + fenced poll/cancellation loop. |
 | `lib/ai-tools/tools/control-browser.ts` | Single-action agent tool, always-approve. |
 | `lib/ai-tools/tools/browser-task.ts` | Multi-step agent tool, `classifyActionSafety` gate. |
 | `app/api/browser-control/**` | Pairing, poll, frame, status, link, headless start/stop/poll routes. |
 | `app/s/[slug]/settings/browser-control/` | The settings UI — pairing, connected devices, live session status. |
 | `supabase/migrations/2026090{1,2,3}*` | Schema: link/pairing/session/action tables, frame + heartbeat columns, headless source support. |
+| `supabase/migrations/20260913000000_chippi_research_workspace_leases.sql` | Feature-off Research Workspace lease, tenant allowlist, and worker-fencing additions. |
 | `extension/README.md` | Extension-specific load/pair/permissions detail. |

@@ -316,7 +316,7 @@ export function OnboardingRealtorV2({ defaultName }: Props) {
       case 'role': return `Good to meet you, ${firstName}. What are you running?`;
       case 'business': return 'What should leads call your business?';
       case 'where': return 'Where do you work, and how long have you been at it?';
-      case 'promise': return 'Before we go further, one promise: I draft, you approve. Nothing leaves without your name on it.';
+      case 'promise': return 'Before we go further, one promise: when you ask me to act, I use your connected tools and show you exactly what happened.';
       case 'serve': return "Who do you work with most? Pick up to three and I'll tune everything to them.";
       case 'voice': return 'A new lead just asked about a listing. Which reply sounds like you?';
       case 'sources': return "Where do most of your leads come from? Pick your top one or two. That's where I'll watch first.";

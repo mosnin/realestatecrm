@@ -400,6 +400,7 @@ async def run_agent_for_space(
     instruction: str | None = None,
     owner_clerk_id: str | None = None,
     trigger_source: dict | None = None,
+    run_id: str | None = None,
 ) -> None:
     """Execute one autonomous run for a space.
 
@@ -429,6 +430,12 @@ async def run_agent_for_space(
         the drafts tool persists it on AgentDraft.triggerSource so the
         inbox UI can render the "Chippi noticed because…" breadcrumb.
         None for chat / routine / sweep paths.
+    run_id:
+        The pre-recorded dispatch id supplied by routine/sweep callers.  It
+        becomes the capability-grant correlation id when valid.  Older manual
+        and immediate-trigger callers may omit it; their generated id only
+        receives the unattended read capability and can never authorize an
+        integration or team-message write.
     """
     # Respect the on/off switch. The realtor can pause Chippi from the
     # header; an autonomous run must honour that.
@@ -442,21 +449,27 @@ async def run_agent_for_space(
     # check before either recorded usage, overspending the cap. The lock
     # closes both holes and auto-expires past Modal's timeout, so a crash
     # can't wedge the space.
-    run_id = str(uuid.uuid4())
-    if not await acquire_run_lock(space.id, run_id):
-        logger.bind(space_id=space.id, run_id=run_id).info("agent_run_skipped_concurrent")
+    supplied_run_id = ""
+    if run_id:
+        try:
+            supplied_run_id = str(uuid.UUID(run_id))
+        except (ValueError, TypeError, AttributeError):
+            logger.bind(space_id=space.id).warning("agent_run_invalid_supplied_run_id")
+    effective_run_id = supplied_run_id or str(uuid.uuid4())
+    if not await acquire_run_lock(space.id, effective_run_id):
+        logger.bind(space_id=space.id, run_id=effective_run_id).info("agent_run_skipped_concurrent")
         return
     try:
         await _run_locked(
             space,
             agent_settings,
-            run_id,
+            effective_run_id,
             instruction,
             owner_clerk_id,
             trigger_source,
         )
     finally:
-        await release_run_lock(space.id, run_id)
+        await release_run_lock(space.id, effective_run_id)
 
 
 async def _run_locked(
@@ -513,6 +526,8 @@ async def _run_locked(
         space_name=space.name,
         user_id=owner_clerk_id,
         trigger_source=trigger_source,
+        run_mode="unattended",
+        run_policy_run_id=run_id,
     )
     # A routine run is scoped to its instruction — don't drain the trigger
     # queue out from under a trigger-driven run.

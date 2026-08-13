@@ -387,7 +387,7 @@ export default function CapturePage() {
               className="hidden h-10 w-px bg-neutral-200 sm:block"
             />
             <p className="text-sm tracking-tight text-zinc-400 sm:mt-1 sm:text-base">
-              Three steps between a fill and a reply waiting for your tap
+              Three steps between a fill and a grounded reply sent on request
             </p>
           </div>
           <div className="mt-4 h-px bg-neutral-200" />
@@ -483,7 +483,7 @@ export default function CapturePage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
               One form, every channel. However a lead arrives, it enters the same
-              loop, scored, drafted, waiting for your tap.
+              loop, scored, acted on, and recorded.
             </p>
           </FadeUp>
           <Stagger className="mt-12 grid gap-6 sm:grid-cols-2 sm:gap-8">

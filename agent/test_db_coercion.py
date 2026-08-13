@@ -45,8 +45,12 @@ class CoerceParamTests(unittest.TestCase):
         self.assertEqual(out.tzinfo, timezone.utc)
 
     def test_does_not_touch_plain_strings(self) -> None:
-        for v in ("%alex%", "active", "", "hello world", "2026-05-04"):
+        for v in ("%alex%", "active", "", "hello world"):
             self.assertEqual(_coerce_param(v), v)
+
+    def test_coerces_bare_date_to_midnight_utc(self) -> None:
+        out = _coerce_param("2026-05-04")
+        self.assertEqual(out, datetime(2026, 5, 4, tzinfo=timezone.utc))
 
     def test_does_not_touch_non_strings(self) -> None:
         self.assertEqual(_coerce_param(42), 42)

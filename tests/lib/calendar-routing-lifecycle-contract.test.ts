@@ -56,12 +56,16 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     expect(route).not.toContain('const testSendCounts = new Map');
   });
 
-  it('retains detached agent dispatch and task activity logging', () => {
+  it('retains durable agent dispatch and detached task activity logging', () => {
     const delegation = readFileSync('lib/ai-tools/tools/delegate-task.ts', 'utf8');
+    const launch = readFileSync('lib/swarm-launch.ts', 'utf8');
     const taskStatus = readFileSync('app/api/agent/tasks/[taskId]/status/route.ts', 'utf8');
 
-    expect(delegation).toContain('const triggerTask = fetch(modalSwarmUrl');
-    expect(delegation).toContain('after(() => triggerTask)');
+    expect(delegation).toContain('createAndEnqueueSwarmRun');
+    expect(launch).toContain("enqueueWorkerTask('swarm-run-timeout'");
+    expect(launch).toContain("enqueueWorkerTask('swarm-run-launch'");
+    expect(delegation).not.toContain('fetch(modalSwarmUrl');
+    expect(delegation).not.toContain('after(() => triggerTask)');
     expect(taskStatus).toContain('const activityTask = Promise.resolve(');
     expect(taskStatus).toContain('after(() => activityTask)');
   });

@@ -20,6 +20,7 @@ import {
   QuestionFlow,
   type QuestionFlowProps,
 } from '@/components/tool-ui/question-flow';
+import { AgentApprovalCard } from '@/components/ai/agent-status';
 import { safeParseSerializableQuestionFlow } from '@/components/tool-ui/question-flow/schema';
 import {
   buildQuestionFlow,
@@ -51,9 +52,12 @@ export function QuestionFlowResult({
         : undefined,
     };
     return (
-      <div className="mt-2 max-w-lg">
+      <AgentApprovalCard
+        description="Answer the guided questions so Work can continue with the right constraints."
+        interactive={interactive}
+      >
         <QuestionFlow {...completeProps} />
-      </div>
+      </AgentApprovalCard>
     );
   }
 
@@ -72,9 +76,9 @@ export function QuestionFlowResult({
         : undefined,
     };
     return (
-      <div className="mt-2 max-w-lg">
+      <AgentApprovalCard interactive={interactive}>
         <QuestionFlow {...progressiveProps} />
-      </div>
+      </AgentApprovalCard>
     );
   }
 

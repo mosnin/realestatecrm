@@ -24,7 +24,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AgentEvent } from '@/lib/ai-tools/events';
+import type { AgentEvent, WorkActivityEvent } from '@/lib/ai-tools/events';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import type { PermissionPromptData } from '@/components/ai/blocks/permission-prompt-view';
 import { chippiErrorMessage, classifyError } from '@/lib/ai-tools/chippi-voice';
@@ -36,6 +36,11 @@ import {
   turnKey,
   type TurnRecord,
 } from './turn-runner';
+import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
+import type {
+  ConversationTurnAttachment,
+  ConversationTurnRecord,
+} from '@/lib/chat/turn-control';
 
 export interface UiMessage {
   id: string;
@@ -46,13 +51,14 @@ export interface UiMessage {
 }
 
 /**
- * Per-message runtime pick from the composer's Chat/Agent switch.
+ * Product-facing pick from the top-of-page Chat/Work switch.
  *   - 'chat'  → lean single-call path (one LLM completion + read-only vector
  *               search). Fast, cheap, can't act.
- *   - 'agent' → full tool surface on Modal. Can act; bounded server-side.
+ *   - 'work'  → full tool surface plus durable background work. Can act;
+ *               bounded server-side.
  * Defaults to 'chat' when the caller omits it.
  */
-export type ChatMode = 'chat' | 'agent';
+export type ChatMode = 'chat' | 'work';
 
 /**
  * Lightweight attachment descriptor the composer passes to `send` so the
@@ -79,7 +85,7 @@ export interface UseAgentTaskOptions {
    * fresh chat). Parent uses this to update the sidebar + keep future
    * sends scoped to the same conversation.
    */
-  onConversationCreated?: (conversationId: string) => void;
+  onConversationCreated?: (conversationId: string, mode: ChatMode) => void;
   /**
    * Called when a turn this hook was DRIVING reaches its terminal state, with
    * the conversation it belonged to. The surface uses this to record that its
@@ -112,6 +118,21 @@ export interface UseAgentTaskOptions {
   conversationsEndpoint?: string;
   resumeEndpointBase?: string;
   conversationCreatePayload?: Record<string, unknown>;
+  /** Receives typed rich tool results that drive workspace-level UI state. */
+  onToolResult?: (input: { name: string; data: unknown; ok: boolean }) => void;
+  /**
+   * Narrow lifecycle signal for workspace surfaces that must open while a
+   * long-running tool is still active. It carries no tool arguments and does
+   * not create a generic tool-event rendering channel.
+   */
+  onToolStart?: (input: { name: string }) => void;
+  /** A Workbench the user has actively opened. The server re-resolves it in
+   * the caller's tenant before putting any workbook state in the tool context. */
+  activeWorkbookArtifactId?: string | null;
+  /** Persisted execution posture for Work conversations. */
+  workExecutionMode?: WorkExecutionMode;
+  /** Current product mode; used to prevent legacy per-tool auto-allow from bypassing Review. */
+  conversationMode?: ChatMode;
 }
 
 export interface UseAgentTaskResult {
@@ -136,12 +157,14 @@ export interface UseAgentTaskResult {
    * created yet. Cleared automatically on `turn_complete`.
    */
   activePlan: { task: string; steps: Array<{ title: string; description: string }> } | null;
+  /** Grounded runtime receipts for the live Work turn. */
+  workActivities: WorkActivityEvent[];
   send: (
     text: string,
     attachmentIds?: string[],
     mode?: ChatMode,
     attachmentsMeta?: AttachmentMeta[],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   /**
    * Object URLs for just-sent attachments, keyed by attachment id. Lets the
    * user-message renderer show an image thumbnail instantly while the signed
@@ -168,6 +191,13 @@ export interface UseAgentTaskResult {
    */
   retryLastMessage: () => Promise<void>;
   /**
+   * Put a new instruction ahead of ordinary queued messages and ask the
+   * active server turn to stop at its next safe boundary. The instruction is
+   * dispatched only after that turn has actually settled, so a late stop
+   * signal cannot bleed into the replacement turn.
+   */
+  steer: (text: string, mode?: ChatMode) => Promise<boolean>;
+  /**
    * Seconds remaining on a rate-limit cool-down (429). Zero when no
    * rate-limit is active. The composer can show a countdown and re-enable
    * itself automatically when this reaches zero.
@@ -177,9 +207,61 @@ export interface UseAgentTaskResult {
    * Messages typed while a turn was streaming, waiting to dispatch — one per
    * completed turn, in order (the ChatGPT-Work "queued messages" mechanic).
    */
-  queuedMessages: { text: string; mode: ChatMode }[];
-  /** Drop a queued message (by index) before it dispatches. */
-  removeQueuedMessage: (index: number) => void;
+  queuedMessages: PendingTurnMessage[];
+  /** Drop a queued message by its stable database id before it dispatches. */
+  removeQueuedMessage: (turnId: string) => Promise<void>;
+}
+
+export interface PendingTurnMessage {
+  id: string;
+  clientRequestId: string;
+  text: string;
+  mode: ChatMode;
+  kind: 'queued' | 'steer';
+  status: 'pending' | 'failed';
+  attachmentIds: string[];
+  attachments: ConversationTurnAttachment[];
+}
+
+/** Keep steering instructions FIFO, but ahead of ordinary queued turns. */
+export function insertSteeringMessage(
+  pending: readonly PendingTurnMessage[],
+  next: PendingTurnMessage,
+): PendingTurnMessage[] {
+  const firstQueued = pending.findIndex((message) => message.kind === 'queued');
+  const index = firstQueued === -1 ? pending.length : firstQueued;
+  return [...pending.slice(0, index), next, ...pending.slice(index)];
+}
+
+function queuedMessagesFromTurns(
+  turns: readonly ConversationTurnRecord[],
+): PendingTurnMessage[] {
+  return turns
+    .filter((turn) => turn.status === 'pending' || turn.status === 'failed')
+    .slice()
+    .sort((a, b) => b.priority - a.priority || a.enqueueSeq - b.enqueueSeq)
+    .map((turn) => ({
+      id: turn.id,
+      clientRequestId: turn.clientRequestId,
+      text: turn.message,
+      mode: turn.mode,
+      kind: turn.source === 'steer' ? 'steer' : 'queued',
+      status: turn.status as 'pending' | 'failed',
+      attachmentIds: turn.attachmentIds ?? [],
+      attachments: turn.attachments ?? [],
+    }));
+}
+
+function nextDispatchableQueuedTurn(
+  turns: readonly ConversationTurnRecord[],
+): ConversationTurnRecord | null {
+  if (turns.some((turn) => turn.status === 'running' || turn.status === 'paused' || turn.status === 'failed')) {
+    return null;
+  }
+  return turns
+    .filter((turn) => turn.status === 'pending')
+    .slice()
+    .sort((a, b) => b.priority - a.priority || a.enqueueSeq - b.enqueueSeq)[0] ?? null;
 }
 
 /** Short random id for UI-local message keys. */
@@ -212,6 +294,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     conversationsEndpoint = '/api/ai/conversations',
     resumeEndpointBase = '/api/ai/task/resume',
     conversationCreatePayload,
+    onToolResult,
+    onToolStart,
+    activeWorkbookArtifactId,
+    workExecutionMode = 'autonomous',
+    conversationMode = 'chat',
   } = options;
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -222,12 +309,30 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const isStreamingRef = useRef(false);
   // Messages typed while a turn is streaming. Dispatched in order, one per
   // completed turn (the ChatGPT-Work "queued messages" mechanic).
-  const [queuedMessages, setQueuedMessages] = useState<{ text: string; mode: ChatMode }[]>([]);
-  const queuedRef = useRef<{ text: string; mode: ChatMode }[]>([]);
-  // Late-bound self-reference so the drain in consumeStream's finally can
-  // call the CURRENT send without a circular useCallback dependency.
+  const [queuedMessages, setQueuedMessages] = useState<PendingTurnMessage[]>([]);
+  const queuedRef = useRef<PendingTurnMessage[]>([]);
+  const durableTurnQueueEnabled = taskEndpoint === '/api/ai/task';
+  // Exact identity of the currently running/approval-paused turn. Stop and
+  // Steer must target this id rather than a conversation-wide flag that can
+  // accidentally bleed into the next instruction.
+  const activeTurnIdRef = useRef<string | null>(null);
+  const unacceptedSubmissionRef = useRef<{
+    fingerprint: string;
+    turnId: string;
+    clientRequestId: string;
+  } | null>(null);
+  const lastAcceptedTurnRef = useRef<{
+    turn: ConversationTurnRecord;
+    attachmentsMeta?: AttachmentMeta[];
+  } | null>(null);
+  const queueDrainInFlightRef = useRef<Promise<void> | null>(null);
+  const refreshDurableQueueRef = useRef<((conversationId: string) => Promise<ConversationTurnRecord[]>) | null>(null);
+  // Late-bound callbacks close the runTurn -> drain -> dispatch cycle without
+  // making React recreate the stream driver on every queue refresh.
+  const drainDurableQueueRef = useRef<((conversationId: string) => Promise<void>) | null>(null);
+  const dispatchQueuedTurnRef = useRef<((turn: ConversationTurnRecord) => Promise<void>) | null>(null);
   const sendRef = useRef<
-    ((text: string, attachmentIds?: string[], mode?: ChatMode) => Promise<void>) | null
+    ((text: string, attachmentIds?: string[], mode?: ChatMode, attachmentsMeta?: AttachmentMeta[]) => Promise<boolean>) | null
   >(null);
   const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
@@ -243,6 +348,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     task: string;
     steps: Array<{ title: string; description: string }>;
   } | null>(null);
+  const [workActivities, setWorkActivities] = useState<WorkActivityEvent[]>([]);
 
   // Refs shadow the reactive state for places where we need the latest value
   // synchronously without re-closing over it every render. We only sync
@@ -287,6 +393,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // already-fired requestId into the new chat.
   useEffect(() => {
     setPendingApproval(null);
+    setWorkActivities([]);
     autoApprovedRef.current = null;
     // Drop stale optimistic preview URLs — the new conversation's history
     // signs its own URLs per image.
@@ -311,7 +418,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     setAllowedTools(new Set());
   }, [initialConversationId, STORAGE_PREFIX]);
 
-  function commitAllow(toolName: string) {
+  const commitAllow = useCallback((toolName: string) => {
     const next = new Set(allowedToolsRef.current);
     next.add(toolName);
     allowedToolsRef.current = next;
@@ -324,19 +431,21 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         /* quota / private mode — in-memory allow-list still works */
       }
     }
-  }
+  }, [STORAGE_PREFIX]);
 
   // The runner key of the turn THIS hook instance is currently driving.
   // Turns themselves live at module scope (turn-runner.ts) so they survive
   // this component unmounting; the key is how abort() reaches them.
   const activeKeyRef = useRef<string | null>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
+  const toolNameByCallIdRef = useRef<Map<string, string>>(new Map());
   // True once the turn reaches a real terminal event (turn_complete or a
   // landed error). If the SSE stream closes WITHOUT one — the serverless proxy
   // hit its duration cap mid-response, the socket dropped, or Modal was killed
   // — we must not leave the bubble blinking "streaming" forever with no word to
   // the realtor. Reset at the start of every turn.
   const turnTerminalRef = useRef(false);
+  const turnOutcomeRef = useRef<'complete' | 'paused' | 'cancelled' | 'failed' | null>(null);
   // Wall-clock when the assistant turn started. Set on the first event of
   // the turn; used to derive ReasoningBlock.durationMs at turn_complete.
   const turnStartedAtRef = useRef<number | null>(null);
@@ -365,6 +474,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
    */
   const landChippiError = useCallback((message: string) => {
     turnTerminalRef.current = true;
+    turnOutcomeRef.current = 'failed';
     setError(message);
     setCurrentAction(null);
     const targetId = streamingMsgIdRef.current;
@@ -435,11 +545,12 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     // keepalive lets the request survive a quick navigation; best-effort.
     // ONLY the user-facing Stop reaches this; see abortLocal above.
     const cid = conversationIdRef.current;
-    if (cid) {
+    const turnId = activeTurnIdRef.current;
+    if (cid && turnId) {
       void fetch('/api/ai/stop', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId: cid }),
+        body: JSON.stringify({ conversationId: cid, turnId }),
         keepalive: true,
       }).catch(() => {});
     }
@@ -491,6 +602,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'tool_call_start': {
+        toolNameByCallIdRef.current.set(event.callId, event.name);
+        onToolStart?.({ name: event.name });
         const targetId = streamingMsgIdRef.current;
         if (!targetId) return;
         setCurrentAction(`${friendlyToolAction(event.name)}…`);
@@ -521,6 +634,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       }
 
       case 'tool_call_result': {
+        const toolName = toolNameByCallIdRef.current.get(event.callId);
+        toolNameByCallIdRef.current.delete(event.callId);
+        if (toolName && event.data !== undefined) onToolResult?.({ name: toolName, data: event.data, ok: event.ok });
         setLiveCallIds((s) => {
           if (!s.has(event.callId)) return s;
           const next = new Set(s);
@@ -591,6 +707,27 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
 
+      case 'work_activity': {
+        setWorkActivities((previous) => {
+          const sameWork = previous.length === 0 || previous[0]?.workId === event.workId;
+          const base = sameWork ? previous : [];
+          const correlation =
+            event.toolCallId ?? event.subagentRunId ?? `${event.phase}:${event.status}`;
+          const index = base.findIndex((candidate) => {
+            const candidateCorrelation =
+              candidate.toolCallId ??
+              candidate.subagentRunId ??
+              `${candidate.phase}:${candidate.status}`;
+            return candidateCorrelation === correlation;
+          });
+          const next = [...base];
+          if (index >= 0) next[index] = event;
+          else next.push(event);
+          return next.slice(-24);
+        });
+        return;
+      }
+
       case 'subagent_spawned': {
         // A delegate_task call started a Modal sub-agent run. Drop a
         // subagent_task block into the streaming assistant turn; its view
@@ -618,6 +755,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       case 'turn_complete': {
         turnTerminalRef.current = true;
+        turnOutcomeRef.current = event.reason === 'paused'
+          ? 'paused'
+          : event.reason === 'aborted'
+            ? 'cancelled'
+            : 'complete';
         const targetId = streamingMsgIdRef.current;
         // Snapshot + reset the reasoning buffer + start time before any
         // async setState — we need both values inside the updater closure.
@@ -674,7 +816,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         return;
       }
     }
-  }, [landChippiError]);
+  }, [landChippiError, onToolResult, onToolStart]);
 
   /**
    * Drive one turn owned by the module-scope TurnRunner: replay whatever
@@ -690,7 +832,9 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   const runTurn = useCallback(
     async (rec: TurnRecord) => {
       activeKeyRef.current = rec.key;
+      activeTurnIdRef.current = rec.turnId;
       turnTerminalRef.current = false;
+      turnOutcomeRef.current = null;
       setIsStreaming(true);
       isStreamingRef.current = true;
       setError(null);
@@ -802,20 +946,38 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // the history loader, so the loader sees the flag already set and
         // doesn't blank the thread it just watched stream in.
         onTurnSettledRef.current?.(rec.conversationId);
-        // Drain the queue: one message per completed turn, in order. Deferred
-        // a tick so this turn's teardown state settles before the next send's
-        // optimistic UI lands.
-        const next = queuedRef.current[0];
-        if (next) {
-          queuedRef.current = queuedRef.current.slice(1);
-          setQueuedMessages(queuedRef.current);
-          setTimeout(() => {
-            void sendRef.current?.(next.text, undefined, next.mode);
-          }, 0);
+        if (durableTurnQueueEnabled && (
+          turnOutcomeRef.current === 'complete' || turnOutcomeRef.current === 'cancelled'
+        )) {
+          // PostgreSQL — not this component — decides whether a paused/failed
+          // turn holds the queue and which pending instruction is next.
+          await drainDurableQueueRef.current?.(rec.conversationId);
+        } else if (durableTurnQueueEnabled) {
+          // A network/HTTP failure can occur before the server claims the row;
+          // redispatching here would create a tight billing/rate-limit loop.
+          // Refresh the durable state for honest UI, but require user retry or
+          // the recovery rail to decide what happens next.
+          await refreshDurableQueueRef.current?.(rec.conversationId).catch(() => {});
+        } else {
+          // Broker chat has not migrated to ConversationTurn yet. Keep its
+          // bounded per-tab FIFO behavior, but still use exact per-turn Stop.
+          if (activeTurnIdRef.current === rec.turnId) activeTurnIdRef.current = null;
+          const next = queuedRef.current[0];
+          if (next) {
+            queuedRef.current = queuedRef.current.slice(1);
+            setQueuedMessages(queuedRef.current);
+            const meta = next.attachments.map((attachment) => ({
+              ...attachment,
+              isImage: attachment.isImage ?? attachment.mimeType.startsWith('image/'),
+            }));
+            setTimeout(() => {
+              void sendRef.current?.(next.text, next.attachmentIds, next.mode, meta);
+            }, 0);
+          }
         }
       }
     },
-    [applyEvent, landChippiError],
+    [applyEvent, durableTurnQueueEnabled, landChippiError],
   );
 
   /**
@@ -828,6 +990,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       url: string,
       body: unknown,
       conversationId: string,
+      turnId: string,
       optimistic: { text: string; attachmentBlocks: MessageBlock[] } = {
         text: '',
         attachmentBlocks: [],
@@ -842,6 +1005,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // resume turn re-attaches exactly like the turn it continues.
         endpoint: taskEndpoint,
         conversationId,
+        turnId,
         body,
         optimistic,
       });
@@ -896,10 +1060,13 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
    * resolveBrokerContext) without a custom hook. Defaults preserve the
    * realtor behaviour: POST /api/ai/conversations { slug }.
    */
-  const ensureConversationId = useCallback(async (): Promise<string> => {
+  const ensureConversationId = useCallback(async (mode: ChatMode): Promise<string> => {
     if (conversationIdRef.current) return conversationIdRef.current;
-    const body =
-      conversationCreatePayload ?? ({ slug: spaceSlug } as Record<string, unknown>);
+    const body = {
+      ...(conversationCreatePayload ?? ({ slug: spaceSlug } as Record<string, unknown>)),
+      mode,
+      executionMode: workExecutionMode,
+    };
     const res = await fetch(conversationsEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -908,9 +1075,158 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     if (!res.ok) throw new Error('Could not start conversation');
     const conv = (await res.json()) as { id: string };
     conversationIdRef.current = conv.id;
-    onConversationCreated?.(conv.id);
+    onConversationCreated?.(conv.id, mode);
     return conv.id;
-  }, [spaceSlug, onConversationCreated, conversationsEndpoint, conversationCreatePayload]);
+  }, [spaceSlug, onConversationCreated, conversationsEndpoint, conversationCreatePayload, workExecutionMode]);
+
+  const loadDurableTurns = useCallback(async (conversationId: string) => {
+    if (!durableTurnQueueEnabled) return [] as ConversationTurnRecord[];
+    const response = await fetch(
+      `/api/ai/turns?conversationId=${encodeURIComponent(conversationId)}`,
+      { cache: 'no-store' },
+    );
+    if (!response.ok) throw new Error('Could not load queued work.');
+    const payload = (await response.json()) as { turns?: ConversationTurnRecord[] };
+    const turns = Array.isArray(payload.turns) ? payload.turns : [];
+    const visible = queuedMessagesFromTurns(turns);
+    queuedRef.current = visible;
+    setQueuedMessages(visible);
+    const active = turns.find((turn) => turn.status === 'running' || turn.status === 'paused');
+    activeTurnIdRef.current = active?.id ?? null;
+    return turns;
+  }, [durableTurnQueueEnabled]);
+  refreshDurableQueueRef.current = loadDurableTurns;
+
+  const beginAcceptedTurn = useCallback((input: {
+    turnId: string;
+    clientRequestId?: string;
+    conversationId: string;
+    text: string;
+    mode: ChatMode;
+    attachmentIds?: string[];
+    attachmentsMeta?: AttachmentMeta[];
+  }) => {
+    const attachmentBlocks: MessageBlock[] = (input.attachmentsMeta ?? []).map((attachment) => ({
+      type: 'attachment',
+      id: attachment.id,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      isImage: attachment.isImage,
+      ...(typeof attachment.sizeBytes === 'number' ? { sizeBytes: attachment.sizeBytes } : {}),
+    }));
+    if (input.attachmentsMeta?.length) {
+      setAttachmentPreviewUrls((previous) => {
+        const next = { ...previous };
+        for (const attachment of input.attachmentsMeta ?? []) {
+          if (attachment.previewUrl) next[attachment.id] = attachment.previewUrl;
+        }
+        return next;
+      });
+    }
+
+    const userMsg: UiMessage = {
+      id: newId(),
+      role: 'user',
+      blocks: [
+        ...attachmentBlocks,
+        ...(input.text ? [{ type: 'text', content: input.text } as MessageBlock] : []),
+      ],
+    };
+    const assistantMsgId = newId();
+    streamingMsgIdRef.current = assistantMsgId;
+    activeTurnIdRef.current = input.turnId;
+    setMessages((previous) => [
+      ...previous,
+      userMsg,
+      { id: assistantMsgId, role: 'assistant', blocks: [], streaming: true },
+    ]);
+    setPendingApproval(null);
+    setWorkActivities([]);
+    setCurrentAction('Thinking…');
+    lastUserInputRef.current = {
+      text: input.text,
+      ...(input.attachmentIds?.length ? { attachmentIds: input.attachmentIds } : {}),
+    };
+
+    void consumeStream(
+      taskEndpoint,
+      {
+        spaceSlug,
+        conversationId: input.conversationId,
+        message: input.text,
+        mode: input.mode,
+        executionMode: workExecutionMode,
+        ...(input.clientRequestId
+          ? { turnId: input.turnId, clientRequestId: input.clientRequestId }
+          : { turnId: input.turnId }),
+        ...(input.attachmentIds?.length ? { attachmentIds: input.attachmentIds } : {}),
+        ...(activeWorkbookArtifactId ? { activeWorkbookArtifactId } : {}),
+      },
+      input.conversationId,
+      input.turnId,
+      { text: input.text, attachmentBlocks },
+    );
+  }, [activeWorkbookArtifactId, consumeStream, spaceSlug, taskEndpoint, workExecutionMode]);
+
+  const dispatchQueuedTurn = useCallback(async (turn: ConversationTurnRecord) => {
+    if (isStreamingRef.current) return;
+    const meta: AttachmentMeta[] = (turn.attachments ?? []).map((attachment) => ({
+      ...attachment,
+      isImage: attachment.isImage ?? attachment.mimeType.startsWith('image/'),
+    }));
+    beginAcceptedTurn({
+      turnId: turn.id,
+      clientRequestId: turn.clientRequestId,
+      conversationId: turn.conversationId,
+      text: turn.message,
+      mode: turn.mode,
+      attachmentIds: turn.attachmentIds,
+      attachmentsMeta: meta,
+    });
+  }, [beginAcceptedTurn]);
+  dispatchQueuedTurnRef.current = dispatchQueuedTurn;
+
+  const drainDurableQueue = useCallback(async (conversationId: string) => {
+    if (!durableTurnQueueEnabled) return;
+    if (queueDrainInFlightRef.current) return queueDrainInFlightRef.current;
+    const drain = (async () => {
+      const turns = await loadDurableTurns(conversationId);
+      const next = nextDispatchableQueuedTurn(turns);
+      if (next && !isStreamingRef.current) {
+        await dispatchQueuedTurnRef.current?.(next);
+      }
+    })().catch((queueError) => {
+      const message = queueError instanceof Error ? queueError.message : 'Could not continue queued work.';
+      setError(message);
+    }).finally(() => {
+      if (queueDrainInFlightRef.current === drain) queueDrainInFlightRef.current = null;
+    });
+    queueDrainInFlightRef.current = drain;
+    return drain;
+  }, [durableTurnQueueEnabled, loadDurableTurns]);
+  drainDurableQueueRef.current = drainDurableQueue;
+
+  useEffect(() => {
+    if (!durableTurnQueueEnabled || !initialConversationId) {
+      if (durableTurnQueueEnabled) {
+        queuedRef.current = [];
+        setQueuedMessages([]);
+        activeTurnIdRef.current = null;
+      }
+      return;
+    }
+    let cancelled = false;
+    void loadDurableTurns(initialConversationId)
+      .then((turns) => {
+        if (cancelled || isStreamingRef.current) return;
+        const next = nextDispatchableQueuedTurn(turns);
+        if (next) void dispatchQueuedTurnRef.current?.(next);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not restore queued work.');
+      });
+    return () => { cancelled = true; };
+  }, [durableTurnQueueEnabled, initialConversationId, loadDurableTurns]);
 
   const send = useCallback(
     async (
@@ -918,117 +1234,191 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       attachmentIds?: string[],
       mode: ChatMode = 'chat',
       attachmentsMeta?: AttachmentMeta[],
-    ) => {
+    ): Promise<boolean> => {
       const trimmed = text.trim();
-      const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
-      // Allow attachment-only sends — the user might just want to drop in a
-      // photo with no caption. Block when both text AND attachments are empty.
-      if (!trimmed && !hasAttachments) return;
-      // Mid-turn sends QUEUE instead of dropping: the message dispatches in
-      // order when the current turn ends (ChatGPT-Work mechanic). Text only —
-      // attachment uploads are owned by the composer's lifecycle. Guarded on
-      // the ref (not state) so the drain in consumeStream's finally can never
-      // race a stale closure back into the queue.
-      if (isStreamingRef.current) {
-        if (trimmed && !hasAttachments) {
-          queuedRef.current = [...queuedRef.current, { text: trimmed, mode }];
-          setQueuedMessages(queuedRef.current);
-        }
-        return;
-      }
-
-      // Fix 2: record immediately so retryLastMessage always has current data.
-      lastUserInputRef.current = { text: trimmed, ...(hasAttachments ? { attachmentIds } : {}) };
-
-      // Build attachment blocks for the optimistic user bubble so the chips
-      // show immediately, and stash any object URLs for instant thumbnails.
-      const attachmentBlocks: MessageBlock[] = (attachmentsMeta ?? []).map((a) => ({
-        type: 'attachment',
-        id: a.id,
-        filename: a.filename,
-        mimeType: a.mimeType,
-        isImage: a.isImage,
-        ...(typeof a.sizeBytes === 'number' ? { sizeBytes: a.sizeBytes } : {}),
-      }));
-      if (attachmentsMeta && attachmentsMeta.length > 0) {
-        setAttachmentPreviewUrls((prev) => {
-          const next = { ...prev };
-          for (const a of attachmentsMeta) {
-            if (a.previewUrl) next[a.id] = a.previewUrl;
-          }
-          return next;
-        });
-      }
-
-      // Optimistic UI: push the user message + a streaming assistant
-      // placeholder BEFORE we await conversation creation. This is what
-      // flips the workspace from the empty / "Good evening" view into the
-      // active thread; previously it waited on the POST /api/ai/conversations
-      // round-trip (~200–500ms) and the user perceived a freeze. The thinking
-      // indicator shows immediately because `messages` is non-empty.
-      const userMsg: UiMessage = {
-        id: newId(),
-        role: 'user',
-        // Attachment chips render above the text, matching the composer.
-        blocks: [
-          ...attachmentBlocks,
-          ...(trimmed ? [{ type: 'text', content: trimmed } as MessageBlock] : []),
-        ],
-      };
-      const assistantMsgId = newId();
-      const assistantMsg: UiMessage = {
-        id: assistantMsgId,
-        role: 'assistant',
-        blocks: [],
-        streaming: true,
-      };
-      streamingMsgIdRef.current = assistantMsgId;
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setPendingApproval(null);
-      // Instant signal — the server's first status event is a network
-      // round-trip away; the indicator must not wait for it.
-      setCurrentAction('Thinking…');
+      const hasAttachments = Boolean(attachmentIds?.length);
+      if (!trimmed && !hasAttachments) return false;
 
       let convId: string;
       try {
-        convId = await ensureConversationId();
-      } catch (err) {
-        // Conversation creation failed — pull the optimistic placeholders
-        // back so the realtor doesn't see a hung user message + empty
-        // assistant bubble. landChippiError surfaces an error message in
-        // its place via a fresh assistant entry.
-        setMessages((prev) =>
-          prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsgId),
-        );
-        streamingMsgIdRef.current = null;
-        const raw = err instanceof Error ? err.message : '';
+        convId = await ensureConversationId(mode);
+      } catch (conversationError) {
+        const raw = conversationError instanceof Error ? conversationError.message : '';
         landChippiError(chippiErrorMessage(classifyError(raw)));
-        return;
+        return false;
       }
 
-      await consumeStream(
-        taskEndpoint,
-        {
-          spaceSlug,
-          conversationId: convId,
-          message: trimmed,
+      if (durableTurnQueueEnabled) {
+        const manifest: ConversationTurnAttachment[] = (attachmentsMeta ?? []).map((attachment) => ({
+          id: attachment.id,
+          filename: attachment.filename,
+          mimeType: attachment.mimeType,
+          isImage: attachment.isImage,
+          ...(typeof attachment.sizeBytes === 'number' ? { sizeBytes: attachment.sizeBytes } : {}),
+        }));
+        const fingerprint = JSON.stringify({ convId, mode, trimmed, attachmentIds: attachmentIds ?? [], manifest });
+        const priorSubmission = unacceptedSubmissionRef.current;
+        const turnId = priorSubmission?.fingerprint === fingerprint ? priorSubmission.turnId : newId();
+        const clientRequestId = priorSubmission?.fingerprint === fingerprint
+          ? priorSubmission.clientRequestId
+          : newId();
+        unacceptedSubmissionRef.current = { fingerprint, turnId, clientRequestId };
+        try {
+          const response = await fetch('/api/ai/turns', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              conversationId: convId,
+              turnId,
+              clientRequestId,
+              mode,
+              source: 'typed',
+              message: trimmed,
+              attachmentIds: attachmentIds ?? [],
+              attachments: manifest,
+            }),
+          });
+          const payload = (await response.json().catch(() => ({}))) as {
+            turn?: ConversationTurnRecord;
+            error?: string;
+          };
+          if (!response.ok || !payload.turn) {
+            throw new Error(payload.error || 'Could not queue this message.');
+          }
+          const accepted = payload.turn;
+          unacceptedSubmissionRef.current = null;
+          lastAcceptedTurnRef.current = { turn: accepted, attachmentsMeta };
+          if (isStreamingRef.current || activeTurnIdRef.current) {
+            await loadDurableTurns(convId);
+          } else {
+            beginAcceptedTurn({
+              turnId: accepted.id,
+              clientRequestId: accepted.clientRequestId,
+              conversationId: convId,
+              text: accepted.message,
+              mode: accepted.mode,
+              attachmentIds: accepted.attachmentIds,
+              attachmentsMeta,
+            });
+          }
+          return true;
+        } catch (queueError) {
+          setError(queueError instanceof Error ? queueError.message : 'Could not queue this message.');
+          return false;
+        }
+      }
+
+      // Broker compatibility queue. It remains per-tab until the separate
+      // BrokerConversation schema receives its own durable ledger.
+      if (isStreamingRef.current) {
+        const localTurn: PendingTurnMessage = {
+          id: newId(),
+          clientRequestId: newId(),
+          text: trimmed,
           mode,
-          ...(hasAttachments ? { attachmentIds } : {}),
-        },
-        convId,
-        { text: trimmed, attachmentBlocks },
-      );
+          kind: 'queued',
+          status: 'pending',
+          attachmentIds: attachmentIds ?? [],
+          attachments: (attachmentsMeta ?? []).map((attachment) => ({
+            id: attachment.id,
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            isImage: attachment.isImage,
+            sizeBytes: attachment.sizeBytes,
+          })),
+        };
+        queuedRef.current = [...queuedRef.current, localTurn];
+        setQueuedMessages(queuedRef.current);
+        return true;
+      }
+
+      beginAcceptedTurn({
+        turnId: newId(),
+        conversationId: convId,
+        text: trimmed,
+        mode,
+        attachmentIds,
+        attachmentsMeta,
+      });
+      return true;
     },
-    [isStreaming, spaceSlug, ensureConversationId, consumeStream, landChippiError, taskEndpoint],
+    [beginAcceptedTurn, durableTurnQueueEnabled, ensureConversationId, landChippiError, loadDurableTurns],
   );
-  // Late-bind for the queue drain (see consumeStream's finally).
   sendRef.current = send;
 
-  /** Drop a queued message before it dispatches (index into queuedMessages). */
-  const removeQueuedMessage = useCallback((index: number) => {
-    queuedRef.current = queuedRef.current.filter((_, i) => i !== index);
-    setQueuedMessages(queuedRef.current);
-  }, []);
+  const steer = useCallback(async (text: string, mode: ChatMode = 'work'): Promise<boolean> => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    if (!isStreamingRef.current && !activeTurnIdRef.current) {
+      return (await sendRef.current?.(trimmed, undefined, mode)) ?? false;
+    }
+
+    const conversationId = conversationIdRef.current;
+    const activeTurnId = activeTurnIdRef.current;
+    if (!durableTurnQueueEnabled || !conversationId || !activeTurnId) {
+      if (durableTurnQueueEnabled) return false;
+      const local: PendingTurnMessage = {
+        id: newId(),
+        clientRequestId: newId(),
+        text: trimmed,
+        mode,
+        kind: 'steer',
+        status: 'pending',
+        attachmentIds: [],
+        attachments: [],
+      };
+      queuedRef.current = insertSteeringMessage(queuedRef.current, local);
+      setQueuedMessages(queuedRef.current);
+      return true;
+    }
+
+    const fingerprint = JSON.stringify({ conversationId, mode, trimmed, source: 'steer', activeTurnId });
+    const priorSubmission = unacceptedSubmissionRef.current;
+    const turnId = priorSubmission?.fingerprint === fingerprint ? priorSubmission.turnId : newId();
+    const clientRequestId = priorSubmission?.fingerprint === fingerprint
+      ? priorSubmission.clientRequestId
+      : newId();
+    unacceptedSubmissionRef.current = { fingerprint, turnId, clientRequestId };
+    const response = await fetch('/api/ai/turns', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        conversationId,
+        turnId,
+        clientRequestId,
+        mode,
+        source: 'steer',
+        message: trimmed,
+        activeTurnId,
+      }),
+      keepalive: true,
+    });
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      setError(payload.error || 'Could not steer the active work.');
+      return false;
+    }
+    unacceptedSubmissionRef.current = null;
+    await loadDurableTurns(conversationId);
+    return true;
+  }, [durableTurnQueueEnabled, loadDurableTurns]);
+
+  const removeQueuedMessage = useCallback(async (turnId: string) => {
+    if (!durableTurnQueueEnabled) {
+      queuedRef.current = queuedRef.current.filter((turn) => turn.id !== turnId);
+      setQueuedMessages(queuedRef.current);
+      return;
+    }
+    const response = await fetch(`/api/ai/turns/${encodeURIComponent(turnId)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      setError('That queued message could not be removed.');
+      return;
+    }
+    const conversationId = conversationIdRef.current;
+    if (conversationId) await loadDurableTurns(conversationId);
+  }, [durableTurnQueueEnabled, loadDurableTurns]);
 
   const approve = useCallback(
     async (requestId: string, editedArgs?: Record<string, unknown>) => {
@@ -1052,6 +1442,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           ...(editedArgs ? { editedArgs } : {}),
         },
         conversationIdRef.current ?? `resume-${requestId}`,
+        activeTurnIdRef.current ?? `legacy-resume:${requestId}`,
       );
     },
     [isStreaming, consumeStream, resumeEndpointBase],
@@ -1105,6 +1496,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         `${resumeEndpointBase}/${encodeURIComponent(requestId)}`,
         { approved: false },
         conversationIdRef.current ?? `resume-${requestId}`,
+        activeTurnIdRef.current ?? `legacy-resume:${requestId}`,
       );
     },
     [isStreaming, pendingApproval, consumeStream, resumeEndpointBase],
@@ -1115,18 +1507,53 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       // Capture the tool name from the CURRENT pending prompt at click time —
       // by the time approve() returns the prompt will have been cleared.
       const toolName = pendingApproval?.name;
+      // Exact workbook transforms are intentionally one-time approvals: their
+      // source version, hash, and every target are what the user reviewed.
+      if (toolName === 'apply_workbook_transformation') {
+        await approve(requestId);
+        return;
+      }
       if (toolName) commitAllow(toolName);
       await approve(requestId, editedArgs);
     },
-    [pendingApproval, approve],
+    [pendingApproval, approve, commitAllow],
   );
 
   // Fix 2: stable retry callback — calls send() with whatever was last sent.
   const retryLastMessage = useCallback(async () => {
+    if (durableTurnQueueEnabled) {
+      const accepted = lastAcceptedTurnRef.current;
+      const conversationId = conversationIdRef.current;
+      if (accepted && conversationId) {
+        try {
+          const turns = await loadDurableTurns(conversationId);
+          const sameTurn = turns.find((turn) => turn.id === accepted.turn.id);
+          if (sameTurn?.status === 'pending' && !isStreamingRef.current) {
+            beginAcceptedTurn({
+              turnId: sameTurn.id,
+              clientRequestId: sameTurn.clientRequestId,
+              conversationId: sameTurn.conversationId,
+              text: sameTurn.message,
+              mode: sameTurn.mode,
+              attachmentIds: sameTurn.attachmentIds,
+              attachmentsMeta: accepted.attachmentsMeta,
+            });
+            return;
+          }
+          if (sameTurn?.status === 'failed') {
+            setError('This turn failed and is holding the queue. Remove it before retrying the instruction.');
+            return;
+          }
+        } catch {
+          setError('Chippi could not verify the saved turn yet. Try again in a moment.');
+          return;
+        }
+      }
+    }
     const last = lastUserInputRef.current;
     if (!last) return;
     await send(last.text, last.attachmentIds);
-  }, [send]);
+  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, send]);
 
   // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
   useEffect(() => {
@@ -1153,12 +1580,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       autoApprovedRef.current = null;
       return;
     }
+    if (conversationMode === 'work') return;
     if (isStreaming) return;
+    if (pendingApproval.name === 'apply_workbook_transformation') return;
     if (!allowedTools.has(pendingApproval.name)) return;
     if (autoApprovedRef.current === pendingApproval.requestId) return;
     autoApprovedRef.current = pendingApproval.requestId;
     void approve(pendingApproval.requestId);
-  }, [pendingApproval, isStreaming, allowedTools, approve]);
+  }, [pendingApproval, isStreaming, allowedTools, approve, conversationMode]);
 
   return {
     messages,
@@ -1170,6 +1599,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     streamingReasoning,
     currentAction,
     activePlan,
+    workActivities,
     send,
     attachmentPreviewUrls,
     approve,
@@ -1179,6 +1609,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     abort,
     clearError,
     retryLastMessage,
+    steer,
     rateLimitSeconds,
     queuedMessages,
     removeQueuedMessage,

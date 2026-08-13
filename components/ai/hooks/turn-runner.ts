@@ -33,6 +33,10 @@ export type TurnStatus = 'streaming' | 'done' | 'aborted' | 'http_error' | 'netw
 export interface TurnRecord {
   key: string;
   conversationId: string;
+  /** Stable server-side identity for this exact turn. ConversationTurn-backed
+   *  realtor turns require it; broker turns use the same identity for an
+   *  exact, non-leaking Stop signal. */
+  turnId: string;
   /** The task endpoint this turn was posted to — surfaces only adopt turns
    *  from their own endpoint (realtor vs broker). */
   endpoint: string;
@@ -144,6 +148,7 @@ export function startTurn(opts: {
   url: string;
   endpoint: string;
   conversationId: string;
+  turnId?: string;
   body: unknown;
   optimistic: { text: string; attachmentBlocks: MessageBlock[] };
 }): TurnRecord {
@@ -154,6 +159,7 @@ export function startTurn(opts: {
   const rec: InternalRecord = {
     key,
     conversationId: opts.conversationId,
+    turnId: opts.turnId ?? `legacy:${opts.conversationId}`,
     endpoint: opts.endpoint,
     events: [],
     status: 'streaming',

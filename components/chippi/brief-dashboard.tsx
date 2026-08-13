@@ -28,10 +28,10 @@
  *
  * The bento cells (varied col/row spans):
  *   ┌─────────────────────────────┬───────────────┐
- *   │ GREETING (date + line)      │ NEEDS YOU      │ ← 3 stat tiles inside
+ *   │ GREETING (date + line)      │ NEEDS YOU      │ ← live CRM obligations
  *   ├───────────────┬─────────────┤ (new leads /   │
  *   │ ON DECK       │ TODAY        │  follow-ups /  │
- *   │ (action rows) │ (tours)      │  drafts)       │
+ *   │ (action rows) │ (tours)      │  replies)      │
  *   ├───────────────┴──────┬───────┴───────────────┤
  *   │ PIPELINE             │ HOT LEADS             │
  *   ├──────────────────────┴───────────────────────┤
@@ -49,7 +49,6 @@ import { motion } from 'framer-motion';
 import {
   Users,
   CalendarClock,
-  FileText,
   MessagesSquare,
   Flame,
   TrendingUp,
@@ -73,6 +72,7 @@ import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber, SplitReveal, StaggerReveal, Parallax } from '@/components/motion';
 import { AccentBarLabel, CARD_TITLE } from '@/components/ui/surface-card';
+import { Button } from '@/components/ui/button';
 import { BriefCell, useBriefMotionEnabled } from './brief-motion';
 import type { BriefDashboard as DashboardData } from '@/lib/briefing/dashboard';
 import type { BriefCard, SignalKind } from '@/lib/briefing/types';
@@ -343,13 +343,6 @@ function NeedsYouCell({ slug, needsYou }: { slug: string; needsYou: DashboardDat
       href: `/s/${slug}/follow-ups`,
       icon: CalendarClock,
     },
-    {
-      n: needsYou.pendingDrafts,
-      label: pluralize(needsYou.pendingDrafts, 'Draft ready', 'Drafts ready'),
-      sub: 'approve or edit',
-      href: `/s/${slug}/chippi/inbox`,
-      icon: FileText,
-    },
   ];
 
   // Clients waiting on a reply only appears when someone actually is — an empty
@@ -472,18 +465,20 @@ function OnDeckCell({
           ))}
       </ul>
       {overflow > 0 && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
+          className="mt-2 h-auto gap-1 rounded-sm p-0 text-[11px] text-muted-foreground transition-colors has-[>svg]:px-0 hover:bg-transparent hover:text-foreground active:scale-100 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0"
         >
           {expanded ? 'Show less' : `${overflow} more`}
           <ChevronDown
             size={12}
             className={cn('transition-transform duration-200', expanded && 'rotate-180')}
           />
-        </button>
+        </Button>
       )}
     </div>
   );

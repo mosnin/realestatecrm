@@ -27,7 +27,8 @@ import {
   planSession as planWorkSession,
   executeSession as executeWorkSession,
 } from '@/lib/work-sessions/engine';
-import { redis } from '@/lib/redis';
+import { dispatchWorkspaceRunTask } from '@/lib/workspace-runs/server';
+import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
 
@@ -250,6 +251,12 @@ export const handleComposioTrigger = inngest.createFunction(
       userId: string;
       payload: Record<string, unknown>;
     };
+
+    if (!isRedisConfigured()) {
+      throw new Error(
+        'Redis is required by the legacy Composio handler idempotency path; refusing to acknowledge delivery',
+      );
+    }
 
     // 0. In-handler idempotency. The receiver dedupes on webhook-id at
     //    HTTP-arrival time, but Inngest itself is at-least-once: if a
@@ -474,12 +481,14 @@ export const handleComposioTrigger = inngest.createFunction(
 export const workSessionPlan = inngest.createFunction(
   { id: 'work-session-plan', triggers: [{ event: 'work-session/plan' }] },
   async ({ event, step }) => {
-    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    const data = event.data as { sessionId?: unknown; workspaceRunId?: unknown };
+    const sessionId = String(data.sessionId ?? '');
+    const workspaceRunId = typeof data.workspaceRunId === 'string' ? data.workspaceRunId : undefined;
     if (!sessionId) return { skipped: true };
-    const status = await step.run('plan', () => planWorkSession(sessionId));
+    const status = await step.run('plan', () => planWorkSession(sessionId, workspaceRunId));
     // just_go sessions fall straight through to execution.
     if (status === 'running') {
-      await step.run('execute', () => executeWorkSession(sessionId));
+      await step.run('execute', () => executeWorkSession(sessionId, workspaceRunId));
     }
     return { sessionId, status };
   },
@@ -488,9 +497,21 @@ export const workSessionPlan = inngest.createFunction(
 export const workSessionExecute = inngest.createFunction(
   { id: 'work-session-execute', triggers: [{ event: 'work-session/execute' }] },
   async ({ event, step }) => {
-    const sessionId = String((event.data as { sessionId?: unknown }).sessionId ?? '');
+    const data = event.data as { sessionId?: unknown; workspaceRunId?: unknown };
+    const sessionId = String(data.sessionId ?? '');
+    const workspaceRunId = typeof data.workspaceRunId === 'string' ? data.workspaceRunId : undefined;
     if (!sessionId) return { skipped: true };
-    await step.run('execute', () => executeWorkSession(sessionId));
+    await step.run('execute', () => executeWorkSession(sessionId, workspaceRunId));
     return { sessionId };
+  },
+);
+
+export const workspaceRunTaskExecute = inngest.createFunction(
+  { id: 'workspace-run-task-execute', triggers: [{ event: 'workspace-run-task/execute' }] },
+  async ({ event, step }) => {
+    const data = event.data as { taskId?: unknown; runId?: unknown; spaceId?: unknown };
+    if (typeof data.taskId !== 'string' || typeof data.runId !== 'string' || typeof data.spaceId !== 'string') return { skipped: true };
+    await step.run('dispatch-isolated-workspace-task', () => dispatchWorkspaceRunTask({ taskId: data.taskId as string, runId: data.runId as string, spaceId: data.spaceId as string }));
+    return { taskId: data.taskId };
   },
 );

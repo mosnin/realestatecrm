@@ -74,6 +74,7 @@ import { researchAreaTool } from './research-area';
 import { usePluginTool } from './use-plugin';
 import { listPluginsTool } from './list-plugins';
 import { findComparablePropertiesTool } from './find-comparable-properties';
+import { analyzePropertyValuesTool } from './analyze-property-values';
 import { addPropertyTool } from './add-property';
 import { updatePropertyStatusTool } from './update-property-status';
 import { deletePropertyTool } from './delete-property';
@@ -122,9 +123,15 @@ import { readFileTool } from './read-file';
 import { attachFileToPropertyTool } from './attach-file-to-property';
 import { readSpreadsheetTool } from './read-spreadsheet';
 import { summarizeDocumentTool } from './summarize-document';
+import { continueWorkspaceRunTool } from './continue-workspace-run';
+import { generateStudioImageTool } from './generate-studio-image';
 
 // Planning
 import { createPlanTool } from './plan';
+import { createAutomationTool } from './create-automation';
+import { startWorkSessionTool } from './start-work-session';
+import { openSpreadsheetInWorkbenchTool } from './open-spreadsheet-in-workbench';
+import { inspectWorkbookTool, applyWorkbookTransformationTool } from './workbook-transform';
 
 // Browser control (paired Chrome extension driving the realtor's own browser)
 import { controlBrowserTool } from './control-browser';
@@ -142,6 +149,7 @@ import { askRealtorTool } from './ask-realtor';
  * allowed to use (sub-agents calling sub-agents isn't a feature we want).
  */
 export const ALL_TOOLS: ToolDefinition[] = [
+  continueWorkspaceRunTool as ToolDefinition,
   // ── People ─────────────────────────────────────────────────────────────
   findPersonTool as ToolDefinition,
   listContactsTool as ToolDefinition,
@@ -186,6 +194,7 @@ export const ALL_TOOLS: ToolDefinition[] = [
   findPropertyTool as ToolDefinition,
   researchAreaTool as ToolDefinition,
   findComparablePropertiesTool as ToolDefinition,
+  analyzePropertyValuesTool as ToolDefinition,
   addPropertyTool as ToolDefinition,
   updatePropertyStatusTool as ToolDefinition,
   deletePropertyTool as ToolDefinition,
@@ -227,14 +236,20 @@ export const ALL_TOOLS: ToolDefinition[] = [
   // ── Memory ─────────────────────────────────────────────────────────────
   recallHistoryTool as ToolDefinition,
   readAttachmentTool as ToolDefinition,
+  openSpreadsheetInWorkbenchTool as ToolDefinition,
+  inspectWorkbookTool as ToolDefinition,
+  applyWorkbookTransformationTool as ToolDefinition,
   listFilesTool as ToolDefinition,
   readFileTool as ToolDefinition,
   attachFileToPropertyTool as ToolDefinition,
   readSpreadsheetTool as ToolDefinition,
   summarizeDocumentTool as ToolDefinition,
+  generateStudioImageTool as ToolDefinition,
 
   // ── Planning ───────────────────────────────────────────────────────────
   createPlanTool as ToolDefinition,
+  createAutomationTool as ToolDefinition,
+  startWorkSessionTool as ToolDefinition,
 
   // ── Clarification ──────────────────────────────────────────────────────
   askRealtorTool as ToolDefinition,

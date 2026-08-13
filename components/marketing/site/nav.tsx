@@ -60,12 +60,12 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'For solo real estate agents',
       title: 'Your extra teammate in the field.',
-      body: 'Drafts in your voice, leads scored, tours booked, from your phone, between showings.',
+      body: 'Replies sent in your voice, leads scored, tours booked, from your phone, between showings.',
       cta: 'See the real estate agent story',
       href: '/realtors',
     },
     items: [
-      { icon: PenLine, label: 'Drafts in your voice', desc: 'Written before you open the thread', href: '/realtors' },
+      { icon: PenLine, label: 'Replies in your voice', desc: 'Sent when you ask Chippi to reply', href: '/realtors' },
       { icon: Target, label: 'Know who to call first', desc: 'Scored against your live deals', href: '/people' },
       { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time, it’s handled', href: '/realtors' },
       { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six tabs', href: '/deals' },

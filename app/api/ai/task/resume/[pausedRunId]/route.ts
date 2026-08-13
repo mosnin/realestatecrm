@@ -27,6 +27,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
@@ -35,50 +36,108 @@ import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import { streamTsResumeTurn } from '@/lib/ai-tools/sdk-chat-stream';
 import { clearChatStop } from '@/lib/chat/stop-signal';
+import {
+  finishConversationTurnV2,
+  resumePausedConversationTurnV2,
+  type ConversationTurnRecord,
+  type TurnTerminalOutcome,
+} from '@/lib/chat/turn-control';
+import { BODY_LIMITS, parseOrBadRequest, readJsonWithLimit } from '@/lib/validation';
 import { chatRuntime } from '@/lib/ai-tools/runtime-flag';
+import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import {
+  DEFAULT_WORK_EXECUTION_MODE,
+  parseWorkExecutionMode,
+} from '@/lib/chat/work-execution-mode';
+import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 
-interface PostBody {
-  approved: boolean;
-  message?: string;
-  callId?: string;
-}
+const resumeBodySchema = z.object({
+  approved: z.boolean(),
+  message: z.string().max(1000).optional(),
+  callId: z.string().trim().min(1).max(200).optional(),
+  editedArgs: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+type PostBody = z.infer<typeof resumeBodySchema>;
 
 interface PausedRunRow {
   id: string;
   spaceId: string;
   userId: string;
   conversationId: string | null;
+  turnId: string | null;
   runState: string;
   approvals: Array<{ callId: string; toolName: string; arguments: unknown; summary: string }>;
+  attachmentManifest: Array<{ id: string; filename?: string }>;
+  activeWorkbookContext?: unknown;
   status: 'pending' | 'resumed' | 'cancelled' | 'expired';
   expiresAt: string | null;
+}
+
+interface PersistedActiveWorkbookContext {
+  artifactId: string;
+  versionNumber: number;
+  title: string;
+}
+
+function parseActiveWorkbookContext(value: unknown): PersistedActiveWorkbookContext | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const context = value as Record<string, unknown>;
+  if (Object.keys(context).some((key) => key !== 'artifactId' && key !== 'versionNumber' && key !== 'title')) return null;
+  if (typeof context.artifactId !== 'string' || context.artifactId.length < 1 || context.artifactId.length > 200) return null;
+  if (!Number.isInteger(context.versionNumber) || (context.versionNumber as number) < 1) return null;
+  if (typeof context.title !== 'string' || context.title.length < 1 || context.title.length > 200) return null;
+  return { artifactId: context.artifactId, versionNumber: context.versionNumber as number, title: context.title };
+}
+
+/** Rehydrates only an identity that was server-derived at pause time. The
+ * approval arguments must agree but can never introduce workbook authority. */
+async function restoreApprovedWorkbookContext(
+  paused: PausedRunRow,
+  approvedArguments: unknown,
+  spaceId: string,
+): Promise<PersistedActiveWorkbookContext | null> {
+  const persisted = parseActiveWorkbookContext(paused.activeWorkbookContext);
+  if (!persisted || !approvedArguments || typeof approvedArguments !== 'object' || Array.isArray(approvedArguments)) return null;
+  const args = approvedArguments as Record<string, unknown>;
+  if (args.artifactId !== persisted.artifactId || args.sourceVersionNumber !== persisted.versionNumber || args.workbookTitle !== persisted.title) return null;
+  try {
+    const { data: artifact } = await supabase
+      .from('Artifact')
+      .select('id, title, artifactType, currentVersionId')
+      .eq('id', persisted.artifactId)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!artifact || artifact.artifactType !== 'workbook' || artifact.title !== persisted.title) return null;
+    const { data: version } = await supabase
+      .from('ArtifactVersion')
+      .select('id, versionNumber')
+      .eq('artifactId', persisted.artifactId)
+      .eq('spaceId', spaceId)
+      .eq('versionNumber', persisted.versionNumber)
+      .maybeSingle();
+    if (!version || version.versionNumber !== persisted.versionNumber) return null;
+    return persisted;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ pausedRunId: string }> },
 ) {
-  // Guardrail: this endpoint only makes sense when the TS runtime is on.
-  // If someone hits it on a default-modal deploy we 404 — keeps the
-  // contract honest with the flag.
-  if (chatRuntime() !== 'ts') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
 
   const { pausedRunId } = await params;
-  if (!pausedRunId || typeof pausedRunId !== 'string') {
+  if (!pausedRunId || typeof pausedRunId !== 'string' || pausedRunId.length > 200) {
     return NextResponse.json({ error: 'pausedRunId required' }, { status: 400 });
   }
 
-  let body: PostBody;
-  try {
-    body = (await req.json()) as PostBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-  if (typeof body.approved !== 'boolean') {
-    return NextResponse.json({ error: 'approved (boolean) required' }, { status: 400 });
-  }
+  const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
+  if (!read.ok) return read.response;
+  const parsed = parseOrBadRequest(resumeBodySchema, read.data);
+  if (!parsed.ok) return parsed.response;
+  const body: PostBody = parsed.data;
 
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -90,20 +149,24 @@ export async function POST(
   }
 
   // Load + scope check. The userId stored on the row is the Clerk userId.
+  // Keep old, feature-off deployments compatible until the additive Slice C
+  // migration is applied. Once Workbench is enabled, the field is mandatory
+  // for an approved transform and validation below fails closed if absent.
+  const pausedColumns = isWorkbenchEnabled()
+    ? 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt'
+    : 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, status, expiresAt';
   const { data: row, error } = await supabase
     .from('AgentPausedRun')
-    .select('id, spaceId, userId, conversationId, runState, approvals, status, expiresAt')
+    .select(pausedColumns)
     .eq('id', pausedRunId)
+    .eq('userId', auth.userId)
     .maybeSingle();
   if (error) {
     logger.error('[ai/task resume] load failed', { pausedRunId }, error);
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const paused = row as PausedRunRow;
-  if (paused.userId !== auth.userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const paused = row as unknown as PausedRunRow;
   if (paused.status !== 'pending') {
     return NextResponse.json({ error: `Run is ${paused.status}` }, { status: 409 });
   }
@@ -140,11 +203,36 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Resume must restore the persisted conversation mode server-side. A Work
+  // run rebuilt as Chat would let a newly proposed connected-app write create
+  // an approval interruption that the Work UI intentionally does not render.
+  // If the binding cannot be proven, stop before rehydrating provider tools.
+  let workMode = false;
+  let workExecutionMode = DEFAULT_WORK_EXECUTION_MODE;
+  if (paused.conversationId) {
+    const { data: conversation, error: conversationError } = await supabase
+      .from('Conversation')
+      .select('title, mode, executionMode')
+      .eq('id', paused.conversationId)
+      .eq('spaceId', paused.spaceId)
+      .maybeSingle();
+    if (conversationError || !conversation || isReservedConversationTitle(conversation.title)) {
+      return NextResponse.json(
+        { error: 'Conversation mode could not be restored for this run.' },
+        { status: 409 },
+      );
+    }
+    workMode = conversation.mode === 'work';
+    workExecutionMode = parseWorkExecutionMode(conversation.executionMode);
+  }
+
   const abortController = new AbortController();
   const ctx: ToolContext = {
     userId: auth.userId,
     space: { id: space.id, slug: space.slug, name: space.name, ownerId: space.ownerId },
     signal: abortController.signal,
+    workMode,
+    workExecutionMode,
   };
 
   // Pick which approval the decision applies to. The body can name a
@@ -154,32 +242,101 @@ export async function POST(
   if (!callId) {
     return NextResponse.json({ error: 'No pending approvals on this run' }, { status: 400 });
   }
-
-  // Mark the row resumed before we kick off the stream. If the model's
-  // continuation lands a NEW pause, the stream pump will write a NEW
-  // AgentPausedRun row — we don't reuse the old one because the run state
-  // has advanced past it.
-  // Compare-and-swap: only the request that flips pending→resumed proceeds.
-  // Without the status filter two concurrent resumes both passed the
-  // `status !== 'pending'` check above and both ran the approved tool.
-  const { data: marked, error: markErr } = await supabase
-    .from('AgentPausedRun')
-    .update({ status: 'resumed', updatedAt: new Date().toISOString() })
-    .eq('id', paused.id)
-    .eq('status', 'pending')
-    .select('id');
-  if (markErr) {
-    logger.error('[ai/task resume] status update failed', { pausedRunId }, markErr);
-    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  const approvedCall = paused.approvals.find((approval) => approval.callId === callId);
+  if (!approvedCall) return NextResponse.json({ error: 'Approval not found' }, { status: 400 });
+  const workbenchTool = approvedCall?.toolName === 'open_spreadsheet_in_workbench'
+    || approvedCall?.toolName === 'apply_workbook_transformation';
+  // A transform approval is an exact compare-and-swap over the inspected
+  // source id/hash and named operations. It is never an editable template.
+  if (approvedCall?.toolName === 'apply_workbook_transformation' && body.editedArgs !== undefined) {
+    return NextResponse.json({ error: 'Exact workbook approvals cannot be edited.' }, { status: 400 });
   }
-  if (!marked || marked.length === 0) {
-    return NextResponse.json({ error: 'Run is already resumed' }, { status: 409 });
+  if (chatRuntime() !== 'ts' && !workbenchTool) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (workbenchTool && !isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (approvedCall?.toolName === 'open_spreadsheet_in_workbench') {
+    const args = approvedCall.arguments as { attachmentId?: unknown; attachmentFilename?: unknown } | null;
+    const attachmentId = args?.attachmentId;
+    const attachment = typeof attachmentId === 'string'
+      ? paused.attachmentManifest?.find((candidate) => candidate.id === attachmentId)
+      : undefined;
+    // Approval arguments select a member of the server-hydrated, persisted
+    // manifest; they never create attachment authority themselves.
+    if (body.approved) {
+      if (!attachment || typeof args?.attachmentFilename !== 'string' || args.attachmentFilename !== attachment.filename) return NextResponse.json({ error: 'Invalid approved attachment' }, { status: 400 });
+      ctx.attachmentIds = [attachment.id];
+      ctx.attachmentManifest = [{ id: attachment.id, filename: attachment.filename ?? '' }];
+    }
+  }
+  try { await assertSpaceEnabled(paused.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
+
+  if (approvedCall?.toolName === 'apply_workbook_transformation' && body.approved) {
+    const activeWorkbook = await restoreApprovedWorkbookContext(paused, approvedCall.arguments, paused.spaceId);
+    if (!activeWorkbook) {
+      return NextResponse.json({ error: 'That workbook is no longer available for this approval. Reopen and inspect it again.' }, { status: 409 });
+    }
+    ctx.activeWorkbook = activeWorkbook;
+  }
+
+  // New durable turns resume the approval row and exact ConversationTurn in
+  // one database transaction. This prevents the continuation from running
+  // while its parent remains `paused` and holding every later queued message.
+  let resumedTurn: ConversationTurnRecord | null = null;
+  if (paused.turnId) {
+    try {
+      resumedTurn = await resumePausedConversationTurnV2(supabase, {
+        pausedRunId: paused.id,
+        turnId: paused.turnId,
+        spaceId: paused.spaceId,
+        userId: auth.userId,
+      });
+    } catch (resumeError) {
+      logger.warn('[ai/task resume] durable resume rejected', { pausedRunId }, resumeError);
+      return NextResponse.json({ error: 'Run is already resumed or no longer active' }, { status: 409 });
+    }
+  } else {
+    // Rolling-deploy compatibility for approval rows created before the turn
+    // ledger migration. These cannot hold a ConversationTurn queue.
+    const { data: marked, error: markErr } = await supabase
+      .from('AgentPausedRun')
+      .update({ status: 'resumed', updatedAt: new Date().toISOString() })
+      .eq('id', paused.id)
+      .eq('status', 'pending')
+      .select('id');
+    if (markErr) {
+      logger.error('[ai/task resume] status update failed', { pausedRunId }, markErr);
+      return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+    }
+    if (!marked || marked.length === 0) {
+      return NextResponse.json({ error: 'Run is already resumed' }, { status: 409 });
+    }
   }
 
   // A resume is a new streaming turn on the same conversation, so it needs the
   // same stale-Stop clear the initial turn gets in app/api/ai/task — otherwise
   // an old flag aborts the continuation the moment the realtor approves.
-  if (paused.conversationId) await clearChatStop(paused.conversationId);
+  if (paused.turnId) await clearChatStop(paused.turnId);
+
+  if (resumedTurn && !resumedTurn.attemptToken) {
+    logger.error('[ai/task resume] resumed turn missing attempt authority', {
+      pausedRunId,
+      turnId: resumedTurn.id,
+    });
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  }
+  const resumedAttemptToken = resumedTurn?.attemptToken ?? undefined;
+
+  const settleTurn = resumedTurn
+      ? async (outcome: TurnTerminalOutcome) => {
+        if (!resumedAttemptToken) throw new Error('Missing resumed turn attempt authority.');
+        return finishConversationTurnV2(supabase, {
+          turnId: resumedTurn.id,
+          spaceId: resumedTurn.spaceId,
+          conversationId: resumedTurn.conversationId,
+          attemptToken: resumedAttemptToken,
+          outcome,
+        });
+      }
+    : undefined;
 
   return streamTsResumeTurn({
     ctx,
@@ -190,5 +347,12 @@ export async function POST(
       ? { approved: true }
       : { approved: false, message: body.message },
     abortController,
+    ...(resumedTurn
+      ? {
+          turnId: resumedTurn.id,
+          attemptToken: resumedAttemptToken,
+          onSettled: settleTurn,
+        }
+      : {}),
   });
 }

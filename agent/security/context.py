@@ -63,6 +63,15 @@ class AgentContext:
     # other run path (chat, routine, sweep, manual run-now).
     trigger_source: dict = field(default_factory=dict, compare=False)
 
+    # Execution class is injected by the entrypoint, never supplied to a tool
+    # by the model.  Internal action helpers mint a short-lived grant from the
+    # fixed run/space/user values and this mode at each call boundary.
+    run_mode: str = field(default="interactive", compare=False)
+    # The visible chat/event correlation can be a legacy non-UUID string.
+    # Capability claims require a UUID, so entrypoints retain a separate
+    # authority identifier without changing existing event stream keys.
+    run_policy_run_id: str = field(default="", compare=False)
+
     # ── find_integration_tool loop guard ─────────────────────────────────
     # Counts integration discoveries this run that came back empty or errored.
     # The dispatcher hard-stops after two so a failing/empty search can't grind
@@ -79,7 +88,9 @@ class AgentContext:
         brokerage_id: str = "",
         broker_role: str = "",
         trigger_source: dict | None = None,
-    ) -> "AgentContext":
+        run_mode: str = "interactive",
+        run_policy_run_id: str = "",
+    ) -> AgentContext:
         return cls(
             space_id=settings.space_id,
             space_name=space_name,
@@ -89,5 +100,6 @@ class AgentContext:
             brokerage_id=brokerage_id,
             broker_role=broker_role,
             trigger_source=trigger_source or {},
+            run_mode=run_mode,
+            run_policy_run_id=run_policy_run_id,
         )
-

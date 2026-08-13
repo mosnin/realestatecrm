@@ -21,6 +21,13 @@ import { executeToolForEntity, composioConfigured } from '@/lib/integrations/com
 import { checkRateLimit } from '@/lib/rate-limit';
 import { userOwnsSpace } from '@/lib/space';
 import { logger } from '@/lib/logger';
+import {
+  RUN_POLICY_HEADER,
+  mayExecuteIntegrationAction,
+  runPolicyEnforcementMode,
+  verifyRunPolicy,
+} from '@/lib/agent/run-policy';
+import { classifyIntegrationAction } from '@/lib/integrations/action-policy';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -73,6 +80,67 @@ export async function POST(req: NextRequest) {
   // this is defense-in-depth on top of that.
   if (!(await userOwnsSpace(spaceId, userId))) {
     return NextResponse.json({ ok: false, error: 'space/user mismatch' }, { status: 403 });
+  }
+
+  // A bearer secret authenticates the worker process, not the authority of
+  // this particular run. Signed, tenant-bound run policy is the capability
+  // boundary. Shadow mode preserves existing customer flows while trusted
+  // callers are migrated; an explicitly signed unattended grant is enforced
+  // immediately and can never perform a write.
+  const actionClass = classifyIntegrationAction(slug);
+  const policyToken = req.headers.get(RUN_POLICY_HEADER);
+  const policy = verifyRunPolicy(policyToken, { spaceId });
+  if (policy.ok) {
+    // The signed grant is issued for exactly the Composio entity whose body
+    // userId will receive the effect.  A valid grant for another user is not
+    // transferable merely because both users can access the same space.
+    if (policy.claims.subject !== userId) {
+      logger.warn('[integrations.execute] run policy subject mismatch', {
+        runId: policy.claims.runId,
+        spaceId,
+        claimedSubject: policy.claims.subject,
+        userId,
+      });
+      return NextResponse.json(
+        { ok: false, error: 'Run capability grant is not bound to this user.', code: 'RUN_POLICY_DENIED' },
+        { status: 403 },
+      );
+    }
+    if (!mayExecuteIntegrationAction(policy.claims, actionClass)) {
+      logger.warn('[integrations.execute] run policy denied action', {
+        runId: policy.claims.runId,
+        spaceId,
+        mode: policy.claims.mode,
+        slug,
+        actionClass,
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'This run is not allowed to execute that integration action. Create a proposal for review.',
+          code: 'RUN_POLICY_DENIED',
+        },
+        { status: 403 },
+      );
+    }
+  } else if (policyToken || runPolicyEnforcementMode() === 'enforce') {
+    logger.warn('[integrations.execute] missing or invalid run policy', {
+      spaceId,
+      slug,
+      actionClass,
+      reason: policy.reason,
+    });
+    return NextResponse.json(
+      { ok: false, error: 'A valid run capability grant is required.', code: 'RUN_POLICY_REQUIRED' },
+      { status: 403 },
+    );
+  } else {
+    logger.warn('[integrations.execute] legacy caller allowed in shadow mode', {
+      spaceId,
+      slug,
+      actionClass,
+      reason: policy.reason,
+    });
   }
 
   // Per-space cap — the bearer secret authenticates Modal, but a runaway

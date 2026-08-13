@@ -1,16 +1,34 @@
 'use client';
 
 import type { HTMLAttributes } from 'react';
+import { motion, useReducedMotion, type HTMLMotionProps } from 'framer-motion';
+import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
-export interface MessageProps extends HTMLAttributes<HTMLDivElement> {
+export interface MessageProps
+  extends Omit<HTMLMotionProps<'div'>, 'animate' | 'initial' | 'role' | 'transition'> {
   role: 'user' | 'assistant' | 'system';
+  /** Plays a restrained entrance once, when this stable message row mounts. */
+  animateIn?: boolean;
 }
 
-export function Message({ role, className, ...props }: MessageProps) {
+export function Message({ role, animateIn = false, className, ...props }: MessageProps) {
+  const reduceMotion = useReducedMotion() ?? false;
+  const shouldAnimate = animateIn && !reduceMotion;
+
   return (
-    <div
+    <motion.div
       data-role={role}
+      data-animate-in={shouldAnimate ? 'true' : 'false'}
+      initial={
+        shouldAnimate
+          ? role === 'user'
+            ? { opacity: 0, y: 10, scale: 0.985 }
+            : { opacity: 0, y: 6 }
+          : false
+      }
+      animate={shouldAnimate ? { opacity: 1, y: 0, scale: 1 } : undefined}
+      transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
       className={cn(
         'flex w-full',
         role === 'user' && 'justify-end',

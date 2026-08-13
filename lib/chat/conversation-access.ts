@@ -58,10 +58,10 @@ export function isReservedConversationTitle(title: string | null | undefined): b
  * surface must gate on this. A false result means "deny": 404, or fall
  * through to the empty state. Never expose.
  */
-export function isRealtorConversation(
-  conv: { spaceId: string; title: string } | null | undefined,
+export function isRealtorConversation<T extends { spaceId: string; title: string }>(
+  conv: T | null | undefined,
   spaceId: string,
-): boolean {
+): conv is T {
   if (!conv) return false;
   if (conv.spaceId !== spaceId) return false;
   if (isReservedConversationTitle(conv.title)) return false;

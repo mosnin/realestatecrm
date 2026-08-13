@@ -120,7 +120,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'tours',
     title: 'Tours',
-    desc: 'Approve a time and the tour books itself, calendar, client, and deal all updated, confirmation sent.',
+    desc: 'Ask Chippi to book and the tour lands on the calendar, the client is confirmed, and the deal updates.',
     mockup: (
       <Frost title="Tours" badge="This week">
         <Row icon={CalendarCheck} title="Sat 2:00, 142 Oak St" meta="Sarah Chen" tone="text-[#ff9a6e]" right={<Chip label="Confirmed" tone="bg-emerald-400/15 text-emerald-300" />} active />

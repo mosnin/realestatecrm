@@ -217,41 +217,43 @@ and redeploy for them to take effect. `FIRECRAWL_API_KEY` is presumably
 already set if property analysis already works today; confirm both are
 present rather than assuming.
 
-### 3. Wire the headless browser-control worker into Modal
+### 3. Stage the Research Workspace worker in Modal
 
-This is a **code change**, not a config flip — nothing below is done yet.
-The full context and rationale lives in the "Modal wiring (NOT wired in)"
-comment block at the bottom of `agent/browser_headless.py`; summarized:
+The code path is implemented but feature-off. `agent/browser_modal_app.py`
+is a separate Modal app with a minimal Playwright image, bounded worker, and
+launch endpoint; the web app claims a fenced lease and starts or reuses that
+worker. Do not deploy `agent/modal_app.py` or reuse its broad secret bundle
+when staging this browser-only surface.
 
-1. Add `"playwright>=1.45,<2"` to `agent/pyproject.toml`'s `dependencies`.
-2. Extend the Modal `image` in `agent/modal_app.py` with the same pin and a
-   browser install, e.g.:
-   ```python
-   headless_image = image.pip_install("playwright>=1.45,<2").run_commands(
-       "playwright install --with-deps chromium"
-   )
-   ```
-3. Add an `@app.function` bound to `headless_image` that runs one session
-   to completion by calling `browser_headless.poll_and_execute(...)` — see
-   the sketch in `agent/browser_headless.py`'s trailing comment block for
-   the exact call shape (`base_url`, `internal_secret`, `session_id`).
-4. Wire something to actually **spawn** that function when a
-   `BrowserSession` with `source = 'headless'` is created.
-   `POST /api/browser-control/headless/start`
-   (`app/api/browser-control/headless/start/route.ts`) currently only
-   inserts the DB session row — its own docstring says explicitly it "does
-   NOT itself launch a Modal headless worker." Until this step exists,
-   queued headless actions sit unpicked-up until `ACTION_TTL_SECONDS`
-   (120s, `lib/browser-control/protocol.ts`) expires them. Steps 1–3 alone
-   are not sufficient to make headless sessions actually run.
+1. Deploy with `CHIPPI_BROWSER_MODAL_APP_NAME` set to an isolated staging app
+   name (the default is `chippi-browser`).
+2. Set `CHIPPI_BROWSER_MODAL_SECRET_NAME` to the isolated browser secret
+   containing only `CHIPPI_BROWSER_APP_URL` and
+   `CHIPPI_BROWSER_WORKER_SECRET`; do not alter it. If the staging Vercel
+   origin uses Deployment Protection, set optional
+   `CHIPPI_BROWSER_MODAL_BYPASS_SECRET_NAME` to a separate Modal secret
+   containing only `CHIPPI_BROWSER_VERCEL_BYPASS_SECRET`. When it is absent,
+   the worker receives an empty placeholder. The entrypoint uses
+   `modal.is_local()` plus remote empty placeholders, so both local deploy and
+   remote startup retain the same two-secret worker dependency graph.
+3. Apply the Research Workspace lease migration to the staging Supabase
+   project after its duplicate-active-session preflight passes.
+4. Configure the preview deployment's worker URL, matching worker secret,
+   server/client feature flags, and one explicit staging space allowlist.
+5. Verify an authenticated launch, first heartbeat, live frame,
+   multi-source cited result, reload, Stop, worker crash, and emergency flag
+   disable before considering a production canary.
 
-None of steps 1–4 are implemented as of this doc; they are scoped to the
-`agent/**` / Modal-deploy track, not the docs track that wrote this runbook.
+The code path for steps 1–4 is present, but none of those activation steps has
+been performed for the live `chippi` project by this integration. Keep both
+Research Workspace flags off until the isolated Modal app, migration, secrets,
+allowlist, and authenticated fault journey are verified together.
 
 ### 4. Redeploy Modal
 
-After step 3 lands: `cd agent && modal deploy modal_app.py` (or your CI's
-equivalent Modal deploy step). Confirm the new headless-worker function
+After the step 3 staging prerequisites are ready: `cd agent && modal deploy
+browser_modal_app.py` (or your CI's equivalent browser-only Modal deploy
+step). Confirm the new headless-worker function
 shows up in `modal app list` / the Modal dashboard before relying on it.
 
 ### 5. Load and submit the Chrome extension

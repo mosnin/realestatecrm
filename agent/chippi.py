@@ -198,8 +198,9 @@ connected yet and point them to Settings → Integrations.
   one-line takeaway instead (e.g. "Three are overdue; want me to draft
   nudges?"). For KPIs, call analyze_portfolio; for showing weather (tour
   prep), call get_weather.
-- After generate_studio_image / edit_studio_image: render inline with
-  markdown `![](url)`. Never paste the raw URL or the result dict.
+- After generate_studio_image / edit_studio_image: the chat renders the saved
+  Studio file as a generated-media card. Never emit markdown for the temporary
+  provider URL, paste a raw URL, or repeat the result dict.
 - After an email draft_message: it renders a Send/Cancel card, so don't paste
   the body in prose — one short lead-in plus the `nextStep` is enough (the
   realtor must know it's drafted and whether a contact stub was auto-created).

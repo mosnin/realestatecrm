@@ -4,24 +4,21 @@
  * One shared vocabulary for every card-like surface on the realtor and
  * brokerage dashboards, translated from the owner's reference design:
  *
- *   - large radius (rounded-3xl), borderless, whisper-soft shadow
- *   - flat bg-card surfaces on a softly washed canvas, generous padding
- *   - friendly semibold card titles with a quiet control at top-right
+ *   - compact 16px radius, precise hairline, shallow editorial elevation
+ *   - warm paper surfaces on a lightly inset canvas, generous padding
+ *   - quiet medium-weight card titles with a restrained control at top-right
  *   - small stat cards with a short vertical accent bar beside the label
  *   - statuses as small rounded-full bg-muted pills
- *   - ONE solid accent card per view (the "most alive" card)
+ *   - ONE graphite accent card per view (the "most alive" card)
  *   - a dot-matrix coverage viz + bottom "insight strip" pill for charts
  *
  * Everything here is SERVER-SAFE (no hooks, no client-only imports) so both
  * server pages (broker brief) and client islands (bento cells, analytics)
  * can compose the same classes.
  *
- * Color discipline: the accent is the sanctioned "agent energy" orange
- * family already used by the composer glow (#FF9F0A → #FF6A00, see
- * globals.css §Chippi composer). It is centralized HERE — consumers import
- * the primitives (or the class constants) instead of hand-rolling orange.
- * The single data-mark accent (#F25A00) passes the palette validator on
- * both the light (#ffffff) and dark (#151517) card surfaces at >= 3:1.
+ * Color discipline: interface selection and emphasis use graphite, matching
+ * the dashboard's primary controls. Brand warmth remains available to the
+ * Chippi composer and identity moments rather than filling whole cards.
  */
 
 import type { ReactNode } from 'react';
@@ -30,37 +27,39 @@ import { cn } from '@/lib/utils';
 
 /* ─── Class constants (compose onto arbitrary elements) ─────────────────── */
 
-/** The base card: large radius, borderless, whisper-soft shadow, flat. */
+/** The base card: warm paper, exact hairline, compact radius, shallow lift. */
 export const SURFACE_CARD =
-  'rounded-3xl bg-card text-card-foreground ' +
-  'shadow-[0_1px_2px_rgb(17_17_19/0.03),0_12px_32px_-20px_rgb(17_17_19/0.12)]';
+  'rounded-2xl border border-border/85 bg-card text-card-foreground ' +
+  'shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.22)]';
 
 /** Generous default padding for a surface card. */
 export const SURFACE_CARD_PAD = 'p-6 sm:p-7';
 
 /**
- * The ONE solid accent card per view — calm, barely-gradient agent orange
- * with white ink. Inner elements on it use white/20 translucent surfaces
- * (see ACCENT_CARD_PILL). Same geometry as SURFACE_CARD.
+ * The ONE solid accent card per view — restrained graphite with white ink.
+ * It echoes the reference's selected controls without turning the dashboard
+ * into a field of dark panels. Same geometry as SURFACE_CARD.
  */
 export const ACCENT_CARD =
-  'rounded-3xl text-white bg-gradient-to-br from-[#FF9500] to-[#F25A00] ' +
-  'shadow-[0_1px_2px_rgb(242_90_0/0.10),0_16px_40px_-24px_rgb(242_90_0/0.55)]';
+  'rounded-2xl border border-[#18181a] bg-[#18181a] text-white ' +
+  'dark:border-white/10 dark:bg-[#202024] ' +
+  'shadow-[0_1px_1px_rgb(17_17_19/0.06),0_8px_22px_-16px_rgb(17_17_19/0.42)]';
 
 /** Translucent white pill for controls that live ON the accent card. */
 export const ACCENT_CARD_PILL =
   'inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium ' +
-  'bg-white/20 text-white hover:bg-white/30 transition-colors duration-150 ' +
+  'border border-white/15 bg-white/10 text-white hover:bg-white/15 transition-colors duration-150 ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60';
 
-/** Friendly card title — semibold, tracking-tight, top-left of the card. */
-export const CARD_TITLE = 'text-lg font-semibold tracking-tight text-foreground';
+/** Quiet editorial card title — medium weight, top-left of the card. */
+export const CARD_TITLE =
+  'text-[17px] leading-snug font-medium tracking-[-0.01em] text-foreground';
 
 /**
  * The single accent used for data marks (dot-matrix fills, chart accents).
  * Validated against both card surfaces — do not lighten it.
  */
-export const DATA_ACCENT_HEX = '#F25A00';
+export const DATA_ACCENT_HEX = '#202023';
 
 /* ─── SurfaceCard ────────────────────────────────────────────────────────── */
 
@@ -126,7 +125,7 @@ export function AccentBarLabel({
     <span className={cn('flex items-center gap-2 min-w-0', className)}>
       <span
         aria-hidden
-        className="h-3.5 w-1 shrink-0 rounded-full bg-gradient-to-b from-[#FF9500] to-[#F25A00]"
+        className="h-3.5 w-px shrink-0 rounded-full bg-foreground/65"
       />
       <span className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
         {children}
@@ -201,7 +200,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/80',
+        'inline-flex items-center rounded-full border border-border/80 bg-background/75 px-2.5 py-0.5 text-xs font-medium text-foreground/80 shadow-[0_1px_1px_rgb(17_17_19/0.025)]',
         className,
       )}
     >
@@ -251,7 +250,7 @@ export function InsightStrip({
     </>
   );
   const shell = cn(
-    'mt-4 flex items-center gap-2.5 rounded-2xl bg-muted/60 px-4 py-3',
+    'mt-4 flex items-center gap-2.5 rounded-xl border border-border/70 bg-muted/35 px-4 py-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.55)]',
     className,
   );
   if (href) {

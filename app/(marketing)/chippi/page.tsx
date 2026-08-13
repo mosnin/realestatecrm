@@ -37,7 +37,7 @@ export default function MeetChippiPage() {
           description="Chippi lives inside your CRM and works the hours between closings: reading, drafting, booking, and logging. You get the decisions, not the busywork."
           features={[
             { icon: 'Inbox', title: 'Reads every lead', desc: 'Every inbound read the moment it lands, history in context.' },
-            { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'A reply waiting before you open the thread.' },
+            { icon: 'MessagesSquare', title: 'Replies sent in your voice', desc: 'Ask Chippi to reply and it sends through your connected inbox.' },
             { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times proposed against your real availability.' },
           ]}
           image="/marketing/chippi-hero.jpg"

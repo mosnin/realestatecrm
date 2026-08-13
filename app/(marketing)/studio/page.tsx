@@ -228,7 +228,7 @@ export default function StudioPage() {
                   <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">From one listing</h3>
                   <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
                     <PenLine className="h-4 w-4 text-[#ff4b29]" />
-                    Drafts ready
+                    Actions completed
                   </span>
                 </div>
 

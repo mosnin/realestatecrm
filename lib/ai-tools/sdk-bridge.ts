@@ -19,15 +19,18 @@
  * What does NOT live here — yet:
  *   - The custom-loop's persistence/streaming/sub-agent wiring. Those
  *     stay on `loop.ts` until the cutover PR.
- *   - Rate limiting. We keep enforcement in our `executeTool` wrapper
- *     (the bridge's `execute` calls into our existing rate-limit gate
- *     so behavior is preserved across both code paths).
+ *
+ * Rate limiting DOES live at this boundary because the Agents SDK invokes
+ * the bridged handler directly and never passes through `executeTool`.
+ * Keeping the same key and cap here preserves the legacy blast-radius policy.
  *
  * Approval flow mapping:
  *   - our `requiresApproval: false`         → SDK `needsApproval: false`
  *   - our `requiresApproval: true`          → SDK `needsApproval: true`
  *   - our `requiresApproval: 'maybe'`       → SDK `needsApproval: async (...)` that
  *                                              calls our `shouldApprove(args, ctx)`
+ *   - an exact tool name in the server-derived Work-mode execution grant
+ *                                             → SDK `needsApproval: false`
  *
  * The realtor-facing `summariseCall` is OUR concern, not the SDK's. The
  * caller of `run()` reads `result.interruptions` and renders the message
@@ -37,6 +40,7 @@
 
 import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@openai/agents';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/rate-limit';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
 const DEFAULT_MODEL = 'gpt-5-mini';
@@ -65,6 +69,14 @@ export type ToolResultSink = (
 /** Shape of the SDK's third `execute` arg — only the bit we read (the call id). */
 type ToolCallDetailsLike = { toolCall?: { callId?: string } };
 
+function formatRateLimitWindow(windowSeconds: number): string {
+  if (windowSeconds === 3_600) return 'hour';
+  if (windowSeconds === 60) return 'minute';
+  if (windowSeconds % 3_600 === 0) return `${windowSeconds / 3_600} hours`;
+  if (windowSeconds % 60 === 0) return `${windowSeconds / 60} minutes`;
+  return `${windowSeconds} seconds`;
+}
+
 /**
  * Convert one of our tools into an SDK `FunctionTool`.
  *
@@ -79,8 +91,18 @@ export function toSdkTool<TArgs, TData>(
   ctx: ToolContext,
   sink?: ToolResultSink,
 ) {
+  // Work mode alone is not authorization for every exposed mutation. The
+  // caller derives a narrow per-turn grant from the exact user message; tools
+  // outside that set retain their normal confirmation policy.
+  const directlyAuthorized =
+    ctx.workMode === true &&
+    ctx.workExecutionMode !== 'review' &&
+    def.riskLevel !== 'destructive' &&
+    ctx.directExecutionToolNames?.includes(def.name) === true;
   const needsApproval =
-    def.requiresApproval === false
+    directlyAuthorized
+      ? false
+      : def.requiresApproval === false
       ? false
       : def.requiresApproval === 'maybe'
         ? async (_runCtx: RunContext, input: unknown) => {
@@ -110,6 +132,20 @@ export function toSdkTool<TArgs, TData>(
     needsApproval,
     async execute(input, _runCtx, details) {
       try {
+        // The SDK runtime invokes this callback directly; it does not pass
+        // through executeTool(). Enforce the definition's blast-radius cap at
+        // this boundary before any handler side effect can occur.
+        if (def.rateLimit) {
+          const { allowed } = await checkRateLimit(
+            `ai:tool:${def.name}:${ctx.userId}`,
+            def.rateLimit.max,
+            def.rateLimit.windowSeconds,
+          );
+          if (!allowed) {
+            return `Error: Rate limit reached for "${def.name}" (${def.rateLimit.max} per ${formatRateLimitWindow(def.rateLimit.windowSeconds)}). Try again later.`;
+          }
+        }
+
         const result: ToolResult = await def.handler(input as never, ctx);
         // Route the structured payload to the stream pump's sink (keyed by
         // SDK call id) so the rich card gets `data`/`display` while the model
@@ -310,9 +346,19 @@ function readDescription(field: z.ZodTypeAny): string | undefined {
   return (field as unknown as { _def?: { description?: string } })._def?.description;
 }
 
-function serialiseResult(result: ToolResult): string {
+/** Every inner agent step can replay tool output. This is a hard boundary for
+ * model-only context across the entire registry, not only Workbench. */
+export const MAX_TOOL_MODEL_CONTEXT_BYTES = 12 * 1024;
+
+export function serialiseResult(result: ToolResult): string {
   if (result.display === 'error') return `Error: ${result.summary}`;
-  return result.summary;
+  if (!result.modelContext) return result.summary;
+  if (new TextEncoder().encode(result.modelContext).byteLength > MAX_TOOL_MODEL_CONTEXT_BYTES) {
+    // Deliberately omit rather than truncate: a partial JSON/data payload can
+    // change meaning, and tool output must never reopen transcript blowups.
+    return result.summary;
+  }
+  return `${result.summary}\n\n${result.modelContext}`;
 }
 
 interface RunAgentInput {

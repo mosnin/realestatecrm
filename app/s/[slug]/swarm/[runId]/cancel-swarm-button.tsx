@@ -21,6 +21,24 @@ interface CancelSwarmButtonProps {
   slug: string;
 }
 
+export async function cancelSwarmFromMonitor(
+  runId: string,
+  refresh: () => void,
+  fetcher: typeof fetch = fetch,
+): Promise<'cancelled' | 'terminal'> {
+  const response = await fetcher(`/api/swarm/${runId}/cancel`, { method: 'POST' });
+  if (response.ok) {
+    refresh();
+    return 'cancelled';
+  }
+  if (response.status === 409) {
+    refresh();
+    return 'terminal';
+  }
+  const body = (await response.json().catch(() => ({}))) as { error?: string };
+  throw new Error(body.error ?? 'Failed to cancel.');
+}
+
 export function CancelSwarmButton({ runId, slug: _slug }: CancelSwarmButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -28,18 +46,14 @@ export function CancelSwarmButton({ runId, slug: _slug }: CancelSwarmButtonProps
   async function handleCancel() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/swarm/${runId}/cancel`, { method: 'POST' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast.error(
-          typeof body.error === 'string' ? body.error : 'Failed to cancel.',
-        );
-        return;
+      const outcome = await cancelSwarmFromMonitor(runId, () => router.refresh());
+      if (outcome === 'terminal') {
+        toast.info('This task already finished. Refreshing its result.');
+      } else {
+        toast.success('Swarm cancelled.');
       }
-      toast.success('Swarm cancelled.');
-      router.refresh();
-    } catch {
-      toast.error('Something went wrong. Try again.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
@@ -62,7 +76,9 @@ export function CancelSwarmButton({ runId, slug: _slug }: CancelSwarmButtonProps
         <AlertDialogHeader>
           <AlertDialogTitle>Cancel this swarm?</AlertDialogTitle>
           <AlertDialogDescription>
-            The swarm will stop. Work completed by agents so far will not be lost.
+            No new specialist phase will start. A model call already in progress may finish
+            before Chippi reaches the cancellation boundary, but its result will not replace
+            the cancelled run. Work completed earlier will remain visible.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

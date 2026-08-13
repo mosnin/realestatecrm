@@ -1,14 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  XCircle,
-  MinusCircle,
-  Lock,
   Users,
   Briefcase,
   Building2,
@@ -17,10 +10,15 @@ import {
   BarChart3,
   Mail,
   MessageSquare,
+  Workflow,
   Wrench,
+  Table2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tool, ToolStatus, type ToolState } from '@/components/ai/prompt-kit';
+import {
+  AgentToolResult,
+  type AgentToolResultStatus,
+} from '@/components/ai/agent-status';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ToursResult } from './tool-results/tours-result';
 import { AvailabilityPickerCard } from './tool-results/availability-picker-card';
@@ -33,56 +31,10 @@ import { AreaResult } from './tool-results/area-result';
 import { OptionListResult } from './tool-results/option-list-result';
 import { QuestionFlowResult } from './tool-results/question-flow-result';
 import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
+import { GeneratedImageResult } from './tool-results/generated-image-result';
+import { ChippiOpenUiRenderer } from '@/components/ai/openui/chippi-openui-renderer';
 import type { OptionListInput, QuestionFlowInput } from './tool-results/tool-ui-mappers';
 import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
-
-/**
- * Row-level shimmer styles for the running state. A gentle gradient sweep
- * across the row, paper-flat in tone. STYLESHEET.md "premium" voice:
- * subtle, expensive-feeling, opacity capped low so the row never feels
- * busy. Injected on first mount and dedup'd by id so the second mount
- * doesn't re-add the stylesheet.
- *
- * The existing `an-tg-shimmer` class in tool-group.tsx is text-only
- * (background-clip: text). Tool-call-row shimmer needs to sweep across
- * the entire row, so the gradient lives on a pseudo-element overlay
- * sized to 200% of the row width and animated via background-position.
- */
-const ROW_SHIMMER_KEY = 'an-tool-call-row-shimmer';
-
-function ensureRowShimmerStyles() {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(ROW_SHIMMER_KEY)) return;
-  const style = document.createElement('style');
-  style.id = ROW_SHIMMER_KEY;
-  style.textContent = `
-@keyframes an-tool-call-row-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-.an-tool-call-row-shimmer {
-  background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: an-tool-call-row-shimmer 1.8s ease-in-out infinite;
-}
-.dark .an-tool-call-row-shimmer {
-  background-image: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%);
-}
-@keyframes an-tool-call-icon-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-.an-tool-call-icon-pulse {
-  animation: an-tool-call-icon-pulse 1.6s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .an-tool-call-row-shimmer { animation: none; }
-  .an-tool-call-icon-pulse { animation: none; opacity: 1; }
-}
-`;
-  document.head.appendChild(style);
-}
 
 /** Per-tool icon map. Generic Wrench fallback keeps unknown tools readable. */
 const TOOL_ICONS: Record<string, typeof Users> = {
@@ -97,6 +49,9 @@ const TOOL_ICONS: Record<string, typeof Users> = {
   send_email_now: Mail,
   send_sms_now: MessageSquare,
   draft_message: Mail,
+  add_person: Users,
+  create_automation: Workflow,
+  analyze_property_values: BarChart3,
   add_property: Building2,
   find_property: Building2,
   search_properties: Building2,
@@ -120,13 +75,16 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   reschedule_tour: 'Checking calendar…',
   check_availability: 'Checking calendar…',
   find_tours: 'Checking calendar…',
-  send_email: 'Drafting…',
+  send_email: 'Sending email…',
   draft_email: 'Drafting…',
   draft_message: 'Drafting…',
   send_email_now: 'Sending…',
   send_sms_now: 'Texting…',
-  send_sms: 'Writing…',
+  send_sms: 'Sending text…',
   draft_sms: 'Writing…',
+  add_person: 'Creating contact…',
+  create_automation: 'Creating automation…',
+  analyze_property_values: 'Analyzing property values…',
   recall_history: 'Checking history…',
   create_plan: 'Planning…',
   planner: 'Planning…',
@@ -144,6 +102,17 @@ const TOOL_RUNNING_LABEL: Record<string, string> = {
   clear_followup: 'Updating…',
 };
 
+/** Successful mutations and grounded analyses deserve an explicit receipt. */
+const TOOL_COMPLETE_LABEL: Record<string, string> = {
+  send_email: 'Email sent',
+  send_sms: 'Text sent',
+  add_person: 'Contact created',
+  create_automation: 'Automation created',
+  analyze_property_values: 'Analysis grounded',
+};
+
+const EXECUTION_RECEIPT_TOOLS = new Set(Object.keys(TOOL_COMPLETE_LABEL));
+
 /** Friendly title — the tool's name is snake_case, UI wants "Search contacts". */
 function friendlyName(name: string): string {
   return name
@@ -152,9 +121,9 @@ function friendlyName(name: string): string {
     .join(' ');
 }
 
-/** Keep failure messages short enough to fit the transcript column. The full
- *  text stays in the expandable detail pane. */
-function truncateErrorMessage(text: string, max: number): string {
+/** Keep inline messages short enough to fit the transcript column. The full
+ *  result stays in the expandable detail pane. */
+function truncateInlineMessage(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1).trimEnd()}…`;
 }
@@ -208,6 +177,7 @@ interface ToolCallBlockViewProps {
    *  through this prop. The workspace forwards them as the next user
    *  message. Omitted on read-only history surfaces. */
   onUserIntent?: (text: string) => void;
+  onOpenWorkbench?: (artifactId: string) => void;
   className?: string;
 }
 
@@ -215,66 +185,34 @@ export function ToolCallBlockView({
   block,
   live,
   onUserIntent,
+  onOpenWorkbench,
   className,
 }: ToolCallBlockViewProps) {
-  const [expanded, setExpanded] = useState(false);
   const Icon = TOOL_ICONS[block.name] ?? Wrench;
 
-  // Inject the row-shimmer keyframes once per process. Cheap — the early
-  // return inside ensureRowShimmerStyles dedupes via the stylesheet id.
-  useEffect(() => {
-    ensureRowShimmerStyles();
-  }, []);
+  // Rollback must remove the complete Workbench affordance, including the
+  // generic tool row whose friendly name would otherwise reveal a disabled
+  // feature in historical transcripts. Full Chippi passes this callback only
+  // while the deployment flag is enabled.
+  if (block.display === 'workbench' && !onOpenWorkbench) return null;
 
-  const status: ToolState = live ? 'running' : block.status;
-
-  const {
-    label,
-    iconEl,
-    tint,
-  }: { label: string; iconEl: React.ReactNode; tint: string } = (() => {
-    switch (status) {
-      case 'running':
-        // The row-level shimmer IS the running indicator now — a single
-        // calm signal across the row. Dropping the spinner glyph next to
-        // the label keeps the running pill as one quiet line; double
-        // motion (spinner + shimmer) reads as busy. Apple-style: pick.
-        return {
-          label: TOOL_RUNNING_LABEL[block.name] ?? 'Working…',
-          iconEl: null,
-          tint: 'text-muted-foreground',
-        };
-      case 'complete':
-        return {
-          label: 'Complete',
-          iconEl: <CheckCircle2 size={12} />,
-          tint: 'text-emerald-600 dark:text-emerald-400',
-        };
-      case 'error':
-        // Neutral, not red — a failed tool mid-task shouldn't alarm the realtor
-        // (the agent routinely tries a few tools). Same muted tone as the other
-        // terminal states; the XCircle glyph still marks it as failed.
-        return {
-          label: 'Failed',
-          iconEl: <XCircle size={12} />,
-          tint: 'text-muted-foreground',
-        };
-      case 'denied':
-        return {
-          label: 'Denied',
-          iconEl: <Lock size={12} />,
-          tint: 'text-muted-foreground',
-        };
-      case 'skipped':
-        return {
-          label: 'Skipped',
-          iconEl: <MinusCircle size={12} />,
-          tint: 'text-muted-foreground',
-        };
-      default:
-        return { label: status, iconEl: null, tint: 'text-muted-foreground' };
-    }
-  })();
+  const status = live ? 'running' : block.status;
+  const resultStatus: AgentToolResultStatus = status === 'running'
+    ? 'running'
+    : status === 'complete'
+      ? 'success'
+      : status === 'error'
+        ? 'error'
+        : 'cancelled';
+  const resultTitle = status === 'running'
+    ? TOOL_RUNNING_LABEL[block.name] ?? 'Working…'
+    : status === 'complete'
+      ? TOOL_COMPLETE_LABEL[block.name] ?? `${friendlyName(block.name)} complete`
+      : status === 'error'
+        ? `${friendlyName(block.name)} failed`
+        : status === 'denied'
+          ? `${friendlyName(block.name)} denied`
+          : `${friendlyName(block.name)} skipped`;
 
   // Phase 5 — rich inline result rendering. Tools opt in via the `display`
   // hint on their handler return. When the result resolves successfully and
@@ -284,6 +222,30 @@ export function ToolCallBlockView({
     if (status !== 'complete' || !block.result?.ok) return null;
     const data = block.result.data as Record<string, unknown> | undefined;
     if (!data) return null;
+    if (block.display === 'openui' && typeof data.program === 'string') {
+      return <ChippiOpenUiRenderer program={data.program} />;
+    }
+    // A persisted tool result can outlive a rollout. Without an enabled opener,
+    // suppress the whole Workbench-specific card rather than advertise an inert
+    // customer control after the feature has been rolled back.
+    if (
+      block.display === 'workbench'
+      && typeof data.artifactId === 'string'
+      && onOpenWorkbench
+    ) {
+      return (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+          <span className="inline-flex items-center gap-2 text-xs text-foreground"><Table2 className="size-3.5" /> Workbook ready</span>
+          <button
+            type="button"
+            onClick={() => onOpenWorkbench(data.artifactId as string)}
+            className="text-xs font-medium underline underline-offset-4"
+          >
+            Open in Workbench
+          </button>
+        </div>
+      );
+    }
     // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
     // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
@@ -353,97 +315,103 @@ export function ToolCallBlockView({
     return null;
   })();
 
+  // Inline execution receipts keep consequential successes honest: the user
+  // can see what actually happened without expanding developer details or
+  // relying on the assistant's follow-up prose. Read-only tools stay compact
+  // so ordinary searches do not duplicate the next chat message.
+  const inlineSuccess =
+    status === 'complete' &&
+    block.result?.ok === true &&
+    EXECUTION_RECEIPT_TOOLS.has(block.name) &&
+    block.result.summary.trim()
+      ? truncateInlineMessage(block.result.summary.trim(), 220)
+      : null;
+
   // Inline error breadcrumb. On failure the realtor needs to know WHY without
   // hunting for the expand chevron — Stream C's status-honesty pattern
   // (commit 4859066). Truncated to keep the transcript scannable; the full
   // text remains in the expandable details pane.
   //
-  // Inline textual SUCCESS summary used to render here too, but that
-  // duplicated whatever the LLM already said in the following text block —
-  // a row of redundant copy below every read. Removed in this pass; the
-  // collapsed row is now icon + label + status, with the rich result card
-  // (when present) carrying the substance below.
   const inlineError =
     status === 'error' && (block.result?.error || block.result?.summary)
-      ? truncateErrorMessage(block.result?.error ?? block.result?.summary ?? '', 160)
+      ? truncateInlineMessage(block.result?.error ?? block.result?.summary ?? '', 160)
       : null;
 
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
-  // Rows are borderless and transparent — no left accent bar or card edge —
-  // per STYLESHEET.md "paper-flat" principle. Status reads from the icon tint,
-  // the running-row shimmer, and the error breadcrumb instead.
-  // Expand is only useful when there are args or a result summary to show in
-  // the collapsible detail pane (not the same as the inline summary).
   const argsEntries = Object.entries(block.args ?? {});
   const hasDetails = argsEntries.length > 0 || !!block.result?.summary || !!block.result?.error;
+  const generatedMedia = block.name === 'generate_studio_image' || block.display === 'generated-image';
+  const copyText = hasDetails
+    ? JSON.stringify(
+        {
+          arguments: block.args,
+          result: block.result ?? null,
+        },
+        null,
+        2,
+      )
+    : undefined;
 
   return (
-    <motion.div
-      className={cn('group relative', className)}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-    >
-      <Tool state={status}>
-      {/* Compact step row. Collapsed by default — args, summary, and full
-          result detail live behind the expand chevron. Three pieces stay
-          visible without an expand-click: (1) the rich result card below,
-          since it IS the realtor's answer; (2) the rose-tone error
-          breadcrumb on failure (Stream C status-honesty pattern); and
-          (3) a subtle row-shimmer while running, replacing the spinner-
-          only signal with a calm, paper-flat sweep. */}
-      <button
-        type="button"
-        disabled={!hasDetails}
-        onClick={() => hasDetails && setExpanded((v) => !v)}
-        className={cn(
-          'relative flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg text-left min-h-[36px]',
-          'transition-colors overflow-hidden',
-          hasDetails && 'hover:bg-muted/20 cursor-pointer',
-          !hasDetails && 'cursor-default',
-          status === 'running' && 'an-tool-call-row-shimmer',
-        )}
-      >
-        {/* Tool icon — gets a gentle pulse while the call is in flight so the
-            running row reads "alive" now that the left accent bar is gone. */}
-        <span className={cn('flex-shrink-0', tint, status === 'running' && 'an-tool-call-icon-pulse')}>
-          <Icon size={13} />
-        </span>
+    <div className={cn('group relative', className)}>
+      {generatedMedia ? (
+        <GeneratedImageResult
+          data={block.result?.data as Record<string, unknown> | undefined}
+          prompt={typeof block.args?.prompt === 'string' ? block.args.prompt : undefined}
+          status={status === 'running' ? 'running' : status === 'complete' ? 'complete' : 'error'}
+          error={block.result?.error ?? (status === 'error' ? block.result?.summary : undefined)}
+        />
+      ) : (
+        <AgentToolResult
+          tool={block.name}
+          title={resultTitle}
+          status={resultStatus}
+          icon={<Icon className="size-3.5" />}
+          meta={argsHint ?? undefined}
+          collapseOnComplete
+          maxHeight={220}
+          copyText={copyText}
+        >
+          {hasDetails ? (
+            <div className="space-y-2.5">
+              {argsEntries.length > 0 ? (
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Arguments
+                  </p>
+                  <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg border border-border/55 bg-background/70 px-2.5 py-2 font-mono text-[11px] text-foreground/80">
+                    {JSON.stringify(block.args, null, 2)}
+                  </pre>
+                </div>
+              ) : null}
+              {block.result?.summary ? (
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Result
+                  </p>
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+                    {block.result.summary}
+                  </p>
+                </div>
+              ) : null}
+              {block.result?.error && block.result.ok === false ? (
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Error
+                  </p>
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+                    {block.result.error}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </AgentToolResult>
+      )}
 
-        {/* Tool name */}
-        <span className="text-[12px] font-medium text-foreground flex-shrink-0">
-          {friendlyName(block.name)}
-        </span>
-
-        {/* Args hint — only when expanded. Collapsed view stays minimal
-            (icon + label + status); the realtor expands to see context. */}
-        {argsHint && expanded && (
-          <span className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
-            {argsHint}
-          </span>
-        )}
-
-        {/* Spacer */}
-        {(!argsHint || !expanded) && <span className="flex-1" />}
-
-        {/* Status badge */}
-        <ToolStatus state={status} label={label} icon={iconEl} className={cn('ml-1', tint)} />
-
-        {/* Expand chevron — only shown when there's something to expand */}
-        {hasDetails && (
-          <span className="text-muted-foreground/50 flex-shrink-0 ml-0.5">
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </span>
-        )}
-      </button>
-
-      {/* Inline error breadcrumb for failed tools. Always visible — this
-          is Stream C's status-honesty pattern (commit 4859066): the realtor
-          must not have to hunt for the expand chevron to see WHY a call
-          failed. Tone token matches STYLESHEET.md status-pill failed tone. */}
-      {inlineError && (
+      {!generatedMedia && inlineError && (
         <p
           role="status"
           className="text-[12px] text-muted-foreground mt-1 px-1 leading-snug"
@@ -452,60 +420,27 @@ export function ToolCallBlockView({
         </p>
       )}
 
-      {/* Rich inline result rendering — visible by default for known data
-          shapes (contacts, deals, tours) so the realtor doesn't have to expand. */}
-      {richResult}
+      {!generatedMedia && inlineSuccess && (
+        <div
+          role="status"
+          aria-label="Execution receipt"
+          className={cn(
+            'mx-3 mt-1.5 flex items-start gap-2 rounded-xl border px-3 py-2',
+            'border-emerald-500/15 bg-emerald-500/[0.035]',
+            'shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:shadow-none',
+          )}
+        >
+          <CheckCircle2
+            aria-hidden="true"
+            className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+          />
+          <p className="text-[12px] leading-relaxed text-foreground/80">
+            {inlineSuccess}
+          </p>
+        </div>
+      )}
 
-      {/* Collapsible details — rendered below the row, slightly indented.
-          Height + opacity transition on expand/collapse keeps the tool row
-          from snapping; `overflow-hidden` on the outer wrapper clips the
-          content while height animates from 0 → auto. 220ms is the iOS
-          disclosure cadence — fast enough to feel direct, slow enough that
-          the detail pane reads as "opened" rather than "appeared". */}
-      <AnimatePresence initial={false}>
-        {expanded && hasDetails && (
-          <motion.div
-            key="details"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="mt-1 ml-3 pl-3 border-l-2 border-border space-y-2.5 py-2">
-              {argsEntries.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                    Arguments
-                  </p>
-                  <pre className="text-[11px] bg-muted/30 border border-border rounded-md px-2 py-1.5 overflow-x-auto font-mono text-foreground/80">
-                    {JSON.stringify(block.args, null, 2)}
-                  </pre>
-                </div>
-              )}
-              {block.result?.summary && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                    Result
-                  </p>
-                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                    {block.result.summary}
-                  </p>
-                </div>
-              )}
-              {block.result?.error && block.result.ok === false && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                    Error
-                  </p>
-                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{block.result.error}</p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      </Tool>
-    </motion.div>
+      {!generatedMedia ? richResult : null}
+    </div>
   );
 }

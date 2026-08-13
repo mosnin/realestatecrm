@@ -68,12 +68,24 @@ export function cronMatchesInWindow(
   fromExclusive: Date,
   toInclusive: Date,
 ): boolean {
+  return latestCronMatchInWindow(pattern, fromExclusive, toInclusive) !== null;
+}
+
+/** Latest due minute in a catch-up window. This stable occurrence identity
+ * lets the scheduler remember successfully enqueued siblings when a partial
+ * queue failure leaves the broader window open for retry. */
+export function latestCronMatchInWindow(
+  pattern: string,
+  fromExclusive: Date,
+  toInclusive: Date,
+): Date | null {
   const start = Math.floor(fromExclusive.getTime() / 60_000) * 60_000 + 60_000;
   const end = Math.floor(toInclusive.getTime() / 60_000) * 60_000;
-  for (let t = start; t <= end; t += 60_000) {
-    if (cronMatches(pattern, new Date(t))) return true;
+  for (let t = end; t >= start; t -= 60_000) {
+    const at = new Date(t);
+    if (cronMatches(pattern, at)) return at;
   }
-  return false;
+  return null;
 }
 
 /** Does `pattern` fire at this instant (UTC)? Standard cron dom/dow rule:

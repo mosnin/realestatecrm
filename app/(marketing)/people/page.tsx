@@ -51,7 +51,7 @@ const PILLARS = [
 const TOUCHES = [
   { icon: Mail, tone: 'text-blue-600', text: 'Email, replied, wants a Saturday tour' },
   { icon: CalendarCheck, tone: 'text-emerald-600', text: 'Tour, proposed for Sat 2:00' },
-  { icon: PenLine, tone: 'text-[#ff4b29]', text: 'Draft, follow-up waiting for your tap' },
+  { icon: PenLine, tone: 'text-[#ff4b29]', text: 'Follow-up sent in your voice' },
   { icon: FileText, tone: 'text-neutral-500', text: 'Note, has a guarantor, March move' },
 ];
 

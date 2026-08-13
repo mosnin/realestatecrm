@@ -31,9 +31,9 @@ export default function AgentsPage() {
           }
           description="Chippi reads every lead, drafts in your voice, books the tour, and keeps the deal current, so your hours go to closing, not admin."
           features={[
-            { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Every reply written and waiting before you open the thread.' },
+            { icon: 'MessagesSquare', title: 'Replies sent in your voice', desc: 'Ask Chippi to reply and it sends through your connected inbox.' },
             { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
-            { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Approve a time; the calendar, thread, and deal all update.' },
+            { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Ask Chippi to book; the calendar, thread, and deal all update.' },
           ]}
           image="/marketing/agents-hero.jpg"
           variant="inbox"

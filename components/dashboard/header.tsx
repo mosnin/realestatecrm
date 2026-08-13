@@ -17,7 +17,7 @@ import {
   SheetTrigger
 } from '@/components/ui/sheet';
 import { useTheme } from '@/components/theme-provider';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems, realtorNavItems } from '@/lib/nav-items';
 import type { NavChild, NavItem } from '@/lib/nav-items';
@@ -27,9 +27,15 @@ import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import {
   SearchPill,
   WorkspaceSwitcher,
+  BrokerSidebarConversations,
   brokerAdminNavSections,
   brokerMemberNavSections,
 } from '@/components/dashboard/sidebar';
+import {
+  CHIPPI_SIDEBAR_REVEAL_EVENT,
+  chippiSidebarPanelMotion,
+  useChippiSidebarView,
+} from '@/components/dashboard/chippi-sidebar-experience';
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
@@ -95,7 +101,13 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
   const { theme, toggleTheme } = useTheme();
   const isOnBrokerPage = pathname.startsWith('/broker');
   const showBrokerMobileNavOnly = isBroker && isOnBrokerPage;
-  const isOnChippi = pathname.startsWith(`${base}/chippi`);
+  const mobileChatRoot = showBrokerMobileNavOnly ? '/broker' : `${base}/chippi`;
+  const isOnChatRoot = pathname === mobileChatRoot;
+  const [chippiSidebarView, setChippiSidebarView] = useChippiSidebarView(
+    pathname,
+    mobileChatRoot,
+  );
+  const reducedMotion = useReducedMotion() ?? false;
   const { user } = useUser();
   // Admin console link — DB platformRole (server prop) OR Clerk metadata, so
   // an admin set either way sees it. Matches the desktop sidebar.
@@ -109,6 +121,15 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
     : '';
   const drawerDisplayName = (accountName ?? '').trim() || clerkName || 'My Account';
   const drawerEmail = user?.primaryEmailAddress?.emailAddress ?? null;
+
+  useEffect(() => {
+    if (!isOnChatRoot) return;
+    const revealHistory = () => {
+      if (window.matchMedia('(max-width: 767px)').matches) setOpen(true);
+    };
+    window.addEventListener(CHIPPI_SIDEBAR_REVEAL_EVENT, revealHistory);
+    return () => window.removeEventListener(CHIPPI_SIDEBAR_REVEAL_EVENT, revealHistory);
+  }, [isOnChatRoot]);
 
   // Accordion expansion state for the mobile drawer — same contract as the
   // desktop sidebar: at most one parent open at a time, auto-expand the
@@ -160,7 +181,10 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
     setBrokerExpandedKey((prev) => (prev === key ? null : key));
 
   return (
-    <header data-dashboard-header className="h-14 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
+    <header
+      data-dashboard-header
+      className="h-14 flex items-center justify-between border-b border-border/70 bg-background/90 px-4 shadow-[0_1px_0_rgb(17_17_19/0.015)] backdrop-blur-xl md:px-6 sticky top-0 z-40"
+    >
       <div className="flex items-center gap-3">
         {/* Mobile menu trigger — explicit 44×44 tap target with proper hover
             state, not a bare SVG. Radix's Trigger wraps whatever child you
@@ -227,13 +251,57 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
             <div className="px-3 pt-3">
               <SearchPill />
             </div>
-            <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2 space-y-0.5">
+            <nav className="flex-1 overflow-y-auto px-3 pt-4 pb-2">
+              <AnimatePresence initial={false} mode="popLayout">
+                <motion.div
+                  key={isOnChatRoot ? chippiSidebarView : 'menu'}
+                  {...chippiSidebarPanelMotion(
+                    isOnChatRoot ? chippiSidebarView : 'menu',
+                    reducedMotion,
+                  )}
+                  className="space-y-3"
+                >
+              {isOnChatRoot && chippiSidebarView === 'history' ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setChippiSidebarView('menu')}
+                    className="mb-2 inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+                  >
+                    <ArrowLeft size={14} strokeWidth={1.75} />
+                    Back to menu
+                  </button>
+                  {showBrokerMobileNavOnly ? (
+                    <BrokerSidebarConversations
+                      limit={50}
+                      hideLabel
+                      onSelect={closeDrawer}
+                    />
+                  ) : (
+                    <SidebarConversations
+                      slug={slug}
+                      limit={50}
+                      hideLabel
+                      onSelect={closeDrawer}
+                    />
+                  )}
+                </div>
+              ) : (
+                <>
+                  {isOnChatRoot && (
+                    <button
+                      type="button"
+                      onClick={() => setChippiSidebarView('history')}
+                      className="inline-flex h-9 items-center rounded-md px-2 text-[13px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+                    >
+                      Conversation history
+                    </button>
+                  )}
               {!isBrokerOnly && !showBrokerMobileNavOnly && (
                 <>
-                  {/* Primary nav ALWAYS renders. The realtor must be able to
-                      reach any destination from any route — the previous
-                      drawer hid the nav entirely on /chippi, which left them
-                      stranded with only chat history.
+                  {/* The product menu is the alternate view of this same
+                      Sheet. "Back to menu" reaches it from chat history, so
+                      every destination remains one quiet transition away.
 
                       Uses the SAME SidebarNavItem the desktop sidebar
                       renders, so accordion behaviour, chevron affordance,
@@ -260,29 +328,6 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
                     })}
                   </div>
 
-                  {/* Chat history — animates in/out below the primary nav
-                      when the route enters/leaves /chippi. Same motion
-                      params as the desktop sidebar's chippi section so the
-                      app feels coherent across viewports. */}
-                  <AnimatePresence initial={false} mode="wait">
-                    {isOnChippi && (
-                      <motion.div
-                        key="mobile-chippi-history"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                        className="pt-2"
-                      >
-                        <div className="mx-3 mb-2 h-px bg-border/60" aria-hidden />
-                        <SidebarConversations
-                          slug={slug}
-                          limit={6}
-                          onSelect={() => setOpen(false)}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </>
               )}
               {/* Broker drawer — renders the SAME broker nav sections as the
@@ -326,6 +371,10 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
                   })}
                 </div>
               )}
+                </>
+              )}
+                </motion.div>
+              </AnimatePresence>
             </nav>
             {/* What's new + user-menu chip — same components the desktop
                 sidebar uses so localStorage state is shared (dismissals,

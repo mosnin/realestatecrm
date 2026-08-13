@@ -27,7 +27,7 @@ import { PLANS, resolveSelfServePlan, type SelfServePlanId } from '@/lib/plans';
 import { readSignupPlan } from '@/lib/signup-plan';
 
 const FEATURES = [
-  'I draft every follow-up. You approve.',
+  'I send the follow-ups you ask for and log every result.',
   'AI lead scoring on every applicant.',
   'Intake links that qualify leads for you.',
   'Tours scheduled and booked.',

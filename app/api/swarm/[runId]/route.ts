@@ -24,7 +24,9 @@ export async function GET(
   // Fetch the run and verify it belongs to the calling user's space.
   const { data: run, error: runError } = await supabase
     .from('SwarmRun')
-    .select('*')
+    .select(
+      'id,spaceId,goal,status,plan,result,errorMessage,totalCostCents,createdAt,completedAt',
+    )
     .eq('id', runId)
     .eq('spaceId', space.id)
     .maybeSingle();
@@ -40,8 +42,12 @@ export async function GET(
   // Fetch all members for this run.
   const { data: members, error: membersError } = await supabase
     .from('SwarmMember')
-    .select('*')
-    .eq('swarmRunId', runId);
+    .select(
+      'id,swarmRunId,customAgentId,name,role,task,status,output,wave,costCents,startedAt,completedAt,createdAt',
+    )
+    .eq('swarmRunId', runId)
+    .order('wave', { ascending: true })
+    .order('createdAt', { ascending: true });
 
   if (membersError) {
     console.error('[swarm/[runId]/GET] members fetch error:', membersError);

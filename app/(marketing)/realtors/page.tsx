@@ -3,13 +3,13 @@
  *
  * Arc: PageHero ("Your book, worked while you close") → the follow-up loop
  * as a features-split-style section (copy beside a composed skeleton
- * illustration: inbox → draft → booked) → the 2×2 owner-image bento →
+ * illustration: inbox → sent reply → booked) → the 2×2 owner-image bento →
  * the centered closing CTA.
  *
  * Layout law: open white split → white shadow cards → open CTA, with
  * mt-24 sm:mt-32 air between beats. No stock photography, no mock-UI
- * panels, owner image slots and skeleton illustrations only. Honesty:
- * Chippi drafts and proposes; the realtor approves every send.
+ * panels, owner image slots and skeleton illustrations only. Honesty: Chippi
+ * executes requested actions and records each result.
  */
 
 import Link from 'next/link';
@@ -49,13 +49,13 @@ const LOOP_FEATURES = [
   },
   {
     icon: MessageSquare,
-    title: 'Drafts in your voice',
-    body: 'The reply is waiting before you open the thread, written the way you actually write. Edit it, send it, or skip it.',
+    title: 'Sends in your voice',
+    body: 'Tell Chippi to reply and it sends through your connected inbox, written the way you actually write.',
   },
   {
     icon: CalendarCheck,
     title: 'Books against your real calendar',
-    body: 'Approve a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal updates itself.',
+    body: 'Tell Chippi to book a time and the tour lands on the calendar, the confirmation goes back in the thread, and the deal updates itself.',
   },
 ];
 
@@ -67,13 +67,13 @@ const BENTO_CELLS = [
   },
   {
     slot: 'realtor-drafts',
-    title: 'Drafts in your voice.',
-    sub: 'Every reply written and waiting, \nsent only when you tap send.',
+    title: 'Replies sent in your voice.',
+    sub: 'Ask Chippi to reply and it sends,\nthen records the delivery result.',
   },
   {
     slot: 'realtor-tours',
     title: 'Tours book themselves.',
-    sub: 'Approve a time and the calendar,\nthe thread, and the deal all update.',
+    sub: 'Ask Chippi to book and the calendar,\nthe thread, and the deal all update.',
   },
   {
     slot: 'realtor-log',
@@ -100,15 +100,15 @@ const START_STEPS: { n: string; icon: typeof Inbox; title: string; body: string 
   },
   {
     n: '02',
-    icon: PenLine,
-    title: 'Chippi drafts the replies',
-    body: 'Every inbound is read and scored, the reply written in your voice, and tour times proposed from your real availability.',
+    icon: MessageSquare,
+    title: 'Tell Chippi what to do',
+    body: 'Ask it to send the reply, create the contact, or book a tour using your real availability.',
   },
   {
     n: '03',
     icon: ShieldCheck,
-    title: 'You tap to send',
-    body: 'Approve, edit, or skip. The tour books, the thread updates, and the whole move lands in a plain-language log.',
+    title: 'Chippi executes and reports',
+    body: 'The action completes through your connected tools and the result lands in a plain-language log.',
   },
 ];
 
@@ -142,7 +142,7 @@ function ImageSlot({ name }: { name: string }) {
   );
 }
 
-/* ── The loop, skeleton illustration (inbox → draft → booked) ─────────── */
+/* ── The loop, skeleton illustration (inbox → sent reply → booked) ───── */
 
 function LoopIllustration() {
   return (
@@ -169,16 +169,16 @@ function LoopIllustration() {
         </div>
       </div>
 
-      {/* Flow: inbox → draft */}
+      {/* Flow: inbox → sent reply */}
       <div className="absolute left-1/2 top-[22%] z-10 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full border border-black/5 bg-white shadow-sm">
         <ArrowRight className="h-3 w-3 text-[#ff4b29]" />
       </div>
 
-      {/* Draft */}
+      {/* Sent reply */}
       <div className="absolute right-3 top-12 w-[44%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:right-5">
         <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">DRAFT</span>
-          <span className="text-[9px] text-amber-600">Waiting</span>
+          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">SENT</span>
+          <span className="text-[9px] text-emerald-600">Delivered</span>
         </div>
         <div className="space-y-2 p-2">
           <div className="flex items-start gap-2">
@@ -191,13 +191,13 @@ function LoopIllustration() {
               </div>
             </div>
           </div>
-          <div className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700">
-            Awaiting your tap
+          <div className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+            Delivery recorded
           </div>
         </div>
       </div>
 
-      {/* Flow: draft → booked */}
+      {/* Flow: sent reply → booked */}
       <div className="absolute right-[24%] top-[60%] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-black/5 bg-white shadow-sm">
         <ArrowRight className="h-3 w-3 rotate-90 text-[#ff4b29]" />
       </div>
@@ -298,12 +298,12 @@ export default function RealtorsPage() {
             <div>
               <Eyebrow>The loop</Eyebrow>
               <h2 className="mt-4 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">
-                Inbox in. Draft ready. Tour booked.
+                Inbox in. Reply sent. Tour booked.
               </h2>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
-                Chippi runs one loop all day: read the inbound, draft the reply
-                in your voice, propose times from your real calendar. You
-                approve, it logs the rest.
+                Chippi runs one loop all day: read the inbound, send the reply
+                you request in your voice, and book against your real calendar.
+                Every result is logged.
               </p>
 
               <div className="mt-8 space-y-5 border-t border-neutral-200 pt-6">
@@ -371,7 +371,7 @@ export default function RealtorsPage() {
                   <LoopIllustration />
 
                   <p className="mt-6 text-sm text-neutral-500">
-                    Chippi drafts and proposes. You approve. The log writes itself.
+                    Chippi executes what you ask. Every result lands in the log.
                   </p>
                 </div>
               </article>

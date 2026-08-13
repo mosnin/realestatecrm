@@ -71,12 +71,12 @@ export function ChippiPageShell({
 }: ChippiPageShellProps) {
   void variant; // consumed by callers for route resolution — no visual branch today
   return (
-    <div className={cn('h-full overflow-y-auto', washed && 'bg-muted/40 dark:bg-transparent')}>
+    <div className={cn('h-full overflow-y-auto', washed && 'bg-surface/55 dark:bg-transparent')}>
       {/* Match the Automations page frame: the wider max-w-5xl reading column
           and the space-y-8 section rhythm, so every Chippi non-chat sub-page
           (brief, inbox, activity, …) sits in the same premium People/Deals
           surface rather than a narrow chat-reading column. */}
-      <div className="w-full max-w-5xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-8">
+      <div className="w-full max-w-5xl mx-auto chat-content-wrap pt-10 sm:pt-14 pb-24 space-y-9">
         <header className="space-y-1.5">
           <p className={BODY_MUTED}>{greeting}</p>
           {title && (

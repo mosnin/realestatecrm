@@ -17,6 +17,7 @@
  */
 
 import { OptionList } from '@/components/tool-ui/option-list';
+import { AgentApprovalCard } from '@/components/ai/agent-status';
 import {
   safeParseSerializableOptionList,
   type OptionListSelection,
@@ -63,10 +64,10 @@ export function OptionListResult({
   };
 
   return (
-    <div className="mt-2 max-w-lg">
-      {prompt ? (
-        <p className="mb-2 text-[13px] text-foreground/90 leading-snug">{prompt}</p>
-      ) : null}
+    <AgentApprovalCard
+      description={prompt}
+      interactive={interactive}
+    >
       <OptionList
         {...parsed}
         // Read-only history surfaces show the offered choices as a receipt:
@@ -74,6 +75,6 @@ export function OptionListResult({
         // agent provided one. With no handlers the card is non-interactive.
         onAction={interactive ? handleAction : undefined}
       />
-    </div>
+    </AgentApprovalCard>
   );
 }

@@ -16,6 +16,10 @@ export interface WorkSessionRow {
   spaceId: string;
   conversationId: string | null;
   goal: string;
+  /** Research is the established background-report flow; workspace is an
+   * isolated VM-backed multi-file run. Feature-gated at every entry point. */
+  kind?: 'research' | 'workspace';
+  workspaceRunId?: string | null;
   autonomy: 'plan_first' | 'just_go';
   allowQuestions: boolean;
   status:

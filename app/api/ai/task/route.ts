@@ -27,9 +27,21 @@ import { NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import { saveUserMessage, saveAssistantMessage } from '@/lib/ai-tools/persistence';
+import {
+  saveUserMessage,
+  saveConversationTurnAssistantMessage,
+} from '@/lib/ai-tools/persistence';
 import { resolveToolContext } from '@/lib/ai-tools/context';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import {
+  claimConversationMode,
+  type ConversationMode,
+} from '@/lib/chat/conversation-mode';
+import {
+  parseInlineWorkGoal,
+  parseWorkExecutionMode,
+  type WorkExecutionMode,
+} from '@/lib/chat/work-execution-mode';
 import { isPlatformAdmin } from '@/lib/permissions';
 import type { ToolContext } from '@/lib/ai-tools/types';
 import {
@@ -53,8 +65,18 @@ import { resolveBillingAccount } from '@/lib/billing/account';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { decideRoute } from '@/lib/chat/router';
 import { markTurnStarted, markTurnEnded } from '@/lib/chat/turn-presence';
-import { clearChatStop } from '@/lib/chat/stop-signal';
 import { streamDirectTurn } from '@/lib/chat/direct-stream';
+import { createStopPoller, STOP_POLL_INTERVAL_MS } from '@/lib/chat/stop-signal';
+import {
+  claimConversationTurnV2,
+  enqueueConversationTurn,
+  finishConversationTurnV2,
+  settledConversationTurnOutcome,
+  startConversationTurnLeaseGuardian,
+  type ConversationTurnRecord,
+  type ConversationTurnSettler,
+  type TurnTerminalOutcome,
+} from '@/lib/chat/turn-control';
 import {
   type MultimodalAttachment,
   pickModelForAttachments,
@@ -72,7 +94,11 @@ const taskBodySchema = z.object({
   conversationId: z.string().max(200).nullish(),
   message: z.string().max(20000),
   attachmentIds: z.array(z.string().max(200)).max(20).optional(),
+  activeWorkbookArtifactId: z.string().max(200).optional(),
   mode: z.string().max(50).optional(),
+  executionMode: z.enum(['review', 'autonomous']).optional(),
+  turnId: z.string().min(1).max(200).optional(),
+  clientRequestId: z.string().min(1).max(200).optional(),
 });
 
 /** TTL for attachment URLs forwarded to Modal. The agent reads them within
@@ -81,6 +107,13 @@ const taskBodySchema = z.object({
 const ATTACHMENT_HYDRATE_TTL_SECONDS = 60 * 30;
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { mapModalToolResultFrame } from '@/lib/ai-tools/modal-frame';
+import { isWorkbookAttachment } from '@/lib/chippi/workbench-store';
+import { isExplicitWorkbenchIntent, isWorkbookTransformIntent } from '@/lib/chippi/workbench-intent';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-workspace-flag';
+import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
+import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
+import { chatContinuationIdempotencySeed, isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -125,17 +158,55 @@ interface PostBody {
   message: string;
   attachmentIds?: string[];
   /**
-   * Explicit per-message runtime pick from the composer's Chat/Agent switch.
+   * Explicit experience pick from the top-of-page Chat/Work switch.
    *   - 'chat'  → lean single-call path: one LLM completion + read-only vector
    *               search over the realtor's data. No tools, no agent loop, so
    *               a turn costs ~3k tokens. The structural fix for the
    *               500k-tokens-per-input blowup: most turns never touch the
    *               tool loop at all.
-   *   - 'agent' → full tool surface on Modal. Can act (create / send /
-   *               schedule). Bounded server-side (max_turns + lean tool set).
+   *   - 'work'  → full tool surface plus durable background work. The legacy
+   *               'agent' value remains accepted for older clients.
    * Absent (older client) → fall back to the heuristic router.
    */
-  mode?: 'chat' | 'agent' | string;
+  mode?: 'chat' | 'work' | 'agent' | string;
+  executionMode?: WorkExecutionMode;
+  turnId?: string;
+  clientRequestId?: string;
+  activeWorkbookArtifactId?: string;
+}
+
+/** Resolves only the active artifact's current version identity. The agent
+ * must call inspect_workbook for bounded schema/sample/hash data before it can
+ * propose a transform. Missing and foreign ids intentionally look identical. */
+async function resolveActiveWorkbookContext(
+  artifactId: string | undefined,
+  spaceId: string,
+): Promise<ToolContext['activeWorkbook'] | undefined> {
+  if (!artifactId || !isWorkbenchEnabled()) return undefined;
+  try {
+    const { data: artifact } = await supabase
+      .from('Artifact')
+      .select('id, title, artifactType, currentVersionId')
+      .eq('id', artifactId)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!artifact || artifact.artifactType !== 'workbook' || !artifact.currentVersionId || typeof artifact.title !== 'string' || artifact.title.length < 1 || artifact.title.length > 200) return undefined;
+    const { data: version } = await supabase
+      .from('ArtifactVersion')
+      .select('id, versionNumber')
+      .eq('id', artifact.currentVersionId)
+      .eq('artifactId', artifact.id)
+      .eq('spaceId', spaceId)
+      .maybeSingle();
+    if (!version || !Number.isInteger(version.versionNumber) || version.versionNumber < 1) return undefined;
+    return {
+      artifactId: artifact.id,
+      versionNumber: version.versionNumber,
+      title: artifact.title,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function autoTitleConversation(spaceId: string, conversationId: string, userMessage: string): void {
@@ -164,11 +235,19 @@ async function resolveConversation(
   spaceId: string,
   conversationId: string | null | undefined,
   userMessage: string,
-): Promise<string> {
+  requestedMode: ConversationMode,
+  requestedExecutionMode: WorkExecutionMode,
+): Promise<{
+  id: string;
+  mode: ConversationMode;
+  executionMode: WorkExecutionMode;
+  workGoal?: string;
+  workGoalVersion?: number;
+}> {
   if (conversationId) {
     const { data } = await supabase
       .from('Conversation')
-      .select('id, spaceId, title')
+      .select('id, spaceId, title, mode, executionMode, workGoal, workGoalStatus, workGoalVersion')
       .eq('id', conversationId)
       .eq('spaceId', spaceId)
       .maybeSingle();
@@ -182,7 +261,22 @@ async function resolveConversation(
       if (!data.title || data.title === 'New conversation') {
         autoTitleConversation(spaceId, conversationId, userMessage);
       }
-      return conversationId;
+      const mode = await claimConversationMode(supabase, {
+        conversationId,
+        spaceId,
+        requestedMode,
+      });
+      return {
+        id: conversationId,
+        mode,
+        executionMode: parseWorkExecutionMode(data.executionMode),
+        ...(data.workGoalStatus === 'active' && typeof data.workGoal === 'string'
+          ? {
+              workGoal: data.workGoal,
+              workGoalVersion: Number(data.workGoalVersion ?? 0),
+            }
+          : {}),
+      };
     }
   }
 
@@ -191,10 +285,12 @@ async function resolveConversation(
     id,
     spaceId,
     title: 'New conversation',
+    mode: requestedMode,
+    executionMode: requestedExecutionMode,
   });
   if (error) throw error;
   autoTitleConversation(spaceId, id, userMessage);
-  return id;
+  return { id, mode: requestedMode, executionMode: requestedExecutionMode };
 }
 
 async function loadHistory(spaceId: string, conversationId: string): Promise<HistoryRow[]> {
@@ -286,6 +382,9 @@ interface ProxyModalStreamInput {
   spaceId: string;
   conversationId: string;
   abortController: AbortController;
+  turnId: string;
+  attemptToken: string;
+  onSettled: ConversationTurnSettler;
 }
 
 /**
@@ -305,6 +404,9 @@ function proxyModalStream({
   spaceId,
   conversationId,
   abortController,
+  turnId,
+  attemptToken,
+  onSettled,
 }: ProxyModalStreamInput): Response {
   const encoder = new TextEncoder();
   let seq = 0;
@@ -358,26 +460,71 @@ function proxyModalStream({
       // Persist exactly once — on `done`, on `error`, or on the stream simply
       // dropping. Before this only the `done` path saved, so any mid-stream
       // Modal failure erased the whole assistant turn from history.
-      let persisted = false;
+      let persistenceAttempt: Promise<void> | null = null;
       // Track whether a terminal browser event (turn_complete | error) ever
       // reached the wire. Modal can be killed mid-stream (600s container
       // timeout, dropped socket) and end the SSE with NO `done`/`error`
       // frame — the browser's EventSource then sits open forever. The
       // `finally` below uses this to guarantee exactly one terminal frame.
       let sentTerminal = false;
+      // Modal's first `done` or `error` is terminal. Trailing frames are
+      // ignored so they cannot contradict or duplicate the browser receipt.
+      let upstreamTerminalSeen = false;
+      let terminalOutcome: TurnTerminalOutcome = {
+        status: 'failed',
+        reason: 'modal_stream_closed_without_terminal_event',
+        error: 'The Modal stream closed without a terminal event.',
+      };
+      let atomicallySettled = false;
+      let separatelySettled = false;
+      const leaseGuardian = startConversationTurnLeaseGuardian(supabase, {
+        turnId,
+        spaceId,
+        conversationId,
+        attemptToken,
+        abortController,
+      });
+      let stopRequested = false;
+      const shouldStop = createStopPoller(turnId);
+      const stopTimer = setInterval(() => {
+        void shouldStop().then((stop) => {
+          if (!stop || stopRequested) return;
+          stopRequested = true;
+          terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
+          try { abortController.abort(); } catch { /* already aborted */ }
+          void reader.cancel().catch(() => {});
+        });
+      }, STOP_POLL_INTERVAL_MS);
       async function persistOnce(finalText?: string): Promise<void> {
-        if (persisted) return;
-        persisted = true;
+        if (persistenceAttempt) return persistenceAttempt;
         let toSave: MessageBlock[] = blocks;
         if (toSave.length === 0 && finalText && finalText.trim()) {
           toSave = [{ type: 'text', content: finalText }];
         }
-        if (toSave.length === 0) return;
-        try {
-          await saveAssistantMessage({ spaceId, conversationId, blocks: toSave });
-        } catch (err) {
-          logger.warn('[ai/task] modal: persist assistant message failed', { spaceId }, err);
+        if (toSave.length === 0) {
+          persistenceAttempt = Promise.resolve();
+          return persistenceAttempt;
         }
+        persistenceAttempt = (async () => {
+          leaseGuardian.assertActive();
+          await leaseGuardian.prepareToCommit();
+          const receipt = await saveConversationTurnAssistantMessage({
+            spaceId,
+            conversationId,
+            turnId,
+            attemptToken,
+            outcome: terminalOutcome,
+            blocks: toSave,
+          });
+          terminalOutcome = {
+            status: receipt.terminalStatus,
+            reason: receipt.terminalReason,
+          };
+          atomicallySettled = true;
+          leaseGuardian.commitSucceeded();
+          leaseGuardian.stop();
+        })();
+        return persistenceAttempt;
       }
 
       /**
@@ -394,14 +541,44 @@ function proxyModalStream({
           finalText = chippiErrorMessage('empty_reply');
           push(controller, { type: 'text_delta', delta: finalText });
         }
-        await persistOnce(finalText);
-        push(controller, { type: 'turn_complete', reason: 'complete' });
+        terminalOutcome = stopRequested
+          ? { status: 'cancelled', reason: 'interrupted' }
+          : { status: 'completed', reason: 'complete' };
+        try {
+          await persistOnce(finalText);
+        } catch (err) {
+          const authorityFailure = leaseGuardian.hasLostAuthority()
+            || /lease|attempt token|terminal result/i.test(
+              err instanceof Error ? err.message : String(err),
+            );
+          terminalOutcome = {
+            status: 'failed',
+            reason: authorityFailure ? 'lease_authority_lost' : 'persistence',
+            error: err instanceof Error ? err.message : 'Assistant message persistence failed.',
+          };
+          logger.warn('[ai/task] modal: persist assistant message failed', { spaceId }, err);
+          push(controller, {
+            type: 'error',
+            message: authorityFailure
+              ? 'This turn no longer had authority to publish its reply.'
+              : chippiErrorMessage('persistence'),
+            code: authorityFailure ? 'lease_authority_lost' : 'persistence',
+          });
+          sentTerminal = true;
+          return;
+        }
+        push(controller, {
+          type: 'turn_complete',
+          reason: terminalOutcome.status === 'cancelled' ? 'aborted' : 'complete',
+        });
       }
 
       try {
+        await leaseGuardian.renewNow();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          leaseGuardian.assertActive();
 
           lineBuf += decoder.decode(value, { stream: true });
           const lines = lineBuf.split('\n');
@@ -510,19 +687,33 @@ function proxyModalStream({
                   : textChunks.join(''),
               );
               sentTerminal = true;
+              upstreamTerminalSeen = true;
+              break;
 
             } else if (type === 'error') {
               // Persist whatever streamed before the failure so a mid-turn
               // Modal error doesn't erase the assistant message the user saw.
-              await persistOnce();
+              terminalOutcome = {
+                status: 'failed',
+                reason: 'modal_error',
+                error: String(evt.message ?? 'Agent error'),
+              };
+              try {
+                await persistOnce();
+              } catch (persistError) {
+                logger.warn('[ai/task] modal: persist partial assistant message failed', { spaceId }, persistError);
+              }
               push(controller, { type: 'error', message: evt.message ?? 'Agent error' });
               sentTerminal = true;
+              upstreamTerminalSeen = true;
+              break;
             }
           }
+          if (upstreamTerminalSeen) break;
         }
 
         // Flush any remaining buffer
-        if (lineBuf.startsWith('data: ')) {
+        if (!upstreamTerminalSeen && lineBuf.startsWith('data: ')) {
           const raw = lineBuf.slice(6).trim();
           if (raw) {
             try {
@@ -534,6 +725,7 @@ function proxyModalStream({
                     : textChunks.join(''),
                 );
                 sentTerminal = true;
+                upstreamTerminalSeen = true;
               }
             } catch {
               // ignore malformed trailing line
@@ -545,29 +737,123 @@ function proxyModalStream({
         // left there's no one to tell — just fall through to persist. We no
         // longer abort on disconnect, so this is a real error, not our own abort.
         if (!clientGone) {
+          if (leaseGuardian.hasLostAuthority()) {
+            terminalOutcome = {
+              status: 'failed',
+              reason: 'lease_authority_lost',
+              error: 'Conversation turn attempt authority could not be renewed.',
+            };
+            push(controller, {
+              type: 'error',
+              message: 'This turn lost execution authority and was stopped safely.',
+              code: 'lease_authority_lost',
+            });
+            sentTerminal = true;
+          } else if (stopRequested) {
+            terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
+          } else {
+            terminalOutcome = {
+              status: 'failed',
+              reason: 'modal_stream_error',
+              error: err instanceof Error ? err.message : 'Modal stream failed.',
+            };
           logger.error('[ai/task] modal stream read error', { spaceId }, err);
           push(controller, { type: 'error', message: chippiErrorMessage('internal') });
           sentTerminal = true;
+          }
         }
       } finally {
+        clearInterval(stopTimer);
+        if (leaseGuardian.hasLostAuthority()) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'lease_authority_lost',
+            error: 'Conversation turn attempt authority could not be renewed.',
+          };
+        }
         // Safety net — the stream ended with no `done`/`error` event (Modal
         // crash, dropped connection, 600s container kill mid-stream). Persist
-        // whatever streamed (idempotent via `persisted`) AND guarantee a still-
+        // whatever streamed (idempotent via the cached attempt) AND guarantee a still-
         // connected browser sees exactly one terminal frame so its EventSource
         // closes instead of hanging open forever. When the client is gone the
         // persist is the whole point — the finished turn lands in history.
-        await persistOnce();
-        if (!sentTerminal && !clientGone) {
-          logger.warn('[ai/task] modal stream ended with no terminal event', { spaceId });
-          push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+        try {
+          await persistOnce();
+        } catch (persistError) {
+          const authorityFailure = leaseGuardian.hasLostAuthority()
+            || /lease|attempt token|terminal result/i.test(
+              persistError instanceof Error ? persistError.message : String(persistError),
+            );
+          terminalOutcome = {
+            status: 'failed',
+            reason: authorityFailure ? 'lease_authority_lost' : 'persistence',
+            error: persistError instanceof Error ? persistError.message : 'Assistant message persistence failed.',
+          };
+          logger.warn('[ai/task] modal: final assistant persistence failed', { spaceId }, persistError);
+          if (!sentTerminal && !clientGone) {
+            push(controller, {
+              type: 'error',
+              message: authorityFailure
+                ? 'This turn no longer had authority to publish its reply.'
+                : chippiErrorMessage('persistence'),
+              code: authorityFailure ? 'lease_authority_lost' : 'persistence',
+            });
+            sentTerminal = true;
+          }
         }
-        // Clear the turn-presence marker AFTER persistence so a reopening
-        // client that sees inFlight=false can trust the answer is queryable.
+        if (
+          !sentTerminal
+          && !clientGone
+          && terminalOutcome.status === 'cancelled'
+          && !atomicallySettled
+        ) {
+          try {
+            const settled = await onSettled(terminalOutcome);
+            terminalOutcome = settledConversationTurnOutcome(settled, terminalOutcome);
+            separatelySettled = true;
+          } catch (error) {
+            terminalOutcome = {
+              status: 'failed',
+              reason: 'durable_settlement_failed',
+              error: error instanceof Error ? error.message : 'Durable turn settlement failed.',
+            };
+            logger.error('[ai/task] modal pre-terminal durable settlement failed', {
+              conversationId,
+              turnId,
+            }, error);
+            push(controller, {
+              type: 'error',
+              message: chippiErrorMessage('persistence'),
+              code: 'persistence',
+            });
+            sentTerminal = true;
+          }
+        }
+        if (!sentTerminal && !clientGone) {
+          if (terminalOutcome.status === 'cancelled') {
+            push(controller, { type: 'turn_complete', reason: 'aborted' });
+          } else {
+            logger.warn('[ai/task] modal stream ended with no terminal event', { spaceId });
+            push(controller, { type: 'error', message: chippiErrorMessage('internal') });
+          }
+          sentTerminal = true;
+        }
+        try {
+          if (!atomicallySettled && !separatelySettled) await onSettled(terminalOutcome);
+        } catch (error) {
+          logger.error('[ai/task] modal durable turn settlement failed', {
+            conversationId,
+            turnId,
+          }, error);
+        }
+        // Presence clears only after transcript persistence and durable
+        // settlement have both completed or failed visibly.
         await markTurnEnded(conversationId);
         // controller may already be torn down if the client disconnected —
         // closing a cancelled controller throws, so guard it.
         try { controller.close(); } catch { /* already closed by cancel() */ }
         reader.releaseLock();
+        leaseGuardian.stop();
         drainDone();
       }
     },
@@ -617,13 +903,22 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const message = sanitized.sanitized;
+  let message = sanitized.sanitized;
+  const requestedWorkbookTransform = isWorkbenchEnabled() && isWorkbookTransformIntent(message);
 
   const abortController = new AbortController();
 
   const ctxOrResponse = await resolveToolContext(spaceSlug, abortController.signal);
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
+  let activeWorkbook: ToolContext['activeWorkbook'] | undefined;
+  let workModeSelected = body.mode === 'work' || body.mode === 'agent';
+  let workExecutionMode = parseWorkExecutionMode(body.executionMode);
+  let toolCtx: ToolContext = {
+    ...ctx,
+    workMode: workModeSelected,
+    workExecutionMode,
+  };
 
   // The three rate-limit counters are independent — fire them together
   // instead of paying three sequential Redis round-trips on the critical
@@ -750,25 +1045,166 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let conversationId: string;
-  try {
-    conversationId = await resolveConversation(ctx.space.id, body.conversationId ?? null, message);
-  } catch (err) {
-    logger.error('[ai/task] conversation resolve failed', { spaceSlug }, err);
-    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  // This is intentionally after auth, rate, subscription, budget, and credit
+  // gates. A normal chat with an open Workbench stays on its original path;
+  // only a narrow transform request pays these two scoped identity reads.
+  if (requestedWorkbookTransform) {
+    activeWorkbook = await resolveActiveWorkbookContext(body.activeWorkbookArtifactId, ctx.space.id);
+    toolCtx = { ...toolCtx, workbookTransformRequested: true, ...(activeWorkbook ? { activeWorkbook } : {}) };
   }
 
+  let conversationId = '';
+  let conversationTurn: ConversationTurnRecord | null = null;
   try {
-    await saveUserMessage({
+    const conversation = await resolveConversation(
+      ctx.space.id,
+      body.conversationId ?? null,
+      message,
+      workModeSelected ? 'work' : 'chat',
+      workExecutionMode,
+    );
+    conversationId = conversation.id;
+    workModeSelected = conversation.mode === 'work';
+    workExecutionMode = conversation.executionMode;
+
+    if (Boolean(body.turnId) !== Boolean(body.clientRequestId)) {
+      return NextResponse.json(
+        { error: 'turnId and clientRequestId must be provided together' },
+        { status: 400 },
+      );
+    }
+
+    // New clients enqueue before opening the SSE request. Older callers get
+    // an additive compatibility row here, but still pass through the same
+    // FIFO claim and exact-turn lifecycle.
+    const turnId = body.turnId ?? crypto.randomUUID();
+    const clientRequestId = body.clientRequestId ?? `legacy:${turnId}`;
+    if (!body.turnId) {
+      await enqueueConversationTurn(supabase, {
+        turnId,
+        spaceId: ctx.space.id,
+        conversationId,
+        mode: conversation.mode,
+        source: 'typed',
+        clientRequestId,
+        message,
+        attachmentIds: body.attachmentIds,
+      });
+    }
+    conversationTurn = await claimConversationTurnV2(supabase, {
+      turnId,
+      spaceId: ctx.space.id,
+      conversationId,
+      clientRequestId,
+      message,
+      attachmentIds: body.attachmentIds,
+    });
+    // PostgreSQL is the instruction authority. The claim RPC has already
+    // checked an exact body/idempotency binding; use its canonical text.
+    message = conversationTurn.message;
+
+    let conversationGoal = conversation.workGoal;
+    let conversationGoalVersion = conversation.workGoalVersion;
+    const inlineWorkGoal = workModeSelected ? parseInlineWorkGoal(message) : null;
+    if (inlineWorkGoal) {
+      const { data: goalRows, error: goalError } = await supabase.rpc(
+        'set_conversation_work_goal',
+        {
+          p_conversation_id: conversationId,
+          p_space_id: ctx.space.id,
+          p_goal: inlineWorkGoal,
+        },
+      );
+      if (goalError) throw goalError;
+      const goalRow = Array.isArray(goalRows) ? goalRows[0] : goalRows;
+      conversationGoal = inlineWorkGoal;
+      conversationGoalVersion = Number(goalRow?.version ?? (conversationGoalVersion ?? 0) + 1);
+    }
+    toolCtx = {
+      ...toolCtx,
+      workMode: workModeSelected,
+      workExecutionMode,
+      ...(conversationGoal ? { conversationGoal } : {}),
+      ...(typeof conversationGoalVersion === 'number' ? { conversationGoalVersion } : {}),
+    };
+  } catch (err) {
+    logger.error('[ai/task] conversation resolve failed', { spaceSlug }, err);
+    if (conversationTurn) {
+      if (!conversationTurn.attemptToken) throw new Error('Missing turn attempt authority.');
+      await finishConversationTurnV2(supabase, {
+        turnId: conversationTurn.id,
+        spaceId: ctx.space.id,
+        conversationId,
+        attemptToken: conversationTurn.attemptToken,
+        outcome: {
+          status: 'failed',
+          reason: 'preflight_failed',
+          error: err instanceof Error ? err.message : 'Turn preflight failed.',
+        },
+      }).catch(() => {});
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    const queueConflict = /queue|claim|binding|pending|running|paused|failed|head|held/i.test(detail);
+    return NextResponse.json(
+      { error: queueConflict ? 'This turn is queued behind other work.' : chippiErrorMessage('internal') },
+      { status: queueConflict ? 409 : 500 },
+    );
+  }
+
+  if (!conversationTurn) {
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  }
+  const claimedTurn = conversationTurn;
+  if (!claimedTurn.attemptToken) {
+    return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
+  }
+  const claimedAttemptToken = claimedTurn.attemptToken;
+
+  const settleConversationTurn = async (outcome: TurnTerminalOutcome) => {
+    return finishConversationTurnV2(supabase, {
+      turnId: claimedTurn.id,
+      spaceId: ctx.space.id,
+      conversationId,
+      attemptToken: claimedAttemptToken,
+      outcome,
+    });
+  };
+
+  let userMessageId: string;
+  try {
+    ({ messageId: userMessageId } = await saveUserMessage({
       spaceId: ctx.space.id,
       conversationId,
       content: message,
       attachmentIds: body.attachmentIds,
-    });
+    }));
   } catch (err) {
     logger.error('[ai/task] save user message failed', { spaceSlug }, err);
+    await settleConversationTurn({
+      status: 'failed',
+      reason: 'user_message_persistence_failed',
+      error: err instanceof Error ? err.message : 'User message persistence failed.',
+    }).catch(() => {});
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
+
+  // This is the only chat-side capability lookup. It is deliberately
+  // fail-closed: a transient read failure must not interrupt normal chat or
+  // advertise a continuation capability we cannot prove is tenant-scoped.
+  let workspaceContinuationEligible = false;
+  if (isWorkspaceRunContinuationIntent(message)) {
+    try {
+      workspaceContinuationEligible = await isConversationWorkspaceContinuationEligible(ctx.space.id, conversationId);
+    } catch (err) {
+      logger.warn('[ai/task] workspace continuation eligibility unavailable', { spaceSlug, conversationId }, err);
+    }
+  }
+  toolCtx = {
+    ...toolCtx,
+    conversationId,
+    continuationIdempotencySeed: chatContinuationIdempotencySeed(userMessageId),
+    workspaceContinuationEligible,
+  };
 
   // The turn's credit charge is applied by the model-aware ChatUsage trigger
   // (meter_chat_usage_credits) when usage is recorded — not here. A second flat
@@ -819,13 +1255,6 @@ export async function POST(req: NextRequest) {
   //      (kept as a fallback / for running heavy turns entirely in Modal).
   // Router errors → 'agent' (its safe default), so a router bug can't silently
   // drop a real action.
-  // A Stop belongs to the turn it was requested during. The flag lives for
-  // 10 minutes and is only consumed by a polling stream, so one that landed
-  // after its own turn ended would be picked up by THIS turn and abort it
-  // before a single token reached the realtor. Cleared (awaited, so it can't
-  // race the first poll) before any path starts streaming.
-  await clearChatStop(conversationId);
-
   // Turn presence — mark this conversation busy BEFORE any path starts
   // streaming, so a client that reopens (even after a full browser close)
   // can see the turn is in flight via /api/ai/turn-status and wait for the
@@ -837,18 +1266,27 @@ export async function POST(req: NextRequest) {
     id: a.id,
     mimeType: a.mime_type,
   }));
-  // Explicit per-message mode from the composer's Chat/Agent switch wins over
+  // Explicit mode from the top-of-page Chat/Work switch wins over
   // the heuristic router. 'agent' always gets the full tool surface. 'chat'
   // gets the fast direct path ONLY when the heuristic router would also send
   // it direct — workspace-data reads and integration queries still need tools
   // regardless of which mode the composer is in (forcing them direct made the
   // model say "I don't have access to any tools", the bug the escalation
   // hook was meant to rescue). An absent mode falls back to decideRoute.
-  const explicitMode: 'chat' | 'agent' | null =
-    body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+  const explicitMode: 'chat' | 'agent' = workModeSelected ? 'agent' : 'chat';
   const heuristicRoute = decideRoute(message, routerAttachments);
+  const workbenchRequested =
+    process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true'
+    && hydratedAttachments.some((attachment) => isWorkbookAttachment({ mimeType: attachment.mime_type, filename: attachment.filename }))
+    && isExplicitWorkbenchIntent(message);
+  // A natural follow-up stays in the Workbench TS lane even if the selected
+  // id is missing or foreign. In that case the prompt asks the user to reopen
+  // a workbook rather than silently falling back to legacy Modal tools.
+  const workbookTransformRequested = requestedWorkbookTransform;
+  const researchWorkspaceRequested =
+    isResearchWorkspaceEnabledForSpace(ctx.space.id) && isResearchWorkspaceIntent(message);
   const route =
-    explicitMode === 'agent'
+    workbenchRequested || workbookTransformRequested || researchWorkspaceRequested || explicitMode === 'agent'
       ? 'agent'
       : explicitMode === 'chat' && heuristicRoute === 'direct'
         ? 'direct'
@@ -893,6 +1331,9 @@ export async function POST(req: NextRequest) {
       history: history.map((h) => ({ role: h.role, content: h.content })),
       attachments: turnAttachments,
       abortController,
+      turnId: claimedTurn.id,
+      attemptToken: claimedAttemptToken,
+      onSettled: settleConversationTurn,
       // Escalation hook — when the direct model's reply trips
       // shouldEscalate() ("I can't send that from here…"), re-run the SAME
       // message on the in-process TS agent (full tool surface) and pipe its
@@ -902,13 +1343,17 @@ export async function POST(req: NextRequest) {
       onEscalate: async () => {
         logger.info('[ai/task] direct → agent escalation', { spaceSlug, model: turnModel });
         return streamTsChatTurn({
-          ctx,
+          ctx: { ...toolCtx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
           conversationId,
           userMessage: message,
           history,
           model: turnModel,
           attachments: turnAttachments,
+          attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mime_type })),
           abortController,
+          turnId: claimedTurn.id,
+          attemptToken: claimedAttemptToken,
+          onSettled: settleConversationTurn,
         });
       },
     });
@@ -919,12 +1364,27 @@ export async function POST(req: NextRequest) {
   //      This is a deliberate deploy choice, so a missing MODAL_CHAT_URL is a
   //      misconfiguration we surface loudly (callModalAgent returns 503) rather
   //      than silently downgrading the whole deploy to the TS runtime.
-  //   2. The realtor picked Agent mode for THIS message. Prefer Modal, but if
+  //   2. The realtor picked Work mode for THIS message. Prefer Modal, but if
   //      MODAL_CHAT_URL is unset, degrade gracefully to the in-process TS agent
   //      (it has the full tool surface too) instead of failing the one turn.
   const forcedModal = chatRuntime() === 'modal';
   const perMessageModal = explicitMode === 'agent' && Boolean(process.env.MODAL_CHAT_URL);
-  if (route === 'agent' && (forcedModal || perMessageModal)) {
+  // Workbench is deliberately a TypeScript-native vertical slice: its tool
+  // accepts stable Attachment ids and returns a typed UI result. Do not send
+  // this one request to the legacy Modal catalog, where that contract does not
+  // exist. This is feature-gated and only narrows requests that explicitly ask
+  // to open this turn's uploaded spreadsheet.
+  const requiresTsWorkbenchTool = workbenchRequested || workbookTransformRequested;
+  // Work mode stays on the unified TypeScript runtime because that is where
+  // the natural-language durable-work bridge and inline progress contract
+  // live. Modal remains an execution backend reached by delegated tools, not
+  // a separate product mode with a different catalog.
+  const requiresTsNativeTool =
+    workModeSelected ||
+    requiresTsWorkbenchTool ||
+    researchWorkspaceRequested ||
+    workspaceContinuationEligible;
+  if (route === 'agent' && !requiresTsNativeTool && (forcedModal || perMessageModal)) {
     logger.info('[ai/task] router → agent (Modal)', { spaceSlug, explicitMode, forcedModal });
     return callModalAgent({
       ctx,
@@ -934,6 +1394,9 @@ export async function POST(req: NextRequest) {
       hydratedAttachments,
       abortController,
       spaceSlug,
+      turnId: claimedTurn.id,
+      attemptToken: claimedAttemptToken,
+      onSettled: settleConversationTurn,
     });
   }
 
@@ -945,13 +1408,17 @@ export async function POST(req: NextRequest) {
   // streamed back inline.
   logger.info('[ai/task] router → agent (in-process TS)', { spaceSlug, model: turnModel });
   return streamTsChatTurn({
-    ctx,
+    ctx: { ...toolCtx, attachmentIds: hydratedAttachments.map((a) => a.id), attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename })) },
     conversationId,
     userMessage: message,
     history,
     model: turnModel,
     attachments: turnAttachments,
+    attachmentManifest: hydratedAttachments.map((a) => ({ id: a.id, filename: a.filename, mimeType: a.mime_type })),
     abortController,
+    turnId: claimedTurn.id,
+    attemptToken: claimedAttemptToken,
+    onSettled: settleConversationTurn,
   });
 }
 
@@ -987,15 +1454,19 @@ interface CallModalAgentInput {
   hydratedAttachments: AttachmentPayload[];
   abortController: AbortController;
   spaceSlug: string;
+  turnId: string;
+  attemptToken: string;
+  onSettled: ConversationTurnSettler;
 }
 
 async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
-  const { ctx, conversationId, message, history, hydratedAttachments, abortController, spaceSlug } =
+  const { ctx, conversationId, message, history, hydratedAttachments, abortController, spaceSlug, turnId, attemptToken, onSettled } =
     input;
 
   const modalChatUrl = process.env.MODAL_CHAT_URL;
   if (!modalChatUrl) {
     logger.error('[ai/task] MODAL_CHAT_URL not set — cannot route to Modal sandbox', { spaceSlug });
+    await onSettled({ status: 'failed', reason: 'modal_not_configured', error: 'MODAL_CHAT_URL is missing.' }).catch(() => {});
     return NextResponse.json(
       { error: 'Agent backend not configured. Set MODAL_CHAT_URL.' },
       { status: 503 },
@@ -1004,6 +1475,7 @@ async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
   const agentInternalSecret = process.env.AGENT_INTERNAL_SECRET;
   if (!agentInternalSecret) {
     logger.error('[ai/task] AGENT_INTERNAL_SECRET not set — refusing Modal agent call', { spaceSlug });
+    await onSettled({ status: 'failed', reason: 'modal_auth_not_configured', error: 'AGENT_INTERNAL_SECRET is missing.' }).catch(() => {});
     return NextResponse.json(
       { error: 'Agent backend auth not configured. Set AGENT_INTERNAL_SECRET.' },
       { status: 503 },
@@ -1036,12 +1508,14 @@ async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
     });
   } catch (err) {
     logger.error('[ai/task] Modal fetch failed', { spaceSlug }, err);
+    await onSettled({ status: 'failed', reason: 'modal_fetch_failed', error: err instanceof Error ? err.message : 'Modal fetch failed.' }).catch(() => {});
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
   }
 
   if (!modalRes.ok || !modalRes.body) {
     const status = modalRes.status;
     logger.error('[ai/task] Modal returned error', { status, spaceSlug });
+    await onSettled({ status: 'failed', reason: 'modal_response_failed', error: `Modal returned ${status}.` }).catch(() => {});
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 502 });
   }
 
@@ -1050,5 +1524,8 @@ async function callModalAgent(input: CallModalAgentInput): Promise<Response> {
     spaceId: ctx.space.id,
     conversationId,
     abortController,
+    turnId,
+    attemptToken,
+    onSettled,
   });
 }

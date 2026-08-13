@@ -40,11 +40,11 @@ const PRINCIPLES = [
   },
   {
     title: 'Accountable, by design.',
-    body: 'We are building an agent people trust with their book. That trust is a feature: nothing leaves without a name on it, and we hold that line in the code.',
+    body: 'We are building an agent people trust with their book. That trust is a feature: every action has an owner, an outcome, and a receipt, and we hold that line in the code.',
   },
   {
     title: 'One voice, everywhere.',
-    body: 'A draft card, a toast, an activity row, the same signature carries through. Consistency and polish are not the last pass; they are how we build.',
+    body: 'An action card, a toast, an activity row, the same signature carries through. Consistency and polish are not the last pass; they are how we build.',
   },
 ];
 

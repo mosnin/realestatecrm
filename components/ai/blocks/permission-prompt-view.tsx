@@ -5,7 +5,6 @@ import {
   Check,
   X,
   Pencil,
-  ShieldCheck,
   Loader2,
   Infinity as InfinityIcon,
   Clock,
@@ -14,6 +13,7 @@ import {
   Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ToolApproval, type ToolApprovalStatus } from '@/components/ai/agent-status';
 
 /** SMS one-segment budget (GSM-7). Long-form is 153/segment after the first. */
 const SMS_SOFT_LIMIT = 160;
@@ -89,8 +89,8 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
 }
 
 /**
- * Inline compose card for send_email / send_sms. The realtor edits in place
- * — no JSON, no pencil. Send fires the existing approval pipeline with the
+ * Inline send card for send_email / send_sms. The realtor edits in place
+ * — no JSON, no pencil. Send fires the existing confirmation pipeline with the
  * edited subject/body, which routes to Resend (email) or Telnyx (SMS) on
  * the server side. Read-only recipient (To:) — recipient selection happens
  * upstream in the Chippi conversation, not in this card.
@@ -202,9 +202,10 @@ interface PermissionPromptViewProps {
 }
 
 /**
- * The "user confirms before mutation" card. Renders the summary + the args
- * preview, with Approve / Deny buttons inline. Clicking the pencil opens an
- * editor so the user can tweak the JSON args before approving — the Phase 3d
+ * The Chat-mode "user confirms before mutation" card. Work mode executes
+ * requested actions directly and does not render this surface. The card renders
+ * a summary + args preview, with Run / Cancel buttons inline. Clicking the pencil
+ * opens an editor so the user can tweak the JSON args before confirming — the Phase 3d
  * edit-args path is already supported server-side.
  */
 export function PermissionPromptView({
@@ -217,13 +218,24 @@ export function PermissionPromptView({
   const isSendEmail = prompt.name === 'send_email';
   const isSendSms = prompt.name === 'send_sms';
   const isSendTool = isSendEmail || isSendSms;
+  const requiresExactApproval = prompt.name === 'apply_workbook_transformation';
 
   const [editing, setEditing] = useState(false);
   const [argsText, setArgsText] = useState(() => {
     try { return JSON.stringify(prompt.args, null, 2); } catch { return '{}'; }
   });
   const [parseError, setParseError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<null | 'approve' | 'deny' | 'always'>(null);
+
+  // A card instance can be reused for the next paused call. Never carry an
+  // editable JSON state into an exact workbook approval.
+  useEffect(() => {
+    setEditing(false);
+    setParseError(null);
+    setSubmitError(null);
+    try { setArgsText(JSON.stringify(prompt.args, null, 2)); } catch { setArgsText('{}'); }
+  }, [prompt.requestId, prompt.args]);
 
   // Inline compose state for send_email / send_sms. The draft fields are
   // editable in place — no JSON-pencil step — and ride through to the
@@ -248,6 +260,7 @@ export function PermissionPromptView({
 
   /** Shared pre-parse for the approve paths — keeps the JSON editor DRY. */
   function resolveEditedArgs(): { ok: true; edited?: Record<string, unknown> } | { ok: false } {
+    if (requiresExactApproval) return { ok: true };
     // Send tools: merge the inline compose state into the original args.
     // Even when not dirty we send the explicit values so the server's
     // schema is satisfied regardless of editor history.
@@ -267,6 +280,7 @@ export function PermissionPromptView({
 
   async function doApprove() {
     setSubmitting('approve');
+    setSubmitError(null);
     try {
       const parsed = resolveEditedArgs();
       if (!parsed.ok) {
@@ -274,6 +288,8 @@ export function PermissionPromptView({
         return;
       }
       await onApprove(prompt.requestId, parsed.edited);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Approval failed. Try again.');
     } finally {
       setSubmitting(null);
     }
@@ -281,8 +297,11 @@ export function PermissionPromptView({
 
   async function doDeny() {
     setSubmitting('deny');
+    setSubmitError(null);
     try {
       await onDeny(prompt.requestId);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Denial failed. Try again.');
     } finally {
       setSubmitting(null);
     }
@@ -291,6 +310,7 @@ export function PermissionPromptView({
   async function doAlwaysAllow() {
     if (!onAlwaysAllow) return;
     setSubmitting('always');
+    setSubmitError(null);
     try {
       const parsed = resolveEditedArgs();
       if (!parsed.ok) {
@@ -298,149 +318,144 @@ export function PermissionPromptView({
         return;
       }
       await onAlwaysAllow(prompt.requestId, parsed.edited);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Approval failed. Try again.');
     } finally {
       setSubmitting(null);
     }
   }
 
   const disabled = busy || submitting !== null;
+  const approvalStatus: ToolApprovalStatus = submitting
+    ? 'approving'
+    : submitError
+      ? 'error'
+      : 'pending';
+
+  const details = isSendTool ? (
+    <InlineComposeCard
+      kind={isSendEmail ? 'email' : 'sms'}
+      args={prompt.args as Record<string, unknown>}
+      subject={compose.subject}
+      body={compose.body}
+      onSubjectChange={(value) => setCompose((previous) => ({ ...previous, subject: value }))}
+      onBodyChange={(value) => setCompose((previous) => ({ ...previous, body: value }))}
+      disabled={disabled}
+    />
+  ) : editing && !requiresExactApproval ? (
+    <div>
+      <textarea
+        value={argsText}
+        onChange={(event) => {
+          setArgsText(event.target.value);
+          setParseError(null);
+        }}
+        rows={Math.min(10, Math.max(4, argsText.split('\n').length + 1))}
+        className="w-full rounded-lg border border-border bg-background px-2.5 py-2 font-mono text-[11px] text-foreground outline-none transition-colors focus:border-foreground"
+        spellCheck={false}
+        disabled={disabled}
+      />
+      {parseError ? (
+        <p role="alert" className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
+          {parseError}
+        </p>
+      ) : null}
+    </div>
+  ) : (
+    PrettyArgs({ prompt }) ?? (
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-muted/35 px-2.5 py-2 font-mono text-[11px] text-foreground/80">
+        {JSON.stringify(prompt.args, null, 2)}
+      </pre>
+    )
+  );
 
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground">
-          <ShieldCheck size={15} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
-            {isSendEmail ? 'Email draft: review and send' : isSendSms ? 'SMS draft: review and send' : 'Approve before running'}
+    <ToolApproval
+      tool={prompt.name}
+      title={isSendEmail ? 'Allow this email to send?' : isSendSms ? 'Allow this text to send?' : 'Allow this tool to run?'}
+      description={prompt.summary}
+      status={approvalStatus}
+      defaultOpen
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={doApprove}
+            disabled={disabled || (isSendTool && composeEmpty)}
+            className={cn(
+              'inline-flex min-h-10 items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-xs font-semibold text-background transition-opacity',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+            )}
+          >
+            {submitting === 'approve' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : isSendTool ? (
+              <Send size={12} />
+            ) : (
+              <Check size={12} />
+            )}
+            {isSendTool ? 'Allow and send' : editing ? 'Allow edited' : 'Allow once'}
+          </button>
+          {onAlwaysAllow && !requiresExactApproval ? (
+            <button
+              type="button"
+              onClick={doAlwaysAllow}
+              disabled={disabled}
+              title={`Allow ${prompt.name} for the rest of this chat`}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting === 'always' ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <InfinityIcon size={12} />
+              )}
+              Always allow
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={doDeny}
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting === 'deny' ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+            Deny
+          </button>
+          {!isSendTool && !requiresExactApproval ? (
+            <button
+              type="button"
+              onClick={() => setEditing((value) => !value)}
+              disabled={disabled}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Pencil size={11} />
+              {editing ? 'Cancel edit' : 'Edit details'}
+            </button>
+          ) : null}
+        </>
+      }
+    >
+      {details}
+      {(prompt.otherPendingCalls?.length ?? 0) > 0 ? (
+        <div className="mt-3 border-t border-border/60 pt-3">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            Also queued in this run ({prompt.otherPendingCalls!.length})
           </p>
-          <p className="text-sm font-semibold text-foreground">{prompt.summary}</p>
-
-          {/* Args preview / editor — three branches:
-              1. Send tools (email / SMS): inline compose card with editable
-                 subject/body fields. No pencil; the editor IS the surface.
-              2. JSON editing toggled: textarea for power-user edits.
-              3. Default: PrettyArgs (tool-specific renderer) or raw JSON. */}
-          {isSendTool ? (
-            <InlineComposeCard
-              kind={isSendEmail ? 'email' : 'sms'}
-              args={prompt.args as Record<string, unknown>}
-              subject={compose.subject}
-              body={compose.body}
-              onSubjectChange={(v) => setCompose((p) => ({ ...p, subject: v }))}
-              onBodyChange={(v) => setCompose((p) => ({ ...p, body: v }))}
-              disabled={disabled}
-            />
-          ) : editing ? (
-            <div className="mt-2.5">
-              <textarea
-                value={argsText}
-                onChange={(e) => {
-                  setArgsText(e.target.value);
-                  setParseError(null);
-                }}
-                rows={Math.min(10, Math.max(4, argsText.split('\n').length + 1))}
-                className="w-full text-[11px] font-mono bg-background/80 border border-border rounded-md px-2.5 py-1.5 text-foreground outline-none focus:border-foreground transition-colors"
-                spellCheck={false}
-                disabled={disabled}
-              />
-              {parseError && (
-                <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">{parseError}</p>
-              )}
-            </div>
-          ) : (
-            (() => {
-              const pretty = PrettyArgs({ prompt });
-              if (pretty) return pretty;
-              return (
-                <pre className="mt-2.5 text-[11px] bg-background/60 border border-border rounded-md px-2.5 py-1.5 font-mono text-foreground/80 overflow-x-auto">
-                  {JSON.stringify(prompt.args, null, 2)}
-                </pre>
-              );
-            })()
-          )}
-
-          {/* Also queued */}
-          {(prompt.otherPendingCalls?.length ?? 0) > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                Also queued in this run ({prompt.otherPendingCalls!.length}):
-              </p>
-              <div className="space-y-1">
-                {prompt.otherPendingCalls!.map((call) => (
-                  <div key={call.callId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Clock size={10} className="flex-shrink-0" />
-                    <span>{call.name}</span>
-                  </div>
-                ))}
+          <div className="space-y-1">
+            {prompt.otherPendingCalls!.map((call) => (
+              <div key={call.callId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock size={10} className="shrink-0" />
+                <span>{call.name}</span>
               </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={doApprove}
-              disabled={disabled || (isSendTool && composeEmpty)}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-md bg-foreground text-background px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-all',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-              )}
-            >
-              {submitting === 'approve' ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : isSendTool ? (
-                <Send size={12} />
-              ) : (
-                <Check size={12} />
-              )}
-              {isSendTool ? 'Send' : editing ? 'Approve edited' : 'Approve'}
-            </button>
-            {onAlwaysAllow && (
-              <button
-                type="button"
-                onClick={doAlwaysAllow}
-                disabled={disabled}
-                title={`Auto-approve ${prompt.name} for the rest of this chat`}
-                className="inline-flex items-center gap-1 rounded-md border border-foreground/20 bg-background hover:bg-muted px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submitting === 'always' ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <InfinityIcon size={12} />
-                )}
-                Always allow
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={doDeny}
-              disabled={disabled}
-              className="inline-flex items-center gap-1 rounded-md border border-rose-400/50 bg-background text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 px-3 py-2.5 min-h-[44px] text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting === 'deny' ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <X size={12} />
-              )}
-              {isSendTool ? 'Discard' : 'Deny'}
-            </button>
-            {!isSendTool && (
-              <button
-                type="button"
-                onClick={() => setEditing((v) => !v)}
-                disabled={disabled}
-                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Pencil size={11} />
-                {editing ? 'Cancel edit' : 'Edit'}
-              </button>
-            )}
+            ))}
           </div>
         </div>
-      </div>
-    </div>
+      ) : null}
+      {submitError ? (
+        <p role="alert" className="mt-3 text-[11px] text-rose-600 dark:text-rose-400">
+          {submitError}
+        </p>
+      ) : null}
+    </ToolApproval>
   );
 }

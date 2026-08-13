@@ -9,7 +9,6 @@
 import {
   LayoutGrid,
   Library,
-  PenLine,
   ScrollText,
   Search,
   Home,
@@ -36,7 +35,7 @@ import {
 
 const TOP_FEATURES = [
   { icon: Library, title: 'Trained on your book', desc: 'Grounded in your listings, your voice, and how you actually work.' },
-  { icon: PenLine, title: 'Drafts, never sends', desc: 'Every message is proposed; the send always goes through you.' },
+  { icon: Send, title: 'Acts when you ask', desc: 'Sends messages and completes CRM work, then shows you exactly what changed.' },
   { icon: ScrollText, title: 'Audited end to end', desc: 'Every action written down in plain language you can review.' },
 ];
 

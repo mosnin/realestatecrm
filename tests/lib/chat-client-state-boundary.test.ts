@@ -16,6 +16,10 @@ const workspaceSource = readFileSync(
   path.join(ROOT, 'components/chippi/chippi-workspace.tsx'),
   'utf8',
 );
+const sidebarConversationsSource = readFileSync(
+  path.join(ROOT, 'components/dashboard/sidebar-conversations.tsx'),
+  'utf8',
+);
 
 describe('chat client-side boundary state', () => {
   it('scopes always-allow session storage by chat surface endpoint and conversation id', () => {
@@ -64,7 +68,12 @@ describe('chat client-side boundary state', () => {
     expect(workspaceSource).toContain('conversationId=${encodeURIComponent(convId)}');
     expect(workspaceSource).toContain('conversationId=${encodeURIComponent(conv.id)}');
     expect(workspaceSource).toContain('conversationId=${encodeURIComponent(id)}');
-    expect(workspaceSource).toContain('`${conversationItemBase}/${encodeURIComponent(id)}`');
+    expect(sidebarConversationsSource).toContain(
+      '`/api/ai/conversations/${encodeURIComponent(id)}`',
+    );
+    expect(sidebarConversationsSource).toContain(
+      'conversationId=${encodeURIComponent(conv.id)}',
+    );
   });
 
   // The broker split panel is now enabled (feature parity with realtor), but
@@ -104,8 +113,12 @@ describe('chat client-side boundary state', () => {
     expect(workspaceSource).toContain("{isBroker ? 'Reviews' : 'Drafts'}");
   });
 
-  it('hides realtor approval polling chrome on the broker surface', () => {
-    expect(workspaceSource).toContain('{!isBroker && <ApprovalsPill />}');
+  it('shows approval polling chrome in Chat and Work Review, but not autonomous Work', () => {
+    expect(workspaceSource).toContain("(chatMode === 'chat' ||");
+    expect(workspaceSource).toContain(
+      "(chatMode === 'work' && workExecutionMode === 'review')) && (",
+    );
+    expect(workspaceSource).toContain('<ApprovalsPill />');
   });
 
   // Broker @-mentions now resolve through the brokerage-scoped endpoint

@@ -65,7 +65,7 @@ const NAV_LINKS: NavLink[] = [
       },
       {
         label: 'The reply',
-        desc: 'drafts in your voice, ready before you open the thread.',
+        desc: 'sends in your voice when you ask Chippi to reply.',
         to: 'the-reply',
       },
       {
@@ -80,7 +80,7 @@ const NAV_LINKS: NavLink[] = [
       },
       {
         label: 'You stay in control',
-        desc: 'nothing leaves without your name on it.',
+        desc: 'every action carries your identity and a result receipt.',
         to: 'stay-in-control',
       },
     ],

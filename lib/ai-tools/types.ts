@@ -8,9 +8,11 @@
  *   - either auto-running (read-only) or permission-gated (mutations)
  *   - executed with a ToolContext that carries the caller's identity + space
  *
- * Read-only tools run immediately inside the loop. Mutating tools emit a
- * `permission_required` SSE event and pause until the user approves — see
- * lib/ai-tools/events.ts and phase 3.
+ * Read-only tools run immediately inside the loop. Mutating tools normally
+ * emit a `permission_required` SSE event and pause until the user approves —
+ * see lib/ai-tools/events.ts and phase 3. A server-derived, exact Work-mode
+ * execution grant may authorize only the mutation named by the current user
+ * message; selecting Work alone is never blanket authorization.
  *
  * The contract is enforced at the type level, not by markdown:
  *   - `requiresApproval: true | 'maybe'` REQUIRES `summariseCall` and
@@ -26,6 +28,7 @@
  */
 
 import type { z } from 'zod';
+import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
 
 // ── Risk level for autonomous agent approval gating ───────────────────────
 
@@ -58,6 +61,40 @@ export interface ToolContext {
   };
   /** The AbortSignal for the current turn — handlers should respect it. */
   signal: AbortSignal;
+  /** Server-resolved conversation binding for tools that continue durable work. */
+  conversationId?: string;
+  /** True only when the user explicitly selected the product's Work mode. */
+  workMode?: boolean;
+  /** Persisted Work policy. Chat ignores this field. */
+  workExecutionMode?: WorkExecutionMode;
+  /** Active, exact user-authored outcome for this Work conversation. */
+  conversationGoal?: string;
+  /** Monotonic goal revision captured by durable child work. */
+  conversationGoalVersion?: number;
+  /** Server-derived, turn-scoped native tool names that the user's exact
+   * Work-mode request authorizes to execute without another prompt. Merely
+   * exposing a tool to the model does not put it in this set. */
+  directExecutionToolNames?: readonly string[];
+  /** Deterministic turn/call seed; never supplied by the model. */
+  continuationIdempotencySeed?: string;
+  /** Stable server-issued key for a leased durable side effect. Derived from
+   * the durable action row, never from model-authored message content. */
+  executionIdempotencyKey?: string;
+  /** Server-resolved capability: this conversation has a completed Workspace. */
+  workspaceContinuationEligible?: boolean;
+  /** Exact Attachment ids hydrated for this turn; not a workspace-wide grant. */
+  attachmentIds?: readonly string[];
+  attachmentManifest?: readonly { id: string; filename: string }[];
+  /** Server-validated active Workbench context for this turn. Never taken
+   * directly from a browser id without tenant lookup. */
+  activeWorkbook?: {
+    artifactId: string;
+    versionNumber: number;
+    title: string;
+  };
+  /** Server-derived intent marker. It carries no artifact authority and lets
+   * the prompt ask for an open workbook rather than inventing an id. */
+  workbookTransformRequested?: boolean;
 }
 
 // ── Tool result ───────────────────────────────────────────────────────────
@@ -70,7 +107,14 @@ export interface ToolContext {
  */
 export interface ToolResult<TData = unknown> {
   summary: string;
+  /** Bounded, tool-authored context for the model only. UI data stays out of
+   * the model transcript unless a tool deliberately supplies this field. */
+  modelContext?: string;
   data?: TData;
+  /** Internal receipt for a leased durable executor. Interactive callers
+   * ignore it. A tool may declare that a provider-side failure is terminal,
+   * or that the outcome is ambiguous and needs manual reconciliation. */
+  durableExecutionDisposition?: 'terminal_failure' | 'reconciliation_required';
   /**
    * How the block renderer should tint this result.
    *
@@ -102,6 +146,9 @@ export interface ToolResult<TData = unknown> {
     | 'message-draft'
     | 'question-flow'
     | 'option-list'
+    | 'generated-image'
+    | 'openui'
+    | 'workbench'
     | 'plain'
     | 'success'
     | 'error'
@@ -141,9 +188,10 @@ export interface ReadOnlyToolDefinition<TArgs = unknown, TData = unknown>
 }
 
 /**
- * Mutating tool — pauses for user approval. `summariseCall` is REQUIRED so
- * the realtor sees what they're saying yes to. `rateLimit` is REQUIRED so
- * we cap blast radius even if the model goes wild.
+ * Mutating tool — pauses for user approval unless the current Work turn has a
+ * server-derived exact-name execution grant. `summariseCall` is REQUIRED so
+ * gated callers see what they're saying yes to. `rateLimit` is REQUIRED so we
+ * cap blast radius even when direct execution is authorized.
  */
 export interface MutatingToolDefinition<TArgs = unknown, TData = unknown>
   extends BaseToolFields<TArgs, TData> {

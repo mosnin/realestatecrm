@@ -40,7 +40,7 @@ import { buildSdkUserContent, type MultimodalAttachment } from '@/lib/chat/multi
 import { buildDelegateTaskTool } from './tools/delegate-task';
 import { buildSystemPrompt, buildPersonalizedSystemPrompt } from './system-prompt';
 import { ALL_TOOLS } from './tools';
-import { getChatTools } from './toolsets';
+import { getChatTools, selectDirectExecutionToolNames } from './toolsets';
 import { withLoopGuard } from './loop-guard';
 import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
@@ -49,6 +49,7 @@ import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
 import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
 import { isComposioAuthError } from '@/lib/integrations/composio-errors';
+import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
@@ -128,9 +129,28 @@ export function buildChatAgent(
   } = {},
 ): Agent {
   const selectedDomain =
-    opts.userMessage != null ? getChatTools(opts.userMessage) : ALL_TOOLS;
-  const domainTools = selectedDomain.map((t: ToolDefinition) =>
-    toSdkTool(t, ctx, opts.resultSink),
+    opts.userMessage != null
+      ? getChatTools(opts.userMessage, {
+          workspaceContinuationEligible: ctx.workspaceContinuationEligible,
+          workMode: ctx.workMode,
+        })
+      : ALL_TOOLS.filter(
+          (tool) =>
+            (tool.name !== 'continue_workspace_run' || ctx.workspaceContinuationEligible) &&
+            (tool.name !== 'start_work_session' || ctx.workMode),
+        );
+  // Never carry a prior turn's authorization forward. The exact current user
+  // message and the already-scoped native catalog jointly produce this turn's
+  // direct-execution grant; Work mode by itself grants nothing.
+  const turnCtx: ToolContext = {
+    ...ctx,
+    directExecutionToolNames:
+      ctx.workMode === true && ctx.workExecutionMode !== 'review' && opts.userMessage != null
+        ? selectDirectExecutionToolNames(opts.userMessage, selectedDomain)
+        : [],
+  };
+  const domainTools = selectedDomain.filter((t) => !['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()).map((t: ToolDefinition) =>
+    toSdkTool(t, turnCtx, opts.resultSink),
   );
 
   // The model every agent in this turn runs on. Either an explicit override
@@ -144,7 +164,7 @@ export function buildChatAgent(
   // Modal sub-agent run (the swarm) for multi-step / in-depth work, and stream
   // its progress back inline. See tools/delegate-task.ts + the system prompt's
   // "when to delegate" guidance.
-  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, ctx, opts.resultSink);
+  const delegateTool = toSdkTool(buildDelegateTaskTool() as ToolDefinition, turnCtx, opts.resultSink);
 
   // Per-turn sub-agents removed (token redesign L2). `analyze_pipeline`,
   // `research_person`, and `planner` used to be attached as tools on EVERY
@@ -349,7 +369,10 @@ export function isAuthLikeError(err: unknown): boolean {
  * model actually calls find_integration_tool. Still reports the connected
  * toolkits so the prompt can tell the model which apps are reachable.
  */
-export async function loadIntegrationMetaTools(ctx: ToolContext): Promise<IntegrationLoadResult> {
+export async function loadIntegrationMetaTools(
+  ctx: ToolContext,
+  options: { userMessage?: string } = {},
+): Promise<IntegrationLoadResult> {
   let toolkits: string[];
   try {
     toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
@@ -368,7 +391,15 @@ export async function loadIntegrationMetaTools(ctx: ToolContext): Promise<Integr
     );
     return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
   }
-  return { tools: buildIntegrationSearchTools(ctx, toolkits), liveToolkits: toolkits, unavailableToolkits: [] };
+  return {
+    tools: buildIntegrationSearchTools(ctx, toolkits, {
+      // Only a fresh turn supplies the exact current message. Resume and all
+      // other callers omit it, which intentionally creates no Work write grant.
+      userMessage: options.userMessage,
+    }),
+    liveToolkits: toolkits,
+    unavailableToolkits: [],
+  };
 }
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────
@@ -408,6 +439,8 @@ export interface RunChatTurnInput {
    * the card") no longer has to detour through Modal.
    */
   attachments?: MultimodalAttachment[];
+  /** Stable IDs and names that let file tools act on exactly this turn's uploads. */
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   /**
    * Sink for tool `data`/`display` keyed by SDK call id. The stream pump
    * creates this and reads it back to attach rich-card payloads to the SSE
@@ -427,7 +460,9 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // truth — previously the prompt's "Connected: …" line came from a 5-minute
   // cache, so right after connecting Gmail the model HELD the Gmail tools
   // while its own prompt said Gmail wasn't connected.
-  const integrations = await loadIntegrationMetaTools(input.ctx);
+  const integrations = await loadIntegrationMetaTools(input.ctx, {
+    userMessage: input.userMessage,
+  });
   const instructions = await buildPersonalizedSystemPrompt(input.ctx, {
     integrations: {
       liveToolkits: integrations.liveToolkits,
@@ -447,10 +482,14 @@ export async function runChatTurn(input: RunChatTurnInput) {
   // otherwise a plain string. The builder splices a calm note onto the text
   // when an attachment can't be shown, so the model never pretends it saw
   // something it didn't.
-  let userContent: unknown = input.userMessage;
+  const attachmentManifest = input.attachmentManifest?.slice(0, 20) ?? [];
+  const manifestNote = attachmentManifest.length
+    ? `\n\nAttachment manifest for this turn (use these exact Attachment ids for file tools): ${attachmentManifest.map((a) => `${a.filename} [${a.mimeType}] id=${a.id}`).join('; ')}`
+    : '';
+  let userContent: unknown = input.userMessage + manifestNote;
   if (input.attachments && input.attachments.length > 0) {
     const resolved = resolveChatModel(input.model);
-    userContent = buildSdkUserContent(resolved, input.userMessage, input.attachments).content;
+    userContent = buildSdkUserContent(resolved, input.userMessage + manifestNote, input.attachments).content;
   }
 
   // Build the SDK input as history + new user message. The SDK accepts

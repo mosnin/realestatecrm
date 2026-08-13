@@ -106,6 +106,16 @@ vi.mock('@/lib/chat/broker-direct', () => ({
   streamBrokerDirectTurn: directMock,
 }));
 
+const { clearStopMock, createStopPollerMock } = vi.hoisted(() => ({
+  clearStopMock: vi.fn(async () => undefined),
+  createStopPollerMock: vi.fn(() => async () => false),
+}));
+vi.mock('@/lib/chat/stop-signal', () => ({
+  clearChatStop: clearStopMock,
+  createStopPoller: createStopPollerMock,
+  STOP_POLL_INTERVAL_MS: 5,
+}));
+
 const fetchMock = vi.fn();
 
 // Import AFTER all mocks.
@@ -116,6 +126,8 @@ const ORIGINAL_SECRET = process.env.AGENT_INTERNAL_SECRET;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearStopMock.mockResolvedValue(undefined);
+  createStopPollerMock.mockImplementation(() => async () => false);
   for (const key of Object.keys(tableQueues)) delete tableQueues[key];
   process.env.MODAL_CHAT_URL = 'https://modal.example/broker-chat';
   process.env.AGENT_INTERNAL_SECRET = 'shh';
@@ -163,6 +175,73 @@ describe("POST /api/ai/broker-task — mode='chat' forces the direct snapshot pa
     expect(fetchMock).not.toHaveBeenCalled();
     const call = directMock.mock.calls[0][0] as { degradedFromAgentMode?: boolean };
     expect(call.degradedFromAgentMode).toBe(false);
+  });
+});
+
+describe('POST /api/ai/broker-task — exact per-turn Stop identity', () => {
+  it('clears and forwards the client turn id to the direct stream', async () => {
+    const res = await POST(makeRequest({ mode: 'chat', turnId: 'broker-turn-direct-1' }));
+
+    expect(res.status).toBe(200);
+    expect(clearStopMock).toHaveBeenCalledWith('broker-turn-direct-1');
+    expect(directMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: expect.any(String),
+        turnId: 'broker-turn-direct-1',
+      }),
+    );
+  });
+
+  it('mints one exact id for an older client and uses it consistently', async () => {
+    const res = await POST(makeRequest({ mode: 'chat' }));
+
+    expect(res.status).toBe(200);
+    const directInput = directMock.mock.calls[0][0] as { turnId?: string };
+    expect(directInput.turnId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(clearStopMock).toHaveBeenCalledWith(directInput.turnId);
+  });
+
+  it('uses the same client turn id for Modal polling and correlation', async () => {
+    const res = await POST(
+      makeRequest({ message: 'reassign this lead', mode: 'work', turnId: 'broker-turn-modal-1' }),
+    );
+    await res.text();
+
+    expect(clearStopMock).toHaveBeenCalledWith('broker-turn-modal-1');
+    expect(createStopPollerMock).toHaveBeenCalledWith('broker-turn-modal-1');
+    expect(res.headers.get('X-Chippi-Turn-Id')).toBe('broker-turn-modal-1');
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(init.body)).toMatchObject({ turn_id: 'broker-turn-modal-1' });
+  });
+
+  it('interrupts a silent Modal reader when the exact-turn poll changes to Stop', async () => {
+    let polls = 0;
+    const modalCancel = vi.fn();
+    createStopPollerMock.mockImplementation(() => async () => {
+      polls += 1;
+      return polls >= 2;
+    });
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream({
+          cancel() {
+            modalCancel();
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      ),
+    );
+
+    const res = await POST(
+      makeRequest({ message: 'reassign this lead', mode: 'work', turnId: 'broker-turn-silent' }),
+    );
+    const body = await res.text();
+
+    expect(modalCancel).toHaveBeenCalledTimes(1);
+    expect(body).toContain('"type":"turn_complete"');
+    expect(body).toContain('"reason":"stopped"');
   });
 });
 

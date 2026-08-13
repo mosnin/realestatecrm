@@ -18,11 +18,13 @@ import { ChippiIsland } from '@/components/island/chippi-island';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
 import { LayoutShell } from '@/components/dashboard/layout-shell';
 import { ChippiSplash } from '@/components/dashboard/chippi-splash';
+import { PersistentChippiVoice } from '@/components/chippi/persistent-chippi-voice';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { pickGreeting } from '@/lib/greetings';
 import { ReferralTracker } from '@/components/affiliate/referral-tracker';
 import { FprScript } from '@/components/affiliate/fpr-script';
 import { hasCurrentSubscription } from '@/lib/api-auth';
+import { realtimeVoiceGatewayReady } from '@/lib/realtime/voice-feature';
 
 
 export default async function DashboardLayout({
@@ -306,6 +308,12 @@ export default async function DashboardLayout({
           top-center. Hidden on the Chippi surface (the strip owns it there)
           and in ?embed=1 mode; renders null when nothing is running. */}
       <ChippiIsland slug={slug} spaceId={space.id} />
+      {/* Route-level ownership keeps the one active WebRTC session alive while
+          the user switches conversations or visits another workspace page. */}
+      <PersistentChippiVoice
+        slug={slug}
+        enabled={!isBroker && realtimeVoiceGatewayReady()}
+      />
       <ChippiBar slug={slug} />
       <CommandPalette slug={slug} />
       {/* FirstPromoter attribution. FprScript loads fpr.js here (the dashboard

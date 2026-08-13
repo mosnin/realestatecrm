@@ -1,0 +1,126 @@
+import crypto from 'node:crypto';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const { state, supabase } = vi.hoisted(() => {
+const state = { eventResults: [] as string[], rpcCalls: [] as Array<{ name: string; args: Record<string, unknown> }>, runStatus: 'launching', launchToken: 'token-1', finishError: null as Error | null };
+const chain = (result: unknown): any => ({
+  eq: () => chain(result), in: () => chain(result), is: () => chain(result), order: () => chain(result), limit: () => chain(result),
+  maybeSingle: async () => result, single: async () => result,
+});
+const supabase: any = {
+  from(table: string) {
+    if (table === 'WorkspaceRun') return {
+      select: () => chain({ data: { id: 'run-1', workSessionId: 'session-1', status: state.runStatus, launchToken: state.launchToken, cancellationRequestedAt: null }, error: null }),
+    };
+    return { select: () => chain({ data: null, error: null }) };
+  },
+  rpc: async (name: string, args: Record<string, unknown>) => {
+    state.rpcCalls.push({ name, args });
+    if (name === 'record_workspace_run_event') return { data: state.eventResults.shift() ?? 'recorded', error: null };
+    if (name === 'finish_workspace_run_and_session') return { data: state.finishError ? null : true, error: state.finishError };
+    return { data: true, error: null };
+  },
+};
+return { state, supabase };
+});
+
+vi.mock('@/lib/supabase', () => ({ supabase }));
+const { send } = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock('@/lib/inngest/client', () => ({ inngest: { send } }));
+vi.mock('@/lib/api-auth', () => ({ requireSpaceOwner: async () => ({ space: { id: 'space-1' } }) }));
+vi.mock('@/lib/storage', () => ({ buildKey: () => 'private/key', uploadObject: vi.fn(), getSignedDownloadUrl: vi.fn(async () => 'https://example.test/private') }));
+
+import { POST as callback } from '@/app/api/internal/workspace-runs/callback/route';
+import { POST as claimLaunch } from '@/app/api/internal/workspace-runs/launch-claim/route';
+import { GET as download } from '@/app/api/workspace-runs/[id]/files/[fileId]/route';
+import { scheduleWorkspaceLaunchRecovery } from '@/lib/workspace-runs/server';
+
+const secret = 'workspace-test-secret';
+function signedRequest(url: string, body: Record<string, unknown>) {
+  const raw = JSON.stringify(body);
+  const signature = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+  return new NextRequest(url, { method: 'POST', body: raw, headers: { 'content-type': 'application/json', 'x-chippy-workspace-signature': signature } });
+}
+
+describe('Workspace Run lifecycle behavior', () => {
+  beforeEach(() => { process.env.CHIPPI_WORKSPACE_CALLBACK_SECRET = secret; process.env.INNGEST_EVENT_KEY = 'legacy-test-key'; process.env.INNGEST_SIGNING_KEY = 'legacy-signing-test-key'; state.eventResults = []; state.rpcCalls = []; state.runStatus = 'launching'; state.launchToken = 'token-1'; state.finishError = null; send.mockReset(); });
+  afterEach(() => { delete process.env.CHIPPI_WORKSPACE_CALLBACK_SECRET; delete process.env.INNGEST_EVENT_KEY; delete process.env.INNGEST_SIGNING_KEY; });
+
+  it('makes a duplicate intermediate callback a lifecycle no-op', async () => {
+    state.runStatus = 'running';
+    state.eventResults = ['recorded', 'duplicate_event'];
+    const body = { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 1, type: 'command_started', message: 'building' };
+    expect((await callback(signedRequest('http://localhost/callback', body))).status).toBe(200);
+    const duplicate = await callback(signedRequest('http://localhost/callback', body));
+    expect(await duplicate.json()).toMatchObject({ ignored: 'duplicate_event' });
+    expect(state.rpcCalls.filter(({ name }) => name === 'record_workspace_run_event')).toHaveLength(2);
+  });
+
+  it('passes the current token into the atomic start-event transition', async () => {
+    const body = { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 1, type: 'workspace_started', message: 'starting' };
+    const response = await callback(signedRequest('http://localhost/callback', body));
+    expect(response.status).toBe(200);
+    expect(state.rpcCalls).toContainEqual({
+      name: 'record_workspace_run_event',
+      args: expect.objectContaining({ p_run_id: 'run-1', p_space_id: 'space-1', p_launch_token: 'token-1', p_sequence: 1, p_type: 'workspace_started' }),
+    });
+  });
+
+  it('terminal-fails an invalid completed publication through the terminal RPC', async () => {
+    state.runStatus = 'running';
+    const response = await callback(signedRequest('http://localhost/callback', { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 9, type: 'completed', message: 'ready', files: [] }));
+    expect(response.status).toBe(409);
+    expect(state.rpcCalls).toContainEqual(expect.objectContaining({ name: 'finish_workspace_run_and_session', args: expect.objectContaining({ p_launch_token: 'token-1', p_outcome: 'failed', p_sequence: 9 }) }));
+  });
+
+  it('keeps an invalid publication retryable when terminal persistence fails', async () => {
+    state.runStatus = 'running';
+    state.finishError = new Error('database unavailable');
+    const response = await callback(signedRequest('http://localhost/callback', { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1', sequence: 9, type: 'completed', message: 'ready', files: [] }));
+    expect(response.status).toBe(500);
+  });
+
+  it('stops a stale worker before it can record events or publish files', async () => {
+    state.launchToken = 'token-current';
+    const response = await callback(signedRequest('http://localhost/callback', {
+      run_id: 'run-1',
+      space_id: 'space-1',
+      launch_token: 'token-stale',
+      sequence: 1,
+      type: 'workspace_started',
+      message: 'starting',
+    }));
+    expect(await response.json()).toMatchObject({
+      ignored: 'stale_launch',
+      cancellationRequested: true,
+    });
+    expect(state.rpcCalls).toHaveLength(0);
+  });
+
+  it('returns no download before the parent run has completed', async () => {
+    state.runStatus = 'running';
+    const response = await download(new NextRequest('http://localhost/file?slug=demo'), { params: Promise.resolve({ id: 'run-1', fileId: 'file-1' }) });
+    expect(response.status).toBe(404);
+  });
+
+  it('reports the launch-accept winner once and a duplicate thereafter', async () => {
+    let winner = true;
+    supabase.rpc = async (name: string, args: Record<string, unknown>) => {
+      state.rpcCalls.push({ name, args });
+      if (name !== 'accept_workspace_launch') return { data: true, error: null };
+      const data = winner;
+      winner = false;
+      return { data, error: null };
+    };
+    const body = { run_id: 'run-1', space_id: 'space-1', launch_token: 'token-1' };
+    expect((await claimLaunch(signedRequest('http://localhost/claim', body))).status).toBe(202);
+    expect(await (await claimLaunch(signedRequest('http://localhost/claim', body))).json()).toMatchObject({ accepted: true, won: false });
+  });
+
+  it('schedules a deduplicated execute recovery after the launch lease', async () => {
+    await scheduleWorkspaceLaunchRecovery('session-1', 'run-1', 'token-1');
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ id: 'workspace-launch-recovery:run-1:token-1', name: 'work-session/execute', data: expect.objectContaining({ sessionId: 'session-1', reason: 'launch_lease_recovery' }) }));
+    expect(new Date(send.mock.calls[0][0].ts).getTime()).toBeGreaterThan(Date.now() + 120_000);
+  });
+});

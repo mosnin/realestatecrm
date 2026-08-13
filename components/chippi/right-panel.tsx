@@ -12,6 +12,10 @@ import { DURATION_BASE, EASE_IN_OUT } from '@/lib/motion';
 import { RightPanelTabs, type RightPanelTab } from './right-panel-tabs';
 import { BrowserView } from './browser-view';
 import { embedSrcFor, type EmbedTab, type RightPanelVariant } from './right-panel-embeds';
+import { LiveWorkbench } from './live-workbench';
+import { BrowserControlPanel, type BrowserActionLogEntry } from './browser-control-panel';
+import { WorkspaceRunPanel } from './workspace-run-panel';
+import type { ResearchSourceLink } from '@/lib/chippi/research-workspace';
 
 interface RightPanelProps {
   slug: string;
@@ -36,6 +40,19 @@ interface RightPanelProps {
    * has its own dismissal (SplitPanelToggle) and passes nothing here.
    */
   onClose?: () => void;
+  workbenchArtifactId?: string | null;
+  workbenchRefreshVersion?: number | null;
+  /** Bounded in-conversation activity, supplemented by the server history. */
+  researchActions?: BrowserActionLogEntry[];
+  researchSources?: ResearchSourceLink[];
+  /** Server-computed per-space entitlement; never inferred client-side. */
+  researchEnabled?: boolean;
+  workspaceRunsEnabled?: boolean;
+  workspaceRunFollowUpsEnabled?: boolean;
+  workspaceRunId?: string | null;
+  workspaceRunRefreshToken?: number;
+  onContinueWorkspace?: () => void;
+  onOpenWorkbench?: (artifactId: string, versionNumber?: number) => void;
 }
 
 const TAB_LABELS: Record<EmbedTab, string> = {
@@ -54,6 +71,17 @@ export function RightPanel({
   isResizing,
   variant = 'realtor',
   onClose,
+  workbenchArtifactId,
+  workbenchRefreshVersion,
+  researchActions,
+  researchSources,
+  researchEnabled = false,
+  workspaceRunsEnabled = false,
+  workspaceRunFollowUpsEnabled = false,
+  workspaceRunId = null,
+  workspaceRunRefreshToken = 0,
+  onContinueWorkspace,
+  onOpenWorkbench,
 }: RightPanelProps) {
   const [isLoading, setIsLoading] = useState(true);
   // The browser tab mounts lazily on first visit, then STAYS mounted (hidden
@@ -61,24 +89,47 @@ export function RightPanel({
   // history survive hopping between tabs. Embed tabs keep their original
   // remount-per-switch behavior.
   const [browserMounted, setBrowserMounted] = useState(false);
+  const [researchMounted, setResearchMounted] = useState(false);
   const isBrowser = activeTab === 'browser';
+  // Slice A is off unless a deployment explicitly provides this public flag.
+  // The panel is therefore safe to merge without exposing a partial local-only
+  // artifact workflow to paying customers.
+  const workbenchEnabled = process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true';
+  const isWorkbench = activeTab === 'workbench' && workbenchEnabled;
+  // Research is an oversight workspace for the existing browser-control
+  // runtime. It is independently gated so it never advertises a partial
+  // surface in a deployment that has not opted in.
+  const isResearch = activeTab === 'research' && researchEnabled;
+  const isWorkspace = activeTab === 'workspace' && workspaceRunsEnabled;
+  const isUnavailableSpecialTab =
+    (activeTab === 'workbench' && !workbenchEnabled) ||
+    (activeTab === 'research' && !researchEnabled) ||
+    (activeTab === 'workspace' && !workspaceRunsEnabled);
+  const isEmbedded = !isBrowser && !isWorkbench && !isResearch && !isWorkspace && !isUnavailableSpecialTab;
   // Broker has no surface for some realtor tabs (Documents). If a stale
   // persisted tab (the split-panel state is shared across variants) lands on
   // one, self-correct to the always-present live-work activity feed rather
   // than render a broken iframe.
-  const embedTab = isBrowser ? 'activity' : (activeTab as EmbedTab);
-  const embedSrc = embedSrcFor(variant, embedTab, slug);
+  const embedTab: EmbedTab = isEmbedded ? (activeTab as EmbedTab) : 'activity';
+  const embedSrc = isEmbedded ? embedSrcFor(variant, embedTab, slug) : null;
 
   useEffect(() => {
     setIsLoading(true);
     if (activeTab === 'browser') setBrowserMounted(true);
+    if (activeTab === 'research') setResearchMounted(true);
   }, [activeTab]);
 
   useEffect(() => {
-    if (variant === 'broker' && !isBrowser && embedSrc === null) {
+    if (activeTab === 'workbench' && !workbenchEnabled) {
+      onTabChange('activity');
+    } else if (activeTab === 'research' && !researchEnabled) {
+      onTabChange('activity');
+    } else if (activeTab === 'workspace' && !workspaceRunsEnabled) {
+      onTabChange('activity');
+    } else if (variant === 'broker' && isEmbedded && embedSrc === null) {
       onTabChange('activity');
     }
-  }, [variant, isBrowser, embedSrc, onTabChange]);
+  }, [activeTab, embedSrc, isEmbedded, onTabChange, researchEnabled, variant, workbenchEnabled, workspaceRunsEnabled]);
 
   return (
     <motion.div
@@ -96,7 +147,14 @@ export function RightPanel({
       transition={{ duration: DURATION_BASE, ease: EASE_IN_OUT }}
     >
       <div className="relative">
-        <RightPanelTabs activeTab={activeTab} onTabChange={onTabChange} variant={variant} />
+        <RightPanelTabs
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          variant={variant}
+          workbenchEnabled={workbenchEnabled}
+          researchEnabled={researchEnabled}
+          workspaceRunsEnabled={workspaceRunsEnabled}
+        />
         {onClose && (
           <button
             type="button"
@@ -110,7 +168,7 @@ export function RightPanel({
       </div>
 
       <div className="flex-1 relative min-h-0">
-        {!isBrowser && (
+        {isEmbedded && (
           <>
             {isLoading && (
               <div className="absolute inset-0 bg-background">
@@ -142,6 +200,13 @@ export function RightPanel({
             <BrowserView slug={slug} isResizing={isResizing} />
           </div>
         )}
+        {isWorkbench && <LiveWorkbench artifactId={workbenchArtifactId} refreshVersionNumber={workbenchRefreshVersion} />}
+        {researchMounted && (
+          <div className={cn('absolute inset-0 overflow-y-auto p-3', !isResearch && 'hidden')}>
+            <BrowserControlPanel actions={researchActions} sources={researchSources} />
+          </div>
+        )}
+        {isWorkspace && <WorkspaceRunPanel runId={workspaceRunId} slug={slug} onContinue={onContinueWorkspace} onOpenWorkbench={onOpenWorkbench} followUpsEnabled={workspaceRunFollowUpsEnabled} workbenchEnabled={workbenchEnabled} refreshToken={workspaceRunRefreshToken} />}
       </div>
     </motion.div>
   );

@@ -83,7 +83,7 @@ export function SidebarNavItem({
           className={cn(
             'flex-shrink-0 transition-colors',
             isActive
-              ? 'text-foreground'
+              ? 'text-background'
               : 'text-foreground/55 group-hover:text-foreground',
           )}
         />
@@ -97,12 +97,6 @@ export function SidebarNavItem({
   // Full row content for the no-children case (Link wraps everything).
   const rowContent = (
     <>
-      {isActive && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-        />
-      )}
       {linkContent}
     </>
   );
@@ -113,7 +107,7 @@ export function SidebarNavItem({
       ? 'flex items-center justify-center w-10 h-10 mx-auto'
       : 'flex items-center gap-2.5 h-9 pl-3 pr-2.5',
     isActive
-      ? 'bg-foreground/[0.045] text-foreground font-medium'
+      ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
       : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
   );
 
@@ -129,16 +123,10 @@ export function SidebarNavItem({
               'group relative rounded-md text-[13px] transition-colors duration-150',
               'flex items-center h-9 pl-3 pr-1',
               isActive
-                ? 'bg-foreground/[0.045] text-foreground font-medium'
+                ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
                 : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
             )}
           >
-            {isActive && (
-              <span
-                aria-hidden
-                className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-              />
-            )}
             <Link
               href={href}
               onClick={() => {
@@ -155,7 +143,12 @@ export function SidebarNavItem({
               aria-expanded={isExpanded}
               aria-controls={`nav-children-${item.href}`}
               aria-label={isExpanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
-              className="flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors"
+              className={cn(
+                'flex-shrink-0 w-7 h-7 inline-flex items-center justify-center rounded transition-colors',
+                isActive
+                  ? 'text-background/70 hover:bg-background/10 hover:text-background'
+                  : 'text-muted-foreground/60 hover:bg-foreground/5 hover:text-foreground',
+              )}
             >
               <ChevronDown
                 size={12}
@@ -205,7 +198,7 @@ export function SidebarNavItem({
                       className={cn(
                         'flex items-center h-7 px-2 rounded text-[12px] transition-colors duration-150',
                         childActive
-                          ? 'text-foreground font-medium'
+                          ? 'bg-foreground text-background font-medium'
                           : 'text-foreground/55 hover:text-foreground hover:bg-foreground/[0.025]',
                       )}
                     >

@@ -73,9 +73,12 @@ async def generate_studio_image(
         return {"error": f"generation returned a non-JSON response ({resp.status_code}): {snippet}"}
 
     return {
+        "display": "generated-image",
+        "fileId": data.get("fileId"),
         "file_id": data.get("fileId"),
-        "url": data.get("url"),
         "kind": data.get("kind"),
+        "prompt": clean_prompt,
+        "costUsd": data.get("costUsd"),
         "cost_usd": data.get("costUsd"),
     }
 
@@ -137,7 +140,11 @@ async def edit_studio_image(
         return {"error": f"edit returned a non-JSON response ({resp.status_code}): {snippet}"}
 
     return {
+        "display": "generated-image",
+        "fileId": data.get("fileId"),
         "file_id": data.get("fileId"),
-        "url": data.get("url"),
+        "kind": "image",
+        "prompt": prompt or f"{clean_tool} edit",
+        "costUsd": data.get("costUsd"),
         "cost_usd": data.get("costUsd"),
     }

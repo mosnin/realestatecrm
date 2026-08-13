@@ -6,8 +6,6 @@ import { getSpaceForUser } from '@/lib/space';
 // ── POST /api/swarm/[runId]/cancel ────────────────────────────────────────────
 // Cancel a swarm run that is currently queued, planning, running, or auditing.
 
-const CANCELLABLE_STATUSES = new Set(['queued', 'planning', 'running', 'auditing']);
-
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ runId: string }> },
@@ -23,49 +21,47 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Fetch the run and verify it belongs to the calling user's space.
-  const { data: run, error: runError } = await supabase
-    .from('SwarmRun')
-    .select('id, spaceId, status')
-    .eq('id', runId)
-    .eq('spaceId', space.id)
-    .maybeSingle();
-
-  if (runError) {
-    console.error('[swarm/[runId]/cancel/POST] run fetch error:', runError);
-    return NextResponse.json({ error: 'Failed to fetch run' }, { status: 500 });
+  const { data, error } = await supabase.rpc('cancel_swarm_run', {
+    p_run_id: runId,
+    p_space_id: space.id,
+  });
+  if (error) {
+    console.error('[swarm/[runId]/cancel/POST] atomic cancellation error:', error);
+    return NextResponse.json({ error: 'Failed to cancel run' }, { status: 500 });
   }
-  if (!run) {
+  const result = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as { outcome?: unknown; status?: unknown }
+    : null;
+  if (!result || typeof result.outcome !== 'string') {
+    return NextResponse.json({ error: 'Failed to cancel run' }, { status: 500 });
+  }
+  if (result.outcome === 'not_found') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-
-  if (!CANCELLABLE_STATUSES.has(run.status as string)) {
+  if (result.outcome === 'already_terminal') {
+    return NextResponse.json(
+      {
+        error: 'Run already finished before cancellation could be applied',
+        status: typeof result.status === 'string' ? result.status : undefined,
+        rehydrate: true,
+      },
+      { status: 409 },
+    );
+  }
+  if (result.outcome === 'inactive') {
     return NextResponse.json(
       { error: 'Run cannot be cancelled in its current state' },
       { status: 400 },
     );
   }
-
-  // Mark the run as cancelled.
-  const { error: updateError } = await supabase
-    .from('SwarmRun')
-    .update({ status: 'cancelled', completedAt: new Date().toISOString() })
-    .eq('id', runId);
-
-  if (updateError) {
-    console.error('[swarm/[runId]/cancel/POST] update error:', updateError);
+  if (result.outcome !== 'cancelled') {
     return NextResponse.json({ error: 'Failed to cancel run' }, { status: 500 });
   }
 
-  // Append a cancellation event to the event log.
-  const { error: eventError } = await supabase
-    .from('SwarmEvent')
-    .insert({ swarmRunId: runId, type: 'swarm_cancelled', data: { reason: 'user_cancelled' } });
-
-  if (eventError) {
-    console.error('[swarm/[runId]/cancel/POST] event insert error:', eventError);
-    // Run is already cancelled — don't fail the request over a missing event row.
-  }
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    status: 'cancelled',
+    message:
+      'Cancellation recorded. A specialist already inside a model call may finish that call, but its result will not replace the cancelled run.',
+  });
 }

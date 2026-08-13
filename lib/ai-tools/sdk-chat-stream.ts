@@ -22,7 +22,10 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
-import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
+import {
+  saveAssistantMessage,
+  saveConversationTurnAssistantMessage,
+} from '@/lib/ai-tools/persistence';
 import type { ToolContext, ToolResult } from '@/lib/ai-tools/types';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
@@ -43,8 +46,35 @@ import type { MultimodalAttachment } from '@/lib/chat/multimodal';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import { markTurnEnded } from '@/lib/chat/turn-presence';
 import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
+import {
+  settledConversationTurnOutcome,
+  startConversationTurnLeaseGuardian,
+  type ConversationTurnSettler,
+  type TurnTerminalOutcome,
+} from '@/lib/chat/turn-control';
 
 const COMPACTION_THRESHOLD_CHARS = 80_000;
+const WORK_ACTIVITY_LABEL_LIMIT = 160;
+
+/** Keep activity copy compact even when a provider or tool supplied a long value. */
+export function boundedWorkActivityLabel(value: string): string {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (compact.length <= WORK_ACTIVITY_LABEL_LIMIT) return compact;
+  return `${compact.slice(0, WORK_ACTIVITY_LABEL_LIMIT - 1).trimEnd()}…`;
+}
+
+/**
+ * Opaque, deterministic correlation id for one persisted user turn. The seed
+ * is server-issued (normally the saved Message id wrapped by
+ * continuationIdempotencySeed), never model-authored.
+ */
+export function createWorkActivityId(seed: string): string {
+  return `work_${crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24)}`;
+}
+
+function readableToolName(name: string): string {
+  return name.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
 
 interface HistoryRow {
   role: 'user' | 'assistant';
@@ -61,7 +91,13 @@ interface StreamTsChatTurnInput {
   model?: string;
   /** Attachments for this turn (images / PDFs), hydrated to signed URLs. */
   attachments?: MultimodalAttachment[];
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   abortController: AbortController;
+  /** Stable database turn identity. Stop/pause/finish must never key on a conversation. */
+  turnId?: string;
+  /** Exact v2 attempt authority for transcript publication. */
+  attemptToken?: string;
+  onSettled?: ConversationTurnSettler;
 }
 
 export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
@@ -96,7 +132,17 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
 
   const stream = buildSseStream({
     ctx: input.ctx,
+    attachmentManifest: input.attachmentManifest,
+    workActivityId: input.ctx.workMode
+      ? createWorkActivityId(
+          input.ctx.continuationIdempotencySeed ??
+            `${input.conversationId}:${crypto.randomUUID()}`,
+        )
+      : undefined,
     conversationId: input.conversationId,
+    turnId: input.turnId,
+    attemptToken: input.attemptToken,
+    onSettled: input.onSettled,
     abortController: input.abortController,
     initialEvents,
     model: input.model,
@@ -108,6 +154,7 @@ export function streamTsChatTurn(input: StreamTsChatTurnInput): Response {
         history,
         model: input.model,
         attachments: input.attachments,
+        attachmentManifest: input.attachmentManifest,
         resultSink,
       });
       return { result: result as unknown as SdkResultLike };
@@ -125,12 +172,21 @@ interface StreamResumeInput {
   callId: string;
   decision: { approved: true } | { approved: false; message?: string };
   abortController: AbortController;
+  turnId?: string;
+  attemptToken?: string;
+  onSettled?: ConversationTurnSettler;
 }
 
 export function streamTsResumeTurn(input: StreamResumeInput): Response {
   const stream = buildSseStream({
     ctx: input.ctx,
+    workActivityId: input.ctx.workMode
+      ? createWorkActivityId(`${input.conversationId}:${input.serializedState}`)
+      : undefined,
     conversationId: input.conversationId,
+    turnId: input.turnId,
+    attemptToken: input.attemptToken,
+    onSettled: input.onSettled,
     abortController: input.abortController,
     start: async (resultSink) => {
       const { result } = await resumeChatTurn({
@@ -200,7 +256,14 @@ function withIdleTimeout<T>(p: Promise<T>, abortController: AbortController): Pr
 
 interface BuildStreamInput {
   ctx: ToolContext;
+  /** Present only for Work. Groups the normalized activity receipts. */
+  workActivityId?: string;
+  /** Fresh-turn hydrated attachment manifest, retained for pause durability. */
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   conversationId: string;
+  turnId?: string;
+  attemptToken?: string;
+  onSettled?: ConversationTurnSettler;
   abortController: AbortController;
   /**
    * Returns the SDK streamed result. Either fresh or resumed. Receives the
@@ -288,6 +351,27 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
       const nextSeq = createSeqCounter();
       let textBuffer = '';
+      let terminalOutcome: TurnTerminalOutcome = {
+        status: 'failed',
+        reason: 'stream_closed_without_terminal_event',
+        error: 'The stream closed without a terminal event.',
+      };
+      let atomicallySettled = false;
+      let separatelySettled = false;
+      const leaseGuardian = input.turnId && input.attemptToken
+        ? startConversationTurnLeaseGuardian(supabase, {
+            turnId: input.turnId,
+            spaceId: input.ctx.space.id,
+            conversationId: input.conversationId,
+            attemptToken: input.attemptToken,
+            abortController: input.abortController,
+          })
+        : null;
+      // Successful terminal receipts are held until assistant persistence has
+      // committed. Text/tool events can stream live, but the browser and FIFO
+      // ledger must never be told "complete" for a reply that will disappear
+      // from history on reload.
+      let pendingTurnCompleteReason: 'complete' | 'paused' | 'aborted' | null = null;
 
       // The model's thinking trace for this turn (auto-think). Accumulated
       // from reasoning_delta events and persisted as a leading `reasoning`
@@ -311,6 +395,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // name) we can recognize a delegate_task result and lift the SwarmRun
       // id out of its summary marker.
       const callIdToToolName = new Map<string, string>();
+      const callIdToPlanStepCount = new Map<string, number>();
 
       // Sub-agent task blocks spawned this turn (via delegate_task). Persisted
       // alongside the assistant text so a reloaded conversation re-shows the
@@ -334,10 +419,71 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       const toolBlocks: ToolCallBlock[] = [];
       const toolBlockByCallId = new Map<string, ToolCallBlock>();
 
+      // `work_activity` is emitted only for the explicit Work surface. Keep a
+      // single terminal receipt even if a late persistence warning follows a
+      // successful model turn.
+      let terminalActivityEmitted = false;
+      let providerActivityEmitted = false;
+      let pushEvent!: (event: PushableEvent) => void;
+      const pushWorkActivity = (
+        event: Omit<Extract<PushableEvent, { type: 'work_activity' }>, 'type' | 'workId'>,
+      ) => {
+        if (!input.workActivityId) return;
+        pushEvent({
+          type: 'work_activity',
+          workId: input.workActivityId,
+          ...event,
+          label: boundedWorkActivityLabel(event.label),
+        });
+      };
+
       // Drain any events that were queued before the stream opened
       // (e.g. compaction notice assembled in streamTsChatTurn).
       // We define pushEvent first and call it immediately after.
-      const pushEvent = (event: PushableEvent) => {
+      pushEvent = (event: PushableEvent) => {
+        // Once lease renewal fails this process is stale. Do not publish any
+        // later provider/tool frame while abort propagates through the SDK.
+        if (leaseGuardian?.hasLostAuthority() && event.type !== 'error') return;
+        if (event.type === 'turn_complete') {
+          terminalOutcome = event.reason === 'complete'
+            ? { status: 'completed', reason: 'complete' }
+            : event.reason === 'paused'
+              ? { status: 'paused', reason: 'approval_required' }
+              : { status: 'cancelled', reason: 'interrupted' };
+        } else if (event.type === 'error') {
+          terminalOutcome = {
+            status: 'failed',
+            reason: event.code ?? 'stream_error',
+            error: event.message,
+          };
+        }
+        if (event.type === 'turn_complete' && !terminalActivityEmitted) {
+          terminalActivityEmitted = true;
+          const status =
+            event.reason === 'complete'
+              ? 'completed'
+              : event.reason === 'paused'
+                ? 'paused'
+                : 'cancelled';
+          pushWorkActivity({
+            phase: 'terminal',
+            status,
+            label:
+              event.reason === 'complete'
+                ? 'Work turn finished'
+                : event.reason === 'paused'
+                  ? 'Work is waiting for review'
+                  : 'Work turn stopped',
+          });
+        } else if (event.type === 'error' && !terminalActivityEmitted) {
+          terminalActivityEmitted = true;
+          pushWorkActivity({
+            phase: 'terminal',
+            status: 'failed',
+            label: 'Work turn could not finish',
+          });
+        }
+
         if (event.type === 'text_delta') {
           textBuffer += event.delta;
           reasoningBuffer += event.delta;
@@ -359,7 +505,24 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
                   description: typeof s['description'] === 'string' ? s['description'] : '',
                 }))
               : [];
+            callIdToPlanStepCount.set(event.callId, steps.length);
+            pushWorkActivity({
+              phase: 'plan',
+              status: 'active',
+              label: `Preparing ${steps.length} plan step${steps.length === 1 ? '' : 's'}`,
+              toolCallId: event.callId,
+              toolName: event.name,
+              planStepCount: steps.length,
+            });
             pushEvent({ type: 'plan_created', task, steps });
+          } else {
+            pushWorkActivity({
+              phase: 'tool',
+              status: 'active',
+              label: `Running ${readableToolName(event.name)}`,
+              toolCallId: event.callId,
+              toolName: event.name,
+            });
           }
 
           // Fire-and-forget — telemetry must never block the stream.
@@ -458,6 +621,28 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // client mounts the live task card.
           const toolName = callIdToToolName.get(event.callId);
           callIdToToolName.delete(event.callId);
+          if (toolName === 'create_plan') {
+            const planStepCount = callIdToPlanStepCount.get(event.callId);
+            callIdToPlanStepCount.delete(event.callId);
+            pushWorkActivity({
+              phase: 'plan',
+              status: event.ok ? 'completed' : 'failed',
+              label: event.ok
+                ? `Plan ready${planStepCount === undefined ? '' : ` with ${planStepCount} step${planStepCount === 1 ? '' : 's'}`}`
+                : 'Plan could not be created',
+              toolCallId: event.callId,
+              toolName,
+              ...(planStepCount === undefined ? {} : { planStepCount }),
+            });
+          } else if (toolName) {
+            pushWorkActivity({
+              phase: 'tool',
+              status: event.ok ? 'completed' : 'failed',
+              label: `${readableToolName(toolName)} ${event.ok ? 'finished' : 'failed'}`,
+              toolCallId: event.callId,
+              toolName,
+            });
+          }
           if (toolName === DELEGATE_TASK_TOOL_NAME && event.ok) {
             const runId = parseSubagentRunId(event.summary);
             event.summary = stripSubagentMarker(event.summary);
@@ -471,6 +656,14 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
                 runId,
                 goal,
               });
+              pushWorkActivity({
+                phase: 'specialist',
+                status: 'active',
+                label: 'Specialist team started',
+                toolCallId: event.callId,
+                toolName,
+                subagentRunId: runId,
+              });
               pushEvent({ type: 'subagent_spawned', runId, goal, callId: event.callId });
             }
           }
@@ -482,6 +675,21 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           /* controller already closed */
         }
       };
+
+      // These receipts are grounded in route/runtime boundaries, not model
+      // narration. The request and user message have already been validated
+      // and persisted before this stream is constructed; context assembly is
+      // now actively running.
+      pushWorkActivity({
+        phase: 'request',
+        status: 'completed',
+        label: 'Request received',
+      });
+      pushWorkActivity({
+        phase: 'context',
+        status: 'active',
+        label: 'Preparing workspace context',
+      });
 
       // Emit any events queued before the stream opened (e.g. compaction notice).
       for (const ev of input.initialEvents ?? []) {
@@ -496,18 +704,58 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
       let result: SdkResultLike;
       try {
+        // Verify the attempt immediately instead of waiting for the first
+        // timer tick. This closes the gap between route claim and provider
+        // startup on a slow/cold serverless invocation.
+        await leaseGuardian?.renewNow();
         ({ result } = await input.start(resultSink));
+        pushWorkActivity({
+          phase: 'context',
+          status: 'completed',
+          label: 'Workspace context ready',
+        });
       } catch (err) {
+        const leaseLost = leaseGuardian?.hasLostAuthority() ?? false;
         const aborted = (err as { name?: string })?.name === 'AbortError';
-        if (!aborted) {
+        if (leaseLost) {
+          pushEvent({
+            type: 'error',
+            message: 'This turn lost execution authority and was stopped safely.',
+            code: 'internal',
+          });
+        } else if (!aborted) {
           logger.error('[ai/task ts] start failed', { conversationId: input.conversationId }, err);
           pushEvent({
             type: 'error',
             message: chippiErrorMessage('internal'),
             code: 'internal',
           });
+        } else if (!terminalActivityEmitted) {
+          terminalActivityEmitted = true;
+          pushWorkActivity({
+            phase: 'terminal',
+            status: 'cancelled',
+            label: 'Work turn stopped',
+          });
+          terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
         }
-        controller.close();
+        // Startup failures happen before the stream-pump try/finally below.
+        // Settle the exact durable turn here or it remains `running` forever
+        // and blocks every later queued instruction.
+        leaseGuardian?.stop();
+        if (input.onSettled) {
+          try {
+            await input.onSettled(terminalOutcome);
+          } catch (settlementError) {
+            logger.error('[ai/task ts] startup settlement failed', {
+              conversationId: input.conversationId,
+              turnId: input.turnId,
+            }, settlementError);
+          }
+        }
+        await markTurnEnded(input.conversationId);
+        turnDone();
+        try { controller.close(); } catch { /* already closed */ }
         return;
       }
 
@@ -515,7 +763,10 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // between stream events. Distinct from disconnect (which must NOT
       // stop the turn): Stop aborts generation and tool execution; the
       // finally block persists whatever the user already saw.
-      const shouldStop = createStopPoller(input.conversationId);
+      // Fresh durable turns always carry turnId. The fallback keeps legacy
+      // tests/resumes functional without reintroducing a conversation-scoped
+      // key into the migrated path.
+      const shouldStop = createStopPoller(input.turnId ?? `legacy:${input.conversationId}`);
       let stopRequested = false;
 
       try {
@@ -533,6 +784,15 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           // rejects with StreamStalledError instead of parking forever.
           const { done, value } = await withIdleTimeout(reader.read(), input.abortController);
           if (done) break;
+          leaseGuardian?.assertActive();
+          if (!providerActivityEmitted) {
+            providerActivityEmitted = true;
+            pushWorkActivity({
+              phase: 'provider',
+              status: 'active',
+              label: 'Model activity started',
+            });
+          }
           const mapped = mapSdkEvent(value as SdkStreamEventLike, ALL_TOOLS);
           if (mapped) pushEvent(mapped);
         }
@@ -541,7 +801,8 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // the client honestly, and let the finally block persist what the
         // user already saw.
         if (stopRequested) {
-          pushEvent({ type: 'turn_complete', reason: 'aborted' });
+          pendingTurnCompleteReason = 'aborted';
+          terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
           return;
         }
 
@@ -579,6 +840,8 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         if (result.interruptions && result.interruptions.length > 0 && result.state) {
           const pausedRunId = await persistPausedRun({
             ctx: input.ctx,
+            turnId: input.turnId,
+            attachmentManifest: input.attachmentManifest,
             conversationId: input.conversationId,
             state: result.state,
             interruptions: result.interruptions,
@@ -612,8 +875,18 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
                 })),
               });
             }
+            pendingTurnCompleteReason = 'paused';
+            terminalOutcome = { status: 'paused', reason: 'approval_required' };
+          } else {
+            // Never create an unresumable paused ConversationTurn. If the
+            // checkpoint row could not be persisted, fail visibly and hold
+            // the queue for an explicit retry/reconciliation decision.
+            pushEvent({
+              type: 'error',
+              message: 'Chippi could not save the review checkpoint. No action was taken.',
+              code: 'persistence',
+            });
           }
-          pushEvent({ type: 'turn_complete', reason: 'paused' });
         } else {
           // A completed turn that produced NOTHING visible — no prose, no
           // tool cards, no delegated task — is indistinguishable from
@@ -628,11 +901,25 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             textBuffer = chippiErrorMessage('empty_reply');
             pushEvent({ type: 'text_delta', delta: textBuffer });
           }
-          pushEvent({ type: 'turn_complete', reason: 'complete' });
+          pendingTurnCompleteReason = 'complete';
+          terminalOutcome = { status: 'completed', reason: 'complete' };
         }
       } catch (err) {
+        const leaseLost = leaseGuardian?.hasLostAuthority() ?? false;
         const aborted = (err as { name?: string })?.name === 'AbortError';
-        if (!aborted) {
+        if (leaseLost) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'lease_authority_lost',
+            error: 'Conversation turn attempt authority could not be renewed.',
+          };
+          pendingTurnCompleteReason = null;
+          pushEvent({
+            type: 'error',
+            message: 'This turn lost execution authority and was stopped safely.',
+            code: 'internal',
+          });
+        } else if (!aborted) {
           logger.error('[ai/task ts] stream pump crashed', { conversationId: input.conversationId }, err);
           pushEvent({
             type: 'error',
@@ -641,23 +928,38 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           });
         } else if (stopRequested) {
           // The abort raced into a pending read — still an explicit Stop.
-          pushEvent({ type: 'turn_complete', reason: 'aborted' });
+          pendingTurnCompleteReason = 'aborted';
+          terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
         }
       } finally {
+        if (leaseGuardian?.hasLostAuthority()) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'lease_authority_lost',
+            error: 'Conversation turn attempt authority could not be renewed.',
+          };
+          pendingTurnCompleteReason = null;
+          if (!terminalActivityEmitted) {
+            pushEvent({
+              type: 'error',
+              message: 'This turn lost execution authority and was stopped safely.',
+              code: 'internal',
+            });
+          }
+        }
         // Persist the assistant text. Empty buffers are normal on a paused
         // turn (the model hasn't said anything yet) — saveAssistantMessage
         // handles the empty-text case with a placeholder.
         //
-        // Retry-with-backoff. The stream has already emitted `turn_complete`
-        // to the browser, so the realtor SAW the reply. If we just log and
-        // continue (the old behaviour), the assistant's whole turn vanishes
-        // from history on the next page load — and the next turn the model
-        // has no idea what it just said. A Supabase blip becomes silent
-        // data loss with no UI indication. Three attempts with exponential
-        // backoff cover the transient-network failure mode; a permanent
-        // failure surfaces as an error event so the realtor knows the
-        // history is stale and can copy what they need before refreshing.
-        if (textBuffer.trim() || subagentBlocks.length > 0 || toolBlocks.length > 0) {
+        // Persistence is the terminal barrier. Do not retry an ambiguous
+        // insert: saveAssistantMessage currently creates a random Message id,
+        // so a committed insert followed by a lost response would turn a
+        // retry into a duplicate transcript row. A failure stays visible and
+        // keeps the durable turn failed for explicit reconciliation.
+        if (
+          !leaseGuardian?.hasLostAuthority()
+          && (textBuffer.trim() || subagentBlocks.length > 0 || toolBlocks.length > 0)
+        ) {
           // Order: tool-call cards first (what Chippi looked up / did — incl.
           // their rich data/display so the inline cards re-render on reload),
           // then the assistant's prose, then any delegated task cards. Reads
@@ -680,34 +982,95 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           ];
           let saved = false;
           let lastError: unknown;
-          for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
-            try {
+          try {
+            leaseGuardian?.assertActive();
+            if (input.turnId && input.attemptToken) {
+              await leaseGuardian?.prepareToCommit();
+              const receipt = await saveConversationTurnAssistantMessage({
+                spaceId: input.ctx.space.id,
+                conversationId: input.conversationId,
+                turnId: input.turnId,
+                attemptToken: input.attemptToken,
+                outcome: terminalOutcome,
+                blocks,
+              });
+              terminalOutcome = {
+                status: receipt.terminalStatus,
+                reason: receipt.terminalReason,
+              };
+              pendingTurnCompleteReason = receipt.terminalStatus === 'cancelled'
+                ? 'aborted'
+                : receipt.terminalStatus === 'paused'
+                  ? 'paused'
+                  : receipt.terminalStatus === 'completed'
+                    ? 'complete'
+                    : null;
+              atomicallySettled = true;
+              leaseGuardian?.commitSucceeded();
+              leaseGuardian?.stop();
+            } else {
               await saveAssistantMessage({
                 spaceId: input.ctx.space.id,
                 conversationId: input.conversationId,
                 blocks,
               });
-              saved = true;
-            } catch (err) {
-              lastError = err;
-              logger.warn('[ai/task ts] save assistant message attempt failed', {
-                conversationId: input.conversationId,
-                attempt,
-              }, err);
-              if (attempt < 3) {
-                await new Promise((resolve) =>
-                  setTimeout(resolve, 200 * 2 ** (attempt - 1)),
-                );
-              }
             }
+            saved = true;
+          } catch (err) {
+            lastError = err;
+            logger.warn('[ai/task ts] save assistant message failed', {
+              conversationId: input.conversationId,
+            }, err);
           }
           if (!saved) {
-            logger.error('[ai/task ts] save assistant message failed after 3 attempts', {
+            logger.error('[ai/task ts] save assistant message could not be confirmed', {
               conversationId: input.conversationId,
             }, lastError);
             // Surface to the client so the UI can show a non-blocking
             // warning. The reply is on screen; the database doesn't have
             // it. Refreshing now would lose the context.
+            const authorityFailure = leaseGuardian?.hasLostAuthority()
+              || /lease|attempt token|terminal result/i.test(
+                lastError instanceof Error ? lastError.message : String(lastError),
+              );
+            pushEvent({
+              type: 'error',
+              message: authorityFailure
+                ? 'This turn no longer had authority to publish its reply.'
+                : chippiErrorMessage('persistence'),
+              code: authorityFailure ? 'internal' : 'persistence',
+            });
+            pendingTurnCompleteReason = null;
+          }
+        }
+        if (
+          pendingTurnCompleteReason
+          && terminalOutcome.status !== 'failed'
+          && input.onSettled
+          && !atomicallySettled
+        ) {
+          try {
+            const settled = await input.onSettled(terminalOutcome);
+            terminalOutcome = settledConversationTurnOutcome(settled, terminalOutcome);
+            pendingTurnCompleteReason = terminalOutcome.status === 'cancelled'
+              ? 'aborted'
+              : terminalOutcome.status === 'paused'
+                ? 'paused'
+                : terminalOutcome.status === 'completed'
+                  ? 'complete'
+                  : null;
+            separatelySettled = true;
+          } catch (error) {
+            logger.error('[ai/task ts] pre-terminal durable settlement failed', {
+              conversationId: input.conversationId,
+              turnId: input.turnId,
+            }, error);
+            terminalOutcome = {
+              status: 'failed',
+              reason: 'durable_settlement_failed',
+              error: error instanceof Error ? error.message : 'Durable turn settlement failed.',
+            };
+            pendingTurnCompleteReason = null;
             pushEvent({
               type: 'error',
               message: chippiErrorMessage('persistence'),
@@ -715,8 +1078,22 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             });
           }
         }
-        // Clear the turn-presence marker AFTER persistence so a reopening
-        // client that sees inFlight=false can trust the answer is queryable.
+        if (pendingTurnCompleteReason && terminalOutcome.status !== 'failed') {
+          pushEvent({ type: 'turn_complete', reason: pendingTurnCompleteReason });
+        }
+        leaseGuardian?.stop();
+        if (input.onSettled && !atomicallySettled && !separatelySettled) {
+          try {
+            await input.onSettled(terminalOutcome);
+          } catch (error) {
+            logger.error('[ai/task ts] durable turn settlement failed', {
+              conversationId: input.conversationId,
+              turnId: input.turnId,
+            }, error);
+          }
+        }
+        // Presence clears only after transcript persistence and durable
+        // settlement have both completed or failed visibly.
         await markTurnEnded(input.conversationId);
         turnDone();
         try {
@@ -743,9 +1120,24 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
 
 interface PersistPausedInput {
   ctx: ToolContext;
+  turnId?: string;
+  attachmentManifest?: Array<{ id: string; filename: string; mimeType: string }>;
   conversationId: string;
   state: { toString(): string };
   interruptions: ReadonlyArray<unknown>;
+}
+
+/** The only pause-time workbook data retained across approval. Keeping this
+ * pure makes the feature-off omission testable without a database write. */
+export function pausedRunActiveWorkbookFields(ctx: ToolContext): Record<string, unknown> {
+  if (!ctx.activeWorkbook) return {};
+  return {
+    activeWorkbookContext: {
+      artifactId: ctx.activeWorkbook.artifactId,
+      versionNumber: ctx.activeWorkbook.versionNumber,
+      title: ctx.activeWorkbook.title,
+    },
+  };
 }
 
 /**
@@ -769,16 +1161,26 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
       },
       ALL_TOOLS,
     );
-    const { error } = await supabase.from('AgentPausedRun').insert({
+    const pausedRun: Record<string, unknown> = {
       id,
       spaceId: input.ctx.space.id,
       userId: input.ctx.userId,
       conversationId: input.conversationId,
+      ...(input.turnId ? { turnId: input.turnId } : {}),
       runState: serializeRunState(input.state),
       approvals,
+      // The fresh-turn manifest comes from the server's attachment hydration,
+      // not tool approval arguments. Resume intersects that durable grant.
+      attachmentManifest: input.attachmentManifest?.map(({ id, filename }) => ({ id, filename }))
+        ?? input.ctx.attachmentManifest
+        ?? (input.ctx.attachmentIds ?? []).map((id) => ({ id, filename: '' })),
       status: 'pending',
       expiresAt: expires,
-    });
+    };
+    // Do not mention the additive column for ordinary/feature-off pauses: old
+    // schemas and non-Workbench approvals retain their existing insert shape.
+    Object.assign(pausedRun, pausedRunActiveWorkbookFields(input.ctx));
+    const { error } = await supabase.from('AgentPausedRun').insert(pausedRun);
     if (error) {
       logger.error('[ai/task ts] persistPausedRun failed', { conversationId: input.conversationId }, error);
       return null;

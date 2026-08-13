@@ -6,6 +6,8 @@ export interface AuthorizedRealtorConversation {
     id: string;
     spaceId: string;
     title: string;
+    mode?: 'chat' | 'work' | null;
+    executionMode?: 'review' | 'autonomous' | null;
   };
   space: {
     id: string;
@@ -55,7 +57,7 @@ export async function getAuthorizedRealtorConversation({
 
   const { data: conversation, error: convErr } = await supabase
     .from('Conversation')
-    .select('id, spaceId, title')
+    .select('id, spaceId, title, mode, executionMode')
     .eq('id', conversationId)
     .in('spaceId', ownedSpaces.map((space) => space.id))
     .maybeSingle();

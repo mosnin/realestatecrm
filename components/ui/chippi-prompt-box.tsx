@@ -18,18 +18,19 @@ import {
   Search,
   Slash,
   MessageCircle,
-  Zap,
   Send,
   Sunrise,
   UserPlus,
   ClipboardCheck,
   Target,
-  Sparkles,
   Plug,
+  CornerDownLeft,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { BorderBeam } from 'border-beam';
+import { Liquid } from 'liquid-gooey';
 import { cn } from '@/lib/utils';
 
 export interface MentionItem {
@@ -39,6 +40,9 @@ export interface MentionItem {
   subtitle?: string;
 }
 
+/** Product-facing conversation mode. `work` replaces the old Agent label. */
+export type ChatMode = 'chat' | 'work';
+
 /** A skill the realtor can pick from the `/` menu. */
 export interface SkillItem {
   slug: string;
@@ -46,12 +50,8 @@ export interface SkillItem {
   description: string;
   /** Composer text; may carry one {placeholder} for the realtor to fill. */
   prompt: string;
-  /**
-   * When set, picking this entry does NOT inject the prompt — it fires the
-   * parent's onCommandAction(action) instead (e.g. 'work-session' opens the
-   * work-session dialog). Built-in commands only.
-   */
-  action?: string;
+  /** Selecting this skill can move the conversation into the required mode. */
+  mode?: ChatMode;
 }
 
 /**
@@ -83,7 +83,6 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
   'meeting-prep': ClipboardCheck,
   'my-deals': Briefcase,
   goal: Target,
-  work: Sparkles,
 };
 
 /**
@@ -92,37 +91,101 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
  * initial selection), so filtering, keyboard nav, and selection are shared
  * with skills instead of a second command system. Exported for tests.
  *
- * /goal is the standing objective: the agent creates an AgentGoal via
- * manage_goal and keeps working toward it across turns.
+ * /goal is a convenience that puts the conversation in Work mode and seeds a
+ * natural-language outcome. It does not open another surface.
  */
 export const BUILTIN_COMMANDS: SkillItem[] = [
   {
-    slug: 'work',
-    title: 'Start a work session',
-    description: 'Chippi works a goal in the background and returns a report',
-    prompt: '',
-    action: 'work-session',
-  },
-  {
     slug: 'goal',
-    title: 'Set a goal',
-    description: 'Give Chippi an outcome to keep working toward',
+    title: 'Set a work goal',
+    description: 'Give Chippi an outcome to pursue until it is done',
     prompt:
-      'Set a goal for me to work toward: {describe the outcome, e.g. book 3 tours from my Zillow leads this week}. Create it, keep it active, and factor it into what you prioritize and suggest until it is done.',
+      'Set this as the active Work goal: {describe the outcome, e.g. prepare the Henderson listing packet with comps, pricing rationale, and seller talking points}',
+    mode: 'work',
   },
 ];
 
 type Mode = 'draft' | null;
 
+/** The single top-of-page mode selector used by the Chippi workspace. */
+export function ChatWorkModeSwitch({
+  mode,
+  onChange,
+  disabled = false,
+  className,
+}: {
+  mode: ChatMode;
+  onChange: (mode: ChatMode) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <ToggleGroup
+      type="single"
+      value={mode}
+      onValueChange={(nextMode) => {
+        if (nextMode === 'chat' || nextMode === 'work') onChange(nextMode);
+      }}
+      disabled={disabled}
+      aria-label="Conversation mode"
+      className={cn(
+        'relative inline-flex items-center rounded-full border border-border/60 bg-background/90 p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] backdrop-blur-md',
+        className,
+      )}
+    >
+      <Liquid
+        aria-hidden="true"
+        blur={5}
+        contrast={20}
+        fill="var(--chippi-liquid-selected)"
+        shadow="0 1px 2px rgba(0, 0, 0, 0.04)"
+        className="chippi-mode-liquid pointer-events-none"
+        data-mode={mode}
+        style={{ position: 'absolute', inset: '0.125rem' }}
+      >
+        <Liquid.Item
+          effect="move"
+          move={{ springiness: 0.82, wobble: 0.12, stretch: 0.18, trail: 0.16 }}
+          radius={999}
+        >
+          <span className="chippi-mode-liquid-surface block h-7 w-16 rounded-full" />
+        </Liquid.Item>
+      </Liquid>
+      {(['chat', 'work'] as const).map((item) => {
+        const active = mode === item;
+        return (
+          <ToggleGroupItem
+            key={item}
+            type="button"
+            value={item}
+            title={
+              item === 'chat'
+                ? 'Fast answers and everyday questions'
+                : 'Longer tasks, actions, and finished deliverables'
+            }
+            className={cn(
+              'chippi-mode-toggle-item relative z-10 inline-flex h-7 w-16 items-center justify-center rounded-full border border-transparent bg-transparent px-0 text-[12px] font-medium transition-[color,opacity] duration-150 ease-out',
+              'hover:bg-transparent data-[state=on]:bg-transparent data-[spacing=0]:rounded-full data-[spacing=0]:first:rounded-full data-[spacing=0]:last:rounded-full',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              !active && 'border border-transparent hover:text-foreground',
+            )}
+          >
+            {item === 'chat' ? 'Chat' : 'Work'}
+          </ToggleGroupItem>
+        );
+      })}
+    </ToggleGroup>
+  );
+}
+
 /**
- * Chat vs Agent — the per-message runtime the realtor picks in the composer.
+ * Chat vs Work — the experience the realtor picks for the conversation.
  *   - 'chat'  → fast, cheap answer. One model call + read-only search over
  *               their data. Finds and explains; never acts.
- *   - 'agent' → Chippi can act: create, send, schedule, run integrations.
- * Defaults to 'chat' and resets to 'chat' after every send — agent is a
- * deliberate, per-message choice, not a sticky mode you forget you're in.
+ *   - 'work'  → Chippi can act, use tools, and hand sustained goals to the
+ *               durable background runtime without opening a launch form.
  */
-export type ChatMode = 'chat' | 'agent';
 
 /** Metadata passed up on send so the optimistic user bubble can show the
  *  attached files as chips/thumbnails before the server round-trips. */
@@ -145,7 +208,9 @@ interface ChippiPromptBoxProps {
     /** Lightweight metadata for the sent files so the optimistic user bubble
      *  can render chips/thumbnails immediately (before the server persists). */
     attachmentsMeta?: SentAttachmentMeta[],
-  ) => void;
+  ) => boolean | Promise<boolean>;
+  /** Replace the active Work turn at its next safe boundary with this text. */
+  onSteer?: (message: string, mentions: MentionItem[], mode?: ChatMode) => boolean | Promise<boolean>;
   onMentionSearch?: (query: string) => Promise<MentionItem[]>;
   onAttach?: (files: File[]) => void;
   onVoiceStart?: () => void;
@@ -154,9 +219,12 @@ interface ChippiPromptBoxProps {
    *  stream. When omitted, the Send button stays disabled while loading
    *  instead of swapping to Stop. */
   onAbort?: () => void;
-  /** Fired when the realtor picks an action command from the "/" menu
-   *  (e.g. 'work-session'). The parent owns the surface it opens. */
-  onCommandAction?: (action: string) => void;
+  /** Controlled conversation mode selected by the top-of-page switch. */
+  chatMode?: ChatMode;
+  /** A slash skill such as /goal may move the top switch into Work mode. */
+  onModeChange?: (mode: ChatMode) => void;
+  /** Once the first user message is sent, conversation type is immutable. */
+  modeLocked?: boolean;
   disabled?: boolean;
   isLoading?: boolean;
   className?: string;
@@ -170,19 +238,6 @@ interface ChippiPromptBoxProps {
   prefill?: { text: string; nonce: number };
   /** Skills offered in the `/` menu. Empty or omitted → no menu. */
   skills?: SkillItem[];
-  /**
-   * Show the Chat ↔ Agent runtime switch. Default true (realtor surface).
-   * The broker chat is always its own agent, so the switch would be a lie
-   * there — pass false to hide it.
-   */
-  showModeSwitch?: boolean;
-  /**
-   * Active conversation id. Used to persist the Chat/Agent choice per
-   * conversation: the realtor's pick STAYS for that thread across sends
-   * (sessionStorage-keyed). Null/undefined → a fresh thread that defaults
-   * to Chat. Switching conversations re-reads the saved choice.
-   */
-  conversationId?: string | null;
 }
 
 type UploadedAttachment = {
@@ -250,69 +305,25 @@ function formatTime(seconds: number) {
   return `${m}:${s}`;
 }
 
-// Chat/Agent choice is sticky PER conversation: once the realtor flips to
-// Agent it stays Agent for that thread across sends. sessionStorage (not
-// localStorage) matches the "for this chat" lifetime used elsewhere in Chippi
-// (the always-allow list) — a fresh tab forgets. Keyed by conversation id so
-// switching threads re-reads that thread's pick; a brand-new thread (no id
-// yet) defaults to Chat.
-const CHAT_MODE_STORAGE_PREFIX = 'chippi-chat-mode:';
-// A brand-new thread has no id yet, so its in-flight pick is keyed under a
-// stable draft slot — otherwise a re-render before the first send snaps Agent
-// back to Chat. The draft is cleared once the thread gets a real id (see the
-// carry-forward effect), so a fresh thread still defaults to Chat.
-const CHAT_MODE_DRAFT_KEY = `${CHAT_MODE_STORAGE_PREFIX}__draft__`;
-
-function chatModeKey(conversationId: string | null): string {
-  return conversationId ? CHAT_MODE_STORAGE_PREFIX + conversationId : CHAT_MODE_DRAFT_KEY;
-}
-
-function readStoredChatMode(conversationId: string | null): ChatMode {
-  if (typeof window === 'undefined') return 'chat';
-  try {
-    const raw = window.sessionStorage.getItem(chatModeKey(conversationId));
-    return raw === 'agent' ? 'agent' : 'chat';
-  } catch {
-    return 'chat';
-  }
-}
-
-function writeStoredChatMode(conversationId: string | null, mode: ChatMode): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(chatModeKey(conversationId), mode);
-  } catch {
-    /* quota / private mode — the in-memory state still drives this session */
-  }
-}
-
-function clearDraftChatMode(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.removeItem(CHAT_MODE_DRAFT_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
 export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromptBoxProps>(
   function ChippiPromptBox(
     {
       placeholder = 'Message Chippi…',
       onSend,
+      onSteer,
       onMentionSearch,
       onAttach,
       onVoiceStart,
       onAbort,
-      onCommandAction,
+      chatMode = 'chat',
+      onModeChange,
+      modeLocked = false,
       disabled = false,
       isLoading = false,
       className,
       autoFocus = false,
       prefill,
       skills = [],
-      showModeSwitch = true,
-      conversationId = null,
     },
     ref,
   ) {
@@ -333,19 +344,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     const slashDismissedRef = useRef(false);
 
     const [mode, setMode] = useState<Mode>(null);
-    // Chat (default) vs Agent. STICKY per conversation — the realtor's pick
-    // stays for the thread across sends, restored from sessionStorage on
-    // mount and whenever the conversation changes.
-    // Start with the same value SSR renders, then restore browser state. A
-    // sessionStorage read in the initializer made remembered Agent threads
-    // hydrate differently from the server-rendered Chat control.
-    const [chatMode, setChatMode] = useState<ChatMode>('chat');
-    useEffect(() => {
-      setChatMode(readStoredChatMode(conversationId));
-      // Initial restore only; conversation changes are handled below.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     // Send flash — one brightness surge on the border beam the moment a
     // message is dispatched. Keyed to the isLoading RISING edge (send →
     // turn starts), never the falling edge, so the beam settles back to its
@@ -361,38 +359,9 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         return () => clearTimeout(t);
       }
     }, [isLoading]);
-    const prevConversationIdRef = useRef<string | null>(conversationId);
-    // Sync the choice when the active conversation changes. Two cases:
-    //   1. A fresh thread (null id) just got a real id on its first send —
-    //      carry the realtor's in-flight pick forward and persist it under
-    //      the new id, so an Agent chosen before the first message STAYS
-    //      Agent for the rest of the thread.
-    //   2. Navigating between existing threads — re-read that thread's saved
-    //      pick (defaults to Chat when none was stored).
-    useEffect(() => {
-      const prev = prevConversationIdRef.current;
-      prevConversationIdRef.current = conversationId;
-      if (prev === conversationId) return;
-      if (prev === null && conversationId) {
-        writeStoredChatMode(conversationId, chatMode);
-        clearDraftChatMode();
-        return;
-      }
-      setChatMode(readStoredChatMode(conversationId));
-      // chatMode intentionally omitted — we only want this to fire on id change.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [conversationId]);
-    // Persisting setter — write the pick so it survives the next send and a
-    // page reload within the session.
-    const selectChatMode = useCallback(
-      (next: ChatMode) => {
-        setChatMode(next);
-        writeStoredChatMode(conversationId, next);
-      },
-      [conversationId],
-    );
     const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
     const [attachError, setAttachError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const localCounterRef = useRef(0);
 
     const [isRecording, setIsRecording] = useState(false);
@@ -422,11 +391,16 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     // message (the parent's send() holds it and dispatches when the turn
     // ends) — the ChatGPT-Work interaction. Attachments stay blocked while
     // uploading either way.
-    const sendDisabled = disabled || !hasContent || hasUploadingAttachments;
+    const sendDisabled = disabled || isSubmitting || !hasContent || hasUploadingAttachments;
 
     // Slash menu — built-in commands (/goal, …) lead, then the skills. The
     // message after "/" is the live filter query.
-    const menuSkills = [...BUILTIN_COMMANDS, ...skills];
+    const menuSkills = [
+      ...BUILTIN_COMMANDS.filter(
+        (skill) => !modeLocked || !skill.mode || skill.mode === chatMode,
+      ),
+      ...skills,
+    ];
     const slashQuery = slashOpen ? message.slice(1).toLowerCase() : '';
     const filteredSkills =
       slashOpen
@@ -447,8 +421,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         ? ''
         : mode
           ? MODE_META[mode].placeholder
-          : chatMode === 'agent'
-            ? 'Tell Chippi what to do…'
+          : chatMode === 'work'
+            ? 'What should Chippi work on?'
             : placeholder;
 
     // Auto-resize
@@ -750,7 +724,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       setAttachments((prev) => prev.filter((a) => a.localId !== localId));
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
       if (sendDisabled) return;
       // Block submit while uploads are still in flight — readiness is the
       // entire point of the upload-on-select model.
@@ -774,19 +748,33 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
         sizeBytes: a.sizeBytes,
         ...(a.isImage && a.previewUrl ? { previewUrl: a.previewUrl } : {}),
       }));
-      onSend?.(
-        finalText,
-        mentions,
-        readyAttachmentIds.length ? readyAttachmentIds : undefined,
-        chatMode,
-        attachmentsMeta.length ? attachmentsMeta : undefined,
-      );
+      setIsSubmitting(true);
+      let accepted = false;
+      try {
+        accepted = (await onSend?.(
+          finalText,
+          mentions,
+          readyAttachmentIds.length ? readyAttachmentIds : undefined,
+          chatMode,
+          attachmentsMeta.length ? attachmentsMeta : undefined,
+        )) !== false;
+      } catch {
+        accepted = false;
+      } finally {
+        setIsSubmitting(false);
+      }
+      // The durable queue owns the instruction only after its 201 receipt.
+      // Preserve text, mentions, attachments, and object URLs on any failure
+      // so retry never means reconstructing the user's work.
+      if (!accepted) {
+        setAttachError('Chippi could not accept that message yet. Nothing was cleared — try again.');
+        return;
+      }
       setMessage('');
       setMentions([]);
       setMode(null);
-      // Chat/Agent is sticky per conversation now — the realtor's choice
-      // stays for the thread (persisted in selectChatMode), so we do NOT snap
-      // back to Chat after a send. Agent stays Agent until they switch it.
+      // Chat/Work is sticky per conversation in the parent workspace, so the
+      // composer never snaps back to Chat after a send.
       // Don't DELETE the rows — the server is keeping them as part of the
       // turn. Revoke object URLs we did NOT hand off to the transcript;
       // handed-off image previews stay alive for the optimistic thumbnail.
@@ -796,6 +784,29 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
       }
       setAttachments([]);
       setAttachError(null);
+    }
+
+    async function handleSteer() {
+      if (sendDisabled || !onSteer || attachments.length > 0) return;
+      const base = message.trim();
+      if (!base) return;
+      const wrapped = mode ? `[${MODE_META[mode].prefix}: ${base}]` : base;
+      setIsSubmitting(true);
+      let accepted = false;
+      try {
+        accepted = (await onSteer(wrapped, mentions, chatMode)) !== false;
+      } catch {
+        accepted = false;
+      } finally {
+        setIsSubmitting(false);
+      }
+      if (!accepted) {
+        setAttachError('Chippi could not accept that steering instruction yet. It is still here.');
+        return;
+      }
+      setMessage('');
+      setMentions([]);
+      setMode(null);
     }
 
     function selectMention(item: MentionItem) {
@@ -844,14 +855,8 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     }
 
     function selectSkill(skill: SkillItem) {
-      // Action commands (e.g. /work) open a surface instead of injecting a
-      // prompt — clear the "/" query and hand off to the parent.
-      if (skill.action) {
-        setMessage('');
-        setSlashOpen(false);
-        slashDismissedRef.current = false;
-        onCommandAction?.(skill.action);
-        return;
+      if (skill.mode && (!modeLocked || skill.mode === chatMode)) {
+        onModeChange?.(skill.mode);
       }
       const { text, selStart, selEnd } = expandSkillPrompt(skill.prompt);
       setMessage(text);
@@ -916,9 +921,20 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
           return;
         }
       }
+      if (
+        e.key === 'Enter' &&
+        !e.shiftKey &&
+        isLoading &&
+        (e.metaKey || e.ctrlKey) &&
+        onSteer
+      ) {
+        e.preventDefault();
+        void handleSteer();
+        return;
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        handleSubmit();
+        void handleSubmit();
       }
     }
 
@@ -1010,9 +1026,33 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
               </TooltipContent>
             </Tooltip>
           ) : null;
+        const steerButton =
+          hasContent && !sendDisabled && onSteer && attachments.length === 0 ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleSteer}
+                  aria-label="Steer active work"
+                  className={cn(
+                    'inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-2.5',
+                    'border border-border bg-background text-[11px] font-medium text-foreground',
+                    'transition-all duration-150 hover:bg-accent active:scale-[0.98]',
+                  )}
+                >
+                  <CornerDownLeft size={12} strokeWidth={2} />
+                  Steer
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                Stop at the next safe point and follow this · ⌘↵
+              </TooltipContent>
+            </Tooltip>
+          ) : null;
         if (onAbort) {
           return (
             <div className="flex items-center gap-1.5">
+              {steerButton}
               {queueButton}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1123,10 +1163,10 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     return (
       <TooltipProvider>
         <div ref={containerRef} className={cn('relative', className)}>
-          {/* Agent-mode border beam — the <BorderBeam> (border-beam package)
+          {/* Work-mode border beam — the <BorderBeam> (border-beam package)
               wraps the composer shell and travels a sunset beam around its
-              1px border while Chippi is in Agent mode. `active` flips with the
-              Chat/Agent switch; the beam auto-detects the shell's rounded-3xl
+              1px border while Chippi is in Work mode. `active` flips with the
+              top-level Chat/Work switch; the beam auto-detects the shell's rounded-3xl
               radius. In Chat mode it's inert (no ring, no cost).
               Brightness rides two levels above the package default so the
               ring reads unmistakably, and the moment a message is sent
@@ -1136,7 +1176,7 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
             size="md"
             colorVariant="sunset"
             theme="auto"
-            active={chatMode === 'agent'}
+            active={chatMode === 'work'}
             brightness={sendFlash ? 3.2 : 2.2}
             saturation={sendFlash ? 1.7 : 1.4}
             duration={sendFlash ? 1.1 : 1.96}
@@ -1543,57 +1583,6 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
                 )}
               </div>
 
-              {/* Chat ↔ Agent — the runtime switch. Chat answers fast and
-                  reads their data; Agent can act. Sticky per conversation:
-                  the pick stays for the thread across sends until changed. */}
-              {showModeSwitch && (
-              <div
-                role="group"
-                aria-label="Response mode"
-                className="inline-flex items-center rounded-full bg-foreground/[0.04] p-0.5"
-              >
-                {(['chat', 'agent'] as const).map((m) => {
-                  const active = chatMode === m;
-                  const Icon = m === 'chat' ? MessageCircle : Zap;
-                  return (
-                    <Tooltip key={m}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => selectChatMode(m)}
-                          disabled={disabled || isLoading || isRecording}
-                          aria-pressed={active}
-                          className={cn(
-                            'inline-flex items-center gap-1 h-6 px-2.5 rounded-full',
-                            'text-[11.5px] font-medium transition-all duration-150',
-                            'disabled:opacity-50 disabled:cursor-not-allowed',
-                            active
-                              ? 'bg-background text-foreground border border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
-                              : 'text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          {/* Active Agent gets the glow family's orange on the
-                              bolt only — the label stays foreground so the
-                              pill and the composer ring read as one system
-                              without shouting. */}
-                          <Icon
-                            size={11}
-                            strokeWidth={2}
-                            className={cn(active && m === 'agent' && 'text-[#ff8a0a]')}
-                          />
-                          {m === 'chat' ? 'Chat' : 'Agent'}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" sideOffset={6}>
-                        {m === 'chat'
-                          ? 'Fast answers, reads your data'
-                          : 'Chippi can act — create, send, schedule'}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-              )}
               </div>
 
               {renderRightButton()}

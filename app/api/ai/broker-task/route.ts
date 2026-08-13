@@ -49,7 +49,11 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { auth } from '@clerk/nextjs/server';
 import { decideBrokerRoute } from '@/lib/chat/router';
 import { streamBrokerDirectTurn } from '@/lib/chat/broker-direct';
-import { createStopPoller, clearChatStop } from '@/lib/chat/stop-signal';
+import {
+  createStopPoller,
+  clearChatStop,
+  STOP_POLL_INTERVAL_MS,
+} from '@/lib/chat/stop-signal';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { z } from 'zod';
@@ -61,6 +65,9 @@ const brokerTaskBodySchema = z.object({
   conversationId: z.string().max(200).nullish(),
   message: z.string().max(20000),
   mode: z.string().max(50).optional(),
+  // New clients mint this before dispatch so Stop can target one exact turn.
+  // Optional during the rolling deploy: the route mints one for older clients.
+  turnId: z.string().min(1).max(200).optional(),
 });
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
@@ -83,12 +90,13 @@ interface HistoryRow {
 interface PostBody {
   conversationId?: string | null;
   message: string;
+  turnId?: string;
   /**
    * Explicit per-message runtime pick — mirrors the realtor composer's
-   * Chat/Agent switch (`app/api/ai/task/route.ts`'s `mode` field), threaded
+   * Chat/Work switch (`app/api/ai/task/route.ts`'s `mode` field), threaded
    * through here so the broker surface can expose the same switch.
    *   - 'chat'  → force the in-process broker snapshot turn (no Modal hop).
-   *   - 'agent' → force the Modal BROKER_TOOLS dispatch. If Modal isn't
+   *   - 'work'  → force the Modal BROKER_TOOLS dispatch. If Modal isn't
    *               reachable (MODAL_CHAT_URL unset, or no runtime Space to
    *               anchor the agent run), degrades to the direct snapshot
    *               path same as the unset-mode router — but the direct turn
@@ -97,7 +105,7 @@ interface PostBody {
    * Absent (older client / realtor-only UI not yet wired for broker) →
    * unchanged `decideBrokerRoute` heuristic.
    */
-  mode?: 'chat' | 'agent' | string;
+  mode?: 'chat' | 'work' | 'agent' | string;
 }
 
 /** Cap on history messages fed to the model. Mirrors the realtor route's
@@ -190,6 +198,7 @@ interface ProxyModalStreamInput {
   modalBody: ReadableStream<Uint8Array>;
   brokerageId: string;
   conversationId: string;
+  turnId: string;
   abortController: AbortController;
 }
 
@@ -197,6 +206,7 @@ function proxyModalStream({
   modalBody,
   brokerageId,
   conversationId,
+  turnId,
   abortController,
 }: ProxyModalStreamInput): Response {
   const encoder = new TextEncoder();
@@ -230,7 +240,7 @@ function proxyModalStream({
       // Modal events. Distinct from disconnect (clientGone), which keeps the
       // turn alive: Stop tears down the Modal fetch and commits whatever
       // streamed. Mirrors the realtor SDK path (lib/ai-tools/sdk-chat-stream).
-      const shouldStop = createStopPoller(conversationId);
+      const shouldStop = createStopPoller(turnId);
       let stopRequested = false;
       async function persistOnce(finalText?: string): Promise<void> {
         if (persisted) return;
@@ -246,6 +256,18 @@ function proxyModalStream({
           logger.warn('[ai/broker-task] persist assistant message failed', { brokerageId }, err);
         }
       }
+
+      // A Modal stream can be silent while a tool runs. Poll independently of
+      // incoming frames so Stop does not wait for Modal to emit again before
+      // aborting the exact requested turn.
+      const stopTimer = setInterval(() => {
+        void shouldStop().then((shouldAbort) => {
+          if (!shouldAbort || stopRequested) return;
+          stopRequested = true;
+          abortController.abort();
+          void reader.cancel().catch(() => {});
+        });
+      }, STOP_POLL_INTERVAL_MS);
 
       try {
         while (true) {
@@ -346,6 +368,14 @@ function proxyModalStream({
           }
         }
 
+        // The independent Stop poll can cancel a blocked reader. Land the
+        // terminal event here after that read unblocks, exactly once.
+        if (stopRequested && !sentTerminal) {
+          await persistOnce(textChunks.join(''));
+          push(controller, { type: 'turn_complete', reason: 'stopped' });
+          sentTerminal = true;
+        }
+
         // Flush trailing buffer — skip it on Stop: we already emitted the
         // terminal frame and aborted, so a partial trailing line must not push
         // a second turn_complete.
@@ -378,6 +408,7 @@ function proxyModalStream({
           sentTerminal = true;
         }
       } finally {
+        clearInterval(stopTimer);
         // Safety net — ported from the realtor route: a Modal crash / dropped
         // connection / container kill mid-stream previously ended this stream
         // with NO terminal frame, so the broker's EventSource hung open
@@ -407,6 +438,7 @@ function proxyModalStream({
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'X-Chippi-Turn-Id': turnId,
     },
   });
 }
@@ -530,21 +562,25 @@ export async function POST(req: NextRequest) {
   // fail-closed because that is an auth boundary, not an availability issue.
   let route = decideBrokerRoute(message);
 
-  // Explicit per-message mode from the composer's Chat/Agent switch (once
+  // Explicit mode from the top-of-page Chat/Work switch
   // wired — see flag at end of route file) wins over the heuristic router,
   // same contract as the realtor `/api/ai/task` route. 'chat' always forces
   // the in-process snapshot turn; 'agent' always forces an attempt at the
   // Modal BROKER_TOOLS dispatch. An absent/unrecognized mode leaves the
   // decideBrokerRoute result untouched.
   const explicitMode: 'chat' | 'agent' | null =
-    body.mode === 'agent' ? 'agent' : body.mode === 'chat' ? 'chat' : null;
+    body.mode === 'work' || body.mode === 'agent'
+      ? 'agent'
+      : body.mode === 'chat'
+        ? 'chat'
+        : null;
   if (explicitMode === 'chat') {
     route = 'direct';
   } else if (explicitMode === 'agent') {
     route = 'agent';
   }
 
-  // True only when the realtor/broker explicitly asked for Agent mode but we
+  // True only when the realtor/broker explicitly asked for Work mode but we
   // had to downgrade to the direct snapshot path anyway (Modal unreachable or
   // unconfigured) — NOT when the plain heuristic router picked 'direct' on
   // its own. Threaded into streamBrokerDirectTurn so the direct turn can emit
@@ -625,10 +661,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: chippiErrorMessage('internal') }, { status: 500 });
   }
 
+  // Exact per-request identity. The shared hook supplies this before starting
+  // the fetch; minting here keeps older clients working during a rolling
+  // deploy, and the response header lets them discover the server identity.
+  const turnId = body.turnId ?? crypto.randomUUID();
+
   // A Stop belongs to the turn it was requested during — see the same call in
   // app/api/ai/task. Without this a stop flag that outlived its own turn
   // aborts the NEXT one before a token reaches the browser.
-  await clearChatStop(conversationId);
+  await clearChatStop(turnId);
 
   try {
     await saveBrokerUserMessage({ brokerageId, conversationId, content: message });
@@ -671,6 +712,7 @@ export async function POST(req: NextRequest) {
       runtimeSpaceId,
       userId: clerkUserId,
       conversationId,
+      turnId,
       userMessage: message,
       history: history.map((h) => ({ role: h.role, content: h.content })),
       abortController,
@@ -695,6 +737,9 @@ export async function POST(req: NextRequest) {
     message,
     history: history.map((h) => ({ role: h.role, content: h.content })),
     conversation_id: conversationId,
+    // Correlation only. The Next.js proxy owns Stop polling; Modal may log this
+    // value but it does not treat it as an authorization capability.
+    turn_id: turnId,
     // ── Broker-mode fields — Modal's chat_turn reads these to dispatch
     //    to make_broker_agent() and to populate AgentContext for the
     //    per-tool require_broker_role() guard (defense layer 3). ──
@@ -726,6 +771,7 @@ export async function POST(req: NextRequest) {
     modalBody: modalRes.body,
     brokerageId,
     conversationId,
+    turnId,
     abortController,
   });
 }

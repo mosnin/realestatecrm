@@ -4,17 +4,21 @@ import { useState, useRef, useEffect, useCallback, useMemo, useTransition } from
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ConversationSidebar } from '@/components/ai/conversation-sidebar';
 import { WorkSessionsStrip } from '@/components/chippi/work-sessions-strip';
-import { WorkSessionDialog } from '@/components/chippi/work-session-dialog';
+import type { DelegatedWork } from '@/components/chippi/realtime-voice-dialog';
+import {
+  requestChippiVoice,
+  subscribeToChippiVoiceWorkspaceEvents,
+} from '@/components/chippi/persistent-chippi-voice';
 import {
   ChippiPromptBox,
+  ChatWorkModeSwitch,
   type MentionItem,
   type SkillItem,
   type SentAttachmentMeta,
 } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, X, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
+import { History, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -41,10 +45,25 @@ import { PlanCard } from '@/components/chippi/plan-card';
 import { useSplitPanel } from '@/hooks/use-split-panel';
 import { SplitPanelToggle } from '@/components/chippi/split-panel-toggle';
 import { RightPanel } from '@/components/chippi/right-panel';
+import type { BrowserActionLogEntry } from '@/components/chippi/browser-control-panel';
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
+import { WorkExecutionModeMenu } from '@/components/chippi/work-execution-mode-menu';
+import { WorkActivityTimeline } from '@/components/chippi/work-activity-timeline';
+import { useChatLiveEdge } from '@/components/chippi/use-chat-live-edge';
 import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
+import { requestChippiSidebarView } from '@/components/dashboard/chippi-sidebar-experience';
+import {
+  parseWorkExecutionMode,
+  type WorkExecutionMode,
+} from '@/lib/chat/work-execution-mode';
 import { SystemMessage } from '@/components/ai/prompt-kit';
+import { fallbackHeuristic } from '@/lib/ai-tools/chippi-voice';
+import {
+  boundedResearchSources,
+  researchActivityFromToolResult,
+  type ResearchSourceLink,
+} from '@/lib/chippi/research-workspace';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -82,6 +101,14 @@ interface ChippiWorkspaceProps {
   spaceId?: string;
   /** Connected apps + custom plugins offered in the @ mention menu. */
   mentionApps?: { slug: string; label: string }[];
+  /** Server-computed readiness. The browser never infers this from secrets. */
+  realtimeVoiceEnabled?: boolean;
+  /** Server-authorized, per-space entitlement for the Research Workspace. */
+  researchEnabled?: boolean;
+  /** Server-authorized, per-space entitlement for isolated Workspace Runs. */
+  workspaceRunsEnabled?: boolean;
+  /** Separate per-space rollout for continuation tasks in the terminal panel. */
+  workspaceRunFollowUpsEnabled?: boolean;
   /** The realtor's Chippi profile name (DB User.name, chosen at onboarding).
    *  Preferred over the Clerk identity for the greeting so it doesn't fall back
    *  to the Google/Gmail name on the account. */
@@ -103,30 +130,9 @@ interface ChippiWorkspaceProps {
 }
 
 const MESSAGE_LIMIT = 50;
-
-/**
- * The warmup status line, chosen by how long the turn has been waiting with no
- * concrete output yet. Time-based (not a blind rotating list) so the wording
- * escalates HONESTLY as the wait grows — a fresh turn reads "Thinking…", a
- * genuinely slow one admits "Still working on it…" — and, paired with the live
- * seconds counter the indicator renders, the wait never looks frozen.
- *
- * `coldStart` = the first Agent turn of a conversation, the one that actually
- * pays the Modal sandbox warmup; only there do we name the honest warmup steps.
- * Every other turn reuses the warm sandbox, so it gets the calm thinking copy —
- * the sandbox wording would be a lie there (honest-UI non-negotiable).
- */
-export function warmupPhraseFor(coldStart: boolean, elapsedMs: number): string {
-  if (coldStart) {
-    if (elapsedMs < 2500) return 'Getting things ready…';
-    if (elapsedMs < 6000) return 'Warming up…';
-    if (elapsedMs < 11000) return 'Lining up the work…';
-    return 'Still working on it…';
-  }
-  if (elapsedMs < 3000) return 'Thinking…';
-  if (elapsedMs < 8000) return 'Working it through…';
-  return 'Still working on it…';
-}
+const RESEARCH_BROWSER_ACTION_TYPES = new Set([
+  'navigate', 'click', 'type', 'press', 'scroll', 'read_dom', 'screenshot', 'wait',
+]);
 
 /**
  * What the history loader should do for the conversation the URL is asking
@@ -180,17 +186,66 @@ export function planHistoryLoad(input: {
 }
 
 /**
- * Whether the composer's Chat/Agent mode switch should render for a given
- * chat surface variant. Both the realtor surface (`/api/ai/task`) and the
- * broker surface (`/api/ai/broker-task`) now honor the `mode` field the
- * turn is sent with, so the switch is offered on both — there is nothing
- * variant-specific left to gate here. Kept as a named, tested function
- * (rather than an inline `!isBroker` check) so a future surface that
- * genuinely can't support one mode has a single, obvious place to encode
- * that instead of a scattered boolean.
+ * Whether the top-of-page Chat/Work mode switch should render for a given
+ * chat surface variant. The main Chippi surface (`/api/ai/task`) owns the
+ * durable Work runtime. Broker chat can accept a legacy mode hint, but it
+ * does not expose the same Work tools or lifecycle yet, so rendering the
+ * switch there would overpromise product parity.
  */
-export function shouldShowModeSwitch(_variant: 'realtor' | 'broker'): boolean {
-  return true;
+export function shouldShowModeSwitch(variant: 'realtor' | 'broker'): boolean {
+  return variant === 'realtor';
+}
+
+/** A conversation's type is chosen before its first user message and then fixed. */
+export function isConversationModeLocked(
+  messages: ReadonlyArray<{ role: string }>,
+): boolean {
+  return messages.some((message) => message.role === 'user');
+}
+
+export function storedConversationMode(
+  conversations: ReadonlyArray<Pick<ChatConversation, 'id' | 'mode'>>,
+  conversationId: string | null,
+): ChatMode | null {
+  if (!conversationId) return null;
+  const mode = conversations.find((conversation) => conversation.id === conversationId)?.mode;
+  return mode === 'chat' || mode === 'work' ? mode : null;
+}
+
+const CHAT_MODE_STORAGE_PREFIX = 'chippi-chat-mode:';
+const CHAT_MODE_DRAFT_KEY = `${CHAT_MODE_STORAGE_PREFIX}__draft__`;
+
+function chatModeStorageKey(conversationId: string | null): string {
+  return conversationId ? `${CHAT_MODE_STORAGE_PREFIX}${conversationId}` : CHAT_MODE_DRAFT_KEY;
+}
+
+/** Reads both the new value and the old `agent` value for seamless migration. */
+export function readStoredChatMode(conversationId: string | null): ChatMode {
+  if (typeof window === 'undefined') return 'chat';
+  try {
+    const value = window.sessionStorage.getItem(chatModeStorageKey(conversationId));
+    return value === 'work' || value === 'agent' ? 'work' : 'chat';
+  } catch {
+    return 'chat';
+  }
+}
+
+function writeStoredChatMode(conversationId: string | null, mode: ChatMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(chatModeStorageKey(conversationId), mode);
+  } catch {
+    // Private/quota-limited storage does not block the in-memory choice.
+  }
+}
+
+function clearDraftChatMode(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(CHAT_MODE_DRAFT_KEY);
+  } catch {
+    // Ignore storage failures; the current component state remains authoritative.
+  }
 }
 
 /**
@@ -282,8 +337,13 @@ export function ChippiWorkspace({
   variant = 'realtor',
   spaceId,
   mentionApps = [],
+  realtimeVoiceEnabled = false,
+  researchEnabled = false,
+  workspaceRunsEnabled = false,
+  workspaceRunFollowUpsEnabled = false,
 }: ChippiWorkspaceProps) {
   const isBroker = variant === 'broker';
+  const workbenchEnabled = process.env.NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED === 'true';
   const endpoints = useMemo(() => chatSurfaceEndpoints(variant, slug), [variant, slug]);
   const { user } = useUser();
   const router = useRouter();
@@ -291,9 +351,53 @@ export function ChippiWorkspace({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     initialConversationId,
   );
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  // /work command → the work-session launcher.
-  const [workDialogOpen, setWorkDialogOpen] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>('chat');
+  const [draftWorkExecutionMode, setDraftWorkExecutionMode] =
+    useState<WorkExecutionMode>(() =>
+      parseWorkExecutionMode(
+        initialConversations.find((conversation) => conversation.id === initialConversationId)
+          ?.executionMode,
+      ),
+    );
+  const activeConversationExecutionMode = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  )?.executionMode;
+  const workExecutionMode = activeConversationId
+    ? parseWorkExecutionMode(activeConversationExecutionMode)
+    : draftWorkExecutionMode;
+  const modeConversationRef = useRef<string | null>(activeConversationId);
+  useEffect(() => {
+    setChatMode(
+      storedConversationMode(initialConversations, activeConversationId)
+      ?? (isConversationModeLocked(initialMessages) ? 'chat' : readStoredChatMode(activeConversationId)),
+    );
+    // Hydration restore only. Conversation changes are handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const previous = modeConversationRef.current;
+    modeConversationRef.current = activeConversationId;
+    if (previous === activeConversationId) return;
+    const persistedMode = storedConversationMode(conversations, activeConversationId);
+    if (persistedMode) {
+      setChatMode(persistedMode);
+      writeStoredChatMode(activeConversationId, persistedMode);
+      clearDraftChatMode();
+      return;
+    }
+    if (previous === null && activeConversationId) {
+      writeStoredChatMode(activeConversationId, chatMode);
+      clearDraftChatMode();
+      return;
+    }
+    setChatMode(readStoredChatMode(activeConversationId));
+    // Carry-forward needs the current selection but must fire only on id change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId]);
+  const selectChatMode = useCallback((mode: ChatMode) => {
+    setChatMode(mode);
+    writeStoredChatMode(activeConversationId, mode);
+  }, [activeConversationId]);
   // Server-driven loading: pending during the soft-nav so we can show the
   // "One moment" placeholder instead of the previous conversation's
   // transcript flashing for a beat. `useTransition` is the natural fit —
@@ -349,8 +453,108 @@ export function ChippiWorkspace({
   // tracking the cursor instead of "getting stuck". The callbacks are stable so
   // the handle's listener effect doesn't tear down/re-add on every drag frame.
   const [isResizingSplit, setIsResizingSplit] = useState(false);
+  const [workbenchArtifactId, setWorkbenchArtifactId] = useState<string | null>(null);
+  const [workbenchRefreshVersion, setWorkbenchRefreshVersion] = useState<number | null>(null);
+  const [workspaceRunId, setWorkspaceRunId] = useState<string | null>(null);
+  const [workspaceRunRefreshToken, setWorkspaceRunRefreshToken] = useState(0);
+  // Durable re-entry: a page reload does not discard the latest workspace
+  // attached to this conversation; the Workspace tab can reopen it.
+  useEffect(() => {
+    // Clear first: a new/no-match conversation must never borrow the prior
+    // thread's local workspace id while this durable lookup is in flight.
+    setWorkspaceRunId(null);
+    if (!workspaceRunsEnabled || !activeConversationId) return;
+    let active = true;
+    void fetch(`/api/work-sessions?slug=${encodeURIComponent(slug)}&conversationId=${encodeURIComponent(activeConversationId)}`, { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((payload: { sessions?: Array<{ conversationId?: string | null; workspaceRunId?: string | null }> } | null) => {
+        const match = payload?.sessions?.find((session) => session.workspaceRunId);
+        if (active && match?.workspaceRunId) setWorkspaceRunId(match.workspaceRunId);
+      }).catch(() => {});
+    return () => { active = false; };
+  }, [activeConversationId, slug, workspaceRunsEnabled]);
+  // Immediate, in-conversation activity. The Research Workspace also reads
+  // the persisted browser-action timeline, so this state is just the small
+  // gap between a streamed tool result and the next server refresh.
+  const [researchActions, setResearchActions] = useState<BrowserActionLogEntry[]>([]);
+  const [researchSources, setResearchSources] = useState<ResearchSourceLink[]>([]);
+  const openedWorkbenchUrlRef = useRef<string | null>(null);
+  const researchResultSequenceRef = useRef(0);
+  useEffect(() => {
+    researchResultSequenceRef.current = 0;
+    setResearchActions([]);
+    setResearchSources([]);
+  }, [activeConversationId]);
   const handleSplitDragStart = useCallback(() => setIsResizingSplit(true), []);
   const handleSplitDragEnd = useCallback(() => setIsResizingSplit(false), []);
+  const openWorkbenchArtifact = useCallback((artifactId: string, refreshVersion?: number) => {
+    // Deep links and streamed tool results are untrusted entrypoints. Keeping
+    // the tab out of the tab bar is not enough: an old/shared URL must not open
+    // the split panel when the deployment has the Workbench rollout disabled.
+    if (!workbenchEnabled) return;
+    openedWorkbenchUrlRef.current = artifactId;
+    setWorkbenchArtifactId(artifactId);
+    if (typeof refreshVersion === 'number' && Number.isInteger(refreshVersion) && refreshVersion > 0) {
+      setWorkbenchRefreshVersion(refreshVersion);
+    } else {
+      setWorkbenchRefreshVersion(null);
+    }
+    setRightTab('workbench');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('workbenchArtifact', artifactId);
+      router.replace(`${endpoints.routeBase}?${params.toString()}`, { scroll: false });
+    }
+  }, [effectiveIsSplit, endpoints.routeBase, isMobileOverlay, router, setRightTab, toggleSplit, workbenchEnabled]);
+  const handleWorkbenchToolResult = useCallback(({ name, data, ok }: { name: string; data: unknown; ok: boolean }) => {
+    if (!ok || (name !== 'open_spreadsheet_in_workbench' && name !== 'apply_workbook_transformation') || !data || typeof data !== 'object') return;
+    const { artifactId, versionNumber } = data as { artifactId?: unknown; versionNumber?: unknown };
+    if (typeof artifactId === 'string') openWorkbenchArtifact(artifactId, name === 'apply_workbook_transformation' && typeof versionNumber === 'number' ? versionNumber : undefined);
+  }, [openWorkbenchArtifact]);
+  const openResearchWorkspace = useCallback(() => {
+    // This matches the tab's deployment gate. A streamed browser result must
+    // never expose a surface the deployment intentionally kept dark.
+    if (!researchEnabled) return;
+    setRightTab('research');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+  }, [effectiveIsSplit, isMobileOverlay, researchEnabled, setRightTab, toggleSplit]);
+  const handleResearchToolStart = useCallback(({ name }: { name: string }) => {
+    // browser_task is the bounded cloud-research flow for an entitled public
+    // task. control_browser may act in the realtor's paired extension, which
+    // belongs in the existing Browser experience instead.
+    if (name === 'browser_task') openResearchWorkspace();
+  }, [openResearchWorkspace]);
+  const handleResearchToolResult = useCallback(({ name, data, ok }: { name: string; data: unknown; ok: boolean }) => {
+    const timestamp = new Date().toISOString();
+    const idPrefix = `research:${++researchResultSequenceRef.current}`;
+    const activity = researchActivityFromToolResult({ name, data, ok, idPrefix, timestamp });
+    if (!activity) return;
+
+    const validActions = activity.actions
+      .filter((action) => RESEARCH_BROWSER_ACTION_TYPES.has(action.type))
+      .map((action) => ({ ...action, type: action.type as BrowserActionLogEntry['type'] }));
+    if (validActions.length > 0) {
+      setResearchActions((previous) => [...previous, ...validActions].slice(-24));
+    }
+    if (activity.sources.length > 0) {
+      setResearchSources((previous) => boundedResearchSources([...previous, ...activity.sources]));
+    }
+    if (activity.shouldOpen) openResearchWorkspace();
+  }, [openResearchWorkspace]);
+  const handleWorkspaceToolResult = useCallback((input: { name: string; data: unknown; ok: boolean }) => {
+    if (workspaceRunsEnabled && input.name === 'continue_workspace_run' && input.ok && input.data && typeof input.data === 'object') {
+      const runId = (input.data as { runId?: unknown; openWorkspacePanel?: unknown }).runId;
+      if (typeof runId === 'string' && (input.data as { openWorkspacePanel?: unknown }).openWorkspacePanel === true) {
+        setWorkspaceRunId(runId);
+        setWorkspaceRunRefreshToken((value) => value + 1);
+        setRightTab('workspace');
+        if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+      }
+    }
+    handleWorkbenchToolResult(input);
+    handleResearchToolResult(input);
+  }, [effectiveIsSplit, handleResearchToolResult, handleWorkbenchToolResult, isMobileOverlay, setRightTab, toggleSplit, workspaceRunsEnabled]);
 
   // (no per-plan animation state needed — isAnimating is derived from the
   //  message's streaming flag, which already tracks live vs. settled.)
@@ -365,7 +569,9 @@ export function ChippiWorkspace({
     streamingReasoning,
     currentAction: serverAction,
     activePlan,
+    workActivities,
     send,
+    steer,
     attachmentPreviewUrls,
     approve,
     deny,
@@ -382,7 +588,11 @@ export function ChippiWorkspace({
     conversationsEndpoint: endpoints.conversationsEndpoint,
     resumeEndpointBase: endpoints.resumeEndpointBase,
     conversationCreatePayload: endpoints.conversationCreatePayload,
-    onConversationCreated: (id) => {
+    onToolStart: handleResearchToolStart,
+    activeWorkbookArtifactId: workbenchArtifactId,
+    workExecutionMode,
+    conversationMode: chatMode,
+    onConversationCreated: (id, mode) => {
       setActiveConversationId(id);
       // Mark as loaded so the conversation-loading effect won't try to
       // re-fetch when the URL update below arrives (messages are already
@@ -399,6 +609,8 @@ export function ChippiWorkspace({
                 title: 'New conversation',
                 createdAt: new Date(),
                 updatedAt: new Date(),
+                mode,
+                executionMode: workExecutionMode,
               } as ChatConversation,
               ...prev,
             ],
@@ -418,7 +630,70 @@ export function ChippiWorkspace({
       locallyStreamedConvIdRef.current = id;
       loadedConvIdRef.current = id;
     },
+    onToolResult: handleWorkspaceToolResult,
   });
+  const executionModeChangeDisabled =
+    isStreaming || messages.some((message) => message.streaming === true);
+  const handleWorkExecutionModeChange = useCallback(
+    async (nextMode: WorkExecutionMode) => {
+      if (isBroker || executionModeChangeDisabled || nextMode === workExecutionMode) return;
+
+      const previousMode = workExecutionMode;
+      setDraftWorkExecutionMode(nextMode);
+      if (!activeConversationId) return;
+
+      setConversations((previous) =>
+        previous.map((conversation) =>
+          conversation.id === activeConversationId
+            ? { ...conversation, executionMode: nextMode }
+            : conversation,
+        ),
+      );
+
+      try {
+        const response = await fetch(
+          `/api/ai/conversations/${encodeURIComponent(activeConversationId)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ executionMode: nextMode }),
+          },
+        );
+        if (!response.ok) throw new Error(`execution mode update failed: ${response.status}`);
+        const updated = (await response.json()) as ChatConversation;
+        const confirmedMode = parseWorkExecutionMode(updated.executionMode);
+        setDraftWorkExecutionMode(confirmedMode);
+        setConversations((previous) =>
+          previous.map((conversation) =>
+            conversation.id === activeConversationId
+              ? { ...conversation, ...updated, executionMode: confirmedMode }
+              : conversation,
+          ),
+        );
+      } catch (error) {
+        console.error('[Chat] execution mode update failed', error);
+        setDraftWorkExecutionMode(previousMode);
+        setConversations((previous) =>
+          previous.map((conversation) =>
+            conversation.id === activeConversationId
+              ? { ...conversation, executionMode: previousMode }
+              : conversation,
+          ),
+        );
+        toast.error("Couldn't change how Chippi works. Try again.");
+      }
+    },
+    [
+      activeConversationId,
+      executionModeChangeDisabled,
+      isBroker,
+      workExecutionMode,
+    ],
+  );
+  const conversationModeLocked = isConversationModeLocked(messages);
+  // Permission prompts are server-authoritative. Review mode pauses for
+  // mutations; Autonomous only interrupts for the destructive boundary.
+  const pendingConfirmation = pendingApproval;
 
   // ── Retry support ────────────────────────────────────────────────────────
   // Track whether the user has sent anything this session, purely to decide
@@ -479,6 +754,7 @@ export function ChippiWorkspace({
   // when onConversationCreated updates the URL to the just-created conv).
   const searchParams = useSearchParams();
   const urlConversationId = searchParams.get('conversationId');
+  const workbenchUrlArtifactId = searchParams.get('workbenchArtifact');
   const loadedConvIdRef = useRef<string | null>(null);
   // The conversation whose latest turn THIS surface watched stream to the end
   // (set by useAgentTask's onTurnSettled). Distinguishes "a turn finished
@@ -489,13 +765,24 @@ export function ChippiWorkspace({
   // so a momentarily-empty transcript can never bounce the composer up to
   // centre and back down.
   const [historyReloading, setHistoryReloading] = useState(false);
+  useEffect(() => {
+    if (!workbenchEnabled || !workbenchUrlArtifactId) {
+      openedWorkbenchUrlRef.current = null;
+      return;
+    }
+    if (openedWorkbenchUrlRef.current === workbenchUrlArtifactId) return;
+    openedWorkbenchUrlRef.current = workbenchUrlArtifactId;
+    setWorkbenchArtifactId(workbenchUrlArtifactId);
+    setRightTab('workbench');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+  }, [effectiveIsSplit, isMobileOverlay, setRightTab, toggleSplit, workbenchEnabled, workbenchUrlArtifactId]);
 
-  // Deep-link to history: ?view=history (used by the collapsed sidebar's
-  // Chats icon) opens the conversation-history drawer on mount, then
-  // cleans the URL so a back/refresh doesn't re-trigger it.
+  // Backwards-compatible deep-link: older links used `?view=history` for a
+  // fixed overlay. Route that intent into the dashboard's one shared sidebar
+  // surface, then clean the URL so refresh does not replay the transition.
   useEffect(() => {
     if (searchParams.get('view') === 'history') {
-      setDrawerOpen(true);
+      requestChippiSidebarView('history', { reveal: true });
       const next = new URLSearchParams(searchParams.toString());
       next.delete('view');
       const qs = next.toString();
@@ -519,17 +806,6 @@ export function ChippiWorkspace({
   // Endpoint above, is what fixes the broker "can't load history after reload"
   // 404 — the realtor endpoint refuses broker conversations by design.
   const messagesEndpoint = endpoints.messagesEndpoint;
-
-  // Per-conversation mutations (rename / delete) hit the broker-gated
-  // `/api/ai/broker-conversations/<id>` for the broker variant — the realtor
-  // `/api/ai/conversations/<id>` route refuses broker rows (and the broker
-  // rows live in a different table entirely). Returns the base path; callers
-  // append the conversation id.
-  const conversationItemBase = endpoints.conversationItemBase;
-  const conversationItemUrl = useCallback(
-    (id: string) => `${conversationItemBase}/${encodeURIComponent(id)}`,
-    [conversationItemBase],
-  );
 
   const loadConversation = useCallback(
     async (convId: string): Promise<LegacyMessage[] | null> => {
@@ -730,28 +1006,19 @@ export function ChippiWorkspace({
     };
   }, [messages, activeConversationId, isStreaming, loadConversation, setMessages]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, pendingApproval, isStreaming]);
-
   // Resolve the route base once. Same URL shape both variants — broker
   // sits at /broker, realtor at /s/<slug>/chippi.
   const chippiBaseUrl = endpoints.routeBase;
-
-  function handleSelectConversation(conv: ChatConversation) {
-    setDrawerOpen(false);
-    if (conv.id === activeConversationId) return;
-    startConversationTransition(() => {
-      router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(conv.id)}`, { scroll: false });
-    });
-  }
 
   async function handleNewConversation() {
     try {
       const res = await fetch(endpoints.conversationsEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(endpoints.conversationCreatePayload),
+        body: JSON.stringify({
+          ...endpoints.conversationCreatePayload,
+          ...(!isBroker ? { executionMode: workExecutionMode } : {}),
+        }),
       });
       if (!res.ok) {
         toast.error("Couldn't start a new chat.", {
@@ -761,7 +1028,6 @@ export function ChippiWorkspace({
       }
       const conv = (await res.json()) as ChatConversation;
       setConversations((prev) => [conv, ...prev]);
-      setDrawerOpen(false);
       startConversationTransition(() => {
         router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(conv.id)}`, { scroll: false });
       });
@@ -769,126 +1035,6 @@ export function ChippiWorkspace({
       console.error('[Chat] new conversation failed', err);
       toast.error("Couldn't start a new chat.", {
         action: { label: 'Retry', onClick: () => void handleNewConversation() },
-      });
-    }
-  }
-
-  // Pending hard-delete timers, keyed by conversation id. The DELETE doesn't
-  // fire until the toast window closes — Undo just clears the timer and puts
-  // the row back. Gmail's pattern: removal feels immediate, the destructive
-  // call is delayed enough that the realtor can walk it back without a
-  // confirm dialog gating every click. Norman's Designing for Error:
-  // reversibility beats interruption.
-  const DELETE_DELAY_MS = 5000;
-  const pendingDeleteTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  useEffect(() => {
-    return () => {
-      // Fire any still-pending deletes on unmount so a row doesn't survive
-      // a page nav after the realtor walked away from the toast.
-      for (const [id, timer] of pendingDeleteTimersRef.current.entries()) {
-        clearTimeout(timer);
-        void fetch(conversationItemUrl(id), { method: 'DELETE' });
-      }
-      pendingDeleteTimersRef.current.clear();
-    };
-  }, [conversationItemUrl]);
-
-  async function handleDeleteConversation(id: string) {
-    // Snapshot for restore on undo. Capture both the row and the active-
-    // conversation flag — the latter drives whether undo also needs to
-    // navigate back into the transcript.
-    const prevConv = conversations.find((c) => c.id === id);
-    if (!prevConv) return;
-    const wasActive = activeConversationId === id;
-    const prevIndex = conversations.findIndex((c) => c.id === id);
-
-    // Optimistic: remove from the sidebar immediately so the realtor sees
-    // the action took. Navigate away from the transcript if it was active.
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (wasActive) {
-      startConversationTransition(() => {
-        router.push(chippiBaseUrl, { scroll: false });
-      });
-    }
-
-    // Broker conversations live in their own "BrokerConversation" table, so
-    // the delete routes to the broker-gated /api/ai/broker-conversations/<id>
-    // (which scopes the delete to the caller's brokerage). The realtor route
-    // is used for the realtor variant.
-    const timer = setTimeout(async () => {
-      pendingDeleteTimersRef.current.delete(id);
-      try {
-        const res = await fetch(conversationItemUrl(id), { method: 'DELETE' });
-        if (!res.ok) {
-          // Server rejected the delete — put the row back and tell the
-          // realtor. They've already moved on by now, so the toast carries
-          // the burden of explaining what slipped.
-          setConversations((prev) => {
-            if (prev.some((c) => c.id === id)) return prev;
-            const next = [...prev];
-            next.splice(Math.min(prevIndex, next.length), 0, prevConv);
-            return next;
-          });
-          toast.error("Couldn't delete that conversation. Try again.");
-        }
-      } catch (err) {
-        console.error('[Chat] delete conversation failed', err);
-        setConversations((prev) => {
-          if (prev.some((c) => c.id === id)) return prev;
-          const next = [...prev];
-          next.splice(Math.min(prevIndex, next.length), 0, prevConv);
-          return next;
-        });
-        toast.error("Couldn't delete that conversation. Try again.");
-      }
-    }, DELETE_DELAY_MS);
-    pendingDeleteTimersRef.current.set(id, timer);
-
-    toast.success('Conversation deleted.', {
-      duration: DELETE_DELAY_MS,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          const pending = pendingDeleteTimersRef.current.get(id);
-          if (pending) {
-            clearTimeout(pending);
-            pendingDeleteTimersRef.current.delete(id);
-          }
-          setConversations((prev) => {
-            if (prev.some((c) => c.id === id)) return prev;
-            const next = [...prev];
-            next.splice(Math.min(prevIndex, next.length), 0, prevConv);
-            return next;
-          });
-          if (wasActive) {
-            startConversationTransition(() => {
-              router.push(`${chippiBaseUrl}?conversationId=${encodeURIComponent(id)}`, { scroll: false });
-            });
-          }
-        },
-      },
-    });
-  }
-
-  async function handleRenameConversation(id: string, title: string) {
-    try {
-      const res = await fetch(conversationItemUrl(id), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
-      if (!res.ok) {
-        toast.error("Couldn't rename that. Try again.", {
-          action: { label: 'Retry', onClick: () => void handleRenameConversation(id, title) },
-        });
-        return;
-      }
-      const updated = (await res.json()) as ChatConversation;
-      setConversations((prev) => prev.map((c) => (c.id === id ? updated : c)));
-    } catch (err) {
-      console.error('[Chat] rename conversation failed', err);
-      toast.error("Couldn't rename that. Try again.", {
-        action: { label: 'Retry', onClick: () => void handleRenameConversation(id, title) },
       });
     }
   }
@@ -982,7 +1128,7 @@ export function ChippiWorkspace({
       attachmentsMeta?: SentAttachmentMeta[],
     ) => {
       const hasAttachments = Array.isArray(attachmentIds) && attachmentIds.length > 0;
-      if (!text && !hasAttachments) return;
+      if (!text && !hasAttachments) return false;
       let contextPrefix = '';
       if (mentions.length > 0) {
         const labels = mentions.map((m) =>
@@ -995,16 +1141,22 @@ export function ChippiWorkspace({
 
       // Record the full text so the retry button can replay it.
       lastUserMsgRef.current = contextPrefix + text;
-      // Drive the warmup status: only Agent turns spin up Modal and earn the
-      // cycling sandbox lines.
-      setActiveTurnMode(mode);
-
+      // The first send fixes this conversation's product mode locally while
+      // the database claim runs. Existing server modes always win.
+      if (activeConversationId) {
+        setConversations((previous) => previous.map((conversation) =>
+          conversation.id === activeConversationId
+            ? { ...conversation, mode: conversation.mode ?? mode }
+            : conversation,
+        ));
+      }
       // Opt-in send chime. Gated inside softTap() so the call site stays
       // clean — the helper no-ops when the realtor hasn't enabled sound
       // or when reduced-motion is on.
       softTap();
 
-      await send(contextPrefix + text, attachmentIds, mode, attachmentsMeta);
+      const accepted = await send(contextPrefix + text, attachmentIds, mode, attachmentsMeta);
+      if (!accepted) return false;
 
       // Bump the sidebar's conversation ordering.
       const cid = activeConversationId;
@@ -1015,8 +1167,26 @@ export function ChippiWorkspace({
           return [{ ...conv, updatedAt: new Date() }, ...prev.filter((c) => c.id !== cid)];
         });
       }
+      return true;
     },
     [send, activeConversationId],
+  );
+
+  const handleSteer = useCallback(
+    async (text: string, mentions: MentionItem[], mode: ChatMode = 'work') => {
+      if (!text.trim()) return false;
+      const references = mentions.map((mention) =>
+        mention.type === 'app'
+          ? `[Use the ${mention.label} app/plugin for this request]`
+          : `[${mention.type === 'contact' ? 'Contact' : 'Deal'}: ${mention.label}]`,
+      );
+      const contextPrefix = references.length > 0
+        ? `(Referencing: ${references.join(', ')})\n\n`
+        : '';
+      softTap();
+      return steer(contextPrefix + text, mode);
+    },
+    [steer],
   );
 
   // Auto-send when arriving from the command palette via ?q= — fires once on
@@ -1071,6 +1241,138 @@ export function ChippiWorkspace({
   const handleTellMeAboutLead = useCallback((text: string) => {
     setPrefill({ text, nonce: Date.now() });
   }, []);
+
+  const handleVoiceDelegated = useCallback(
+    (work: DelegatedWork) => {
+      setActiveConversationId(work.conversationId);
+      setConversations((prev) => {
+        const existing = prev.find((conversation) => conversation.id === work.conversationId);
+        if (existing) {
+          return [
+            { ...existing, updatedAt: new Date() },
+            ...prev.filter((conversation) => conversation.id !== work.conversationId),
+          ];
+        }
+        return [
+          {
+            id: work.conversationId,
+            title: fallbackHeuristic(work.goal),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as ChatConversation,
+          ...prev,
+        ];
+      });
+      setMessages((prev) => {
+        if (
+          prev.some((message) =>
+            message.blocks.some(
+              (block) => block.type === 'work_session' && block.sessionId === work.sessionId,
+            ),
+          )
+        ) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `voice-user-${work.sessionId}`,
+            role: 'user',
+            blocks: [{ type: 'text', content: `Start a work session: ${work.goal}` }],
+          },
+          {
+            id: `voice-assistant-${work.sessionId}`,
+            role: 'assistant',
+            blocks: [
+              { type: 'text', content: 'I started this as a background work session.' },
+              {
+                type: 'work_session',
+                sessionId: work.sessionId,
+                goal: work.goal,
+                source: 'voice',
+              },
+            ],
+          },
+        ];
+      });
+      router.replace(
+        `${chippiBaseUrl}?conversationId=${encodeURIComponent(work.conversationId)}`,
+        { scroll: false },
+      );
+      toast.success('Work session started. Voice is still connected.');
+    },
+    [chippiBaseUrl, router, setMessages],
+  );
+
+  const handleVoiceWorkspaceContinuation = useCallback((work: { conversationId: string; callId: string; instruction: string; runId: string; taskId: string; status: string }) => {
+    if (!workspaceRunsEnabled) return;
+    setWorkspaceRunId(work.runId);
+    setWorkspaceRunRefreshToken((value) => value + 1);
+    setRightTab('workspace');
+    if (!effectiveIsSplit && !isMobileOverlay) toggleSplit();
+    setMessages((previous) => {
+      if (previous.some((message) => message.blocks.some((block) => block.type === 'tool_call' && block.callId === work.callId))) return previous;
+      return [...previous,
+        { id: `voice-user-${work.callId}`, role: 'user', blocks: [{ type: 'text', content: `Continue the workspace: ${work.instruction}` }] },
+        { id: `voice-assistant-${work.callId}`, role: 'assistant', blocks: [
+          { type: 'text', content: 'I started a private workspace continuation.' },
+          { type: 'tool_call', callId: work.callId, name: 'continue_workspace_run', args: { instruction: work.instruction }, result: { ok: true, summary: 'I started a private workspace continuation.', data: { runId: work.runId, taskId: work.taskId, status: work.status, openWorkspacePanel: true } }, status: 'complete', display: 'success' },
+        ] },
+      ];
+    });
+  }, [effectiveIsSplit, isMobileOverlay, setMessages, setRightTab, toggleSplit, workspaceRunsEnabled]);
+
+  const handleVoiceSpecialistControlled = useCallback((runId: string) => {
+    window.dispatchEvent(new CustomEvent('chippi:swarm-refresh', { detail: { runId } }));
+  }, []);
+
+  const handleVoiceSpecialistSpawned = useCallback((work: { conversationId: string; runId: string; callId: string; goal: string; status: string }) => {
+    setActiveConversationId(work.conversationId);
+    loadedConvIdRef.current = work.conversationId;
+    setConversations((previous) => previous.some((conversation) => conversation.id === work.conversationId)
+      ? previous
+      : [{
+          id: work.conversationId,
+          title: fallbackHeuristic(work.goal),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mode: 'work',
+          executionMode: workExecutionMode,
+        } as ChatConversation, ...previous]);
+    setMessages((previous) => {
+      if (previous.some((message) => message.blocks.some((block) => block.type === 'subagent_task' && block.runId === work.runId))) return previous;
+      return [...previous,
+        { id: `voice-user-${work.callId}`, role: 'user', blocks: [{ type: 'text', content: `Start a specialist team: ${work.goal}` }] },
+        { id: `voice-assistant-${work.callId}`, role: 'assistant', blocks: [
+          { type: 'text', content: work.status === 'queued' ? 'I queued a specialist team for this background goal.' : 'The specialist request is being reconciled.' },
+          { type: 'subagent_task', callId: work.callId, runId: work.runId, goal: work.goal },
+        ] },
+      ];
+    });
+    router.replace(`${chippiBaseUrl}?conversationId=${encodeURIComponent(work.conversationId)}`, { scroll: false });
+    toast.success('Specialist team queued. Voice is still connected.');
+  }, [chippiBaseUrl, router, setMessages, workExecutionMode]);
+
+  useEffect(() => subscribeToChippiVoiceWorkspaceEvents((event) => {
+    if (event.type === 'delegated') {
+      handleVoiceDelegated(event.work);
+      return;
+    }
+    if (event.type === 'workspace_continued') {
+      handleVoiceWorkspaceContinuation(event.work);
+      return;
+    }
+    if (event.type === 'specialist_spawned') {
+      handleVoiceSpecialistSpawned(event.work);
+      return;
+    }
+    handleVoiceSpecialistControlled(event.runId);
+  }), [
+    handleVoiceDelegated,
+    handleVoiceSpecialistControlled,
+    handleVoiceSpecialistSpawned,
+    handleVoiceWorkspaceContinuation,
+  ]);
 
   // Counts for the header status sentence. Fetch only when we're rendering
   // the today view — no point pinging while in an active conversation. The
@@ -1147,40 +1449,9 @@ export function ChippiWorkspace({
   // message, which is exactly where confidence is won or lost.
   const turnActive = isStreaming || Boolean(tailMessage?.streaming);
   // The indicator block (avatar + shimmer line + optional plan card) only
-  // renders when there's actually something to show. `currentAction` is
-  // computed below and falls back to "Thinking…" during the dead air
-  // before the first token, so this gate is effectively:
-  //   "we're streaming AND we have a status to communicate."
+  // renders when the runtime has something real to show.
   // Once real assistant text starts flowing, currentAction → null and
   // the indicator slides out — the chat bubble takes over.
-
-  // Map in-flight tool call names to human-readable status phrases.
-  const TOOL_ACTION_MAP: Record<string, string> = {
-    search_contacts: 'Searching your contacts…',
-    find_person: 'Searching your contacts…',
-    get_contact: 'Looking up contact…',
-    pipeline_summary: 'Analyzing your pipeline…',
-    find_stuck_deals: 'Analyzing your pipeline…',
-    find_deal: 'Looking up deals…',
-    search_deals: 'Looking up deals…',
-    schedule_tour: 'Checking the calendar…',
-    reschedule_tour: 'Checking the calendar…',
-    find_tours: 'Checking the calendar…',
-    send_email: 'Drafting your email…',
-    draft_email: 'Drafting your email…',
-    send_sms: 'Drafting your message…',
-    draft_sms: 'Drafting your message…',
-    recall_history: 'Checking history…',
-    set_followup: 'Updating follow-up…',
-    clear_followup: 'Updating follow-up…',
-    create_deal: 'Updating deal…',
-    mark_deal_won: 'Updating deal…',
-    mark_deal_lost: 'Updating deal…',
-    note_on_person: 'Adding note…',
-    note_on_deal: 'Adding note…',
-    planner: 'Building a plan…',
-    create_plan: 'Building a plan…',
-  };
 
   // Best-effort: map tool name keywords to which plan step is likely active.
   // Matches on lower-cased step title. Not guaranteed to be exact — just a
@@ -1244,130 +1515,33 @@ export function ChippiWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tailMessage, liveCallIds]);
 
-  // ── Alive warmup status — Agent (Modal) spin-up ────────────────────────────
-  // The FIRST Agent turn of a fresh conversation pays a cold Modal warmup
-  // before the first token. That one time we cycle a warm "getting ready" set
-  // so the longer wait reads as progress, not a hang — but NEVER infra jargon
-  // like "sandbox" (the realtor must not see our plumbing). Every later turn
-  // (and every Chat turn) reuses the warm path and cycles the calm "Thinking…"
-  // set below instead.
-  // First Agent turn of a fresh conversation? True when no assistant turn has
-  // landed any blocks yet — i.e. the streaming tail is the only assistant
-  // bubble. That's the one turn that pays the cold Modal warmup; later turns
-  // reuse the warm sandbox, so they skip the sandbox copy.
-  const isFirstAgentTurn = useMemo(
-    () =>
-      !messages.some(
-        (m) => m.role === 'assistant' && m !== tailMessage && m.blocks.length > 0,
-      ),
-    [messages, tailMessage],
-  );
-  // The runtime the in-flight turn is running on. Set on each send.
-  const [activeTurnMode, setActiveTurnMode] = useState<ChatMode>('chat');
-  // Milliseconds the current turn has spent warming up (streaming open, nothing
-  // concrete yet). Drives BOTH the escalating status phrase and the live
-  // seconds counter — a steadily-climbing clock is the strongest "still alive"
-  // signal during a cold start or a slow first token.
-  const [warmupElapsedMs, setWarmupElapsedMs] = useState(0);
-  const warmupStartRef = useRef<number | null>(null);
-
-  // Warming up = streaming, assistant bubble open, nothing concrete yet (no
-  // streamed text, no live tool call, no reasoning tokens).
-  const isWarmingUp =
-    turnActive &&
-    tailMessage?.role === 'assistant' &&
-    (!liveCallIds || liveCallIds.size === 0) &&
-    !streamingReasoning?.trim() &&
-    !tailMessage.blocks.some(
-      (b) => b.type === 'text' && b.content.trim().length > 0,
-    );
-
-  // Tick a live elapsed clock while warming up. One interval at 1s: it both
-  // advances the honest phrase (warmupPhraseFor) and updates the seconds
-  // counter the indicator renders, so a slow turn visibly counts up instead of
-  // sitting on a frozen word. Resets the instant real output starts flowing.
-  useEffect(() => {
-    if (!isWarmingUp) {
-      warmupStartRef.current = null;
-      setWarmupElapsedMs(0);
-      return;
-    }
-    if (warmupStartRef.current === null) warmupStartRef.current = Date.now();
-    const update = () =>
-      setWarmupElapsedMs(Date.now() - (warmupStartRef.current ?? Date.now()));
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [isWarmingUp]);
-
-  const currentAction = useMemo<string | null>(() => {
-    if (!turnActive || !tailMessage) return null;
-    // Live tool call → its action verb wins.
-    if (liveCallIds && liveCallIds.size > 0) {
-      for (const block of tailMessage.blocks) {
-        if (
-          block.type === 'tool_call' &&
-          'callId' in block &&
-          liveCallIds.has((block as { callId: string }).callId)
-        ) {
-          const name = (block as { name: string }).name;
-          if (TOOL_ACTION_MAP[name]) return TOOL_ACTION_MAP[name];
-          // Composio toolkit-prefixed slugs (HUBSPOT_*, GMAIL_*, SLACK_*, …)
-          // get a friendly verb derived from the toolkit name so realtors
-          // don't see raw SDK slugs in the status line.
-          const prefix = name.split('_')[0];
-          if (prefix === 'HUBSPOT') return 'Reading HubSpot…';
-          if (prefix === 'GMAIL') return 'Reading Gmail…';
-          if (prefix === 'SLACK') return 'Talking to Slack…';
-          if (prefix === 'GOOGLECALENDAR' || prefix === 'GOOGLE') return 'Checking your calendar…';
-          if (prefix === 'NOTION') return 'Reading Notion…';
-          if (prefix === 'LINEAR') return 'Reading Linear…';
-          if (prefix === 'GITHUB') return 'Reading GitHub…';
-          return 'Working on it…';
-        }
+  const inlineWorkSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const message of messages) {
+      for (const block of message.blocks) {
+        if (block.type === 'work_session') ids.add(block.sessionId);
       }
     }
-    // A concrete server-sent status ("Reading your workspace…",
-    // "Running Find Contacts…") beats the generic rotating filler — it's
-    // real signal about what the turn is actually doing right now. The
-    // generic "Thinking…" from the server falls through to the rotating
-    // set below so the line keeps breathing.
-    if (serverAction && serverAction !== 'Thinking…') return serverAction;
-    // Streaming, no tool call active, no tokens yet → still warming up the
-    // container / fetching tools / waiting on first model token. Fill the
-    // dead air with a single calm status so the realtor knows Chippi is on
-    // it, not stuck.
-    const hasText = tailMessage.blocks.some(
-      (b) => b.type === 'text' && b.content.trim().length > 0,
-    );
-    if (!hasText) {
-      // Time-based, honest escalation (see warmupPhraseFor). The cold Modal
-      // warmup is only paid on the first Agent turn; later turns reuse the warm
-      // sandbox and get the calm thinking copy.
-      const coldStart = activeTurnMode === 'agent' && isFirstAgentTurn;
-      return warmupPhraseFor(coldStart, warmupElapsedMs);
-    }
-    return null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    turnActive,
-    tailMessage,
-    liveCallIds,
-    serverAction,
-    activeTurnMode,
-    isFirstAgentTurn,
-    warmupElapsedMs,
-  ]);
+    return ids;
+  }, [messages]);
 
-  // Final visibility gate for the indicator block — we want the avatar +
-  // shimmer line + plan card only when there's actually something to
-  // communicate, otherwise the row would render hollow once real text starts
-  // flowing into the assistant bubble below.
+  // Activity copy comes from the runtime stream. The workspace no longer
+  // guesses whether a Work turn is cold-starting or rotates timer-based Modal
+  // phrases; normalized status/tool events are the only source of truth.
+  const currentAction = turnActive ? serverAction : null;
+
+  // Keep the optimistic assistant row visibly alive from acceptance through
+  // the first grounded runtime receipt. "Thinking…" is the one deliberately
+  // non-specific pre-grounded label; once text arrives the hook clears the
+  // tail streaming state and this line yields to the response in place.
   const showThinking =
-    (turnActive &&
-      tailMessage?.role === 'assistant' &&
-      (Boolean(currentAction) || Boolean(streamingReasoning?.trim()) || Boolean(activePlan))) ||
+    (turnActive && tailMessage?.role === 'assistant') ||
     recoveringTurn;
+
+  const chatLiveEdge = useChatLiveEdge({
+    conversationKey: activeConversationId,
+    reduceMotion,
+  });
 
   // Live state for Chippi's orb avatar, read from what the turn is doing right
   // now: running a tool or executing a plan reads as "solving" (energetic);
@@ -1385,23 +1559,31 @@ export function ChippiWorkspace({
   // inside ChippiPromptBox itself.
   const renderInput = () => (
     <div>
-      {/* Live background work sessions — plan progress, approvals, questions,
+      {/* Live background work sessions — plan progress, questions,
           and the finished report, updating over Supabase Realtime. */}
-      {spaceId && !isBroker && <WorkSessionsStrip slug={slug} spaceId={spaceId} />}
+      {spaceId && !isBroker && (
+        <WorkSessionsStrip
+          slug={slug}
+          spaceId={spaceId}
+          hiddenSessionIds={inlineWorkSessionIds}
+        />
+      )}
       {/* Queued messages — typed while Chippi was working; each dispatches in
           order as a turn finishes. × drops one before it sends. */}
       {queuedMessages.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5 px-1">
-          {queuedMessages.map((q, i) => (
+          {queuedMessages.map((q) => (
             <span
-              key={`${i}-${q.text.slice(0, 16)}`}
+              key={q.id}
               className="inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground"
             >
               <span className="truncate">{q.text}</span>
-              <span className="shrink-0 text-muted-foreground/60">· queued</span>
+              <span className="shrink-0 text-muted-foreground/60">
+                · {q.status === 'failed' ? 'needs attention' : q.kind === 'steer' ? 'steering next' : 'queued'}
+              </span>
               <button
                 type="button"
-                onClick={() => removeQueuedMessage(i)}
+                onClick={() => { void removeQueuedMessage(q.id); }}
                 aria-label="Remove queued message"
                 className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
               >
@@ -1414,26 +1596,24 @@ export function ChippiWorkspace({
       <ChippiPromptBox
         placeholder="Tell me what you need, or press / for skills…"
         onSend={handleSend}
+        onSteer={chatMode === 'work' ? handleSteer : undefined}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
         // NOT locked while streaming — typing stays live and Enter (or the
         // queue button) holds the message for the next turn (useAgentTask
-        // owns the queue). Approval waits + rate limits still lock it.
-        disabled={pendingApproval !== null || rateLimitSeconds > 0}
+        // owns the queue). Chat confirmations + rate limits still lock it.
+        disabled={pendingConfirmation !== null || rateLimitSeconds > 0}
         isLoading={turnActive}
         prefill={prefill ?? undefined}
         skills={skills}
-        showModeSwitch={shouldShowModeSwitch(variant)}
-        conversationId={activeConversationId}
-        onCommandAction={(action) => {
-          if (action === 'work-session') setWorkDialogOpen(true);
-        }}
-      />
-      <WorkSessionDialog
-        slug={slug}
-        conversationId={activeConversationId}
-        open={workDialogOpen}
-        onOpenChange={setWorkDialogOpen}
+        chatMode={chatMode}
+        onModeChange={conversationModeLocked ? undefined : selectChatMode}
+        modeLocked={conversationModeLocked}
+        onVoiceStart={
+          realtimeVoiceEnabled && !isBroker
+            ? () => requestChippiVoice({ conversationId: activeConversationId })
+            : undefined
+        }
       />
       {/* Rate-limit countdown — shown below the composer when the API is
           throttling. Counts down from 60 s and disappears automatically. */}
@@ -1478,37 +1658,6 @@ export function ChippiWorkspace({
 
   return (
     <div className="relative flex flex-col h-full min-h-0">
-      {/* Conversation history drawer — softened overlay */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="w-80 max-w-[85vw] bg-background border-r border-border flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-              <span className="font-semibold text-sm">History</span>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                aria-label="Close history"
-              >
-                <X size={15} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ConversationSidebar
-                slug={slug}
-                conversations={conversations}
-                activeId={activeConversationId}
-                onSelect={handleSelectConversation}
-                onNew={handleNewConversation}
-                onDelete={handleDeleteConversation}
-                onRename={handleRenameConversation}
-              />
-            </div>
-          </div>
-          <div className="flex-1 bg-foreground/10" onClick={() => setDrawerOpen(false)} />
-        </div>
-      )}
-
       {/* ── Main content area — supports split panel on desktop ──── */}
       <div className="flex flex-1 min-w-0 overflow-hidden" ref={containerRef}>
         {/* Left panel — all chat/workspace content */}
@@ -1516,12 +1665,24 @@ export function ChippiWorkspace({
           className="relative flex flex-col h-full overflow-hidden min-w-0"
           style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}
         >
+      {shouldShowModeSwitch(variant)
+        && !conversationModeLocked
+        && !historyReloading
+        && !isLoadingConversation && (
+        <div className="absolute left-1/2 top-1.5 z-20 -translate-x-1/2 sm:top-2">
+          <ChatWorkModeSwitch
+            mode={chatMode}
+            onChange={selectChatMode}
+            disabled={pendingConfirmation !== null || rateLimitSeconds > 0}
+          />
+        </div>
+      )}
       {/* Floating control cluster — top-right, no top bar chrome.
           Four affordances + one menu trigger. The composer below is the
           focal element on this surface; this row stays a small calm
           shelf instead of competing with it. Voice, Run now, memory, and
           settings live inside the More menu — primary chat actions (new
-          chat, history, approvals, split) earn the visible row.
+          chat, history, Chat confirmations, split) earn the visible row.
           Pre-fix this cluster carried eight competing icons plus a
           message-limit counter; the DOET audit (PR #101) called it a
           score-2 Discoverability failure.
@@ -1539,7 +1700,18 @@ export function ChippiWorkspace({
           verified bug). No calc() needed once the cluster is anchored to the
           pane it actually belongs to. */}
       <div className="absolute top-1.5 right-2 sm:top-2 sm:right-3 z-20 flex items-center gap-1.5">
-        {!isBroker && <ApprovalsPill />}
+        {!isBroker && chatMode === 'work' && (
+          <WorkExecutionModeMenu
+            value={workExecutionMode}
+            onChange={(mode) => void handleWorkExecutionModeChange(mode)}
+            disabled={executionModeChangeDisabled}
+          />
+        )}
+        {!isBroker &&
+          (chatMode === 'chat' ||
+            (chatMode === 'work' && workExecutionMode === 'review')) && (
+            <ApprovalsPill />
+          )}
         {/* One three-dots menu — folds New chat, History, Brief/Drafts, and
             (realtor) Run now / Memory / Chippi settings into a single animated
             dropdown so the chat surface stays open instead of carrying a row of
@@ -1563,7 +1735,10 @@ export function ChippiWorkspace({
               <SquarePen size={14} className="mr-2" />
               New chat
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setDrawerOpen(true)} className="cursor-pointer">
+            <DropdownMenuItem
+              onSelect={() => requestChippiSidebarView('history', { reveal: true })}
+              className="cursor-pointer"
+            >
               <History size={14} className="mr-2" />
               History
             </DropdownMenuItem>
@@ -1710,9 +1885,13 @@ export function ChippiWorkspace({
               className="flex flex-col flex-1 min-h-0 overflow-hidden"
             >
               {/* Active thread */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36">
+          <div className="relative flex-1 min-h-0 overflow-hidden">
+            <ScrollArea ref={chatLiveEdge.rootRef} className="h-full">
+              <div
+                ref={chatLiveEdge.contentRef}
+                className="w-full max-w-3xl mx-auto chat-content-wrap pt-12 sm:pt-14 pb-36"
+                aria-busy={turnActive || recoveringTurn}
+              >
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
                   <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
@@ -1723,14 +1902,6 @@ export function ChippiWorkspace({
                 <div className="space-y-7">
                   {messages.map((msg, i) => {
                     const isTail = i === messages.length - 1;
-                    if (
-                      isTail &&
-                      msg.role === 'assistant' &&
-                      msg.blocks.length === 0 &&
-                      turnActive
-                    ) {
-                      return null;
-                    }
                     // First time we see this id → run the entrance animation.
                     // Subsequent renders (re-mount during scroll virtualization
                     // would also hit this code path, though we don't virtualize)
@@ -1774,6 +1945,17 @@ export function ChippiWorkspace({
                             className="mt-[3px]"
                           />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
+                            {isTail && chatMode === 'work' && workActivities.length > 0 && (
+                              <WorkActivityTimeline events={workActivities} />
+                            )}
+                            {isTail && showThinking && activePlan && planBlocks.length === 0 && (
+                              <PlanCard
+                                task={activePlan.task}
+                                steps={activePlan.steps}
+                                isAnimating={true}
+                                activeStepIndex={activePlanStepIndex}
+                              />
+                            )}
                             {/* PlanCard — rendered for each create_plan tool
                                 call. Falls back to args so the card appears
                                 immediately on tool_call_start (before result
@@ -1795,22 +1977,39 @@ export function ChippiWorkspace({
                                 />
                               );
                             })}
+                            {isTail && showThinking && (
+                              <ThinkingIndicator
+                                currentAction={
+                                  recoveringTurn
+                                    ? 'Still working on your last message…'
+                                    : currentAction ?? 'Thinking…'
+                                }
+                                streamingReasoning={streamingReasoning}
+                              />
+                            )}
                             <Transcript
                               blocks={msg.blocks}
                               messageId={msg.id}
                               role={msg.role}
                               streaming={msg.streaming && turnActive}
+                              announceText={!(
+                                isTail &&
+                                chatMode === 'work' &&
+                                workActivities.length > 0
+                              )}
                               liveCallIds={liveCallIds}
                               onUserIntent={(text) => {
                                 void handleSend(text, [], undefined);
                               }}
+                              onOpenWorkbench={workbenchEnabled ? openWorkbenchArtifact : undefined}
                               pendingApproval={
-                                isTail && pendingApproval && !isStreaming
+                                isTail && pendingConfirmation && !isStreaming
                                   ? {
-                                      prompt: pendingApproval,
+                                      prompt: pendingConfirmation,
                                       onApprove: approveCelebrating,
                                       onDeny: deny,
-                                      onAlwaysAllow: alwaysAllowCelebrating,
+                                      onAlwaysAllow:
+                                        chatMode === 'chat' ? alwaysAllowCelebrating : undefined,
                                       busy: isStreaming,
                                     }
                                   : undefined
@@ -1858,49 +2057,11 @@ export function ChippiWorkspace({
                           onUserIntent={(text) => {
                             void handleSend(text, [], undefined);
                           }}
+                          onOpenWorkbench={workbenchEnabled ? openWorkbenchArtifact : undefined}
                         />
                       </motion.div>
                     );
                   })}
-
-                  <AnimatePresence>
-                    {showThinking && (
-                      <motion.div
-                        key="thinking-indicator"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                        className="flex gap-3"
-                      >
-                        {/* mt-1.5 centers the 20px orb on the indicator's
-                            first row (pt-0.5 + min-h-7 → center at 16px). */}
-                        <ThinkingOrb state={orbState} size={20} className="mt-1.5" />
-                        <div className="flex-1 min-w-0 pt-0.5 space-y-3">
-                          {/* Preview PlanCard — appears immediately when the
-                              plan_created event arrives, before the tool call
-                              settles into a message block. */}
-                          {activePlan && (
-                            <PlanCard
-                              task={activePlan.task}
-                              steps={activePlan.steps}
-                              isAnimating={true}
-                              activeStepIndex={activePlanStepIndex}
-                            />
-                          )}
-                          <ThinkingIndicator
-                            currentAction={
-                              recoveringTurn
-                                ? 'Still working on your last message…'
-                                : currentAction
-                            }
-                            streamingReasoning={streamingReasoning}
-                            elapsedMs={isWarmingUp ? warmupElapsedMs : 0}
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   {/* Suggested follow-ups — visible only when the conversation
                       is idle (no thinking, no streaming, no error) and the
@@ -1933,6 +2094,22 @@ export function ChippiWorkspace({
                 </div>
               </div>
             </ScrollArea>
+            <AnimatePresence>
+              {!chatLiveEdge.following && chatLiveEdge.hasNewContent && (
+                <motion.button
+                  key="jump-to-latest"
+                  type="button"
+                  onClick={chatLiveEdge.jumpToLatest}
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full border border-border/70 bg-background/95 px-3 py-1.5 text-[11px] font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Jump to latest
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
 
             </motion.div>
@@ -2012,6 +2189,17 @@ export function ChippiWorkspace({
               key="chippi-right-panel"
               slug={slug}
               variant={variant}
+              workbenchArtifactId={workbenchArtifactId}
+              workbenchRefreshVersion={workbenchRefreshVersion}
+              researchActions={researchActions}
+              researchSources={researchSources}
+              researchEnabled={researchEnabled}
+              workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
+              workspaceRunId={workspaceRunId}
+              workspaceRunRefreshToken={workspaceRunRefreshToken}
+              onOpenWorkbench={openWorkbenchArtifact}
+              onContinueWorkspace={() => { setRightTab('activity'); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="flex-1 min-w-0"
@@ -2044,6 +2232,17 @@ export function ChippiWorkspace({
             <RightPanel
               slug={slug}
               variant={variant}
+              workbenchArtifactId={workbenchArtifactId}
+              workbenchRefreshVersion={workbenchRefreshVersion}
+              researchActions={researchActions}
+              researchSources={researchSources}
+              researchEnabled={researchEnabled}
+              workspaceRunsEnabled={workspaceRunsEnabled}
+              workspaceRunFollowUpsEnabled={workspaceRunFollowUpsEnabled}
+              workspaceRunId={workspaceRunId}
+              workspaceRunRefreshToken={workspaceRunRefreshToken}
+              onOpenWorkbench={openWorkbenchArtifact}
+              onContinueWorkspace={() => { setRightTab('activity'); closeMobileOverlay(); }}
               activeTab={rightTab}
               onTabChange={setRightTab}
               className="h-full"

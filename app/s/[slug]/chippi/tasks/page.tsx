@@ -110,21 +110,12 @@ export default async function AgentTasksPage({
       title="Agent Tasks"
       subtitle="Long-running goals Chippi is working on."
     >
-      {/* Back-link + cross-link sit inside children so the shell header stays pure. */}
-      <div className="flex items-center justify-between">
-        <Link
-          href={`/s/${slug}/chippi`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft size={12} /> Chippi
-        </Link>
-        <Link
-          href={`/s/${slug}/chippi/approvals`}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Pending approvals →
-        </Link>
-      </div>
+      <Link
+        href={`/s/${slug}/chippi`}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft size={12} /> Chippi
+      </Link>
 
       {/* Task list */}
       {taskList.length === 0 ? (

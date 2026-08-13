@@ -24,7 +24,6 @@ issues on the Composio side.
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import httpx
 import structlog
@@ -32,6 +31,7 @@ from agents import RunContextWrapper, function_tool
 
 from config import settings
 from security.context import AgentContext
+from security.run_policy import action_headers, integration_action_capability, is_unattended_write
 from tools.base import rate_limited
 
 logger = structlog.get_logger()
@@ -194,6 +194,23 @@ async def call_integration_tool(
         arg_keys=list(arguments.keys()) if isinstance(arguments, dict) else [],
     )
 
+    capability = integration_action_capability(clean_slug)
+    if is_unattended_write(ctx.context.run_mode, capability):
+        # This is intentionally local as well as enforced at the Next.js
+        # boundary. Shadow rollout must not let a Modal autonomous loop turn
+        # a missing grant into a legacy write path.
+        return json.dumps({
+            "ok": False,
+            "error": (
+                "This unattended run may only read connected integrations. "
+                "Create a proposal for review before performing that action."
+            ),
+            "code": "RUN_POLICY_DENIED",
+        })
+
+    headers = {"Authorization": f"Bearer {secret}"}
+    headers.update(action_headers(ctx.context, capability))
+
     try:
         async with httpx.AsyncClient(timeout=_EXEC_TIMEOUT, follow_redirects=True) as client:
             resp = await client.post(
@@ -204,7 +221,7 @@ async def call_integration_tool(
                     "slug": clean_slug,
                     "arguments": arguments,
                 },
-                headers={"Authorization": f"Bearer {secret}"},
+                headers=headers,
             )
     except Exception as err:
         logger.warning(

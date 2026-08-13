@@ -24,12 +24,13 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('WorkSession')
     .select('*')
     .eq('id', id)
     .eq('spaceId', auth.space.id)
     .maybeSingle();
+  if (error) return NextResponse.json({ error: 'Could not load the session.' }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json({ session: data });
 }
@@ -45,12 +46,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!read.ok) return read.response;
   const { action, answer } = (read.data ?? {}) as { action?: string; answer?: string };
 
-  const { data: session } = await supabase
+  const { data: session, error: sessionError } = await supabase
     .from('WorkSession')
-    .select('id, status')
+    .select('id, status, workspaceRunId')
     .eq('id', id)
     .eq('spaceId', auth.space.id)
     .maybeSingle();
+  if (sessionError) return NextResponse.json({ error: 'Could not load the session.' }, { status: 500 });
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const status = (session as { status: string }).status;
 
@@ -58,11 +60,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (status !== 'awaiting_approval') {
       return NextResponse.json({ error: 'This session is not waiting for approval.' }, { status: 409 });
     }
-    await supabase
+    const { data: transitioned, error: transitionError } = await supabase
       .from('WorkSession')
       .update({ status: 'running', updatedAt: new Date().toISOString() })
       .eq('id', id)
-      .eq('status', 'awaiting_approval');
+      .eq('spaceId', auth.space.id)
+      .eq('status', 'awaiting_approval')
+      .select('id')
+      .maybeSingle();
+    if (transitionError) return NextResponse.json({ error: 'Could not approve the session.' }, { status: 500 });
+    if (!transitioned) return NextResponse.json({ error: 'This session changed before approval.' }, { status: 409 });
     await kickExecute(id);
     return NextResponse.json({ ok: true });
   }
@@ -73,11 +80,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const cleanAnswer = typeof answer === 'string' ? answer.trim().slice(0, 1000) : '';
     if (!cleanAnswer) return NextResponse.json({ error: 'Type an answer first.' }, { status: 400 });
-    await supabase
+    const { data: transitioned, error: transitionError } = await supabase
       .from('WorkSession')
       .update({ answer: cleanAnswer, question: null, status: 'planning', updatedAt: new Date().toISOString() })
       .eq('id', id)
-      .eq('status', 'awaiting_input');
+      .eq('spaceId', auth.space.id)
+      .eq('status', 'awaiting_input')
+      .select('id')
+      .maybeSingle();
+    if (transitionError) return NextResponse.json({ error: 'Could not save the answer.' }, { status: 500 });
+    if (!transitioned) return NextResponse.json({ error: 'This session changed before the answer was saved.' }, { status: 409 });
     await kickPlan(id);
     return NextResponse.json({ ok: true });
   }
@@ -86,11 +98,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!['planning', 'awaiting_approval', 'awaiting_input', 'running'].includes(status)) {
       return NextResponse.json({ error: 'This session already finished.' }, { status: 409 });
     }
-    await supabase
-      .from('WorkSession')
-      .update({ status: 'cancelled', updatedAt: new Date().toISOString() })
-      .eq('id', id)
-      .in('status', ['planning', 'awaiting_approval', 'awaiting_input', 'running']);
+    const { data: cancelled, error: cancelError } = await supabase.rpc('cancel_workspace_run_and_session', { p_session_id: id, p_space_id: auth.space.id });
+    if (cancelError || !cancelled) return NextResponse.json({ error: 'This session already finished.' }, { status: 409 });
     return NextResponse.json({ ok: true });
   }
 

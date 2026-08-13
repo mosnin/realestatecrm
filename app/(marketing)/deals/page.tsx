@@ -24,7 +24,7 @@ const COLUMNS = [
     name: 'NEW',
     cards: [
       { chip: 'Hot · scored', tone: 'bg-[#ff4b29]/10 text-[#ff4b29]' },
-      { chip: 'Draft ready', tone: 'bg-amber-100 text-amber-700' },
+      { chip: 'Reply sent', tone: 'bg-emerald-100 text-emerald-700' },
     ],
   },
   {
@@ -100,12 +100,12 @@ const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
   {
     kicker: 'New',
     title: 'A lead just landed.',
-    body: 'Scored with the reason the moment it arrives, and a reply already drafted in your voice, waiting for your tap.',
+    body: 'Scored with the reason the moment it arrives, with the next action ready for Chippi to execute.',
   },
   {
     kicker: 'Contacted',
     title: 'The first reply is out.',
-    body: 'You approved the draft and it sent. The card carries who you are waiting on and when you last reached them.',
+    body: 'Chippi sent the reply you requested. The card carries who you are waiting on and when you last reached them.',
   },
   {
     kicker: 'Touring',

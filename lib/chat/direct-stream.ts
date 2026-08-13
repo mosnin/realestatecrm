@@ -17,7 +17,10 @@
  */
 
 import { logger } from '@/lib/logger';
-import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
+import {
+  saveAssistantMessage,
+  saveConversationTurnAssistantMessage,
+} from '@/lib/ai-tools/persistence';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
 import { recordChatUsage, type ChatRoute } from '@/lib/usage/record-chat-usage';
 import type { MessageBlock } from '@/lib/ai-tools/blocks';
@@ -33,6 +36,13 @@ import { markTurnEnded } from './turn-presence';
 import { shouldEscalate } from './router';
 import { createStopPoller } from './stop-signal';
 import type { MultimodalAttachment } from './multimodal';
+import {
+  settledConversationTurnOutcome,
+  startConversationTurnLeaseGuardian,
+  type ConversationTurnSettler,
+  type TurnTerminalOutcome,
+} from './turn-control';
+import { supabase } from '@/lib/supabase';
 
 export interface DirectStreamInput {
   spaceId: string;
@@ -44,6 +54,11 @@ export interface DirectStreamInput {
   attachments: MultimodalAttachment[];
   /** AbortController shared with the rest of the request. */
   abortController: AbortController;
+  /** Stable identity for exact-turn Stop and durable settlement. */
+  turnId?: string;
+  /** Exact v2 attempt authority. Required for atomic transcript finalization. */
+  attemptToken?: string;
+  onSettled?: ConversationTurnSettler;
   /**
    * Called when the direct response signals it needs the agent path. The
    * handler builds the AGENT path's SSE Response for the same message (e.g.
@@ -137,6 +152,48 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           clientGone = true;
         }
       };
+      let terminalOutcome: TurnTerminalOutcome = {
+        status: 'failed',
+        reason: 'stream_closed_without_terminal_event',
+        error: 'The direct stream closed without a terminal event.',
+      };
+      let atomicallySettled = false;
+      let settlementDelegated = false;
+      let separatelySettled = false;
+      const leaseGuardian = input.turnId && input.attemptToken
+        ? startConversationTurnLeaseGuardian(supabase, {
+            turnId: input.turnId,
+            spaceId: input.spaceId,
+            conversationId: input.conversationId,
+            attemptToken: input.attemptToken,
+            abortController: input.abortController,
+          })
+        : null;
+      const settleBeforeTerminal = async (): Promise<boolean> => {
+        if (!input.onSettled || atomicallySettled || settlementDelegated) return true;
+        try {
+          const settled = await input.onSettled(terminalOutcome);
+          terminalOutcome = settledConversationTurnOutcome(settled, terminalOutcome);
+          separatelySettled = true;
+          return terminalOutcome.status !== 'failed';
+        } catch (error) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'durable_settlement_failed',
+            error: error instanceof Error ? error.message : 'Durable turn settlement failed.',
+          };
+          logger.error('[direct-stream] pre-terminal durable settlement failed', {
+            conversationId: input.conversationId,
+            turnId: input.turnId,
+          }, error);
+          push({
+            type: 'error',
+            message: chippiErrorMessage('persistence'),
+            code: 'persistence',
+          });
+          return false;
+        }
+      };
 
       // Tell the browser which path served this turn — useful for the
       // existing chat telemetry rail and for any future "this was a
@@ -144,6 +201,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
       push({ type: 'route_picked', route: 'direct' });
 
       try {
+        await leaseGuardian?.renewNow();
         // Retrieve workspace context FIRST so the system message carries
         // it on the first wire — quality lift independent of which path
         // serves the turn.
@@ -186,7 +244,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
         // Explicit Stop (POST /api/ai/stop) — polled at a bounded cadence.
         // Distinct from disconnect: disconnect keeps the turn alive; Stop
         // aborts generation and commits whatever the user already saw.
-        const shouldStop = createStopPoller(input.conversationId);
+        const shouldStop = createStopPoller(input.turnId ?? `legacy:${input.conversationId}`);
         let stopped = false;
         const turnStartedAt = Date.now();
         const result = await runDirectChatStream(
@@ -200,6 +258,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             reasoningEffort,
           },
           (delta) => {
+            if (leaseGuardian?.hasLostAuthority()) return false;
             // Bounded-cadence stop poll (async; flips `stopped` within one
             // interval). Returning false aborts the provider stream.
             void shouldStop().then((s) => {
@@ -236,7 +295,7 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           // a stop or escalation is latched — the trace belongs to a turn
           // the user won't see finish here.
           (delta) => {
-            if (!stopped && !escalationLatched) {
+            if (!leaseGuardian?.hasLostAuthority() && !stopped && !escalationLatched) {
               push({ type: 'reasoning_delta', delta });
             }
           },
@@ -284,6 +343,8 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             // persists its own assistant message and ChatUsage row, so
             // nothing below this block should run.
             push({ type: 'route_picked', route: 'agent', escalated: true });
+            settlementDelegated = true;
+            leaseGuardian?.stop();
             const reader = agentResponse.body.getReader();
             try {
               for (;;) {
@@ -331,8 +392,9 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           // fully buffered — flush it now. Anything longer already streamed.
           push({ type: 'text_delta', delta: finalText });
         }
-        push({ type: 'turn_complete', reason: stoppedTurn ? 'aborted' : 'complete' });
-
+        terminalOutcome = stoppedTurn
+          ? { status: 'cancelled', reason: 'interrupted' }
+          : { status: 'completed', reason: 'complete' };
         // Persist the assistant message + telemetry. The reasoning trace
         // goes first (Claude / o1 pattern — same ordering the client uses
         // live) so the "Thought for Xs" disclosure survives reload.
@@ -350,18 +412,64 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
             { type: 'text', content: finalText },
           ];
           try {
-            await saveAssistantMessage({
-              spaceId: input.spaceId,
-              conversationId: input.conversationId,
-              blocks,
-            });
+            leaseGuardian?.assertActive();
+            if (input.turnId && input.attemptToken) {
+              await leaseGuardian?.prepareToCommit();
+              const receipt = await saveConversationTurnAssistantMessage({
+                spaceId: input.spaceId,
+                conversationId: input.conversationId,
+                turnId: input.turnId,
+                attemptToken: input.attemptToken,
+                outcome: terminalOutcome,
+                blocks,
+              });
+              terminalOutcome = {
+                status: receipt.terminalStatus,
+                reason: receipt.terminalReason,
+              };
+              atomicallySettled = true;
+              leaseGuardian?.commitSucceeded();
+              leaseGuardian?.stop();
+            } else {
+              await saveAssistantMessage({
+                spaceId: input.spaceId,
+                conversationId: input.conversationId,
+                blocks,
+              });
+            }
           } catch (err) {
+            const authorityFailure = leaseGuardian?.hasLostAuthority()
+              || /lease|attempt token|terminal result/i.test(
+                err instanceof Error ? err.message : String(err),
+              );
+            terminalOutcome = {
+              status: 'failed',
+              reason: authorityFailure ? 'lease_authority_lost' : 'persistence',
+              error: err instanceof Error ? err.message : 'Assistant message persistence failed.',
+            };
             logger.warn(
               '[direct-stream] save assistant message failed',
               { spaceId: input.spaceId, conversationId: input.conversationId },
               err,
             );
+            // The browser may have seen streamed text, but it must not see a
+            // successful terminal receipt when the authoritative transcript
+            // could not be committed. Keeping the ledger failed prevents a
+            // later queued turn from proceeding with missing context.
+            push({
+              type: 'error',
+              message: authorityFailure
+                ? 'This turn no longer had authority to publish its reply.'
+                : chippiErrorMessage('persistence'),
+              code: authorityFailure ? 'lease_authority_lost' : 'persistence',
+            });
           }
+        }
+        if (terminalOutcome.status !== 'failed' && await settleBeforeTerminal()) {
+          push({
+            type: 'turn_complete',
+            reason: terminalOutcome.status === 'cancelled' ? 'aborted' : 'complete',
+          });
         }
         await recordChatUsage({
           spaceId: input.spaceId,
@@ -376,16 +484,52 @@ export function streamDirectTurn(input: DirectStreamInput): Response {
           runtime: 'ts',
         });
       } catch (err) {
+        const leaseLost = leaseGuardian?.hasLostAuthority() ?? false;
         const aborted = (err as { name?: string })?.name === 'AbortError';
-        if (!aborted) {
+        if (leaseLost) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'lease_authority_lost',
+            error: 'Conversation turn attempt authority could not be renewed.',
+          };
+          push({
+            type: 'error',
+            message: 'This turn lost execution authority and was stopped safely.',
+            code: 'lease_authority_lost',
+          });
+        } else if (!aborted) {
+          terminalOutcome = {
+            status: 'failed',
+            reason: 'stream_error',
+            error: err instanceof Error ? err.message : 'Direct stream failed.',
+          };
           logger.error('[direct-stream] crashed', { spaceId: input.spaceId }, err);
           push({ type: 'error', message: chippiErrorMessage('internal') });
+        } else {
+          terminalOutcome = { status: 'cancelled', reason: 'interrupted' };
+          if (await settleBeforeTerminal()) {
+            push({ type: 'turn_complete', reason: 'aborted' });
+          }
         }
       } finally {
-        // Clear the turn-presence marker AFTER persistence so a reopening
-        // client that sees inFlight=false can trust the answer is queryable.
-        // Awaited (inside the after() keep-alive window) so the function
-        // can't suspend before the marker clears.
+        leaseGuardian?.stop();
+        if (
+          input.onSettled
+          && !atomicallySettled
+          && !settlementDelegated
+          && !separatelySettled
+        ) {
+          try {
+            await input.onSettled(terminalOutcome);
+          } catch (error) {
+            logger.error('[direct-stream] durable turn settlement failed', {
+              conversationId: input.conversationId,
+              turnId: input.turnId,
+            }, error);
+          }
+        }
+        // Presence clears only after transcript persistence and durable
+        // settlement have both completed or failed visibly.
         await markTurnEnded(input.conversationId);
         turnDone();
         try {

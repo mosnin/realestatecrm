@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { RESERVED_TITLE_LIKE_PATTERNS } from '@/lib/chat/conversation-access';
+import { parseConversationMode } from '@/lib/chat/conversation-mode';
+import { parseWorkExecutionMode } from '@/lib/chat/work-execution-mode';
 
 const rateLimited = () =>
   NextResponse.json(
@@ -21,6 +23,10 @@ export async function GET(req: NextRequest) {
 
     const slug = req.nextUrl.searchParams.get('slug');
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+    const requestedLimit = Number.parseInt(req.nextUrl.searchParams.get('limit') ?? '50', 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(requestedLimit, 50))
+      : 50;
 
     const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
@@ -42,7 +48,8 @@ export async function GET(req: NextRequest) {
       // place. The realtor surface never serves broker-Chippi or team chats.
       .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[0])
       .not('title', 'like', RESERVED_TITLE_LIKE_PATTERNS[1])
-      .order('updatedAt', { ascending: false });
+      .order('updatedAt', { ascending: false })
+      .limit(limit);
     if (error) return NextResponse.json({ error: 'Failed to load conversations' }, { status: 500 });
 
     const conversations = data ?? [];
@@ -65,7 +72,7 @@ export async function GET(req: NextRequest) {
         // workspace so malformed legacy rows cannot bleed into the sidebar.
         .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
-        .limit(ids.length * 20); // generous cap; deduplication below
+        .limit(limit * 20); // bounded generous cap; deduplication below
 
       if (msgs) {
         for (const msg of msgs) {
@@ -97,8 +104,10 @@ export async function POST(req: NextRequest) {
     const { allowed } = await checkRateLimit(`ai:conversations:${userId}`, 20, 60);
     if (!allowed) return rateLimited();
 
-    const { slug } = await req.json();
+    const { slug, mode: rawMode, executionMode: rawExecutionMode } = await req.json();
     if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
+    const mode = parseConversationMode(rawMode);
+    const executionMode = parseWorkExecutionMode(rawExecutionMode);
 
     const space = await getSpaceFromSlug(slug);
     if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
@@ -118,6 +127,8 @@ export async function POST(req: NextRequest) {
         id: crypto.randomUUID(),
         spaceId: space.id,
         title: 'New conversation',
+        mode,
+        executionMode,
         createdAt: now,
         updatedAt: now,
       })

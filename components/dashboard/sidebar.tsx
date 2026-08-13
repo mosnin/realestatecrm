@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
@@ -18,6 +18,10 @@ import {
 } from '@/components/dashboard/sidebar-collapse';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
+import {
+  chippiSidebarPanelMotion,
+  useChippiSidebarView,
+} from '@/components/dashboard/chippi-sidebar-experience';
 import { SidebarWhatsNew } from '@/components/dashboard/sidebar-whats-new';
 import { SidebarUserMenu } from '@/components/dashboard/sidebar-user-menu';
 import { PulseNumber } from '@/components/ui/pulse-number';
@@ -353,26 +357,11 @@ function FlatNavItem({
         'group relative flex items-center gap-2.5 h-9 pl-3 pr-2.5 rounded-md text-[13px]',
         'transition-[background-color,color,transform] duration-150 hover:translate-x-[1.5px]',
         isActive
-          ? 'bg-foreground/[0.045] text-foreground font-medium'
+          ? 'bg-foreground text-background font-medium shadow-[0_1px_2px_rgb(17_17_19/0.12)]'
           : 'text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground',
       )}
       style={{ willChange: 'transform' }}
     >
-      {/* Active accent bar — 2px on the left, foreground tone, rounded
-          corner on the inner edge. Matches the realtor sidebar's active
-          rail exactly (STYLESHEET §Border & radius — Active rail).
-          `layoutId` makes the bar GLIDE between rows when the active item
-          changes (shared broker nav + broker settings sub-nav both use
-          FlatNavItem) instead of popping — framer-motion handles the
-          FLIP transform, no scroll-trigger involved so it's instant. */}
-      {isActive && (
-        <motion.span
-          layoutId="flat-nav-active-rail"
-          aria-hidden
-          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r bg-foreground"
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        />
-      )}
       {isAI ? (
         /* Chip avatar — same 16×16 rounded-full as the realtor Chippi row */
         <img
@@ -386,7 +375,7 @@ function FlatNavItem({
           strokeWidth={isActive ? 2.25 : 1.75}
           className={cn(
             'flex-shrink-0 transition-colors',
-            isActive ? 'text-foreground' : 'text-foreground/55 group-hover:text-foreground',
+            isActive ? 'text-background' : 'text-foreground/55 group-hover:text-foreground',
           )}
         />
       )}
@@ -830,12 +819,22 @@ function UserFooter({
 // ═══════════════════════════════════════════════════════════════════════════════
 // BrokerSidebarConversations — slim broker conversation history rendered when
 // on the broker Chippi page (/broker). Mirrors the realtor SidebarConversations
-// structure (CHAT HISTORY label + New button + recent list + active rail) but
-// calls the broker-scoped conversations API and links into /broker?conversationId=…
-// instead of /s/[slug]/chippi. Bounded to 6 rows + "See all →" link.
+// structure (New button + recent list + active rail) but calls the broker-
+// scoped conversations API and links into /broker?conversationId=… instead of
+// /s/[slug]/chippi. Client state and rendered rows are capped at 50.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function BrokerSidebarConversations() {
+interface BrokerSidebarConversationsProps {
+  limit?: number;
+  hideLabel?: boolean;
+  onSelect?: () => void;
+}
+
+export function BrokerSidebarConversations({
+  limit = 50,
+  hideLabel = false,
+  onSelect,
+}: BrokerSidebarConversationsProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeId = searchParams.get('conversationId');
@@ -849,11 +848,12 @@ function BrokerSidebarConversations() {
       const res = await fetch('/api/ai/broker-conversations');
       if (!res.ok) { setConversations([]); return; }
       const data = await res.json();
-      setConversations(Array.isArray(data) ? data : []);
+      const boundedLimit = Math.max(1, Math.min(limit, 50));
+      setConversations(Array.isArray(data) ? data.slice(0, boundedLimit) : []);
     } catch {
       setConversations([]);
     }
-  }, []);
+  }, [limit]);
 
   useEffect(() => { void fetchConversations(); }, [fetchConversations]);
 
@@ -865,13 +865,11 @@ function BrokerSidebarConversations() {
     });
     if (!res.ok) return;
     const conv = await res.json();
-    setConversations((prev) => (prev ? [conv, ...prev] : [conv]));
+    const boundedLimit = Math.max(1, Math.min(limit, 50));
+    setConversations((prev) => (prev ? [conv, ...prev].slice(0, boundedLimit) : [conv]));
     router.push(`/broker?conversationId=${conv.id}`);
-  }, [router]);
-
-  const LIMIT = 6;
-  const visible = conversations ? conversations.slice(0, LIMIT) : conversations;
-  const hasMore = conversations !== null && conversations.length > LIMIT;
+    onSelect?.();
+  }, [limit, onSelect, router]);
 
   function timeAgo(date: string): string {
     const diff = (Date.now() - new Date(date).getTime()) / 1000;
@@ -884,9 +882,11 @@ function BrokerSidebarConversations() {
 
   return (
     <div className="space-y-1">
-      <p className={cn(SECTION_LABEL, 'px-3 pt-6 pb-2 select-none')}>
-        Chat history
-      </p>
+      {!hideLabel && (
+        <p className={cn(SECTION_LABEL, 'px-3 pt-1 pb-1.5 select-none')}>
+          Chat history
+        </p>
+      )}
 
       <button
         type="button"
@@ -910,7 +910,7 @@ function BrokerSidebarConversations() {
           </p>
         ) : (
           <ul className="space-y-px">
-            {visible!.map((conv) => {
+            {conversations.map((conv) => {
               const isActive = activeId === conv.id;
               return (
                 <li key={conv.id} className="relative">
@@ -930,6 +930,7 @@ function BrokerSidebarConversations() {
                   >
                     <Link
                       href={`/broker?conversationId=${conv.id}`}
+                      onClick={() => onSelect?.()}
                       className="flex-1 min-w-0 pl-2.5 pr-1 py-1.5"
                     >
                       <p
@@ -959,16 +960,6 @@ function BrokerSidebarConversations() {
               );
             })}
           </ul>
-        )}
-
-        {hasMore && (
-          <Link
-            href="/broker?view=history"
-            className="mt-1 flex items-center justify-between gap-1 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
-          >
-            <span>See all</span>
-            <span aria-hidden className="text-muted-foreground/60">→</span>
-          </Link>
         )}
       </div>
     </div>
@@ -1112,7 +1103,8 @@ function RealtorNav({
    */
   isBrokerageMember: boolean;
 }) {
-  const { collapsed } = useSidebarCollapsed();
+  const { collapsed, toggle } = useSidebarCollapsed();
+  const reducedMotion = useReducedMotion() ?? false;
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
 
   // Accordion: at most one parent is expanded at a time. The parent that
@@ -1206,10 +1198,13 @@ function RealtorNav({
     });
   };
 
-  // Route IS the signal for which nav mode this sidebar is in. On
-  // /chippi/* the main links cross-fade out and the conversation history
-  // slides in their place; off Chippi, the reverse.
-  const onChippi = pathname.startsWith(`/s/${slug}/chippi`);
+  const chippiRoot = `/s/${slug}/chippi`;
+  const onChippi = pathname === chippiRoot;
+  const [sidebarView, setSidebarView] = useChippiSidebarView(pathname, chippiRoot);
+  // A 56px rail cannot communicate conversation titles. Preserve the user's
+  // collapsed preference and keep the icon menu visible; the History icon is
+  // an explicit request to expand into the shared history surface.
+  const renderedSidebarView = collapsed ? 'menu' : sidebarView;
 
   // Badge vocabulary, two tiers:
   //   • Calm count (leads, properties) — muted pill, rounded-md, small.
@@ -1304,16 +1299,59 @@ function RealtorNav({
   return (
     <nav
       className={cn(
-        'flex-1 py-2 overflow-y-auto space-y-3',
+        'flex-1 py-2 overflow-y-auto',
         collapsed ? 'px-1' : 'px-3',
       )}
     >
-      {/* Two-mode sidebar: on /chippi the conversation history slides in
-          below the main nav. The main destinations (People, Deals,
-          Calendar…) stay visible the whole time — the realtor must always
-          have a door out of Chippi, not just a door in. The Chippi nav
-          item itself stays pinned at the top regardless so the door in is
-          always there too. Settings stays pinned at the bottom.
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.div
+          key={renderedSidebarView}
+          {...chippiSidebarPanelMotion(renderedSidebarView, reducedMotion)}
+          className="space-y-3"
+        >
+      {renderedSidebarView === 'history' && onChippi ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => setSidebarView('menu')}
+            className="mb-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+          >
+            <ArrowLeft size={13} strokeWidth={1.75} />
+            Back to menu
+          </button>
+          <SidebarConversations slug={slug} limit={50} hideLabel />
+        </div>
+      ) : (
+        <>
+          {onChippi && (
+            collapsed ? (
+              <CollapsedTooltip enabled label="Conversation history">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarView('history');
+                    toggle();
+                  }}
+                  aria-label="Conversation history"
+                  className="group relative flex h-10 w-10 items-center justify-center mx-auto rounded-md text-foreground/65 transition-colors duration-150 hover:bg-foreground/[0.025] hover:text-foreground"
+                >
+                  <History size={15} strokeWidth={1.75} />
+                </button>
+              </CollapsedTooltip>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSidebarView('history')}
+                className="inline-flex h-8 items-center rounded-md px-2 text-[12px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+              >
+                Conversation history
+              </button>
+            )
+          )}
+      {/* One navigation surface, two views. The exact Chippi root defaults to
+          conversation history. "Back to menu" swaps in every product link;
+          the menu's quiet "Conversation history" control swaps back without
+          adding another rail or covering the chat.
 
           The visual polish pass (PR: sidebar-jobs-polish) introduced two
           small-caps headers — WORKSPACE above the daily-work rows, SETUP
@@ -1368,49 +1406,6 @@ function RealtorNav({
         )}
       </div>
 
-      {/* Context-aware second section. Route IS the signal:
-            - On /chippi/* → CHAT HISTORY label + recent conversation list
-              (expanded) or History icon link (collapsed rail). Bounded to
-              6 conversations + "See all →" link into the existing in-chat
-              history drawer. Animates in/out with the app's standard
-              [0.22, 1, 0.36, 1] curve.
-            - Elsewhere → render `realtorMoreNavItems` if it has anything.
-              It's intentionally empty today, but kept as the slot for
-              future secondary nav without re-plumbing the layout. */}
-      <AnimatePresence initial={false} mode="wait">
-        {onChippi && (
-          <motion.div
-            key="chippi-history"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {collapsed ? (
-              <>
-                <div className="my-2 mx-2 h-px bg-border/60" aria-hidden />
-                <CollapsedTooltip enabled label="Conversations">
-                  <Link
-                    href={`/s/${slug}/chippi?view=history`}
-                    aria-label="Conversation history"
-                    className="group relative flex items-center justify-center w-10 h-10 mx-auto rounded-md text-foreground/65 hover:bg-foreground/[0.025] hover:text-foreground transition-colors duration-150"
-                  >
-                    <History size={15} strokeWidth={1.75} />
-                  </Link>
-                </CollapsedTooltip>
-              </>
-            ) : (
-              <>
-                {/* Hairline divider — the only thing separating primary
-                    nav from chat history. No card, no shadow. */}
-                <div className="mx-3 mt-1 mb-2 h-px bg-border/60" aria-hidden />
-                <SidebarConversations slug={slug} limit={6} />
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* realtorMoreNavItems — the secondary slot for non-Chippi pages.
           Empty today; kept so future additions don't require a layout
           replumb. Only renders when the array has items AND we're not on
@@ -1435,6 +1430,10 @@ function RealtorNav({
           collapsed={collapsed}
         />
       </div>
+        </>
+      )}
+        </motion.div>
+      </AnimatePresence>
     </nav>
   );
 }
@@ -1469,6 +1468,12 @@ export function Sidebar({
   // Shared collapse state (provided by the layout). The broker branch below
   // uses it to rail like the realtor sidebar; the header panel toggle drives it.
   const { collapsed: brokerCollapsed, toggle: brokerToggle } = useSidebarCollapsed();
+  const brokerReducedMotion = useReducedMotion() ?? false;
+  const [brokerSidebarView, setBrokerSidebarView] = useChippiSidebarView(
+    pathname,
+    '/broker',
+  );
+  const renderedBrokerSidebarView = brokerCollapsed ? 'menu' : brokerSidebarView;
 
   // Broker nav accordion — one parent expanded at a time, same contract as
   // RealtorNav. Declared here (not inside the broker branch) because that
@@ -1528,7 +1533,7 @@ export function Sidebar({
   // ── Broker settings sub-nav ──────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly) && isOnBrokerSettings) {
     return (
-      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl overflow-hidden shrink-0 m-3', SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('hidden md:flex flex-col bg-sidebar border border-border/85 rounded-2xl overflow-hidden shrink-0 m-3 shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.2)]', SIDEBAR_WIDTH)}>
         <div className="px-4 pt-5 pb-3">
           <BrandLogo className="h-5" alt="Chippi" />
         </div>
@@ -1590,12 +1595,12 @@ export function Sidebar({
   // ── Broker sidebar ───────────────────────────────────────────────────────
   if (isBroker && (isOnBrokerPage || isBrokerOnly)) {
     return (
-      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 overflow-hidden transition-[width] duration-200 ease-out m-3', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
+      <aside data-dashboard-sidebar className={cn('group/rail relative hidden md:flex flex-col bg-sidebar border border-border/85 rounded-2xl shrink-0 overflow-hidden transition-[width] duration-200 ease-out m-3 shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.2)]', brokerCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH)}>
         {/* Same brand-warm tint as the realtor sidebar so brokers see the
             same identity when they switch workspaces. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-2xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
         />
         <div className="relative z-10 flex flex-col h-full">
           {/* Brand mark — in collapsed rail mode it doubles as the expand
@@ -1646,7 +1651,52 @@ export function Sidebar({
           {/* Broker primary nav — same structural vocabulary as RealtorNav:
               py-2 vertical breathing, space-y-3 between section groups,
               overflow-y-auto so deep section lists don't push the footer off. */}
-          <nav className="flex-1 px-3 py-2 mt-1 space-y-3 overflow-y-auto">
+          <nav className="flex-1 px-3 py-2 mt-1 overflow-y-auto">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={renderedBrokerSidebarView}
+                {...chippiSidebarPanelMotion(renderedBrokerSidebarView, brokerReducedMotion)}
+                className="space-y-3"
+              >
+            {renderedBrokerSidebarView === 'history' && pathname === '/broker' ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setBrokerSidebarView('menu')}
+                  className="mb-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+                >
+                  <ArrowLeft size={13} strokeWidth={1.75} />
+                  Back to menu
+                </button>
+                <BrokerSidebarConversations limit={50} hideLabel />
+              </div>
+            ) : (
+              <>
+                {pathname === '/broker' && (
+                  brokerCollapsed ? (
+                    <CollapsedTooltip enabled label="Conversation history">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrokerSidebarView('history');
+                          brokerToggle();
+                        }}
+                        aria-label="Conversation history"
+                        className="group relative flex h-10 w-10 items-center justify-center mx-auto rounded-md text-foreground/65 transition-colors duration-150 hover:bg-foreground/[0.025] hover:text-foreground"
+                      >
+                        <History size={15} strokeWidth={1.75} />
+                      </button>
+                    </CollapsedTooltip>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setBrokerSidebarView('history')}
+                      className="inline-flex h-8 items-center rounded-md px-2 text-[12px] text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground"
+                    >
+                      Conversation history
+                    </button>
+                  )
+                )}
             <div className="space-y-0.5">
               {brokerSections.map((section) => {
                 const visibleItems = section.items.filter(
@@ -1692,26 +1742,9 @@ export function Sidebar({
                 );
               })}
             </div>
-
-            {/* Conversation history — mirrors the realtor sidebar's contextual
-                section. Slides in when on the broker Chippi page (/broker exact),
-                same AnimatePresence pattern. Shows broker conversations via the
-                broker-scoped conversations API. Hidden in collapsed rail mode —
-                there's no room for a conversation list at 56px. */}
-            <AnimatePresence initial={false} mode="wait">
-              {!brokerCollapsed && pathname === '/broker' && (
-                <motion.div
-                  key="broker-chippi-history"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  {/* Hairline divider — same as realtor sidebar (mx-3 to match) */}
-                  <div className="mx-3 mt-1 mb-2 h-px bg-border/60" aria-hidden />
-                  <BrokerSidebarConversations />
-                </motion.div>
-              )}
+              </>
+            )}
+              </motion.div>
             </AnimatePresence>
           </nav>
 
@@ -1815,7 +1848,7 @@ function RealtorSidebarShell({
     <aside
       data-dashboard-sidebar
       className={cn(
-        'group/rail relative hidden md:flex flex-col bg-sidebar border border-border/70 rounded-xl shrink-0 m-3',
+        'group/rail relative hidden md:flex flex-col bg-sidebar border border-border/85 rounded-2xl shrink-0 m-3 shadow-[0_1px_1px_rgb(17_17_19/0.025),0_6px_18px_-16px_rgb(17_17_19/0.2)]',
         'transition-[width] duration-200 ease-in-out',
         collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_WIDTH,
       )}
@@ -1824,7 +1857,7 @@ function RealtorSidebarShell({
           wash doesn't hint at content beyond the visible edge. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 rounded-t-2xl bg-gradient-to-b from-foreground/[0.03] to-transparent"
       />
 
       <div className="relative z-10 flex flex-col h-full">

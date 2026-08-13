@@ -16,6 +16,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { requestChatStop } from '@/lib/chat/stop-signal';
+import { requestConversationTurnCancellationV2 } from '@/lib/chat/turn-control';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 
@@ -28,9 +29,15 @@ export async function POST(req: NextRequest) {
 
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
-  const { conversationId } = (read.data ?? {}) as { conversationId?: string };
+  const { conversationId, turnId } = (read.data ?? {}) as {
+    conversationId?: string;
+    turnId?: string;
+  };
   if (typeof conversationId !== 'string' || !conversationId) {
     return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });
+  }
+  if (typeof turnId !== 'string' || !turnId || turnId.length > 200) {
+    return NextResponse.json({ error: 'turnId is required' }, { status: 400 });
   }
 
   // ── Realtor surface ─────────────────────────────────────────────────────
@@ -49,10 +56,28 @@ export async function POST(req: NextRequest) {
       .eq('spaceId', space.id)
       .maybeSingle();
     if (convo && !isReservedConversationTitle((convo as { title?: string | null }).title)) {
-      const signalled = await requestChatStop(conversationId);
-      // signalled=false means Redis isn't configured — Stop degrades to
-      // client-side rendering stop. Honest response either way.
-      return NextResponse.json({ ok: true, signalled });
+      try {
+        const { data: turn } = await supabase
+          .from('ConversationTurn')
+          .select('id, attemptToken, status')
+          .eq('id', turnId)
+          .eq('spaceId', space.id)
+          .eq('conversationId', conversationId)
+          .maybeSingle();
+        if (!turn || turn.status !== 'running' || !turn.attemptToken) {
+          throw new Error('Running turn not found');
+        }
+        await requestConversationTurnCancellationV2(supabase, {
+          turnId,
+          spaceId: space.id,
+          conversationId,
+          attemptToken: turn.attemptToken,
+        });
+      } catch {
+        return NextResponse.json({ error: 'Running turn not found' }, { status: 409 });
+      }
+      const accelerated = await requestChatStop(turnId);
+      return NextResponse.json({ ok: true, durable: true, accelerated });
     }
   }
 
@@ -74,8 +99,11 @@ export async function POST(req: NextRequest) {
       .eq('brokerageId', brokerCtx.brokerage.id)
       .maybeSingle();
     if (brokerConvo) {
-      const signalled = await requestChatStop(conversationId);
-      return NextResponse.json({ ok: true, signalled });
+      // Broker chat has not migrated to ConversationTurn yet. The caller must
+      // still provide a per-request turn id, so the best-effort Redis signal
+      // cannot bleed into a later turn on the same conversation.
+      const accelerated = await requestChatStop(turnId);
+      return NextResponse.json({ ok: true, durable: false, accelerated });
     }
   }
 

@@ -91,7 +91,20 @@ describe('loadIntegrationMetaTools — constant footprint', () => {
     activeToolkitsMock.mockResolvedValue(['gmail', 'microsoft_teams']);
     const ctx = makeCtx();
     await loadIntegrationMetaTools(ctx);
-    expect(buildIntegrationSearchToolsMock).toHaveBeenCalledWith(ctx, ['gmail', 'microsoft_teams']);
+    expect(buildIntegrationSearchToolsMock).toHaveBeenCalledWith(
+      ctx,
+      ['gmail', 'microsoft_teams'],
+      { userMessage: undefined },
+    );
+  });
+
+  it('passes only the exact fresh-turn message into connected-app authorization', async () => {
+    activeToolkitsMock.mockResolvedValue(['gmail']);
+    const ctx = { ...makeCtx(), workMode: true };
+    await loadIntegrationMetaTools(ctx, { userMessage: 'Send an email through Gmail.' });
+    expect(buildIntegrationSearchToolsMock).toHaveBeenCalledWith(ctx, ['gmail'], {
+      userMessage: 'Send an email through Gmail.',
+    });
   });
 });
 

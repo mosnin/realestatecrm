@@ -25,6 +25,7 @@ from agents import RunContextWrapper, function_tool
 from db import supabase
 from errors import from_supabase_error
 from security.context import AgentContext
+from security.run_policy import action_headers, is_unattended_write
 from tools.activities import persist_log
 from tools.base import idempotent_tool
 from tools.deletion import confirmation_required, delete_row
@@ -129,6 +130,7 @@ async def book_tour(
             ends=ends,
             property_address=property_address,
             notes=notes,
+            run_context=ctx.context,
         )
     except Exception as exc:  # noqa: BLE001 — best-effort
         log.warning(
@@ -197,6 +199,7 @@ async def _write_tour_through_to_external_calendar(
     ends: datetime,
     property_address: str | None,
     notes: str | None,
+    run_context: AgentContext,
 ) -> None:
     """Write the tour through to the realtor's connected external calendar
     via Composio, then log a CalendarEventMirror row.
@@ -256,11 +259,24 @@ async def _write_tour_through_to_external_calendar(
     attendees = [{"email": guest_email, "displayName": guest_name}] if guest_email else []
 
     external_event_id: str | None = None
+    allow_external_write = not is_unattended_write(run_context.run_mode, "integration:write")
+    if not allow_external_write:
+        # The Tour row remains the caller's established local action. The
+        # external-calendar mutation is a distinct consequential integration
+        # write and must wait for an interactive/approved execution path.
+        log.info(
+            "calendar_through_write_proposal_required",
+            space_id=space_id,
+            tour_id=tour_id,
+            mode=run_context.run_mode,
+        )
     try:
         from config import settings  # noqa: WPS433 — local import
         base_url = (settings.app_url or "").rstrip("/")
         secret = settings.agent_internal_secret
         if (
+            allow_external_write
+            and
             base_url
             and secret
             and "localhost" not in base_url
@@ -280,10 +296,12 @@ async def _write_tour_through_to_external_calendar(
                 },
             }
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                headers = {"Authorization": f"Bearer {secret}"}
+                headers.update(action_headers(run_context, "integration:write"))
                 resp = await client.post(
                     f"{base_url}/api/internal/integrations/execute",
                     json=payload,
-                    headers={"Authorization": f"Bearer {secret}"},
+                    headers=headers,
                 )
             if resp.status_code < 400:
                 try:

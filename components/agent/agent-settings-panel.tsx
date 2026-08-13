@@ -33,7 +33,6 @@ interface AgentUsage {
 }
 
 interface AgentStatus {
-  pendingDrafts: number;
   lastRunAt: string | null;
 }
 
@@ -64,26 +63,20 @@ export function AgentSettingsPanel({ slug: _slug }: Props) {
   const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
   const load = useCallback(async () => {
-    const [settingsRes, usageRes, draftsRes, activityRes] = await Promise.all([
+    const [settingsRes, usageRes, activityRes] = await Promise.all([
       fetch('/api/agent/settings'),
       fetch('/api/agent/usage'),
-      fetch('/api/agent/drafts?status=pending&limit=1'),
       fetch('/api/agent/activity?limit=1'),
     ]);
     if (settingsRes.ok) setSettings(await settingsRes.json());
     if (usageRes.ok) setUsage(await usageRes.json());
 
-    let pendingDrafts = 0;
-    if (draftsRes.ok) {
-      const drafts = await draftsRes.json();
-      pendingDrafts = Array.isArray(drafts) ? drafts.length : 0;
-    }
     let lastRunAt: string | null = null;
     if (activityRes.ok) {
       const activity = await activityRes.json();
       lastRunAt = activity[0]?.createdAt ?? null;
     }
-    setStatus({ pendingDrafts, lastRunAt });
+    setStatus({ lastRunAt });
     setLoading(false);
   }, []);
 
@@ -175,7 +168,6 @@ export function AgentSettingsPanel({ slug: _slug }: Props) {
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {status?.lastRunAt ? `Last run ${timeAgo(status.lastRunAt)}` : 'No runs yet'}
-                {status?.pendingDrafts ? ` · ${status.pendingDrafts} draft${status.pendingDrafts !== 1 ? 's' : ''} awaiting review` : ''}
               </p>
             </div>
           </div>

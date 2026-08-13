@@ -16,14 +16,14 @@ describe('chat Prompt Kit UI phases', () => {
     expect(transcript).toContain('markdownId={messageId ? `${messageId}-${item.originalIndex}` : undefined}');
   });
 
-  it('phase 2 uses ThinkingBar with the blinking-text indicator (no pulsing dot)', () => {
+  it('phase 2 uses the grounded agent loading primitives with no pulsing dot', () => {
     const thinkingIndicator = read('components/ai/blocks/thinking-indicator.tsx');
-    const thinkingBar = read('components/ai/prompt-kit/thinking-bar.tsx');
-    expect(thinkingIndicator).toContain("ThinkingBar } from '@/components/ai/prompt-kit'");
-    expect(thinkingIndicator).toContain('<ThinkingBar label={action} />');
-    // The thinking label IS the indicator — a blinking text line, not a dot.
-    expect(thinkingBar).toContain('<TextBlink');
-    expect(thinkingBar).not.toContain('animate-ping');
+    expect(thinkingIndicator).toContain('AgentProgress,');
+    expect(thinkingIndicator).toContain('ReasoningText,');
+    expect(thinkingIndicator).toContain('ThinkingShimmer,');
+    expect(thinkingIndicator).toContain('phrases={[visibleLabel]}');
+    expect(thinkingIndicator).toContain('cycle={false}');
+    expect(thinkingIndicator).not.toContain('animate-ping');
   });
 
   it('phase 3 uses SystemMessage for the usage-limit state', () => {
@@ -33,16 +33,17 @@ describe('chat Prompt Kit UI phases', () => {
     expect(workspace).toContain('heading="You\'ve reached the 50-message limit for this conversation."');
   });
 
-  it('phase 4 renders tool calls and grouped tool runs through Tool and Steps primitives', () => {
+  it('phase 4 renders tool calls through the adapted Tool Result and grouped runs through Steps', () => {
     const toolCall = read('components/ai/blocks/tool-call-block-view.tsx');
     const toolGroup = read('components/ai/blocks/tool-group-block-view.tsx');
     const promptKitIndex = read('components/ai/prompt-kit/index.ts');
+    const agentStatusIndex = read('components/ai/agent-status/index.ts');
 
     expect(promptKitIndex).toContain("export { Tool, ToolStatus, type ToolState } from './tool';");
     expect(promptKitIndex).toContain("export { Steps } from './steps';");
-    expect(toolCall).toContain("import { Tool, ToolStatus, type ToolState } from '@/components/ai/prompt-kit'");
-    expect(toolCall).toContain('<Tool state={status}>');
-    expect(toolCall).toContain('<ToolStatus state={status} label={label} icon={iconEl}');
+    expect(agentStatusIndex).toContain('AgentToolResult,');
+    expect(toolCall).toContain('<AgentToolResult');
+    expect(toolCall).toContain('status={resultStatus}');
     expect(toolGroup).toContain("import { Steps } from '@/components/ai/prompt-kit';");
     expect(toolGroup).toContain('<Steps state={state} count={blocks.length}>');
   });
@@ -77,7 +78,8 @@ describe('chat Prompt Kit UI phases', () => {
     expect(reasoningBlock).toContain("import { ChainOfThought, Reasoning, ReasoningTrigger } from '@/components/ai/prompt-kit';");
     expect(reasoningBlock).toContain('<Reasoning open={expanded}>');
     expect(reasoningBlock).toContain('<ChainOfThought content={block.content} streaming={streaming}');
-    expect(thinkingIndicator).toContain("import { ChainOfThought, ThinkingBar } from '@/components/ai/prompt-kit';");
+    expect(thinkingIndicator).toContain("import { ChainOfThought } from '@/components/ai/prompt-kit';");
+    expect(thinkingIndicator).toContain("} from '@/components/ai/agent-status';");
     expect(thinkingIndicator).toContain("content={streamingReasoning ?? ''}");
   });
 });

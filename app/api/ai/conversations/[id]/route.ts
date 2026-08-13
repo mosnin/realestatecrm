@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getAuthorizedRealtorConversation } from '@/lib/chat/realtor-conversation-auth';
+import { parseWorkExecutionMode } from '@/lib/chat/work-execution-mode';
 
 const rateLimited = () =>
   NextResponse.json(
@@ -33,19 +34,31 @@ export async function PATCH(
     const conv = await getConversationAndVerifyOwner(id, userId);
     if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
 
-    const { title } = await req.json();
-    if (!title || typeof title !== 'string') {
-      return NextResponse.json({ error: 'title required' }, { status: 400 });
+    const body = await req.json();
+    const hasTitle = typeof body?.title === 'string' && body.title.trim().length > 0;
+    const hasExecutionMode = body?.executionMode === 'review' || body?.executionMode === 'autonomous';
+    if (hasTitle === hasExecutionMode) {
+      return NextResponse.json(
+        { error: 'provide exactly one of title or executionMode' },
+        { status: 400 },
+      );
     }
+
+    const patch = hasTitle
+      ? { title: body.title.trim(), updatedAt: new Date().toISOString() }
+      : {
+          executionMode: parseWorkExecutionMode(body.executionMode),
+          updatedAt: new Date().toISOString(),
+        };
 
     const { data, error } = await supabase
       .from('Conversation')
-      .update({ title: title.trim(), updatedAt: new Date().toISOString() })
+      .update(patch)
       .eq('id', id)
       .eq('spaceId', conv.spaceId)
       .select()
       .single();
-    if (error) return NextResponse.json({ error: 'Failed to rename conversation' }, { status: 500 });
+    if (error) return NextResponse.json({ error: 'Failed to update conversation' }, { status: 500 });
 
     return NextResponse.json(data);
   } catch (err) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Sparkles, Users, Briefcase, Building2, FileText, Globe } from 'lucide-react';
+import { Sparkles, Users, Briefcase, Building2, FileText, Globe, Table2, Search, TerminalSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
@@ -23,7 +23,10 @@ export type RightPanelTab =
   | 'deals'
   | 'properties'
   | 'documents'
-  | 'browser';
+  | 'browser'
+  | 'workbench'
+  | 'research'
+  | 'workspace';
 
 interface RightPanelTabsProps {
   activeTab: RightPanelTab;
@@ -32,6 +35,13 @@ interface RightPanelTabsProps {
   /** `broker` omits the Documents tab — there is no brokerage-scoped
    *  Documents surface to embed. Defaults to the realtor tab set. */
   variant?: RightPanelVariant;
+  /** The Workbench is intentionally dark until the feature flag is enabled.
+   *  Keeping the gate at the tab source prevents a stale local preference
+   *  from advertising an unfinished surface. */
+  workbenchEnabled?: boolean;
+  /** The Research Workspace stays unavailable until a deployment opts in. */
+  researchEnabled?: boolean;
+  workspaceRunsEnabled?: boolean;
 }
 
 const TABS: ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users }> = [
@@ -41,12 +51,39 @@ const TABS: ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users
   { id: 'properties', label: 'Properties', icon: Building2 },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'browser', label: 'Browser', icon: Globe },
+  { id: 'workbench', label: 'Workbench', icon: Table2 },
+  { id: 'research', label: 'Research', icon: Search },
+  { id: 'workspace', label: 'Workspace', icon: TerminalSquare },
 ];
 
-export function RightPanelTabs({ activeTab, onTabChange, className, variant = 'realtor' }: RightPanelTabsProps) {
+/** Pure visibility policy, exported so the feature-off contract stays tested. */
+export function visibleRightPanelTabs(
+  variant: RightPanelVariant,
+  workbenchEnabled: boolean,
+  researchEnabled = false,
+  workspaceRunsEnabled = false,
+): ReadonlyArray<{ id: RightPanelTab; label: string; icon: typeof Users }> {
+  return TABS.filter(
+    (tab) =>
+      isTabAvailable(variant, tab.id) &&
+      (tab.id !== 'workbench' || workbenchEnabled) &&
+      (tab.id !== 'research' || researchEnabled) &&
+      (tab.id !== 'workspace' || workspaceRunsEnabled),
+  );
+}
+
+export function RightPanelTabs({
+  activeTab,
+  onTabChange,
+  className,
+  variant = 'realtor',
+  workbenchEnabled = false,
+  researchEnabled = false,
+  workspaceRunsEnabled = false,
+}: RightPanelTabsProps) {
   // Broker has no Documents surface — drop tabs the variant omits so they
   // can't be selected (single source of truth in right-panel-embeds).
-  const tabs = TABS.filter((t) => isTabAvailable(variant, t.id));
+  const tabs = visibleRightPanelTabs(variant, workbenchEnabled, researchEnabled, workspaceRunsEnabled);
   const activeBtnRef = useRef<HTMLButtonElement>(null);
 
   // Keep the active tab in view whenever it changes — e.g. a parent-driven

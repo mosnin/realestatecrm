@@ -25,27 +25,37 @@ WRANGLER="npx wrangler"
 
 # ── 1. Auth ────────────────────────────────────────────────────────────────
 cyan "1/6  Checking Cloudflare login…"
+WHOAMI_OUT="$($WRANGLER whoami 2>&1 || true)"
 if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
   green "Using CLOUDFLARE_API_TOKEN from the environment."
-elif $WRANGLER whoami >/dev/null 2>&1; then
-  green "Already logged in."
-else
-  warn "Not logged in — opening the browser to authorize."
+elif printf '%s' "$WHOAMI_OUT" | grep -qi 'not authenticated'; then
+  warn "Not logged in — opening the browser to authorize. Click Allow."
   $WRANGLER login || die "Login failed. Alternatively set CLOUDFLARE_API_TOKEN and re-run."
+  $WRANGLER whoami 2>&1 | grep -qi 'not authenticated' && die "Still not authenticated after login."
   green "Logged in."
+else
+  green "Already logged in:"
+  printf '%s\n' "$WHOAMI_OUT" | grep -iE 'email|account' | head -2 || true
 fi
 
 # ── 2. Queues ──────────────────────────────────────────────────────────────
-# `queues create` errors if the queue exists; that is a success for our
-# purposes, so we tolerate it rather than aborting a re-run.
 cyan "2/6  Creating queues…"
+QUEUE_LIST="$($WRANGLER queues list 2>&1 || true)"
 for q in chippi-jobs chippi-dlq; do
-  if $WRANGLER queues create "$q" >/dev/null 2>&1; then
+  if printf '%s' "$QUEUE_LIST" | grep -q "$q"; then
+    green "Queue $q already exists."
+  elif CREATE_OUT="$($WRANGLER queues create "$q" 2>&1)"; then
     green "Created queue $q"
   else
-    warn "Queue $q already exists (or Queues is unavailable — check you are on the Workers Paid plan)."
+    printf '%s\n' "$CREATE_OUT" | tail -5
+    die "Could not create queue $q. Check the Workers plan and Queues Edit permission."
   fi
 done
+QUEUE_LIST="$($WRANGLER queues list 2>&1 || true)"
+for q in chippi-jobs chippi-dlq; do
+  printf '%s' "$QUEUE_LIST" | grep -q "$q" || die "Queue $q is not visible after creation."
+done
+green "Both queues verified."
 
 # ── 3. KV namespace for missed-tick recovery ───────────────────────────────
 # Optional but recommended: without it a SKIPPED scheduled trigger is not
@@ -85,8 +95,11 @@ green "CRON_SECRET set."
 if [ -n "${WORKER_SECRET_VALUE:-}" ]; then
   WORKER_VAL="$WORKER_SECRET_VALUE"
 else
-  WORKER_VAL="$(openssl rand -hex 32)"
+  echo "  WORKER_SECRET must be the SAME value as the sensitive Vercel variable."
+  echo "  If rotating it, update both systems before sending production traffic."
+  read -r -s -p "  Paste WORKER_SECRET: " WORKER_VAL; echo
 fi
+[ -n "$WORKER_VAL" ] || die "WORKER_SECRET cannot be empty."
 printf '%s' "$WORKER_VAL" | $WRANGLER secret put WORKER_SECRET >/dev/null
 green "WORKER_SECRET set."
 
@@ -119,13 +132,13 @@ echo "  Vercel → your project → Settings → Environment Variables"
 echo "  Add BOTH, scoped to Production:"
 echo
 echo "    WORKER_URL      = ${WORKER_URL:-<the URL printed above>}"
-echo "    WORKER_SECRET   = $WORKER_VAL"
+echo "    WORKER_SECRET   = <the same sensitive value supplied above>"
 echo
 echo "  Then REDEPLOY Vercel (env vars only apply to new deployments)."
-echo "  Then merge branch claude/dynamic-localized-pages-ubybuh."
+echo "  Never print WORKER_SECRET in shared terminals or CI logs."
 echo
 cyan "Watch it run:   npx wrangler tail"
-cyan "Expect within 5 min:   'master tick … enqueued N/23 jobs'"
+cyan "Expect within 5 min:   'master tick … enqueued N/24 jobs'"
 echo
 warn "NEVER set INNGEST_CRONS_ENABLED while this worker is live — both would"
-warn "run the same 23 jobs and every reminder would send twice."
+warn "run the same 24 jobs and every reminder would send twice."

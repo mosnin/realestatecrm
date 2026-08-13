@@ -149,4 +149,25 @@ describe('direct path — empty provider reply', () => {
     expect(frames.at(-1)).toMatchObject({ type: 'turn_complete', reason: 'aborted' });
     expect(saveMock).not.toHaveBeenCalled();
   });
+
+  it('does not acknowledge completion when the assistant transcript could not be persisted', async () => {
+    const onSettled = vi.fn().mockResolvedValue(undefined);
+    runStreamMock.mockResolvedValue({
+      text: 'The analysis is ready.',
+      reasoningText: '',
+      provider: 'openrouter',
+      usage: noUsage(),
+      fallbackNote: '',
+    });
+    saveMock.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const frames = await drain(streamDirectTurn(input({ onSettled })));
+
+    expect(frames.some((frame) => frame.type === 'turn_complete')).toBe(false);
+    expect(frames.at(-1)).toMatchObject({ type: 'error', code: 'persistence' });
+    expect(onSettled).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'failed',
+      reason: 'persistence',
+    }));
+  });
 });

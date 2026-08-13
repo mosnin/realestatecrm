@@ -54,17 +54,20 @@ interface BrokerDirectInput {
   runtimeSpaceId: string | null;
   userId: string | null;
   conversationId: string;
+  /** Exact identity for this request. Stop must never be scoped only to the
+   * conversation because a late flag could otherwise cancel its next turn. */
+  turnId: string;
   userMessage: string;
   history: DirectHistoryRow[];
   model?: string;
   abortController: AbortController;
   /**
-   * Set by the route when the caller explicitly asked for Agent mode but the
+   * Set by the route when the caller explicitly asked for Work mode but the
    * turn had to downgrade to this direct snapshot path anyway (Modal
    * unreachable/unconfigured or no runtime Space to anchor the agent run).
    * When true, emits an honest `status` note before answering so the degrade
    * is visible (thinking-indicator line) instead of silently answering as if
-   * Agent mode had run. Absent/false for the ordinary heuristic-router direct
+   * Work mode had run. Absent/false for the ordinary heuristic-router direct
    * path — no behavior change there.
    */
   degradedFromAgentMode?: boolean;
@@ -133,16 +136,16 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
 
       push({ type: 'route_picked', route: 'direct' });
 
-      // Honest degrade note — Agent mode was requested but Modal wasn't
+      // Honest degrade note — Work mode was requested but Modal wasn't
       // reachable, so this turn is answering from the snapshot instead. The
       // shared thinking-indicator hook (`use-agent-task.ts`) already renders
       // `status` events as the action line; no client change needed to see
-      // this. Never claim Agent mode ran when it didn't (product
+      // this. Never claim Work mode ran when it didn't (product
       // non-negotiable: no fabricated/silently-degraded UI).
       if (input.degradedFromAgentMode) {
         push({
           type: 'status',
-          label: "Agent mode isn't available right now — answering from the live brokerage snapshot instead.",
+          label: "Work mode isn't available right now — answering from the live brokerage snapshot instead.",
         });
       }
 
@@ -151,7 +154,7 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
       // the shared signal); disconnect is handled separately by cancel(). The
       // realtor direct path polls per-delta; this path's completion is one
       // blocking call, so we drive the poll from an interval instead.
-      const shouldStop = createStopPoller(input.conversationId);
+      const shouldStop = createStopPoller(input.turnId);
       let stopped = false;
       const stopInterval = setInterval(() => {
         void shouldStop().then((s) => {
@@ -238,6 +241,7 @@ export function streamBrokerDirectTurn(input: BrokerDirectInput): Response {
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'X-Chippi-Turn-Id': input.turnId,
     },
   });
 }

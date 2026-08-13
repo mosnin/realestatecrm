@@ -21,12 +21,10 @@ import type { Conversation } from '@/lib/types';
 // sidebar's contextual section when on `/chippi`. Owns its own data fetch and
 // list mutations so it can be dropped into any sidebar slot.
 //
-// The component renders the CHAT HISTORY section label by default so it self-
-// frames as the secondary "history" region underneath the primary nav. Parents
-// that already render their own framing (e.g. an AnimatePresence wrapper) can
-// pass `hideLabel`. The inline list is bounded by `limit` (default 6); past
-// that, a "See all →" link deep-links into the existing in-chat history drawer
-// via the workspace's `?view=history` query param.
+// The component renders the CHAT HISTORY section label by default. Parents
+// that already render their own framing can pass `hideLabel`. Client state and
+// rendered rows are bounded by `limit` (default 50) so the primary navigation
+// surface never accumulates an unbounded in-memory list.
 //
 // The list deliberately collapses to nothing in collapsed (icon-rail) mode —
 // the rail is too narrow to read titles, and we already have the chat icon in
@@ -40,9 +38,7 @@ interface SidebarConversationsProps {
   /** Fired when a conversation row or "New" is activated — useful for closing
    *  a parent mobile sheet on navigation. */
   onSelect?: () => void;
-  /** Cap the inline list — anything beyond is reached via "See all →".
-   *  Default 6 keeps the section bounded so primary nav doesn't get pushed
-   *  off-screen. */
+  /** Cap client state and rendered rows. Default 50 matches the chat page. */
   limit?: number;
   /** Hide the small-caps "CHAT HISTORY" section label. Used when a parent
    *  surface (e.g. the desktop sidebar's chippi section) renders its own
@@ -70,7 +66,7 @@ export function SidebarConversations({
   slug,
   collapsed = false,
   onSelect,
-  limit = 6,
+  limit = 50,
   hideLabel = false,
 }: SidebarConversationsProps) {
   const router = useRouter();
@@ -84,17 +80,20 @@ export function SidebarConversations({
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch(`/api/ai/conversations?slug=${encodeURIComponent(slug)}`);
+      const boundedLimit = Math.max(1, Math.min(limit, 50));
+      const res = await fetch(
+        `/api/ai/conversations?slug=${encodeURIComponent(slug)}&limit=${boundedLimit}`,
+      );
       if (!res.ok) {
         setConversations([]);
         return;
       }
       const data = (await res.json()) as Conversation[];
-      setConversations(data);
+      setConversations(Array.isArray(data) ? data.slice(0, boundedLimit) : []);
     } catch {
       setConversations([]);
     }
-  }, [slug]);
+  }, [limit, slug]);
 
   // Refetch on mount and whenever the user navigates back into /chippi so the
   // list reflects any conversations created from inside the workspace.
@@ -110,17 +109,22 @@ export function SidebarConversations({
     });
     if (!res.ok) return;
     const conv = (await res.json()) as Conversation;
-    setConversations((prev) => (prev ? [conv, ...prev] : [conv]));
-    router.push(`/s/${slug}/chippi?conversationId=${conv.id}`);
+    const boundedLimit = Math.max(1, Math.min(limit, 50));
+    setConversations((prev) => (prev ? [conv, ...prev].slice(0, boundedLimit) : [conv]));
+    router.push(
+      `/s/${encodeURIComponent(slug)}/chippi?conversationId=${encodeURIComponent(conv.id)}`,
+    );
     onSelect?.();
-  }, [router, slug, onSelect]);
+  }, [limit, router, slug, onSelect]);
 
   const handleDelete = useCallback(
     async (id: string) => {
-      const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
       if (!res.ok) return;
       setConversations((prev) => (prev ? prev.filter((c) => c.id !== id) : prev));
-      if (activeId === id) router.push(`/s/${slug}/chippi`);
+      if (activeId === id) router.push(`/s/${encodeURIComponent(slug)}/chippi`);
     },
     [activeId, router, slug],
   );
@@ -135,7 +139,7 @@ export function SidebarConversations({
       const title = renameValue.trim();
       setRenamingId(null);
       if (!title) return;
-      const res = await fetch(`/api/ai/conversations/${id}`, {
+      const res = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
@@ -150,13 +154,6 @@ export function SidebarConversations({
   );
 
   if (collapsed) return null;
-
-  // Bound the inline list. Past `limit`, the "See all →" link below deep-links
-  // into the full conversation-history drawer the chat workspace already owns.
-  const visibleConversations =
-    conversations && limit > 0 ? conversations.slice(0, limit) : conversations;
-  const hasMore =
-    conversations !== null && limit > 0 && conversations.length > limit;
 
   return (
     <div className="space-y-1">
@@ -197,7 +194,7 @@ export function SidebarConversations({
             animate="enter"
             className="space-y-px"
           >
-            {visibleConversations!.map((conv) => {
+            {conversations.map((conv) => {
               const isActive = activeId === conv.id;
               const isRenaming = renamingId === conv.id;
               return (
@@ -239,7 +236,7 @@ export function SidebarConversations({
                       )}
                     >
                       <Link
-                        href={`/s/${slug}/chippi?conversationId=${conv.id}`}
+                        href={`/s/${encodeURIComponent(slug)}/chippi?conversationId=${encodeURIComponent(conv.id)}`}
                         onClick={() => onSelect?.()}
                         className="flex-1 min-w-0 pl-2.5 pr-1 py-1.5"
                       >
@@ -300,19 +297,6 @@ export function SidebarConversations({
               );
             })}
           </motion.ul>
-        )}
-
-        {hasMore && (
-          <Link
-            href={`/s/${slug}/chippi?view=history`}
-            onClick={() => onSelect?.()}
-            className="mt-1 flex items-center justify-between gap-1 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
-          >
-            <span>See all</span>
-            <span aria-hidden className="text-muted-foreground/60">
-              →
-            </span>
-          </Link>
         )}
       </div>
     </div>

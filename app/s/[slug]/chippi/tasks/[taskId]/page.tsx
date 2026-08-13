@@ -133,7 +133,7 @@ function humanizeStepName(name: string | null | undefined): string {
  *    "Completed 4 minutes ago."
  *    "Running — 3 of 7 steps."
  *    "Queued — waiting to start."
- *    "Paused — waiting on your approval." */
+ *    "Paused — required information or access is missing." */
 function statusSentence(task: AgentTask, steps: ExecutionStep[]): string {
   const completedSteps = steps.filter((s) => s.status === 'completed').length;
   const totalSteps = steps.length;
@@ -156,7 +156,7 @@ function statusSentence(task: AgentTask, steps: ExecutionStep[]): string {
         ? `Running — ${completedSteps} of ${totalSteps} steps.`
         : 'Running.';
     case 'paused':
-      return 'Paused — waiting on your approval.';
+      return 'Paused — required information or access is missing. No action was executed.';
     case 'queued':
     default:
       return 'Queued — waiting to start.';

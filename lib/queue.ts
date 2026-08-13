@@ -29,6 +29,18 @@ function workerConfig(): { url: string; secret: string } | null {
   return { url, secret };
 }
 
+/**
+ * Whether this deployment selected Cloudflare Queues as its task rail.
+ *
+ * Callers use this before enqueueing so a network timeout cannot fall through
+ * to Inngest or an inline executor after Cloudflare may already have accepted
+ * the same job. Configuration selects exactly one rail; delivery failures are
+ * surfaced to the caller and retried by that rail.
+ */
+export function workerQueueConfigured(): boolean {
+  return Boolean(process.env.WORKER_URL?.trim() && process.env.WORKER_SECRET?.trim());
+}
+
 export interface EnqueueOptions {
   /** Delay before the worker picks the job up, in seconds (max 12h on CF Queues). */
   delaySeconds?: number;

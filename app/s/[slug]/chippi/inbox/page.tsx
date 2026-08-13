@@ -1,17 +1,10 @@
 /**
- * /chippi/inbox — the merged Drafts + Approvals surface.
+ * /chippi/inbox — explicit message drafts the user asked Chippi to compose.
  *
- * Drafts and Approvals share one intent: "Chippi paused, waiting on
- * your tap." Drafts = a message awaiting send-off. Approvals = a task
- * awaiting yes/no. Two mechanisms, one realtor action: decide. One
- * surface for "things needing my call" instead of two.
- *
- * No tab strip, no filter chrome — the action verbs distinguish the
- * sections (Send / Edit / Hold for drafts vs. Approve / Reject for
- * approvals).
- *
- * /chippi/drafts and /chippi/approvals both redirect here so bookmarks
- * stay live.
+ * Work actions execute from the conversation and never enter this page for
+ * human approval. The surface remains for the distinct, explicit request
+ * "draft this for me". Legacy bookmarks still redirect here, but paused
+ * AgentTask approvals are intentionally not shown.
  */
 
 import { notFound, redirect } from 'next/navigation';
@@ -22,44 +15,8 @@ import { cn } from '@/lib/utils';
 import { BODY_MUTED } from '@/lib/typography';
 import { AgentDraftInbox } from '@/components/agent/agent-draft-inbox';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
-import { ApprovalActions } from '../approvals/approval-actions';
 
 export const dynamic = 'force-dynamic';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ApprovalTask {
-  id: string;
-  spaceId: string;
-  title: string;
-  goalDescription: string | null;
-  status: string;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function pendingActionLabel(metadata: Record<string, unknown> | null): string {
-  if (!metadata) return 'Waiting on your call.';
-  const action = metadata['pendingAction'];
-  if (typeof action === 'string' && action.trim().length > 0) return action.trim();
-  return 'Waiting on your call.';
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -91,75 +48,23 @@ export default async function ChippiInboxPage({
     .eq('spaceId', space.id)
     .eq('status', 'pending');
 
-  const { data: tasks } = await supabase
-    .from('AgentTask')
-    .select('*')
-    .eq('spaceId', space.id)
-    .eq('status', 'paused')
-    .not('metadata->approvalRequired', 'is', null)
-    .order('createdAt', { ascending: false })
-    .limit(50);
-
-  const approvalList = (tasks ?? []) as ApprovalTask[];
   const draftCount = pendingDraftCount ?? 0;
   const hasDrafts = draftCount > 0;
-  const hasApprovals = approvalList.length > 0;
-  const pendingCount = draftCount + approvalList.length;
 
   return (
     <ChippiPageShell
       greeting="Inbox."
-      title={pendingCount === 0 ? 'Nothing waiting.' : 'Need your call.'}
+      title={draftCount === 0 ? 'No drafts.' : `${draftCount} ${draftCount === 1 ? 'draft' : 'drafts'} ready.`}
     >
-      {!hasDrafts && !hasApprovals ? (
+      {!hasDrafts ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-base text-foreground">You&apos;re all caught up.</p>
           <p className={cn(BODY_MUTED, 'mt-1.5 max-w-xs')}>
-            When Chippi has a draft to send or a decision for you, it&apos;ll land here.
+            Drafts you explicitly ask Chippi to prepare will appear here.
           </p>
         </div>
       ) : (
-        <>
-          {hasDrafts && <AgentDraftInbox slug={slug} />}
-
-          {hasDrafts && hasApprovals && (
-            <div className="border-t border-border/60" />
-          )}
-
-          {hasApprovals && (
-            <ul className="divide-y divide-border/60">
-              {approvalList.map((task) => {
-                const goal = task.goalDescription ?? task.title;
-                const truncated = goal.length > 100 ? goal.slice(0, 100) + '…' : goal;
-                const actionLabel = pendingActionLabel(task.metadata);
-                const waitingTime = relativeTime(task.updatedAt ?? task.createdAt);
-
-                return (
-                  <li key={task.id} className="py-3 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="pt-0.5 flex-shrink-0">
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                            'bg-foreground/[0.06] text-foreground/70',
-                          )}
-                        >
-                          Waiting · {waitingTime}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <p className="text-sm text-foreground leading-snug">{truncated}</p>
-                        <p className="text-xs text-muted-foreground">{actionLabel}</p>
-                      </div>
-                    </div>
-
-                    <ApprovalActions taskId={task.id} slug={slug} />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </>
+        <AgentDraftInbox slug={slug} />
       )}
     </ChippiPageShell>
   );

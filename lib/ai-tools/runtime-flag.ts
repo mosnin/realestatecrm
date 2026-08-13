@@ -1,7 +1,7 @@
 /**
  * Runtime flag that selects which chat backend handles a request.
  *
- * `'ts'` — **default**. The in-process TypeScript runtime on `@openai/agents`
+ * `'ts'` — **default and Fast mode**. The in-process TypeScript runtime on `@openai/agents`
  * running against the app-wide LLM client (OpenRouter-first, OpenAI fallback)
  * via chat completions, with the realtor's workspace model, the full tool set,
  * approval gates, and the `delegate_task` orchestrator. No Modal cold start —
