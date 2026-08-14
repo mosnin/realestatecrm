@@ -4,7 +4,8 @@ import { BrandPanel } from './brand-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/motion';
-import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
+import { RealtorPanel } from '../../_components/realtor-page';
+import { SupportingOrientation, SupportingPage, SupportingWorkArea } from '../../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,19 +19,21 @@ export default async function StudioBrandPage({
   if (!space) notFound();
 
   return (
-    <RealtorPage width="reading" className={cn(PAGE_RHYTHM)}>
-      <Reveal variant="fade" as="header" className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Brand
-        </h1>
-        <p className={BODY_MUTED}>
-          Logo, colors, fonts — applied to every generation.
-        </p>
-      </Reveal>
-      <RealtorPanel>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Brand system"
+        title="Make every campaign recognizably yours"
+        summary="Set the reusable identity Studio applies to future generated work."
+        nextAction="Start with your logo and primary type choice; only add color once those feel unmistakably yours."
+        layout="rail"
+      />
+      <SupportingWorkArea className="grid gap-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(16rem,0.28fr)]">
+      <RealtorPanel className="p-7 sm:p-10">
         <BrandPanel />
       </RealtorPanel>
-    </RealtorPage>
+      <aside className="border-l chippi-dashboard-divider pl-6 text-sm leading-6 text-muted-foreground">These choices become the default starting point for Create, Compose, and Edit. You can still adjust an individual campaign later.</aside>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

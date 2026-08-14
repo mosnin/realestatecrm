@@ -4,7 +4,8 @@ import { SchedulePanel } from './schedule-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/motion';
-import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
+import { RealtorPanel } from '../../_components/realtor-page';
+import { SupportingActionLink, SupportingOrientation, SupportingPage, SupportingWorkArea } from '../../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,22 +22,23 @@ export default async function StudioSchedulePage({
   if (!space) notFound();
 
   return (
-    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
-      <Reveal variant="fade" as="header" className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Schedule
-        </h1>
-        <p className={BODY_MUTED}>
-          Queue a post to the social accounts you have connected.
-        </p>
-      </Reveal>
-      <RealtorPanel>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Schedule"
+        title="Put the campaign on the calendar"
+        summary="Choose a saved asset, select a connected channel, and decide exactly when the post should go live."
+        nextAction={fileId ? 'Confirm the selected asset, destination, and publish time.' : 'Pick the campaign asset you want to ship next.'}
+        action={<SupportingActionLink href={`/s/${slug}/studio/library`} quiet>Browse library</SupportingActionLink>}
+      />
+      <SupportingWorkArea className="mx-auto max-w-5xl">
+      <RealtorPanel className="p-7 sm:p-10">
         <SchedulePanel
           slug={slug}
           initialFileId={typeof fileId === 'string' ? fileId : null}
         />
       </RealtorPanel>
-    </RealtorPage>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

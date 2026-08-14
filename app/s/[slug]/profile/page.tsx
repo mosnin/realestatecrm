@@ -16,6 +16,14 @@ import { CopyLinkButton } from '../copy-link-button';
 import { H1 } from '@/lib/typography';
 import { StaggerReveal, SplitReveal } from '@/components/motion';
 import { cn } from '@/lib/utils';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export default function ProfilePage() {
   const params = useParams<{ slug: string }>();
@@ -79,20 +87,27 @@ export default function ProfilePage() {
   const applicationUrl = slug ? buildIntakeUrl(slug) : '';
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Profile.</p>
-        <SplitReveal
-          as="h1"
-          text="Your account"
-          className={cn(H1, '[font-family:var(--font-title)]')}
-        />
-        <p className="text-sm text-muted-foreground">Name, intake link, and public-facing details.</p>
-      </header>
+    <SupportingPage family="control" width="wide">
+      <SupportingOrientation
+        family="control"
+        eyebrow="Account / Identity"
+        title={<SplitReveal as="span" text="The person clients see behind Chippi" />}
+        summary={`${user.fullName ?? user.emailAddresses[0]?.emailAddress ?? 'Your account'} is the active workspace identity.`}
+        nextAction="Confirm your name and public intake destination, then leave account security to your login provider."
+        action={<SupportingActionLink href={applicationUrl}>Open public intake</SupportingActionLink>}
+        layout="rail"
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Identity" value={user.fullName ?? 'Not set'} detail="public name" />
+        <SupportingMetric label="Workspace" value={slug ?? '—'} detail="active slug" accent />
+        <SupportingMetric label="Email" value={user.emailAddresses[0]?.emailAddress ?? 'Not set'} detail="account address" />
+        <SupportingMetric label="Intake route" value={slug ? 'Configured' : 'Not set'} detail="derived from workspace slug" />
+      </SupportingMetricBand>
 
-      <StaggerReveal className="space-y-5">
+      <SupportingWorkArea>
+      <StaggerReveal className="grid gap-6 lg:grid-cols-[minmax(0,0.62fr)_minmax(18rem,0.38fr)] lg:items-start">
       {/* Intake link card */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] lg:col-start-2 lg:row-span-2">
         <div className="px-6 py-4 border-b border-border bg-muted/40 flex items-center gap-2">
           <Link2 size={14} className="text-primary" />
           <p className="font-semibold text-sm">Public application link</p>
@@ -120,7 +135,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Account info */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] lg:col-start-1 lg:row-start-1">
         <div className="px-6 py-4 border-b border-border bg-muted/40">
           <p className="font-semibold text-sm">Your account</p>
         </div>
@@ -177,7 +192,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Account management */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] lg:col-start-1">
         <div className="px-6 py-4 border-b border-border bg-muted/40">
           <p className="font-semibold text-sm">Account management</p>
         </div>
@@ -189,6 +204,7 @@ export default function ProfilePage() {
         </div>
       </div>
       </StaggerReveal>
-    </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

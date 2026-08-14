@@ -17,6 +17,11 @@ import {
   QUIET_LINK,
   SECTION_LABEL,
 } from '@/lib/typography';
+import {
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../../_components/supporting-page';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
@@ -249,22 +254,19 @@ export default function IntakeCustomizePage() {
     // where everything fits. On smaller screens the preview drops below
     // the builder; the "Open in new tab" link at the top of the preview
     // is the escape hatch when the realtor wants a dedicated window.
-    <div data-realtor-page="today" className="chippi-dashboard-canvas grid min-h-[calc(100vh-10rem)] grid-cols-1 gap-6 max-w-[1600px] pb-12 pt-3 sm:pt-5 2xl:grid-cols-[minmax(0,1fr)_480px]">
-      {/* Left column — scrolls with the page */}
-      <div className="min-w-0 space-y-6">
-        {/* Header — H1 + Chippi narration */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-          <div className="space-y-1.5">
-            <h1 className={H1} style={TITLE_FONT}>
-              Customize
-            </h1>
-            <p className={BODY_MUTED}>{subtitle}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+    <SupportingPage family="intake" width="full">
+      <SupportingOrientation
+        family="intake"
+        eyebrow={`Intake / ${activeLeadType === 'rental' ? 'Rental' : 'Buyer'} form`}
+        title="Shape the qualification conversation"
+        summary={subtitle}
+        nextAction={hasChanges ? 'Review the live preview, then save the changes before leaving.' : 'Inspect the first question a new lead sees and remove anything that does not improve qualification.'}
+        action={
+          <>
             <button
               type="button"
               onClick={handleReset}
-              className={cn(QUIET_LINK, 'px-2 h-9 inline-flex items-center')}
+              className={cn(QUIET_LINK, 'px-3 h-10 inline-flex items-center')}
             >
               Reset to default
             </button>
@@ -272,17 +274,17 @@ export default function IntakeCustomizePage() {
               type="button"
               onClick={handleSave}
               disabled={saving || !hasChanges}
-              className={cn(
-                PRIMARY_PILL,
-                'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
-              )}
+              className={cn(PRIMARY_PILL, 'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100')}
             >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
-          </div>
-        </div>
-
+          </>
+        }
+      />
+    <SupportingWorkArea className="grid grid-cols-1 gap-8 2xl:grid-cols-[minmax(0,1fr)_480px]">
+      {/* Left column — scrolls with the page */}
+      <div className="min-w-0 space-y-6">
         {/*
           Tab group — primary (form picker) and secondary (sub-tabs) rows sit
           flush against each other so they read as one stacked control.
@@ -372,6 +374,7 @@ export default function IntakeCustomizePage() {
           />
         </div>
       </aside>
-    </div>
+    </SupportingWorkArea>
+    </SupportingPage>
   );
 }

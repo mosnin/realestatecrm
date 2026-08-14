@@ -5,8 +5,8 @@
  *
  * A routine is a sentence and a time. This screen reads and writes them
  * through /api/routines; the hourly cron at /api/cron/routines is what
- * actually fires the autonomous run. Every run drafts — nothing is sent
- * without the realtor's approval.
+ * actually fires the autonomous run. Execution follows the permission mode
+ * selected by the realtor; approval remains available when review mode is on.
  *
  * Times are stored as a UTC hour. The composer and the schedule labels
  * render that hour in the realtor's own browser timezone, so the cron

@@ -116,15 +116,15 @@ function SectionBlock({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="px-6 py-4 border-b border-border bg-muted/20">
+    <section className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem]">
+      <div className="px-6 pt-6 sm:px-8 sm:pt-8">
         <p className="font-semibold text-sm">{title}</p>
         {description && (
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         )}
       </div>
-      <div className="px-6 py-5">{children}</div>
-    </div>
+      <div className="px-6 pb-6 pt-5 sm:px-8 sm:pb-8">{children}</div>
+    </section>
   );
 }
 
@@ -264,7 +264,7 @@ export function BillingPage({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 min-w-0">
 
       {/* ── Past-due warning banner ── */}
       {subscriptionStatus === 'past_due' && (

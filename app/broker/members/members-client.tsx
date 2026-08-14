@@ -9,7 +9,7 @@ import { BODY_MUTED } from '@/lib/typography';
 import { RemoveMemberButton } from '@/components/broker/remove-member-button';
 import { ChangeRoleButton } from '@/components/broker/change-role-button';
 import { OffboardMemberDialog } from '@/components/broker/offboard-member-dialog';
-import { SplitReveal, StaggerReveal } from '@/components/motion';
+import { StaggerReveal } from '@/components/motion';
 
 interface Member {
   id: string;
@@ -67,16 +67,12 @@ export function MembersClient({
   })();
 
   return (
-    <div className="space-y-6 max-w-3xl pb-56 md:pb-24">
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Members.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          <SplitReveal as="span" text="Who’s on the team" />
-        </h1>
-        <p className={BODY_MUTED}>{subtitle}</p>
+    <div className="space-y-6 pb-56 md:pb-24">
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border/60 pb-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Directory</p>
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        </div>
       </header>
 
       {members.length === 0 ? (

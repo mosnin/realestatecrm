@@ -7,14 +7,17 @@ import { InviteCodeCard } from '@/components/broker/invite-code-card';
 import { RevokeInviteButton } from '@/components/broker/revoke-invite-button';
 import { BulkInviteForm } from '@/components/broker/bulk-invite-form';
 import { getSeatUsage } from '@/lib/brokerage-seats';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { timeAgo } from '@/lib/formatting';
 import { effectiveInvitationStatus } from '@/lib/invitation-status';
 import type { InvitationStatus } from '@/lib/types';
 import type { Metadata } from 'next';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Invitations — Broker Dashboard' };
 
@@ -91,30 +94,39 @@ export default async function BrokerInvitationsPage() {
   })();
 
   return (
-    <div className={`${BROKER_PAGE_READING} max-w-3xl`} data-broker-premium-page="invitations">
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Invitations.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-6xl')} data-broker-premium-page="invitations" data-broker-family="team-onboarding">
+      <header className="border-b chippi-dashboard-divider pb-8" data-route-orientation="onboarding">
+        <p className={BROKER_ORIENTATION}>Team onboarding</p>
+        <h1 className="mt-3 text-4xl tracking-[-0.04em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Bring the team in" />
         </h1>
-        <p className={cn(BODY_MUTED)}>{subtitle}</p>
+        <p className={cn(BODY_MUTED, 'mt-3 max-w-2xl text-base')}>{subtitle}</p>
       </header>
 
-      <InviteCodeCard isOwner={ctx.membership.role === 'broker_owner'} />
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]" data-primary-work-geometry="onboarding-studio">
+        <aside className="space-y-5 lg:sticky lg:top-4">
+          <div className="rounded-[1.75rem] bg-foreground p-6 text-background sm:p-7">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-background/60">Quick join</p>
+            <p className="mt-3 text-2xl tracking-tight" style={TITLE_FONT}>Share one code with the room.</p>
+            <p className="mt-2 text-sm text-background/65">For live onboarding, the team can join without waiting for individual email delivery.</p>
+          </div>
+          <InviteCodeCard isOwner={ctx.membership.role === 'broker_owner'} />
+        </aside>
 
-      <Card>
-        <CardContent className="px-5 py-4 space-y-3">
-          <p className="text-sm font-medium">Send an email invite</p>
-          <InviteForm
-            isOwner={ctx.membership.role === 'broker_owner'}
-            seatUsage={seatUsage}
-          />
-        </CardContent>
-      </Card>
+        <div className="space-y-7">
+          <Card>
+            <CardContent className="px-5 py-5 space-y-3">
+              <p className="text-sm font-medium">Send an email invite</p>
+              <InviteForm
+                isOwner={ctx.membership.role === 'broker_owner'}
+                seatUsage={seatUsage}
+              />
+            </CardContent>
+          </Card>
 
-      <BulkInviteForm seatUsage={seatUsage} />
+          <BulkInviteForm seatUsage={seatUsage} />
 
-      <section className="space-y-3">
+          <section className="space-y-3">
         <p className={cn(SECTION_LABEL)}>Sent</p>
         {invs.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
@@ -184,7 +196,9 @@ export default async function BrokerInvitationsPage() {
             })}
           </ul>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

@@ -35,6 +35,14 @@ import {
   CAPTION,
   META,
 } from '@/lib/typography';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -94,6 +102,8 @@ export function SupportView({ slug }: { slug: string }) {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const openCount = tickets.filter((ticket) => ticket.status === 'open' || ticket.status === 'in_progress').length;
+  const resolvedCount = tickets.filter((ticket) => ticket.status === 'resolved' || ticket.status === 'closed').length;
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -153,17 +163,24 @@ export function SupportView({ slug }: { slug: string }) {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 pb-12 space-y-12">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Support.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          Get help.
-        </h1>
-        <p className={cn(BODY_MUTED)}>
-          Tell us what&apos;s going on. We reply by email, usually within a day.
-        </p>
-      </header>
+    <SupportingPage family="service" width="wide">
+      <SupportingOrientation
+        family="service"
+        eyebrow="Support / Service desk"
+        title="Tell us what is blocking the work"
+        summary="Describe the outcome you expected and what happened instead. Replies go to your account email."
+        nextAction={openCount > 0 ? 'Check the status of your open request before sending a duplicate.' : 'Include the affected page, the action you took, and what you expected to happen.'}
+        action={<SupportingActionLink href="#support-request">Start a request</SupportingActionLink>}
+        layout="rail"
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Open" value={openCount} detail="awaiting resolution" accent />
+        <SupportingMetric label="Resolved" value={resolvedCount} detail="past requests" />
+        <SupportingMetric label="Reply channel" value="Email" detail="sent to your account" />
+        <SupportingMetric label="All requests" value={tickets.length} detail="in this workspace" />
+      </SupportingMetricBand>
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.58fr)_minmax(19rem,0.42fr)] lg:items-start">
+      <div id="support-request" className="scroll-mt-24">
 
       {/* ── Form ───────────────────────────────────────────────────────── */}
       {submitted ? (
@@ -180,7 +197,7 @@ export function SupportView({ slug }: { slug: string }) {
           </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-4">
+        <div className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 space-y-4 sm:px-8 sm:py-8">
           <div className="space-y-1.5">
             <label htmlFor="support-category" className="text-sm font-medium text-foreground">
               What&apos;s this about?
@@ -236,9 +253,10 @@ export function SupportView({ slug }: { slug: string }) {
           </div>
         </div>
       )}
+      </div>
 
       {/* ── Past tickets ───────────────────────────────────────────────── */}
-      <section className="space-y-3">
+      <section className="space-y-3 lg:sticky lg:top-8">
         <p className={cn(SECTION_LABEL)}>Your requests</p>
 
         {loadingTickets ? (
@@ -278,6 +296,7 @@ export function SupportView({ slug }: { slug: string }) {
           </StaggerList>
         )}
       </section>
-    </main>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

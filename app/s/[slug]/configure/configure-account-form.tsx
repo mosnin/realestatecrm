@@ -45,10 +45,11 @@ interface ConfigureAccountFormProps {
     intakeCustomQuestions: { id: string; label: string; placeholder?: string; required?: boolean }[];
   };
   slug: string;
+  showHeader?: boolean;
 }
 
 function SectionHeader({
-  icon: Icon,
+  icon: _Icon,
   title,
   description,
 }: {
@@ -57,19 +58,16 @@ function SectionHeader({
   description: string;
 }) {
   return (
-    <div className="flex items-start gap-3 pb-4 border-b border-border mb-5">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <Icon size={15} className="text-primary" />
-      </div>
+    <div className="pb-5 border-b border-border/60 mb-6">
       <div>
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        <p className="text-base font-medium tracking-[-0.01em]">{title}</p>
+        <p className="text-sm leading-6 text-muted-foreground mt-1">{description}</p>
       </div>
     </div>
   );
 }
 
-export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountFormProps) {
+export function ConfigureAccountForm({ initialData, slug, showHeader = true }: ConfigureAccountFormProps) {
   const [name, setName] = useState(initialData.name);
   const [phone, setPhone] = useState(initialData.phone);
   const [businessName, setBusinessName] = useState(initialData.businessName);
@@ -265,7 +263,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
 
   return (
     <div>
-      <header className="space-y-1.5 mb-6">
+      {showHeader && <header className="space-y-1.5 mb-6">
         <p className="text-sm text-muted-foreground">Configure.</p>
         <h1 className={H1} style={TITLE_FONT}>
           Your workspace
@@ -273,7 +271,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         <p className="text-sm text-muted-foreground">
           Profile, intake link, and notification preferences.
         </p>
-      </header>
+      </header>}
 
       {/* Section nav */}
       <div className="flex items-center gap-3 overflow-x-auto pb-1 mb-2">
@@ -286,13 +284,12 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
           { id: 'content', label: 'Content', icon: FileText },
           { id: 'form-fields', label: 'Form Fields', icon: ListChecks },
           { id: 'notifications', label: 'Notifications', icon: Bell },
-        ].map(({ id, label, icon: Icon }) => (
+        ].map(({ id, label }) => (
           <a
             key={id}
             href={`#section-${id}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-md border border-border hover:bg-muted transition-colors whitespace-nowrap"
+            className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-full border border-border/60 hover:bg-foreground/[0.04] transition-colors whitespace-nowrap"
           >
-            <Icon size={12} />
             {label}
           </a>
         ))}
@@ -300,7 +297,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Profile ─────────────────────────────────────────── */}
-        <section id="section-profile" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-profile" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={User}
             title="Your profile"
@@ -354,7 +351,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Intake link ──────────────────────────────────────── */}
-        <section id="section-intake" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-intake" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={Link2}
             title="Intake link"
@@ -403,7 +400,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Branding ─────────────────────────────────────────── */}
-        <section id="section-branding" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-branding" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={Image}
             title="Branding"
@@ -456,7 +453,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Form Design ───────────────────────────────────────── */}
-        <section id="section-form-design" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-form-design" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={Palette}
             title="Form Design"
@@ -635,7 +632,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Visual ────────────────────────────────────────────── */}
-        <section id="section-visual" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-visual" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={Eye}
             title="Visual"
@@ -707,7 +704,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Content ──────────────────────────────────────────── */}
-        <section id="section-content" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-content" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={FileText}
             title="Content"
@@ -800,7 +797,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Form Fields ──────────────────────────────────────── */}
-        <section id="section-form-fields" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-form-fields" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={ListChecks}
             title="Form Fields"
@@ -933,7 +930,7 @@ export function ConfigureAccountForm({ initialData, slug }: ConfigureAccountForm
         </section>
 
         {/* ── Notifications ────────────────────────────────────── */}
-        <section id="section-notifications" className="rounded-xl border border-border bg-card px-5 py-5 scroll-mt-4">
+        <section id="section-notifications" className="chippi-dashboard-panel rounded-[1.75rem] px-6 py-6 scroll-mt-24 sm:px-8 sm:py-8">
           <SectionHeader
             icon={Bell}
             title="Notifications"

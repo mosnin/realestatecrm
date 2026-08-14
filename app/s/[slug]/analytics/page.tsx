@@ -33,7 +33,7 @@ export default async function AnalyticsOverviewPage({
     const data = { ...buildOverviewData(raw), speedToLead };
     return (
       <Reveal variant="fade">
-        <OverviewView data={data} />
+        <OverviewView data={data} slug={slug} />
       </Reveal>
     );
   } catch (err) {

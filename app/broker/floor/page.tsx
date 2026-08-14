@@ -10,7 +10,7 @@ import {
   AccentBarLabel,
   InsightStrip,
 } from '@/components/ui/surface-card';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { TITLE_FONT, PRIMARY_PILL } from '@/lib/typography';
 import { timeAgo } from '@/lib/formatting';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
@@ -18,6 +18,7 @@ import {
   BROKER_CONTROL_QUIET,
   BROKER_DIVIDED_LIST,
   BROKER_EMPTY,
+  BROKER_ORIENTATION,
   BROKER_PAGE_WIDE,
   BROKER_PANEL,
   BROKER_PANEL_DENSE,
@@ -136,8 +137,6 @@ export default async function BrokerFloorPage() {
   // The coaching queue is the floor's most "alive" surface — people explicitly
   // asking for judgement. It becomes the view's ONE solid accent card whenever
   // someone is actually waiting; empty, it recedes to a calm surface card.
-  const coachingAlive = openReviews.length > 0;
-
   // Honest one-line reads for the insight strips, computed from the same rows
   // rendered above them. Each hides when its list is empty.
   const oldestReviewAgo = openReviews.length ? timeAgo(openReviews[0].createdAt) : null; // asc → oldest first
@@ -148,12 +147,21 @@ export default async function BrokerFloorPage() {
   const moreSuffix = (total: number, shown: number) => (total > shown ? ` · ${total - shown} more` : '');
 
   return (
-    <div className={cn(BROKER_PAGE_WIDE, 'max-w-6xl')} data-broker-premium-page="floor">
-      <header className="space-y-1">
-        <p className="text-sm text-muted-foreground">{ctx.brokerage.name}.</p>
-        <h1 className={H1} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl')} data-broker-premium-page="floor" data-broker-family="operations-floor">
+      <header className="grid gap-7 border-b chippi-dashboard-divider pb-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" data-route-orientation="live-operations">
+        <div className="max-w-3xl space-y-3">
+          <p className={BROKER_ORIENTATION}>{ctx.brokerage.name} · live operations</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="The Floor" />
-        </h1>
+          </h1>
+          <p className="text-base text-muted-foreground">See who is reachable, what is sitting untouched, and where the team needs your judgement right now.</p>
+        </div>
+        <Link
+          href={`/broker/chippi?prompt=${encodeURIComponent('Review the floor and handle the most urgent lead, deal, or coaching issue first.')}`}
+          className={PRIMARY_PILL}
+        >
+          Put Chippi to work
+        </Link>
       </header>
 
       {/* The four standing numbers. Zero is a good number — it renders calm. */}
@@ -182,7 +190,7 @@ export default async function BrokerFloorPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]" data-primary-work-geometry="live-floor-grid">
         {/* 1. Who can I reach right now — live. */}
         <FloorRoster
           brokerageId={ctx.brokerage.id}

@@ -13,6 +13,12 @@ import { ProfileEditor } from '@/components/profile-page/profile-editor';
 import { H1, BODY_MUTED, SECTION_RHYTHM, READING_MAX } from '@/lib/typography';
 import { Reveal, SplitReveal } from '@/components/motion';
 import { cn } from '@/lib/utils';
+import {
+  SupportingActionLink,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export default async function ProfilePageEditor({
   params,
@@ -28,22 +34,20 @@ export default async function ProfilePageEditor({
   if (!space) notFound();
 
   return (
-    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Profile.</p>
-        <SplitReveal
-          as="h1"
-          text="Your public page"
-          className={cn(H1, '[font-family:var(--font-title)]')}
-        />
-        <p className={BODY_MUTED}>
-          The one link you share — application, tours, listings, and more.
-        </p>
-      </header>
-
-      <Reveal>
+    <SupportingPage family="control" width="wide">
+      <SupportingOrientation
+        family="control"
+        eyebrow="Profile / Public hub"
+        title={<SplitReveal as="span" text="One public page for every way to work with you" />}
+        summary="Bring your application, tours, featured listings, videos, and trusted links into one client-facing destination."
+        nextAction="Lead with the one action you most want a new visitor to take, then remove anything that competes with it."
+        action={<SupportingActionLink href={`/p/${slug}`}>View public page</SupportingActionLink>}
+      />
+      <SupportingWorkArea>
+      <Reveal className="mx-auto max-w-5xl">
         <ProfileEditor slug={slug} />
       </Reveal>
-    </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

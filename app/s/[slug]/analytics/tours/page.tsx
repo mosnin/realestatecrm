@@ -5,6 +5,7 @@ import { fetchRawAnalyticsData, buildToursAnalyticsData } from '@/lib/analytics-
 import { ToursView } from '@/components/analytics/tours-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { Reveal } from '@/components/motion';
+import { SupportingActionLink, SupportingOrientation, SupportingWorkArea } from '../../_components/supporting-page';
 
 export default async function ToursAnalyticsPage({
   params,
@@ -23,7 +24,17 @@ export default async function ToursAnalyticsPage({
     const data = buildToursAnalyticsData(raw);
     return (
       <Reveal variant="fade">
-        <ToursView data={data} />
+        <div>
+          <SupportingOrientation
+            family="intelligence"
+            eyebrow="Analytics / Tours"
+            title="What showings are turning into deals"
+            summary={`${data.totalTours} tours booked, ${data.completedTours} completed, and ${data.toursConvertedToDeals} converted to deals.`}
+            nextAction={data.totalTours > 0 ? 'Follow up on completed tours that have not converted yet.' : 'Open your tour calendar and publish the next available window.'}
+            action={<SupportingActionLink href={`/s/${slug}/tours`}>Open tours</SupportingActionLink>}
+          />
+          <SupportingWorkArea><ToursView data={data} /></SupportingWorkArea>
+        </div>
       </Reveal>
     );
   } catch (err) {

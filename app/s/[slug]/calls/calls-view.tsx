@@ -21,13 +21,13 @@ import { Button } from '@/components/ui/button';
 import { toastSuccess, toastError } from '@/lib/toast-helpers';
 import { cn } from '@/lib/utils';
 import {
-  H1,
   TITLE_FONT,
   BODY,
   BODY_MUTED,
   SECTION_LABEL,
   CAPTION,
   META,
+  PRIMARY_PILL,
 } from '@/lib/typography';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -172,20 +172,30 @@ export function CallsView({ slug }: { slug: string }) {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 pb-12 space-y-12">
+    <div className="chippi-dashboard-canvas mx-auto max-w-5xl space-y-10 pb-12 pt-3 sm:pt-5" data-page-family="call-memory">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Calls.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          Your call log
-        </h1>
-        <p className={cn(BODY_MUTED)}>{statusSentence(calls)}</p>
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-16">
+        <div className="max-w-3xl space-y-3">
+          <p className={SECTION_LABEL}>Conversation memory</p>
+          <h1 className="text-[3rem] leading-[.96] tracking-[-0.045em] sm:text-[4.5rem]" style={TITLE_FONT}>
+            Call once. Remember every detail.
+          </h1>
+          <p className={cn(BODY_MUTED)}>{statusSentence(calls)} Chippi keeps the summary and transcript attached to the relationship.</p>
+        </div>
+        <div className="flex items-end gap-3 lg:justify-end">
+          <span className="text-[5rem] leading-[.78] tracking-[-0.06em] tabular-nums" style={TITLE_FONT}>{calls.length}</span>
+          <span className="pb-1.5 text-sm text-muted-foreground">recorded calls</span>
+        </div>
       </header>
 
       {/* ── Start a call ───────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border/70 bg-card px-5 py-5 space-y-3">
-        <p className={cn(SECTION_LABEL)}>Start a call</p>
-        <div className="flex items-center gap-2">
+      <section className="chippi-dashboard-panel grid gap-5 rounded-[1.75rem] p-6 sm:grid-cols-[minmax(0,1fr)_minmax(18rem,.85fr)] sm:items-end sm:p-8">
+        <div>
+          <p className={cn(SECTION_LABEL)}>Start a call</p>
+          <p className="mt-2 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>Make the next conversation count.</p>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
           <Input
             type="tel"
             inputMode="tel"
@@ -201,21 +211,23 @@ export function CallsView({ slug }: { slug: string }) {
           <Button
             onClick={placeCall}
             disabled={placing || voiceConfigured !== true || !number.trim()}
+            className={PRIMARY_PILL}
           >
             <Phone size={14} strokeWidth={2} className="mr-1.5" />
             {placing ? 'Calling…' : 'Call'}
           </Button>
+          </div>
+          {voiceConfigured === false ? (
+            <p className={cn(CAPTION, 'text-amber-700 dark:text-amber-400')}>
+              Calling is not available yet. Ask your administrator to finish phone setup.
+            </p>
+          ) : (
+            <p className={cn(CAPTION)}>
+              Your phone rings first; once you pick up, we connect you to the contact and record the
+              call. Chippi summarizes it when it ends.
+            </p>
+          )}
         </div>
-        {voiceConfigured === false ? (
-          <p className={cn(CAPTION, 'text-amber-700 dark:text-amber-400')}>
-            Calling is not available yet. Ask your administrator to finish phone setup.
-          </p>
-        ) : (
-          <p className={cn(CAPTION)}>
-            Your phone rings first; once you pick up, we connect you to the contact and record the
-            call. Chippi summarizes it when it ends.
-          </p>
-        )}
       </section>
 
       {/* ── List ───────────────────────────────────────────────────────── */}
@@ -223,11 +235,11 @@ export function CallsView({ slug }: { slug: string }) {
         <p className={cn(SECTION_LABEL)}>Recent calls</p>
 
         {loading ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="border-y border-border/60 px-5 py-10 text-center">
             <p className={cn(BODY, 'text-muted-foreground')}>Loading&hellip;</p>
           </div>
         ) : calls.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+          <div className="border-y border-border/60 px-5 py-10 text-center">
             <p className={cn(BODY)}>No calls yet.</p>
             <p className={cn(CAPTION, 'mt-1')}>
               {voiceConfigured === false
@@ -236,7 +248,7 @@ export function CallsView({ slug }: { slug: string }) {
             </p>
           </div>
         ) : (
-          <StaggerList key={calls.length} className="divide-y divide-border/60">
+          <StaggerList key={calls.length} className="divide-y divide-border/60 border-y border-border/60">
             {calls.map((c) => {
               const isOpen = expanded === c.id;
               const duration = formatDuration(c.durationSec);
@@ -307,6 +319,6 @@ export function CallsView({ slug }: { slug: string }) {
           </StaggerList>
         )}
       </section>
-    </main>
+    </div>
   );
 }

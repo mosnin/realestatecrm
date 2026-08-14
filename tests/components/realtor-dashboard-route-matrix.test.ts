@@ -44,7 +44,8 @@ const SURFACE_MATRIX = [
   ['Settings', 'app/s/[slug]/settings/page.tsx'],
 ] as const;
 
-const TODAY_OPT_IN = /data-realtor-page="today"|<RealtorPage\b|layout="dashboard"|chippi-dashboard-canvas/;
+const TODAY_OPT_IN =
+  /data-realtor-page="today"|<RealtorPage\b|<SupportingPage\b|layout="dashboard"|chippi-dashboard-canvas/;
 
 describe('realtor dashboard route matrix', () => {
   it.each(SURFACE_MATRIX)('%s participates in the Today canvas', (_label, file) => {

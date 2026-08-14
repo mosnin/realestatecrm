@@ -5,6 +5,7 @@ import { fetchRawAnalyticsData, buildLeadsAnalyticsData } from '@/lib/analytics-
 import { LeadsView } from '@/components/analytics/leads-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { Reveal } from '@/components/motion';
+import { SupportingActionLink, SupportingOrientation, SupportingWorkArea } from '../../_components/supporting-page';
 
 export default async function LeadsAnalyticsPage({
   params,
@@ -23,7 +24,17 @@ export default async function LeadsAnalyticsPage({
     const data = buildLeadsAnalyticsData(raw);
     return (
       <Reveal variant="fade">
-        <LeadsView data={data} />
+        <div>
+          <SupportingOrientation
+            family="intelligence"
+            eyebrow="Analytics / Lead quality"
+            title="Which demand deserves attention"
+            summary={`${data.totalLeads} leads are measured${data.avgLeadScore != null ? ` with an average score of ${Math.round(data.avgLeadScore)}` : ''}.`}
+            nextAction={data.totalLeads > 0 ? 'Open the hottest leads and confirm the next follow-up is scheduled.' : 'Share your intake link to begin measuring lead quality.'}
+            action={<SupportingActionLink href={`/s/${slug}/leads`}>Open leads</SupportingActionLink>}
+          />
+          <SupportingWorkArea><LeadsView data={data} /></SupportingWorkArea>
+        </div>
       </Reveal>
     );
   } catch (err) {

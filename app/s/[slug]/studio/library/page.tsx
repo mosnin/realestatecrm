@@ -3,7 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { LibraryPanel } from './library-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
+import { SupportingActionLink, SupportingOrientation, SupportingPage, SupportingWorkArea } from '../../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,19 +17,18 @@ export default async function StudioLibraryPage({
   if (!space) notFound();
 
   return (
-    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Library
-        </h1>
-        <p className={BODY_MUTED}>
-          Re-use, duplicate, schedule from past work.
-        </p>
-      </header>
-      <RealtorPanel>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Library"
+        title="Your reusable campaign archive"
+        summary="Every generated image and video stays ready to duplicate, edit, or schedule again."
+        nextAction="Reuse the strongest existing asset before generating another version from scratch."
+        action={<SupportingActionLink href={`/s/${slug}/studio/create`}>Create new asset</SupportingActionLink>}
+      />
+      <SupportingWorkArea>
         <LibraryPanel />
-      </RealtorPanel>
-    </RealtorPage>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

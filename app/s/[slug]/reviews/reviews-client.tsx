@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
 import { MessageCircle } from 'lucide-react';
 import { StaggerReveal } from '@/components/motion';
 
@@ -122,31 +121,26 @@ export function ReviewsClient({ slug, initialReviews }: Props) {
   return (
     <div className="space-y-4">
       {/* Tabs — visual pattern mirrors app/broker/reviews/reviews-client.tsx */}
-      <div className="flex items-center gap-1 border-b border-border pb-0">
+      <div className="flex w-fit items-center gap-1 rounded-full border border-border/70 p-1">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`relative px-3 py-2 text-sm font-medium transition-colors rounded-t-md ${
-              tab === t.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === t.key ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {t.label}
-            {tab === t.key && (
-              <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-primary" />
-            )}
           </button>
         ))}
       </div>
 
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="px-5 py-10 text-center">
-            <p className="text-sm text-muted-foreground">{emptyCopy(tab)}</p>
-          </CardContent>
-        </Card>
+        <div className="border-y border-border/60 px-5 py-14 text-center">
+          <p className="text-sm text-muted-foreground">{emptyCopy(tab)}</p>
+        </div>
       ) : (
-        <StaggerReveal className="space-y-2">
+        <StaggerReveal className="divide-y divide-border/60 border-y border-border/60">
           {filtered.map((r) => {
             const dealTitle = r.deal.title ?? 'Untitled deal';
             const preview =
@@ -156,7 +150,7 @@ export function ReviewsClient({ slug, initialReviews }: Props) {
               <Link
                 key={r.id}
                 href={`/s/${slug}/reviews/${r.id}`}
-                className="block rounded-xl border border-border bg-card px-4 py-3 hover:bg-accent/40 transition-colors"
+                className="block px-1 py-4 transition-colors hover:bg-foreground/[0.025] sm:px-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

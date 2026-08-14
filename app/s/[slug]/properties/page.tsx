@@ -10,7 +10,14 @@ import { cn } from '@/lib/utils';
 import { PropertyListGrid } from '@/components/properties/property-list-grid';
 import { AreaIqLauncher } from '@/components/properties/area-iq-launcher';
 import { Reveal, SplitReveal } from '@/components/motion';
-import { RealtorEmptyState, RealtorPage } from '../_components/realtor-page';
+import { RealtorEmptyState } from '../_components/realtor-page';
+import {
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export default async function PropertiesPage({
   params,
@@ -44,7 +51,7 @@ export default async function PropertiesPage({
 
   if (fetchError) {
     return (
-      <RealtorPage width="content" className="flex items-center justify-center">
+      <SupportingPage family="inventory" width="content" className="flex items-center justify-center">
         <RealtorEmptyState
           title="Your properties didn't load."
           description="Your listings are safe. This is usually temporary."
@@ -54,13 +61,16 @@ export default async function PropertiesPage({
             </a>
           }
         />
-      </RealtorPage>
+      </SupportingPage>
     );
   }
 
   // One quiet sentence about the wall — sale-status counts narrated, not
   // tallied in a chart. Active is the loud fact; the rest is supporting.
   const activeCount = properties.filter((p) => p.listingStatus === 'active').length;
+  const pendingCount = properties.filter((p) => p.listingStatus === 'pending').length;
+  const analyzedCount = properties.filter((p) => p.analyzedAt || p.analysis).length;
+  const pricedCount = properties.filter((p) => p.listPrice != null).length;
   const subtitle =
     properties.length === 0
       ? 'No properties yet.'
@@ -70,19 +80,21 @@ export default async function PropertiesPage({
           (activeCount > 0 ? ` · ${activeCount} active` : '');
 
   return (
-    <RealtorPage width="wide">
-      {/* Page header — status-sentence pattern: muted greeting → serif h1
-          → one-sentence status. Add-listing CTA sits inline; primary
-          action lives where the realtor's eye lands after the title. */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5 min-w-0">
-          <p className={cn(BODY_MUTED)}>Properties.</p>
-          <h1 className={cn(H1)} style={TITLE_FONT}>
-            <SplitReveal as="span" text="All properties" />
-          </h1>
-          <p className={cn(BODY_MUTED)}>{subtitle}</p>
-        </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+    <SupportingPage family="inventory" width="wide">
+      <SupportingOrientation
+        family="inventory"
+        eyebrow="Properties / Inventory"
+        title={<SplitReveal as="span" text="The homes behind every conversation" />}
+        summary={subtitle}
+        nextAction={
+          properties.length === 0
+            ? 'Add the first property you are actively selling, buying, or researching.'
+            : analyzedCount < properties.length
+              ? `Enrich ${properties.length - analyzedCount} ${properties.length - analyzedCount === 1 ? 'property' : 'properties'} so pricing and outreach use grounded context.`
+              : 'Open the active listing with the closest next deadline and move it forward.'
+        }
+        action={
+          <div className="flex flex-wrap items-center gap-2">
           <AreaIqLauncher />
           <Link
             href={`/s/${slug}/properties/new`}
@@ -91,9 +103,18 @@ export default async function PropertiesPage({
             <Plus size={14} aria-hidden />
             Add property
           </Link>
-        </div>
-      </header>
+          </div>
+        }
+      />
 
+      <SupportingMetricBand>
+        <SupportingMetric label="Inventory" value={properties.length} detail="all saved properties" />
+        <SupportingMetric label="Active" value={activeCount} detail="currently marketed" accent />
+        <SupportingMetric label="Pending" value={pendingCount} detail="moving to close" />
+        <SupportingMetric label="Market ready" value={`${analyzedCount}/${properties.length}`} detail={`${pricedCount} with a list price`} />
+      </SupportingMetricBand>
+
+      <SupportingWorkArea>
       {/* Empty state — calm fact, not a directive. */}
       {properties.length === 0 ? (
         <Reveal variant="rise">
@@ -119,6 +140,7 @@ export default async function PropertiesPage({
            avoid animating the same cards twice. */
         <PropertyListGrid slug={slug} properties={properties} />
       )}
-    </RealtorPage>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

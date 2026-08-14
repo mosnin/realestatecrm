@@ -19,12 +19,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
-import { Mail, MessageSquare, Globe, StickyNote, Inbox as InboxIcon } from 'lucide-react';
+import { Mail, MessageSquare, Globe, StickyNote } from 'lucide-react';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { H1, TITLE_FONT, BODY, BODY_MUTED } from '@/lib/typography';
-import { SurfaceCard } from '@/components/ui/surface-card';
+import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { Reveal, SplitReveal, StaggerReveal } from '@/components/motion';
 import { DraftReply } from '@/components/inbox/draft-reply';
 import type { InboxChannel, InboxDirection } from '@/lib/types';
@@ -150,33 +149,40 @@ export default async function InboxPage({
   }
 
   const selectedName = selected ? nameById.get(selected.contactId) ?? 'Unknown contact' : null;
+  const unreadTotal = threads.reduce((sum, thread) => sum + thread.unreadCount, 0);
 
   return (
-    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-6xl space-y-5 pb-12 pt-3 sm:pt-5">
-      <header className="mb-5 space-y-0.5">
-        <p className="text-sm text-muted-foreground">Conversations.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Inbox" />
-        </h1>
+    <div data-realtor-page="today" data-page-family="unified-inbox" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-6xl space-y-8 pb-12 pt-3 sm:pt-5">
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-16">
+        <div className="max-w-3xl space-y-3">
+          <p className={SECTION_LABEL}>Unified client inbox</p>
+          <h1 className="text-[3rem] leading-[.96] tracking-[-0.045em] sm:text-[4.5rem]" style={TITLE_FONT}>
+            <SplitReveal as="span" text="Never lose the thread." />
+          </h1>
+          <p className={BODY_MUTED}>Email, text, portal notes, and the next reply—one continuous client conversation.</p>
+        </div>
+        <div className="flex items-end gap-3 lg:justify-end">
+          <span className="text-[5rem] leading-[.78] tracking-[-0.06em] tabular-nums" style={TITLE_FONT}>{unreadTotal}</span>
+          <span className="pb-1.5 text-sm text-muted-foreground">unread</span>
+        </div>
       </header>
 
       {threads.length === 0 ? (
         <Reveal variant="fade">
-          <SurfaceCard>
+          <div className="border-y border-border/60">
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <InboxIcon size={28} className="text-muted-foreground/50" />
               <p className="mt-3 text-base text-foreground">No conversations yet.</p>
               <p className={cn(BODY_MUTED, 'mt-1 max-w-xs')}>
                 When a client emails, texts, or messages you, the whole thread lands here — every
                 channel in one place.
               </p>
             </div>
-          </SurfaceCard>
+          </div>
         </Reveal>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
           {/* ── Thread list ─────────────────────────────────────────────── */}
-          <SurfaceCard className="p-0 overflow-hidden">
+          <div className="overflow-hidden border-y border-border/60">
             <StaggerReveal as="ul" className="divide-y divide-border/60">
               {threads.map((thread) => {
                 const name = nameById.get(thread.contactId) ?? 'Unknown contact';
@@ -227,10 +233,10 @@ export default async function InboxPage({
                 );
               })}
             </StaggerReveal>
-          </SurfaceCard>
+          </div>
 
           {/* ── Thread view ─────────────────────────────────────────────── */}
-          <SurfaceCard className="flex min-h-[480px] flex-col">
+          <section className="chippi-dashboard-panel flex min-h-[480px] flex-col rounded-[1.75rem] p-6 sm:p-8">
             {selected && (
               <>
                 <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
@@ -291,7 +297,7 @@ export default async function InboxPage({
                 </div>
               </>
             )}
-          </SurfaceCard>
+          </section>
         </div>
       )}
     </div>

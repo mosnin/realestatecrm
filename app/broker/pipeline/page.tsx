@@ -1,9 +1,10 @@
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { dealHealth } from '@/lib/deals/health';
-import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/formatting';
 import { SplitReveal } from '@/components/motion';
@@ -15,7 +16,11 @@ import {
   type RealtorInfo,
   type PipelineSummary,
 } from './pipeline-client';
-import { BROKER_PAGE_WIDE } from '@/components/broker/premium';
+import {
+  BROKER_COMMAND_HERO,
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Pipeline — Teams' };
 
@@ -216,20 +221,44 @@ export default async function BrokerPipelinePage() {
   })();
 
   return (
-    <div className={cn(BROKER_PAGE_WIDE, 'pb-56 md:pb-24')} data-broker-premium-page="pipeline">
-      <header className="space-y-1.5">
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl pb-56 md:pb-24')} data-broker-premium-page="pipeline" data-broker-family="pipeline-analysis">
+      <header className={BROKER_COMMAND_HERO} data-route-orientation="analysis">
+        <div className="max-w-3xl space-y-4">
+          <p className={BROKER_ORIENTATION}>Pipeline intelligence</p>
+          <h1 className="text-4xl tracking-[-0.035em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Pipeline" />
-        </h1>
-        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
+          </h1>
+          <p className={cn(BODY_MUTED, 'text-base')}>{statusSentence}</p>
+          <Link href="/broker/forecast" className={PRIMARY_PILL}>View revenue forecast</Link>
+        </div>
+        <aside className="grid grid-cols-2 gap-x-8 gap-y-5 border-l chippi-dashboard-divider pl-6" aria-label="Pipeline outcome summary">
+          <div>
+            <p className={BROKER_ORIENTATION}>Active</p>
+            <p className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{summary.activeDeals}</p>
+          </div>
+          <div>
+            <p className={BROKER_ORIENTATION}>At risk</p>
+            <p className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{summary.atRiskCount + summary.stuckCount}</p>
+          </div>
+          <div>
+            <p className={BROKER_ORIENTATION}>Won this month</p>
+            <p className="mt-1 text-2xl tabular-nums" style={TITLE_FONT}>{summary.dealsWonThisMonth}</p>
+          </div>
+          <div>
+            <p className={BROKER_ORIENTATION}>Lost this month</p>
+            <p className="mt-1 text-2xl tabular-nums" style={TITLE_FONT}>{summary.dealsLostThisMonth}</p>
+          </div>
+        </aside>
       </header>
 
-      <PipelineClient
-        deals={deals}
-        stages={stages}
-        realtors={realtors}
-        summary={summary}
-      />
+      <section data-primary-work-geometry="funnel-analysis">
+        <PipelineClient
+          deals={deals}
+          stages={stages}
+          realtors={realtors}
+          summary={summary}
+        />
+      </section>
     </div>
   );
 }

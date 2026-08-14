@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { BODY_MUTED, H1, TITLE_FONT } from '@/lib/typography';
+import { BODY_MUTED, H1, SECTION_LABEL, TITLE_FONT } from '@/lib/typography';
 
 type PageWidth = 'reading' | 'content' | 'wide' | 'full';
 
@@ -58,20 +58,86 @@ export function RealtorPageHeader({
 }) {
   return (
     <header
+      data-realtor-page-orientation
       className={cn(
-        'flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between',
+        'flex flex-col gap-7 border-b chippi-dashboard-divider pb-8 pt-2 sm:flex-row sm:items-end sm:justify-between sm:pb-10',
         className,
       )}
     >
-      <div className="min-w-0 space-y-1.5">
-        {eyebrow != null && <p className={BODY_MUTED}>{eyebrow}</p>}
-        <h1 className={H1} style={TITLE_FONT}>
+      <div className="min-w-0 max-w-3xl space-y-2.5">
+        {eyebrow != null && <p className={SECTION_LABEL}>{eyebrow}</p>}
+        <h1 className={cn(H1, 'text-4xl sm:text-5xl')} style={TITLE_FONT}>
           {title}
         </h1>
-        {description != null && <p className={BODY_MUTED}>{description}</p>}
+        {description != null && (
+          <p className={cn(BODY_MUTED, 'max-w-2xl text-[15px] leading-relaxed')}>{description}</p>
+        )}
       </div>
       {action != null && <div className="shrink-0">{action}</div>}
     </header>
+  );
+}
+
+/** Quiet heading above a page-specific working region. */
+export function RealtorSectionHeader({
+  eyebrow,
+  title,
+  description,
+  action,
+  className,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      data-realtor-section-heading
+      className={cn('flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}
+    >
+      <div className="min-w-0">
+        {eyebrow != null && <p className={SECTION_LABEL}>{eyebrow}</p>}
+        <h2 className="mt-1 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+          {title}
+        </h2>
+        {description != null && <p className={cn(BODY_MUTED, 'mt-1 max-w-2xl')}>{description}</p>}
+      </div>
+      {action != null && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+/** One open, hairline-divided outcome strip; metrics are not separate cards. */
+export function RealtorOutcomeStrip({
+  items,
+  className,
+}: {
+  items: Array<{ label: ReactNode; value: ReactNode; detail?: ReactNode }>;
+  className?: string;
+}) {
+  return (
+    <dl
+      data-realtor-outcomes
+      className={cn(
+        'chippi-dashboard-panel grid overflow-hidden rounded-[1.75rem] sm:grid-cols-2 lg:grid-cols-4',
+        className,
+      )}
+    >
+      {items.map((item, index) => (
+        <div
+          key={index}
+          className="min-w-0 border-t chippi-dashboard-divider px-6 py-6 first:border-t-0 sm:[&:nth-child(-n+2)]:border-t-0 sm:[&:nth-child(even)]:border-l lg:border-l lg:border-t-0 lg:first:border-l-0"
+        >
+          <dt className={SECTION_LABEL}>{item.label}</dt>
+          <dd className="mt-2 text-3xl tracking-tight text-foreground" style={TITLE_FONT}>
+            {item.value}
+          </dd>
+          {item.detail != null && <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>}
+        </div>
+      ))}
+    </dl>
   );
 }
 

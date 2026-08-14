@@ -25,6 +25,13 @@ import {
   GHOST_PILL,
   CAPTION,
 } from '@/lib/typography';
+import {
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -191,15 +198,36 @@ export function AffiliateView({ slug }: { slug: string }) {
   })();
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 pb-12 space-y-12">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Affiliate.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          Earn with Chippi.
-        </h1>
-        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
-      </header>
+    <SupportingPage family="service" width="wide">
+      <SupportingOrientation
+        family="service"
+        eyebrow="Growth / Referrals"
+        title="Turn trusted introductions into recurring revenue"
+        summary={statusSentence}
+        nextAction={status.state === 'enrolled' ? 'Share your personal link with the one operator who would get the clearest outcome from Chippi.' : 'Join the program, then make one thoughtful introduction instead of broadcasting a generic pitch.'}
+        action={status.state === 'unenrolled' ? (
+          <button type="button" className={cn(PRIMARY_PILL)} onClick={handleEnroll} disabled={enrolling}>
+            {enrolling ? 'Enrolling…' : 'Become an affiliate'}
+          </button>
+        ) : status.state === 'enrolled' ? (
+          <button type="button" className={cn(PRIMARY_PILL)} onClick={() => handleCopy(status.refLink)}>Copy referral link</button>
+        ) : undefined}
+      />
+
+      {status.state === 'enrolled' && status.stats && (
+        <SupportingMetricBand>
+          <SupportingMetric label="Clicks" value={formatNumber(status.stats.clicks)} detail="link visits" />
+          <SupportingMetric label="Referrals" value={formatNumber(status.stats.referrals)} detail="introduced accounts" accent />
+          <SupportingMetric label="Sales" value={formatNumber(status.stats.sales)} detail="paid accounts" />
+          <SupportingMetric label="Earnings" value={status.balances.length > 0 ? formatCurrency(status.balances[0].amount, status.balances[0].currency) : formatCurrency(status.stats.revenue)} detail="tracked revenue" />
+        </SupportingMetricBand>
+      )}
+
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)] lg:items-start">
+      <aside className="border-l-2 border-foreground pl-5 text-sm leading-6 text-muted-foreground">
+        One link works for individual agents and brokerages. Earnings continue while a referred subscription remains active.
+      </aside>
+      <div className="min-w-0">
 
       {/* ── Loading skeleton ────────────────────────────────────────────── */}
       {status.state === 'loading' && (
@@ -252,14 +280,6 @@ export function AffiliateView({ slug }: { slug: string }) {
             </p>
           </div>
 
-          <button
-            type="button"
-            className={cn(PRIMARY_PILL)}
-            onClick={handleEnroll}
-            disabled={enrolling}
-          >
-            {enrolling ? 'Enrolling…' : 'Become an affiliate'}
-          </button>
         </div>
       )}
 
@@ -286,40 +306,6 @@ export function AffiliateView({ slug }: { slug: string }) {
             </p>
           </div>
 
-          {/* Stats grid */}
-          {status.stats && (
-            <div>
-              <p className={cn(SECTION_LABEL, 'mb-3')}>Performance</p>
-              <section
-                className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/60"
-              >
-                <StatCell
-                  label="Clicks"
-                  value={formatNumber(status.stats.clicks)}
-                />
-                <StatCell
-                  label="Referrals"
-                  value={formatNumber(status.stats.referrals)}
-                />
-                <StatCell
-                  label="Sales"
-                  value={formatNumber(status.stats.sales)}
-                />
-                <StatCell
-                  label="Earnings"
-                  value={
-                    status.balances.length > 0
-                      ? formatCurrency(
-                          status.balances[0].amount,
-                          status.balances[0].currency,
-                        )
-                      : formatCurrency(status.stats.revenue)
-                  }
-                />
-              </section>
-            </div>
-          )}
-
           {/* Payout action */}
           {status.dashboardUrl && (
             <a
@@ -334,6 +320,8 @@ export function AffiliateView({ slug }: { slug: string }) {
           )}
         </div>
       )}
-    </main>
+      </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

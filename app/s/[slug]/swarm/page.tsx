@@ -7,6 +7,14 @@ import { cn } from '@/lib/utils';
 import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import type { CustomAgent, SwarmRun, SwarmStatus } from '@/lib/swarm-types';
 import { SwarmLaunchForm } from '@/components/swarm/swarm-launch-form';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -152,30 +160,36 @@ export default async function SwarmPage({
 
   const agents = (agentsData ?? []) as CustomAgent[];
   const runs = (runsData ?? []) as SwarmRun[];
+  const liveRuns = runs.filter((run) => ['running', 'planning', 'auditing', 'queued'].includes(run.status)).length;
+  const completedRuns = runs.filter((run) => run.status === 'completed').length;
+  const failedRuns = runs.filter((run) => run.status === 'failed').length;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-12 pb-12">
-      {/* Header */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Automation.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={TITLE_FONT}
-        >
-          Swarm
-        </h1>
-        <p className={cn(BODY_MUTED)}>
-          Set a goal and let multiple AI agents work in parallel.
-        </p>
-      </header>
+    <SupportingPage family="coordination" width="wide">
+      <SupportingOrientation
+        family="coordination"
+        eyebrow="Workforce / Coordinated run"
+        title="Give the team one outcome to own"
+        summary={`${agents.length} active specialists are available. ${liveRuns} ${liveRuns === 1 ? 'run is' : 'runs are'} currently in motion.`}
+        nextAction={agents.length < 2 ? 'Add another specialist before launching work that truly benefits from parallel ownership.' : 'Describe the finished outcome, constraints, and evidence the coordinator must return.'}
+        action={<SupportingActionLink href="#swarm-launch">Launch coordinated work</SupportingActionLink>}
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Specialists" value={agents.length} detail="available for selection" />
+        <SupportingMetric label="In motion" value={liveRuns} detail="queued or active" accent />
+        <SupportingMetric label="Completed" value={completedRuns} detail="recent outcomes" />
+        <SupportingMetric label="Needs attention" value={failedRuns} detail="recent failed runs" />
+      </SupportingMetricBand>
 
-      {/* Launch form */}
-      <div className="max-w-2xl">
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.62fr)_minmax(18rem,0.38fr)] lg:items-start">
+      <div id="swarm-launch" className="chippi-dashboard-panel scroll-mt-24 rounded-[2rem] border-l-2 border-l-foreground p-6 sm:p-8">
+        <p className="mb-5 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Define the mission</p>
         <SwarmLaunchForm availableAgents={agents} slug={slug} spaceId={space.id} />
       </div>
 
       {/* Recent runs — only rendered when runs exist */}
-      <RecentRunsList runs={runs} slug={slug} />
-    </div>
+      <div className="lg:sticky lg:top-8"><RecentRunsList runs={runs} slug={slug} /></div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

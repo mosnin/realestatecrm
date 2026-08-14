@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { KanbanBoard } from './kanban-board';
 import { PipelineSummary } from './pipeline-summary';
 import { PipelineTabs } from './pipeline-tabs';
-import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED, QUIET_LINK } from '@/lib/typography';
+import { H1, TITLE_FONT, PRIMARY_PILL, BODY_MUTED, QUIET_LINK, SECTION_LABEL } from '@/lib/typography';
 import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import type { Pipeline, DealStage, Deal, SavedView } from '@/lib/types';
@@ -240,7 +240,7 @@ export function DealsPageClient({
 
   if (loading) {
     return (
-      <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-8 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
+      <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-8 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
         <header className="flex items-end justify-between gap-4">
           <h1 className={H1} style={TITLE_FONT}>
             Deals
@@ -254,16 +254,28 @@ export function DealsPageClient({
   const hasPipelines = pipelines.length > 0;
 
   return (
-    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-8 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
-      {/* Page header — serif H1 + single primary pill. The H1 is the noun
-          realtors use ("deals"); the URL, narration, and Add button all
-          agree. */}
-      <header className="flex items-end justify-between gap-4">
-        <h1 className={H1} style={TITLE_FONT}>
-          Deals
-        </h1>
+    <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-9 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
+      {/* A pipeline is a working board, so its orientation reads horizontally:
+          outcome statement first, current operating context and action at the
+          right edge, then the full-width board below. */}
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
+        <div className="max-w-3xl space-y-3">
+          <p className={SECTION_LABEL}>Deal pipeline</p>
+          <h1 className={cn(H1, 'text-[3rem] leading-[.95] sm:text-[4.75rem]')} style={TITLE_FONT}>
+            Move the deal that can close next.
+          </h1>
+          <p className={BODY_MUTED}>
+            Read the board left to right. Fix stalled work first, then protect the closings already in motion.
+          </p>
+        </div>
         {hasPipelines && (
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <div className="text-left lg:text-right">
+              <p className={SECTION_LABEL}>Board context</p>
+              <p className="mt-2 text-sm text-foreground">
+                {pipelines.length === 1 ? '1 active pipeline' : `${pipelines.length} active pipelines`}
+              </p>
+            </div>
             {/* The conversation is the front door. Saying it out loud is
                 faster than any form, so it gets the primary pill. */}
             <Link

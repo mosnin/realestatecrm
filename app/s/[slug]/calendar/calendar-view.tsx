@@ -398,7 +398,7 @@ export function CalendarView({
   const wide = view === 'month' || view === 'week';
 
   return (
-    <div data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full">
+    <div data-realtor-page="today" data-page-family="calendar-command" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] w-full">
       <div
         className={cn(
           // Bottom padding clears the mobile chat bar (~90px) + the floating
@@ -410,15 +410,25 @@ export function CalendarView({
         )}
       >
         <Reveal as="header" variant="rise" className="space-y-1.5">
-          <p className={BODY_MUTED}>Calendar.</p>
-          <h1 className={H1} style={TITLE_FONT}>
-            <SplitReveal text="Your calendar, in here." by="word" />
-          </h1>
-          <p className={BODY_MUTED}>
-            {connected
-              ? `Reading from ${providerLabel(provider)}.`
-              : 'Connect your calendar so I can see your day and put tours on it.'}
-          </p>
+          <div className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-16">
+            <div className="max-w-3xl space-y-3">
+              <p className={SECTION_LABEL}>Time command</p>
+              <h1 className={cn(H1, 'text-[3rem] leading-[.96] sm:text-[4.5rem]')} style={TITLE_FONT}>
+                <SplitReveal text="Protect the time that closes deals." by="word" />
+              </h1>
+              <p className={BODY_MUTED}>
+                {connected
+                  ? `Live from ${providerLabel(provider)}. Tours, callbacks, and deadlines stay on one calendar.`
+                  : 'Connect your calendar so Chippi can see your day and put tours, callbacks, and deadlines in the right place.'}
+              </p>
+            </div>
+            <div className="flex items-end gap-3 lg:justify-end">
+              <span className="text-[5rem] leading-[.78] tracking-[-0.06em] tabular-nums" style={TITLE_FONT}>
+                {events.length}
+              </span>
+              <span className="pb-1.5 text-sm text-muted-foreground">events in view</span>
+            </div>
+          </div>
         </Reveal>
 
         {!connected && <NotConnectedState slug={slug} />}

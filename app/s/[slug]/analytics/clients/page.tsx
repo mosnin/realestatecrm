@@ -5,6 +5,7 @@ import { fetchRawAnalyticsData, buildClientsAnalyticsData } from '@/lib/analytic
 import { ClientsView } from '@/components/analytics/clients-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { Reveal } from '@/components/motion';
+import { SupportingActionLink, SupportingOrientation, SupportingWorkArea } from '../../_components/supporting-page';
 
 export default async function ClientsAnalyticsPage({
   params,
@@ -23,7 +24,17 @@ export default async function ClientsAnalyticsPage({
     const data = buildClientsAnalyticsData(raw);
     return (
       <Reveal variant="fade">
-        <ClientsView data={data} />
+        <div>
+          <SupportingOrientation
+            family="intelligence"
+            eyebrow="Analytics / Relationships"
+            title="How your book is maturing"
+            summary={`${data.totalContacts} people are in your book. ${data.leadToClientRate}% of leads have become clients.`}
+            nextAction={data.totalLeads > 0 ? 'Review the people still between first contact and active client.' : 'Add people to establish a relationship conversion baseline.'}
+            action={<SupportingActionLink href={`/s/${slug}/contacts`}>Review people</SupportingActionLink>}
+          />
+          <SupportingWorkArea><ClientsView data={data} /></SupportingWorkArea>
+        </div>
       </Reveal>
     );
   } catch (err) {

@@ -3,7 +3,8 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { ComposePanel } from './compose-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
+import { RealtorPanel } from '../../_components/realtor-page';
+import { SupportingActionLink, SupportingOrientation, SupportingPage, SupportingWorkArea } from '../../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,17 +18,22 @@ export default async function StudioComposePage({
   if (!space) notFound();
 
   return (
-    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Compose
-        </h1>
-        <p className={BODY_MUTED}>Write a social caption for a photo.</p>
-      </header>
-      <RealtorPanel>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Compose"
+        title="Give the image a point of view"
+        summary="Upload the strongest listing image and turn its real details into a social-ready caption."
+        nextAction="Choose one audience and one outcome before you write; specificity beats a generic listing recap."
+        action={<SupportingActionLink href="#studio-compose-workspace">Compose a caption</SupportingActionLink>}
+      />
+      <SupportingWorkArea className="mx-auto max-w-5xl">
+      <div id="studio-compose-workspace" className="scroll-mt-24">
+      <RealtorPanel className="p-7 sm:p-10">
         <ComposePanel />
       </RealtorPanel>
-    </RealtorPage>
+      </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

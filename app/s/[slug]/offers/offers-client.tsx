@@ -6,7 +6,6 @@ import { Plus, X, Trash2, Clock } from 'lucide-react';
 import {
   SurfaceCard,
   SurfaceCardHeader,
-  StatusPill,
 } from '@/components/ui/surface-card';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/formatting';
@@ -231,26 +230,25 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
 
       {!hasAny ? (
         <Reveal variant="fade">
-          <SurfaceCard>
-            <div className="py-10 text-center">
+          <div className="border-y border-border/60">
+            <div className="py-14 text-center">
               <p className={BODY_MUTED}>No offers yet.</p>
               <p className={cn(CAPTION, 'mt-1')}>
                 Track a buyer&apos;s offer on a listing to see it here.
               </p>
             </div>
-          </SurfaceCard>
+          </div>
         </Reveal>
       ) : (
-        <StaggerReveal className="flex gap-4 overflow-x-auto pb-2">
+        <StaggerReveal className="flex gap-7 overflow-x-auto pb-3" data-offer-board="negotiation-lanes">
           {OFFER_STATUSES.map((status) => {
             const rows = grouped.get(status) ?? [];
             return (
-              <div key={status} className="w-80 flex-shrink-0">
-                <SurfaceCard className="h-full">
-                  <SurfaceCardHeader
-                    title={STATUS_LABEL[status]}
-                    action={<StatusPill>{rows.length}</StatusPill>}
-                  />
+              <section key={status} className="w-80 flex-shrink-0 border-t border-border/70 pt-4">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2 className="text-sm font-medium text-foreground">{STATUS_LABEL[status]}</h2>
+                    <span className="text-xs tabular-nums text-muted-foreground">{rows.length}</span>
+                  </div>
                   <div className="mt-4 space-y-3">
                     {rows.length === 0 ? (
                       <p className="py-6 text-center text-xs text-muted-foreground/60">
@@ -270,8 +268,7 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
                       ))
                     )}
                   </div>
-                </SurfaceCard>
-              </div>
+              </section>
             );
           })}
         </StaggerReveal>
@@ -299,7 +296,7 @@ function OfferCard({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-border bg-background/60 p-3.5 transition-opacity',
+        'rounded-[1.25rem] bg-dashboard-paper-muted p-4 transition-[opacity,transform,background-color] hover:-translate-y-px hover:bg-background',
         pending && 'opacity-60',
       )}
     >

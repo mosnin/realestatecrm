@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { AnalyticsTabs } from '@/components/analytics/analytics-tabs';
-import { H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
-import { SplitReveal } from '@/components/motion';
+import { SupportingPage } from '../_components/supporting-page';
 
 export const metadata: Metadata = {
   title: 'Analytics',
@@ -17,14 +16,15 @@ export default async function AnalyticsLayout({
   const { slug } = await params;
 
   return (
-    <div className={`${SECTION_RHYTHM} max-w-5xl mx-auto pb-12`}>
-      <header>
-        <h1 className={H1} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Analytics" by="word" />
-        </h1>
-      </header>
+    <SupportingPage family="intelligence" width="wide" className="space-y-8">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          Performance intelligence
+        </p>
+        <p className="hidden text-xs text-muted-foreground sm:block">Live from your workspace</p>
+      </div>
       <AnalyticsTabs slug={slug} />
       {children}
-    </div>
+    </SupportingPage>
   );
 }

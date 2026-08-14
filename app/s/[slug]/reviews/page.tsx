@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { ReviewsClient, type ReviewRow } from './reviews-client';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { AnimatedNumber } from '@/components/motion';
 
 interface PageProps {
@@ -43,13 +43,13 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
   // rather than 404 — the user might visit this link from stale nav.
   if (!space.brokerageId) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto pb-12">
-        <header className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">Reviews.</p>
-          <h1 className={H1} style={TITLE_FONT}>
-            My reviews
+      <div className="chippi-dashboard-canvas mx-auto max-w-5xl space-y-8 pb-12 pt-3 sm:pt-5" data-page-family="broker-review-room">
+        <header className="border-b border-border/60 pb-9">
+          <p className={SECTION_LABEL}>Broker review room</p>
+          <h1 className="mt-3 max-w-3xl text-[3rem] leading-[.96] tracking-[-0.045em] sm:text-[4.5rem]" style={TITLE_FONT}>
+            Get a second set of eyes before risk becomes rework.
           </h1>
-          <p className="text-sm text-muted-foreground">No brokerage connected yet.</p>
+          <p className={`${BODY_MUTED} mt-3`}>Connect a brokerage to request and track deal reviews here.</p>
         </header>
         <ReviewsClient slug={slug} initialReviews={[]} />
       </div>
@@ -142,22 +142,21 @@ export default async function RealtorReviewsPage({ params }: PageProps) {
   const openCount = initialReviews.filter((r) => r.status === 'open').length;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Reviews.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          My reviews
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {openCount > 0 ? (
-            <>
-              <AnimatedNumber value={openCount} /> open{' '}
-              {openCount === 1 ? 'review' : 'reviews'} waiting.
-            </>
-          ) : (
-            'All caught up.'
-          )}
-        </p>
+    <div className="chippi-dashboard-canvas mx-auto max-w-5xl space-y-8 pb-12 pt-3 sm:pt-5" data-page-family="broker-review-room">
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-16">
+        <div className="space-y-3">
+          <p className={SECTION_LABEL}>Broker review room</p>
+          <h1 className="max-w-3xl text-[3rem] leading-[.96] tracking-[-0.045em] sm:text-[4.5rem]" style={TITLE_FONT}>
+            Clear the question. Keep the deal moving.
+          </h1>
+          <p className={BODY_MUTED}>Every flagged decision, broker note, and resolution stays attached to its deal.</p>
+        </div>
+        <div className="flex items-end gap-3 lg:justify-end">
+          <span className="text-[5.5rem] leading-[.78] tracking-[-0.065em] tabular-nums" style={TITLE_FONT}>
+            <AnimatedNumber value={openCount} />
+          </span>
+          <span className="pb-1.5 text-sm text-muted-foreground">open reviews</span>
+        </div>
       </header>
       <ReviewsClient slug={slug} initialReviews={initialReviews} />
     </div>

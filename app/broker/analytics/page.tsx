@@ -11,15 +11,16 @@
  */
 
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
 import {
-  H1,
   TITLE_FONT,
   BODY_MUTED,
   SECTION_RHYTHM,
+  PRIMARY_PILL,
 } from '@/lib/typography';
 import { StatCard, SURFACE_CARD, InsightStrip } from '@/components/ui/surface-card';
 import { Zap } from 'lucide-react';
@@ -34,7 +35,11 @@ import {
 import { fetchSpeedToLead } from '@/lib/analytics/speed-to-lead-data';
 import { AnalyticsClient, type AgentFunnelData } from './analytics-client';
 import { AnalyticsBreakdowns } from './breakdowns';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_COMMAND_HERO,
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 import {
   buildLeadSourceBreakdown,
   buildWinLossByReason,
@@ -215,15 +220,23 @@ export default async function BrokerAnalyticsPage() {
   );
 
   return (
-    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="analytics">
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl')} data-broker-premium-page="analytics" data-broker-family="performance-report">
 
-      {/* Status-sentence header -- per STYLESHEET the-status-sentence-pattern */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Brokerage.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+      <header className={BROKER_COMMAND_HERO} data-route-orientation="performance-report">
+        <div className="max-w-3xl space-y-4">
+          <p className={BROKER_ORIENTATION}>Brokerage performance</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Analytics" />
-        </h1>
-        <p className={BODY_MUTED}>{statusSentence}</p>
+          </h1>
+          <p className={cn(BODY_MUTED, 'text-base')}>{statusSentence}</p>
+          <Link href="/broker/forecast" className={PRIMARY_PILL}>Turn performance into forecast</Link>
+        </div>
+        <aside className="grid grid-cols-2 gap-x-8 gap-y-5 border-l chippi-dashboard-divider pl-6" aria-label="Performance outcome summary">
+          <div><p className={BROKER_ORIENTATION}>Lead to win</p><p className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{teamConversion}%</p></div>
+          <div><p className={BROKER_ORIENTATION}>Active agents</p><p className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{activeAgents}</p></div>
+          <div><p className={BROKER_ORIENTATION}>Leads</p><p className="mt-1 text-2xl tabular-nums" style={TITLE_FONT}>{totalLeads}</p></div>
+          <div><p className={BROKER_ORIENTATION}>Won</p><p className="mt-1 text-2xl tabular-nums" style={TITLE_FONT}>{totalWon}</p></div>
+        </aside>
       </header>
 
       {isEmpty ? (
@@ -235,7 +248,7 @@ export default async function BrokerAnalyticsPage() {
           </p>
         </div>
       ) : (
-        <div className={SECTION_RHYTHM}>
+        <div className={SECTION_RHYTHM} data-primary-work-geometry="performance-report">
 
           {/* KPI strip -- floating stat cards (reference language: flat,
               borderless, large radius, accent-bar labels). "Lead to win" is

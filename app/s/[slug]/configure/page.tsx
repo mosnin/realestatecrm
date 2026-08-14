@@ -6,6 +6,14 @@ import { ConfigureAccountForm } from './configure-account-form';
 import { getBrokerContext } from '@/lib/permissions';
 import { Building2, ExternalLink, ArrowRight } from 'lucide-react';
 import type { User, Space, SpaceSetting } from '@/lib/types';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export const metadata = { title: 'Configure your account — Chippi' };
 
@@ -103,11 +111,27 @@ export default async function ConfigurePage({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
-      <ConfigureAccountForm initialData={initialData} slug={slug} />
+    <SupportingPage family="control" width="wide">
+      <SupportingOrientation
+        family="control"
+        eyebrow="Account / Public configuration"
+        title="Make every client-facing surface feel like you"
+        summary="Your profile, intake identity, brand, public content, form fields, and notifications live here."
+        nextAction="Confirm your contact details and public intake identity before tuning secondary visual preferences."
+        action={<SupportingActionLink href={`/apply/${slug}`}>Preview public intake</SupportingActionLink>}
+        layout="rail"
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Profile" value={initialData.name || 'Not set'} detail={initialData.email} />
+        <SupportingMetric label="Business" value={initialData.businessName || 'Not set'} detail="public identity" />
+        <SupportingMetric label="Intake URL" value={`/${initialData.slug}`} detail="public application path" accent />
+        <SupportingMetric label="Brokerage" value={existingBrokerageName ?? 'Independent'} detail={existingBrokerageName ? 'connected account' : 'no brokerage linked'} />
+      </SupportingMetricBand>
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.72fr)_minmax(18rem,0.28fr)] lg:items-start">
+      <ConfigureAccountForm initialData={initialData} slug={slug} showHeader={false} />
 
       {/* Brokerage section — links to dedicated page */}
-      <div>
+      <aside className="lg:sticky lg:top-8">
         <div className="mb-3">
           <p className="text-sm font-semibold">Brokerage</p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -155,8 +179,8 @@ export default async function ConfigurePage({
             </div>
           </Link>
         )}
-      </div>
-    </div>
+      </aside>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }
-

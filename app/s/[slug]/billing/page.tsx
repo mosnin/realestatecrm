@@ -11,6 +11,14 @@ import type Stripe from 'stripe';
 import { H1 } from '@/lib/typography';
 import { Reveal, SplitReveal } from '@/components/motion';
 import { cn } from '@/lib/utils';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export default async function Billing({
   params,
@@ -82,21 +90,27 @@ export default async function Billing({
     'No active subscription.';
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
+    <SupportingPage family="control" width="wide">
       {/* Fires a Meta Pixel Purchase when returning from a completed checkout. */}
       <Suspense fallback={null}>
         <PurchasePixel />
       </Suspense>
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Billing.</p>
-        <SplitReveal
-          as="h1"
-          text="Subscription"
-          className={cn(H1, '[font-family:var(--font-title)]')}
-        />
-        <p className="text-sm text-muted-foreground">{statusLabel}</p>
-      </header>
-      <Reveal>
+      <SupportingOrientation
+        family="control"
+        eyebrow="Account / Billing"
+        title={<SplitReveal as="span" text="Keep the operating system funded" />}
+        summary={statusLabel}
+        nextAction={subscriptionStatus === 'past_due' ? 'Update the payment method now so active work is not interrupted.' : subscriptionStatus === 'inactive' ? 'Choose the plan that matches the book of business you want Chippi to run.' : 'Review credit usage and the next billing date before changing the plan.'}
+        action={<SupportingActionLink href={`/s/${slug}/settings`} quiet>Back to settings</SupportingActionLink>}
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Plan" value={(((space as { plan?: string }).plan) ?? 'free')} detail="current workspace tier" />
+        <SupportingMetric label="Status" value={subscriptionStatus.replace('_', ' ')} detail="subscription state" accent />
+        <SupportingMetric label="Next cycle" value={currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'} detail="billing date" />
+        <SupportingMetric label="Payment" value={cardLast4 ? `•••• ${cardLast4}` : 'Not set'} detail={cardLast4 ? cardBrand : 'add in billing portal'} />
+      </SupportingMetricBand>
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.66fr)_minmax(19rem,0.34fr)] lg:items-start">
+      <Reveal className="min-w-0">
         <BillingPage
           slug={slug}
           plan={(((space as { plan?: string }).plan) ?? 'free') as PlanId}
@@ -107,10 +121,11 @@ export default async function Billing({
           invoices={invoices}
         />
       </Reveal>
-      <Reveal delay={0.08}>
+      <Reveal delay={0.08} className="lg:sticky lg:top-8">
         <CreditsSummary spaceId={space.id} slug={slug} />
       </Reveal>
-    </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }
 

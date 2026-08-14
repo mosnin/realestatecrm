@@ -946,12 +946,13 @@ export function BrokerLeadsClient({
         </motion.div>
       )}
 
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(18rem,0.82fr)_minmax(0,1.35fr)]">
       {/* Unassigned — the one demanding routing. Shown first so it's the
           first thing the broker reaches for. Hidden when filtering to a
           single realtor: unassigned leads belong to no one, so an empty
           queue under a realtor filter is noise. */}
       {hasAnyLeads && realtorFilter === 'all' && (
-        <section className={cn(BROKER_PANEL, 'space-y-3')}>
+        <section className={cn(BROKER_PANEL, 'space-y-3 lg:sticky lg:top-4')} data-lead-lane="unassigned">
           <SectionHeader
             label="Unassigned"
             count={filteredUnassigned.length}
@@ -986,7 +987,7 @@ export function BrokerLeadsClient({
 
       {/* Routed — what your team is working on. Quieter section. */}
       {hasAnyLeads && (
-        <section className={cn(BROKER_PANEL, 'space-y-3')}>
+        <section className={cn(BROKER_PANEL, 'space-y-3')} data-lead-lane="routed">
           <SectionHeader label="Routed" count={filteredAssigned.length} />
           {filteredAssigned.length === 0 ? (
             <div className={BROKER_EMPTY}>
@@ -1013,6 +1014,7 @@ export function BrokerLeadsClient({
           )}
         </section>
       )}
+      </div>
     </div>
   );
 }

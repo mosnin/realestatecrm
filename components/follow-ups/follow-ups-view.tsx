@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { H1, TITLE_FONT } from '@/lib/typography';
+import { H1, TITLE_FONT, BODY_MUTED, SECTION_LABEL, PRIMARY_PILL } from '@/lib/typography';
 import {
   CheckCircle2, Briefcase, Timer,
 } from 'lucide-react';
@@ -187,13 +187,23 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
 
   if (totalCount === 0) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto pb-12">
-        <header className="space-y-1.5">
-          <p className="text-sm text-muted-foreground">Follow-ups.</p>
-          <h1 className={H1} style={TITLE_FONT}>Nothing due.</h1>
-          <p className="text-sm text-muted-foreground">You&apos;re all caught up — quiet day.</p>
+      <div className="mx-auto max-w-5xl space-y-8 pb-12" data-page-family="follow-up-desk">
+        <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
+          <div className="space-y-3">
+            <p className={SECTION_LABEL}>Follow-up desk</p>
+            <h1 className={cn(H1, 'text-[3rem] leading-[.96] sm:text-[4.5rem]')} style={TITLE_FONT}>
+              Nothing is waiting on you.
+            </h1>
+            <p className={BODY_MUTED}>A quiet desk is the outcome. Set the next touch from any person or deal.</p>
+          </div>
+          <Link
+            href={`/s/${slug}/chippi?prefill=${encodeURIComponent('Review my relationships and schedule the follow-ups that will move deals forward.')}`}
+            className={cn(PRIMARY_PILL, 'justify-self-start lg:justify-self-end')}
+          >
+            Plan outreach
+          </Link>
         </header>
-        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
+        <div className="border-y border-border/60 px-5 py-14 text-center">
           <p className="text-sm text-foreground">Nothing to chase.</p>
           <p className="text-xs text-muted-foreground mt-1">
             Set a follow-up from any person or deal and it&apos;ll land here.
@@ -210,29 +220,50 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Follow-ups.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          {overdueCount > 0 ? `${overdueCount} overdue.` : 'On schedule.'}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {overdueCount > 0
-            ? `${overdueCount} ${overdueCount === 1 ? 'contact or deal' : 'contacts and deals'} past due.`
-            : `${totalCount} ${totalCount === 1 ? 'follow-up' : 'follow-ups'} scheduled.`}
-        </p>
+    <div className="mx-auto max-w-5xl space-y-8 pb-12" data-page-family="follow-up-desk">
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-end lg:gap-16">
+        <div className="space-y-3">
+          <p className={SECTION_LABEL}>Follow-up desk</p>
+          <h1 className={cn(H1, 'max-w-2xl text-[3rem] leading-[.96] sm:text-[4.5rem]')} style={TITLE_FONT}>
+            {overdueCount > 0 ? 'Close the distance.' : 'Keep every promise.'}
+          </h1>
+          <p className={BODY_MUTED}>
+            {overdueCount > 0
+              ? `${overdueCount} ${overdueCount === 1 ? 'relationship is' : 'relationships are'} waiting for a next move.`
+              : `${totalCount} ${totalCount === 1 ? 'touch is' : 'touches are'} scheduled and on time.`}
+          </p>
+        </div>
+        <div className="flex items-end gap-3 lg:justify-end">
+          <span className="text-[5.5rem] leading-[.78] tracking-[-0.065em] tabular-nums" style={TITLE_FONT}>
+            {overdueCount}
+          </span>
+          <span className="pb-1.5 text-sm text-muted-foreground">overdue</span>
+        </div>
       </header>
 
+      <section className="grid grid-cols-3 border-y border-border/60" aria-label="Follow-up outlook">
+        {([
+          ['Past due', tabCounts.overdue],
+          ['Due today', tabCounts.today],
+          ['Ahead', tabCounts.upcoming],
+        ] as const).map(([label, count], index) => (
+          <div key={label} className={cn('py-5', index > 0 && 'border-l border-border/60 pl-5 sm:pl-7')}>
+            <p className={SECTION_LABEL}>{label}</p>
+            <p className="mt-3 text-[2.25rem] leading-none tracking-[-0.04em] tabular-nums" style={TITLE_FONT}>{count}</p>
+          </div>
+        ))}
+      </section>
+
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/50 rounded-lg p-1 w-fit">
+      <div className="flex w-fit gap-1 rounded-full border border-border/70 p-1">
         {tabs.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={cn(
-              'px-4 py-1.5 text-sm font-medium rounded-md transition-colors relative',
+              'relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
               activeTab === t.key
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-foreground text-background'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -257,7 +288,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1">
             Contacts
           </p>
-          <div className="rounded-xl border border-border/70 divide-y divide-border/60 bg-card">
+          <div className="divide-y divide-border/60 border-y border-border/60">
             {visibleContacts.map(contact => {
               const isBusy = busy.has(contact.id);
               const overdueBool = isOverdue(contact.followUpAt);
@@ -366,7 +397,7 @@ export function FollowUpsView({ slug, contacts: initialContacts, deals: initialD
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1">
             Deals
           </p>
-          <div className="rounded-xl border border-border/70 divide-y divide-border/60 bg-card">
+          <div className="divide-y divide-border/60 border-y border-border/60">
             {visibleDeals.map(deal => {
               const isBusy = busy.has(deal.id);
               const overdueBool = isOverdue(deal.followUpAt);

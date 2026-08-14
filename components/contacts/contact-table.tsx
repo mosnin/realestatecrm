@@ -749,22 +749,41 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   })();
 
   return (
-    <div className="space-y-10 sm:space-y-12">
-      <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <p className={BODY_MUTED}>People.</p>
-          <h1 className={cn(H1, 'text-[2.5rem] leading-none sm:text-[3.25rem]')} style={TITLE_FONT}>
-            <SplitReveal as="span" text="Your relationships" />
-          </h1>
-          {subtitle && <p className={BODY_MUTED}>{subtitle}</p>}
+    <div className="space-y-10 sm:space-y-12" data-page-family="relationship-directory">
+      {/* The relationship book opens like a directory, not another generic
+          dashboard page. The count anchors the left edge; purpose and action
+          sit opposite it. Filters and records keep their existing behavior. */}
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,.8fr)] lg:items-end lg:gap-14">
+        <div className="min-w-0">
+          <p className={SECTION_LABEL}>Relationship book</p>
+          <div className="mt-5 flex items-end gap-3">
+            <span
+              className="text-[4.75rem] leading-[.78] tracking-[-0.065em] text-foreground tabular-nums sm:text-[6.5rem]"
+              style={TITLE_FONT}
+            >
+              {loading ? '—' : <AnimatedNumber value={contacts.length} duration={560} />}
+            </span>
+            <span className="pb-1 text-sm text-muted-foreground sm:pb-2">people</span>
+          </div>
+          {subtitle && <p className={cn(BODY_MUTED, 'mt-5')}>{subtitle}</p>}
         </div>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className={cn(PRIMARY_PILL, 'w-fit shrink-0')}
-        >
-          Add person
-        </button>
+        <div className="flex flex-col items-start gap-5 lg:items-end lg:text-right">
+          <div className="max-w-md space-y-2">
+            <h1 className={cn(H1, 'text-[2.4rem] leading-[.96] sm:text-[3.15rem]')} style={TITLE_FONT}>
+              <SplitReveal as="span" text="People worth staying close to." />
+            </h1>
+            <p className={BODY_MUTED}>
+              Find the next relationship to move, then keep every detail and follow-up in one place.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className={cn(PRIMARY_PILL, 'w-fit shrink-0')}
+          >
+            Add person
+          </button>
+        </div>
       </header>
 
       {summary}

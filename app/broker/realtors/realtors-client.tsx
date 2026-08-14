@@ -271,7 +271,13 @@ export function RealtorsClient({ realtors }: { realtors: RealtorRow[] }) {
   return (
     <div className="space-y-3">
       {/* Search + sort toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-end justify-between gap-3 border-b border-border/60 pb-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Coaching roster</p>
+          <p className="mt-1 text-xs text-muted-foreground">Attention first, with each agent’s live book of business.</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap pt-1">
         <div className="relative flex-1 sm:flex-initial min-w-[160px]">
           <Search
             size={14}

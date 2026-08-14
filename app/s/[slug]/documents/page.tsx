@@ -6,8 +6,13 @@
 
 import { notFound } from 'next/navigation';
 import { getSpaceFromSlug } from '@/lib/space';
-import { SplitReveal } from '@/components/motion';
 import { DocumentsPanel } from './documents-panel';
+import {
+  SupportingActionLink,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,22 +26,24 @@ export default async function DocumentsPage({
   if (!space) notFound();
 
   return (
-    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-4xl pb-12 pt-3 sm:pt-5">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Documents.</p>
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
-          <SplitReveal as="span" text="Your documents" />
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Write or paste documents and keep them in one place.
-        </p>
-      </header>
-      <div className="mt-8">
+    <SupportingPage family="records" width="wide">
+      <SupportingOrientation
+        family="records"
+        eyebrow="Records / Documents"
+        title="Write the context that should survive the conversation"
+        summary="Create durable notes, briefs, and source material that stay in your words and remain available to Chippi."
+        nextAction="Capture the one decision, process, or client detail you do not want buried in a message thread."
+        action={<SupportingActionLink href="#documents-workspace">Open document room</SupportingActionLink>}
+        layout="rail"
+      />
+      <SupportingWorkArea className="grid gap-9 lg:grid-cols-[minmax(0,0.74fr)_minmax(16rem,0.26fr)] lg:items-start">
+      <div id="documents-workspace" className="scroll-mt-24">
         <DocumentsPanel />
       </div>
-    </div>
+      <aside className="border-l chippi-dashboard-divider pl-6 text-sm leading-6 text-muted-foreground lg:sticky lg:top-8">
+        Documents are authored here. Uploaded PDFs, images, audio, and chat attachments stay in Files. Chippi can read both without changing your original wording.
+      </aside>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

@@ -3,7 +3,8 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { CreatePanel } from './create-panel';
 import { H1, TITLE_FONT, BODY_MUTED, PAGE_RHYTHM } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { RealtorPage, RealtorPanel } from '../../_components/realtor-page';
+import { RealtorPanel } from '../../_components/realtor-page';
+import { SupportingActionLink, SupportingOrientation, SupportingPage, SupportingWorkArea } from '../../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,20 +24,25 @@ export default async function StudioCreatePage({
   if (!space) notFound();
 
   return (
-    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Create
-        </h1>
-        <p className={BODY_MUTED}>AI-generate listing images.</p>
-      </header>
-      <RealtorPanel>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Create"
+        title="Build the campaign image"
+        summary="Describe the listing moment you want to show. The finished image is saved to your library for captions, edits, and scheduling."
+        nextAction="Name the property, audience, atmosphere, and one visual detail that makes the listing memorable."
+        action={<SupportingActionLink href="#studio-create-workspace">Start creating</SupportingActionLink>}
+      />
+      <SupportingWorkArea className="mx-auto max-w-5xl" >
+      <div id="studio-create-workspace" className="scroll-mt-24">
+      <RealtorPanel className="p-7 sm:p-10">
         <CreatePanel
           initialPrompt={typeof prompt === 'string' ? prompt : undefined}
           initialModel={typeof model === 'string' ? model : undefined}
         />
       </RealtorPanel>
-    </RealtorPage>
+      </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

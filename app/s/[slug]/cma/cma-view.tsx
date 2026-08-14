@@ -47,6 +47,12 @@ import {
 import type { CmaPayload, CmaComp } from '@/lib/cma-types';
 import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
 import { NarrativeSection } from '@/components/cma/narrative-section';
+import {
+  SupportingActionLink,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -265,19 +271,21 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <main data-realtor-page="today" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] max-w-3xl mx-auto pb-12 pt-3 sm:pt-5 space-y-12">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Comparative market analysis.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Price a home." />
-        </h1>
-        <p className={cn(BODY_MUTED)}>
-          Pick a subject, and Chippi pulls real market comps and computes a range.
-        </p>
-      </header>
+    <SupportingPage family="inventory" width="wide">
+      <SupportingOrientation
+        family="inventory"
+        eyebrow="Properties / Comparative market analysis"
+        title={<SplitReveal as="span" text="Turn market evidence into a seller conversation" />}
+        summary={loadingReports ? 'Loading your prior analyses.' : `${reports.length} ${reports.length === 1 ? 'analysis' : 'analyses'} saved. Every range shows the evidence behind it.`}
+        nextAction={initialAddress ? `Build the analysis for ${initialAddress}.` : 'Choose a saved property or enter an address, then inspect the comparable sales before publishing.'}
+        action={<SupportingActionLink href="#cma-builder">Build an analysis</SupportingActionLink>}
+        layout="split"
+      />
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.62fr)_minmax(18rem,0.38fr)] lg:items-start">
+        <div className="space-y-8">
 
       {/* ── Builder ────────────────────────────────────────────────────── */}
+      <div id="cma-builder" className="scroll-mt-24">
       <Reveal variant="rise" className="chippi-dashboard-panel rounded-[1.75rem] px-5 py-5 sm:px-7 sm:py-7 space-y-4">
         <div className="space-y-1.5">
           <label htmlFor="cma-subject" className="text-sm font-medium text-foreground">
@@ -340,6 +348,7 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
           </Button>
         </div>
       </Reveal>
+      </div>
 
       {/* ── Preview ────────────────────────────────────────────────────── */}
       {preview?.payload && (
@@ -422,9 +431,10 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
           <NarrativeSection slug={slug} reportId={preview.id} payload={preview.payload} />
         </Reveal>
       )}
+        </div>
 
       {/* ── Past reports ───────────────────────────────────────────────── */}
-      <section className="space-y-3">
+      <section className="space-y-3 lg:sticky lg:top-8">
         <p className={cn(SECTION_LABEL)}>Your reports</p>
 
         {loadingReports ? (
@@ -482,7 +492,8 @@ export function CmaView({ slug, initialAddress }: { slug: string; initialAddress
           </StaggerList>
         )}
       </section>
-    </main>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }
 

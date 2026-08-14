@@ -68,6 +68,25 @@ Working layouts keep their useful structure:
 Only their frame, typography, spacing, surfaces, controls, states, and visual
 noise are normalized.
 
+## Page composition is not a skin
+
+Adding `chippi-dashboard-canvas`, changing a card radius, or wrapping an old
+screen in `RealtorPage` / `BROKER_PAGE` does **not** count as redesigning that
+page. Every canonical page must express its own job through the Today system:
+
+1. an editorial orientation header that names the outcome, not the feature;
+2. a grounded summary or next-best action when the underlying data supports it;
+3. one primary working region whose geometry matches the task (row list, board,
+   calendar, form, gallery, transcript, or report);
+4. secondary controls consolidated into a quiet toolbar or disclosure instead
+   of a field of icon buttons;
+5. loading, empty, error, and mobile states using the same final geometry.
+
+Page families should remain recognizably different. Pipeline is a board,
+Calendar is a schedule, Messages is a conversation list, Analytics is a report,
+Settings is a calm form, and Properties is an image-led catalog. They share one
+brand system without collapsing into one generic card template.
+
 ## Navigation
 
 Desktop navigation is one collapsible surface:
@@ -110,3 +129,8 @@ reference at the same viewport, then verify representative realtor and broker
 pages in light, dark, desktop, and mobile states. Tests and screenshots are
 evidence; production acceptance also requires the deployed routes and core
 interactions to work.
+
+A route is not accepted on a wrapper/class marker alone. Release evidence must
+show at least one populated representative from every page family and prove
+that its orientation header, outcome summary, primary work region, and primary
+action are visible and functional.

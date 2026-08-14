@@ -17,6 +17,14 @@ import {
 } from '@/lib/typography';
 import { StaggerList, StaggerItem } from '@/components/motion/stagger-list';
 import type { Metadata } from 'next';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export async function generateMetadata({
   params,
@@ -100,35 +108,54 @@ export default async function IntakeOverviewPage({
   // right now. No counts in stat tiles; the count lives in the sentence so
   // the realtor reads it like a thought, not a dashboard.
   const subtitle = formatIntakeStatus(totalSubmissions, hotLeadCount);
+  const latestSubmission = recentLeads[0]?.createdAt
+    ? timeAgo(new Date(recentLeads[0].createdAt))
+    : '—';
 
   return (
-    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${PAGE_RHYTHM} max-w-3xl mx-auto pb-12`}>
-      {/* Header — H1 + Chippi narration */}
-      <header className="space-y-1.5">
-        <h1 className={H1} style={TITLE_FONT}>
-          Intake
-        </h1>
-        <p className={BODY_MUTED}>{subtitle}</p>
-      </header>
+    <SupportingPage family="intake" width="wide">
+      <SupportingOrientation
+        family="intake"
+        eyebrow="Acquisition / Intake"
+        title="Turn interest into a qualified conversation"
+        summary={subtitle}
+        nextAction={hotLeadCount > 0 ? `Open the ${hotLeadCount === 1 ? 'hot lead' : `${hotLeadCount} hot leads`} that arrived this week and follow up while intent is fresh.` : 'Share the live intake link where your next buyer or renter is most likely to see it.'}
+        action={
+          <>
+            <SupportingActionLink href={intakePath}>Preview live intake</SupportingActionLink>
+            <SupportingActionLink href={`/s/${slug}/intake/customize`} quiet>Customize questions</SupportingActionLink>
+          </>
+        }
+      />
+
+      <SupportingMetricBand>
+        <SupportingMetric label="Last 7 days" value={totalSubmissions} detail="completed submissions" accent />
+        <SupportingMetric label="High intent" value={hotLeadCount} detail="hot leads this week" />
+        <SupportingMetric label="Latest arrival" value={latestSubmission} detail="most recent submission" />
+        <SupportingMetric label="Public status" value="Live" detail={`/apply/${space.slug}`} />
+      </SupportingMetricBand>
+
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[minmax(0,0.46fr)_minmax(0,0.54fr)] lg:items-start">
 
       {/* Your link — the one thing every realtor comes here for */}
-      <section className="space-y-3">
+      <section className="space-y-5 rounded-[2rem] bg-foreground p-7 text-background sm:p-9">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 className={H3}>Your link</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/60">Share surface</p>
+            <h2 className="mt-2 text-2xl font-medium tracking-[-0.03em]">Your live intake</h2>
+            <p className="mt-2 text-sm text-background/65">
               Share it. Submissions land in People.
             </p>
           </div>
           <Link
             href={`/s/${slug}/intake/customize`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
+            className="inline-flex items-center gap-1 text-sm text-background/65 hover:text-background transition-colors duration-150"
           >
             Customize
             <ArrowRight size={13} strokeWidth={1.75} />
           </Link>
         </div>
-        <IntakeLinkRow url={intakeUrl} previewHref={intakePath} />
+        <IntakeLinkRow url={intakeUrl} previewHref={intakePath} inverse />
       </section>
 
       {/* AI chat mode — hidden 2026-05-25. The `/apply/<slug>/chat` route
@@ -137,7 +164,7 @@ export default async function IntakeOverviewPage({
           link above already gives the realtor the chat surface. */}
 
       {/* Recent submissions — the second thing they come here for */}
-      <section>
+      <section className="min-w-0 lg:pt-2">
         <div className="flex items-center justify-between mb-3">
           <h2 className={H3}>Recent</h2>
           {recentLeads.length > 0 && (
@@ -218,6 +245,7 @@ export default async function IntakeOverviewPage({
           </StaggerList>
         )}
       </section>
-    </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

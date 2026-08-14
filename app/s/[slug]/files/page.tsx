@@ -18,6 +18,14 @@ import { formatFilesStatus } from '@/lib/realtor-page-status';
 import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
 import { FilesPanel } from './files-panel';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,17 +73,34 @@ export default async function FilesPage({
   const count = (fileCount ?? 0) + (attachmentCount ?? 0);
 
   const statusSentence = formatFilesStatus(count, totalBytes);
+  const newestFileAt = fileAggregateRows?.[0]?.createdAt
+    ? new Date(fileAggregateRows[0].createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '—';
+  const storageLabel = totalBytes < 1024 * 1024
+    ? `${Math.round(totalBytes / 1024)} KB`
+    : `${(totalBytes / (1024 * 1024)).toFixed(totalBytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
 
   return (
-    <div data-realtor-page="today" className="chippi-dashboard-canvas mx-auto min-h-[calc(100vh-10rem)] w-full max-w-5xl space-y-8 pb-12 pt-3 sm:pt-5">
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Files.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
-          <SplitReveal as="span" text="All files" />
-        </h1>
-        <p className={cn(BODY_MUTED)}>{statusSentence}</p>
-      </header>
+    <SupportingPage family="records" width="wide">
+      <SupportingOrientation
+        family="records"
+        eyebrow="Records / Files"
+        title={<SplitReveal as="span" text="Everything the work depends on" />}
+        summary={statusSentence}
+        nextAction={count === 0 ? 'Upload the first document or image Chippi should be able to use.' : 'Open the record tied to your nearest deal deadline and confirm it is current.'}
+        action={<SupportingActionLink href="#file-library">Upload or browse</SupportingActionLink>}
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Saved files" value={fileCount ?? 0} detail="uploaded directly" />
+        <SupportingMetric label="Conversation files" value={attachmentCount ?? 0} detail="from Chippi threads" />
+        <SupportingMetric label="Storage used" value={storageLabel} detail="across this workspace" accent />
+        <SupportingMetric label="Newest record" value={newestFileAt} detail="latest direct upload" />
+      </SupportingMetricBand>
+      <SupportingWorkArea>
+      <div id="file-library" className="scroll-mt-24">
       <FilesPanel />
-    </div>
+      </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

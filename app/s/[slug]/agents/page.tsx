@@ -8,6 +8,13 @@ import { cn } from '@/lib/utils';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { AgentsGrid } from '@/components/agents/agents-grid';
 import type { CustomAgent } from '@/lib/swarm-types';
+import {
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export default async function AgentsPage({
   params,
@@ -42,36 +49,43 @@ export default async function AgentsPage({
   }
 
   const agents = (data ?? []) as CustomAgent[];
+  const newestAgent = agents[0]?.name ?? '—';
+  const capabilityCount = agents.reduce((total, agent) => total + agent.capabilities.length, 0);
+  const modelCount = new Set(agents.map((agent) => agent.model).filter(Boolean)).size;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
-      {/* Header */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5">
-          <p className={cn(BODY_MUTED)}>Swarms.</p>
-          <h1 className={cn(H1)} style={TITLE_FONT}>
-            Custom Agents
-          </h1>
-          <p className={cn(BODY_MUTED)}>
-            Build specialized AI agents for your swarm.
-          </p>
-        </div>
-
+    <SupportingPage family="coordination" width="wide">
+      <SupportingOrientation
+        family="coordination"
+        eyebrow="Workforce / Specialists"
+        title="Build a team around repeatable outcomes"
+        summary={`${agents.length} active ${agents.length === 1 ? 'specialist is' : 'specialists are'} available for coordinated work.`}
+        nextAction={agents.length === 0 ? 'Create one specialist with a narrow responsibility and a clear definition of done.' : 'Review the newest specialist and make sure its tools match the work you expect it to own.'}
+        action={
         <Link
           href={`/s/${slug}/agents/new`}
-          className={cn(PRIMARY_PILL, 'mt-1 shrink-0')}
+          className={cn(PRIMARY_PILL, 'shrink-0')}
         >
           <Plus className="size-4" />
-          New Agent
+          New specialist
         </Link>
-      </header>
+        }
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Active specialists" value={agents.length} detail="available to coordinate" accent />
+        <SupportingMetric label="Newest" value={newestAgent} detail="most recently created" />
+        <SupportingMetric label="Capabilities" value={capabilityCount} detail="assigned across active specialists" />
+        <SupportingMetric label="Models" value={modelCount} detail="used by active specialists" />
+      </SupportingMetricBand>
 
       {/* Grid or empty state */}
+      <SupportingWorkArea>
       <AgentsGrid
         initialAgents={agents}
         slug={slug}
         spaceId={space.id}
       />
-    </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

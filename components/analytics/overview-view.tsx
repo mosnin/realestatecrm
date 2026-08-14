@@ -9,7 +9,6 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import { motion, useReducedMotion } from 'framer-motion';
 import { TrendingUp, Zap } from 'lucide-react';
 import { countLabel, pluralize } from '@/lib/formatting';
 import {
@@ -18,8 +17,6 @@ import {
   meaningfulSpeedToLead,
 } from '@/lib/analytics/speed-to-lead';
 import {
-  StatCell,
-  StatStrip,
   ChartSection,
   ChartContainer,
   ChartTooltip,
@@ -30,8 +27,13 @@ import {
 } from './chart-primitives';
 import type { ChartConfig } from './chart-primitives';
 import type { OverviewData } from '@/lib/analytics-data';
-import { H1, TITLE_FONT, SECTION_RHYTHM } from '@/lib/typography';
-import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingWorkArea,
+} from '@/app/s/[slug]/_components/supporting-page';
 
 const leadsConfig = {
   count: { label: 'Leads', color: 'hsl(var(--foreground))' },
@@ -41,9 +43,7 @@ const dealsConfig = {
   count: { label: 'Deals', color: 'hsl(var(--foreground))' },
 } satisfies ChartConfig;
 
-export function OverviewView({ data }: { data: OverviewData }) {
-  const reduce = useReducedMotion();
-
+export function OverviewView({ data, slug }: { data: OverviewData; slug: string }) {
   // Honest month-over-month read for the insight strip: only when BOTH the
   // current and previous month have real submissions — no fabricated trends.
   const series = data.leadsOverTime;
@@ -61,43 +61,46 @@ export function OverviewView({ data }: { data: OverviewData }) {
   const statusSentence = data.totalContacts > 0
     ? `${countLabel(data.totalContacts, 'person', 'people')} in your book, ${data.totalDeals} active ${pluralize(data.totalDeals, 'deal')}.`
     : 'No data yet. Start by adding your first contact.';
+  const nextAction = data.totalLeads > 0
+    ? `Review the newest ${pluralize(data.totalLeads, 'lead')} and move the strongest opportunity forward.`
+    : 'Add your first person so Chippi can begin measuring response and conversion.';
 
   return (
-    <div className={SECTION_RHYTHM}>
-      <motion.header
-        className="space-y-1.5"
-        initial={reduce ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-      >
-        <p className="text-sm text-muted-foreground">Analytics.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Overview
-        </h1>
-        <p className="text-sm text-muted-foreground">{statusSentence}</p>
-      </motion.header>
+    <div className="space-y-0">
+      <SupportingOrientation
+        family="intelligence"
+        eyebrow="Analytics / Overview"
+        title="Where momentum is building"
+        summary={statusSentence}
+        nextAction={nextAction}
+        action={
+          <>
+            <SupportingActionLink href={`/s/${slug}/contacts`}>Review people</SupportingActionLink>
+            <SupportingActionLink href={`/s/${slug}/deals`} quiet>Open pipeline</SupportingActionLink>
+          </>
+        }
+      />
 
-      {/* Stats strip */}
-      <StatStrip cols={speed ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : undefined}>
-        <StatCell label="New people" value={data.totalLeads} sub="all time" />
-        <StatCell label="Total people" value={data.totalContacts} sub="in your book" />
-        <StatCell label="Active deals" value={data.totalDeals} />
+      <SupportingMetricBand className={speed ? 'lg:grid-cols-5' : undefined}>
+        <SupportingMetric label="New people" value={data.totalLeads} detail="all time" />
+        <SupportingMetric label="Total people" value={data.totalContacts} detail="in your book" />
+        <SupportingMetric label="Active deals" value={data.totalDeals} detail="moving now" />
         {speed && (
-          <StatCell
+          <SupportingMetric
             label="Speed to lead"
             value={formatSpeedToLead(speed.medianMinutes)}
-            sub={`median · p90 ${formatSpeedToLead(speed.p90Minutes)} · ${SPEED_TO_LEAD_WINDOW_DAYS} days`}
+            detail={`median · p90 ${formatSpeedToLead(speed.p90Minutes)} · ${SPEED_TO_LEAD_WINDOW_DAYS} days`}
           />
         )}
-        <StatCell
+        <SupportingMetric
           label="Pipeline value"
-          value={data.totalPipelineValue}
-          format={formatCurrency}
-          sub="combined"
+          value={formatCurrency(data.totalPipelineValue)}
+          detail="combined"
           accent
         />
-      </StatStrip>
+      </SupportingMetricBand>
 
+      <SupportingWorkArea className="space-y-8">
       {/* Honest computed read: how often Chippi's instant first-touch draft
           was the lead's actual first touch. Hidden unless it happened. */}
       {speed && speed.chippiFirstCount > 0 && (
@@ -190,6 +193,7 @@ export function OverviewView({ data }: { data: OverviewData }) {
           </ChartContainer>
         </ChartSection>
       </div>
+      </SupportingWorkArea>
     </div>
   );
 }

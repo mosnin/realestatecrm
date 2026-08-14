@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { listOffers } from '@/lib/offers';
 import { OffersClient } from './offers-client';
-import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, SECTION_LABEL } from '@/lib/typography';
 import { SplitReveal } from '@/components/motion';
 
 interface PageProps {
@@ -37,16 +37,44 @@ export default async function OffersPage({ params }: PageProps) {
     console.error('[offers] initial SSR fetch failed', err);
   }
 
+  const liveOffers = initialOffers.filter((offer) =>
+    ['draft', 'submitted', 'countered'].includes(offer.status),
+  ).length;
+  const acceptedOffers = initialOffers.filter((offer) => offer.status === 'accepted').length;
+  const totalVolume = initialOffers.reduce((sum, offer) => sum + (offer.amount ?? 0), 0);
+  const totalVolumeLabel = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(totalVolume);
+
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      <header className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">Offers.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Offer tracker" />
-        </h1>
-        <p className={BODY_MUTED}>
-          Every offer in flight on your listings, grouped by where it stands.
-        </p>
+    <div className="chippi-dashboard-canvas mx-auto max-w-6xl space-y-9 pb-12 pt-3 sm:pt-5" data-page-family="offer-negotiation">
+      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
+        <div className="max-w-3xl space-y-3">
+          <p className={SECTION_LABEL}>Negotiation room</p>
+          <h1 className="text-[3rem] leading-[.95] tracking-[-0.045em] text-foreground sm:text-[4.75rem]" style={TITLE_FONT}>
+            <SplitReveal as="span" text="Turn the right offer into a signed deal." />
+          </h1>
+          <p className={BODY_MUTED}>
+            Compare the terms that matter, protect every deadline, and move the strongest offer forward.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 border-y border-border/60 lg:grid-cols-1 lg:border-y-0">
+          <div className="py-4 lg:border-b lg:border-border/60">
+            <p className={SECTION_LABEL}>In play</p>
+            <p className="mt-2 text-[2.75rem] leading-none tracking-[-0.04em] tabular-nums" style={TITLE_FONT}>{liveOffers}</p>
+          </div>
+          <div className="border-l border-border/60 py-4 pl-5 lg:border-l-0 lg:pl-0">
+            <p className={SECTION_LABEL}>Accepted</p>
+            <p className="mt-2 text-[2.75rem] leading-none tracking-[-0.04em] tabular-nums" style={TITLE_FONT}>{acceptedOffers}</p>
+          </div>
+          <div className="col-span-2 border-t border-border/60 py-4 lg:col-span-1">
+            <p className={SECTION_LABEL}>Offer volume</p>
+            <p className="mt-2 text-[2.75rem] leading-none tracking-[-0.04em] tabular-nums" style={TITLE_FONT}>{totalVolumeLabel}</p>
+          </div>
+        </div>
       </header>
 
       <OffersClient slug={slug} initialOffers={initialOffers} />

@@ -39,7 +39,7 @@ export default async function BrokerSettingsPage() {
 
   return (
     <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="settings-general">
-      <header className="space-y-1.5">
+      <header className="space-y-1.5 border-b chippi-dashboard-divider pb-7" data-route-orientation="workspace-identity">
         <p className={BODY_MUTED}>Settings.</p>
         <h1 className={H1} style={TITLE_FONT}>
           <SplitReveal as="span" text="General" />

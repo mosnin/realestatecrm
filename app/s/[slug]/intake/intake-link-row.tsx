@@ -15,6 +15,8 @@ interface IntakeLinkRowProps {
   /** Hide the preview link button (e.g. for tracking-link rows where there's
    *  no separate preview destination). */
   hidePreview?: boolean;
+  /** Invert the chip when it sits on a graphite campaign panel. */
+  inverse?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function IntakeLinkRow({
   copyValue,
   display,
   hidePreview,
+  inverse = false,
 }: IntakeLinkRowProps) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,7 +57,12 @@ export function IntakeLinkRow({
 
   return (
     <div className="flex items-center gap-1.5">
-      <code className="flex-1 text-[12px] bg-foreground/[0.04] rounded-md px-2.5 py-1.5 font-mono text-muted-foreground border border-border/60 truncate">
+      <code className={cn(
+        'flex-1 text-[12px] rounded-md px-2.5 py-1.5 font-mono border truncate',
+        inverse
+          ? 'border-background/15 bg-background/10 text-background/75'
+          : 'border-border/60 bg-foreground/[0.04] text-muted-foreground',
+      )}>
         {shown}
       </code>
       <button
@@ -65,7 +73,9 @@ export function IntakeLinkRow({
           'inline-flex items-center justify-center w-8 h-8 rounded-md border transition-colors duration-150 flex-shrink-0 active:scale-[0.98]',
           copied
             ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-            : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
+            : inverse
+              ? 'border-background/15 text-background/70 hover:bg-background/10 hover:text-background'
+              : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]',
         )}
       >
         {copied ? (
@@ -80,7 +90,12 @@ export function IntakeLinkRow({
           target="_blank"
           rel="noreferrer"
           aria-label="Open in new tab"
-          className="inline-flex items-center justify-center w-8 h-8 rounded-md border border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] active:bg-foreground/[0.045] transition-colors duration-150 flex-shrink-0 active:scale-[0.98]"
+          className={cn(
+            'inline-flex items-center justify-center w-8 h-8 rounded-md border transition-colors duration-150 flex-shrink-0 active:scale-[0.98]',
+            inverse
+              ? 'border-background/15 text-background/70 hover:bg-background/10 hover:text-background'
+              : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] active:bg-foreground/[0.045]',
+          )}
         >
           <ExternalLink size={13} strokeWidth={1.75} />
         </a>

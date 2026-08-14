@@ -1,14 +1,14 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { supabase } from '@/lib/supabase';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
 import { formatCompact } from '@/lib/formatting';
 import {
-  H1,
   TITLE_FONT,
   BODY_MUTED,
-  SECTION_RHYTHM,
+  PRIMARY_PILL,
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
@@ -16,7 +16,11 @@ import { BrokerKanbanBoard } from './broker-kanban-board';
 import type { BrokerDealItem } from './broker-deal-card';
 import type { BrokerKanbanColumn } from './broker-kanban-board';
 import type { Metadata } from 'next';
-import { BROKER_PAGE_WIDE } from '@/components/broker/premium';
+import {
+  BROKER_BOARD_SHELL,
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Deals — Brokerage' };
 
@@ -308,17 +312,31 @@ export default async function BrokerDealsPage() {
   })();
 
   return (
-    <div className={cn(BROKER_PAGE_WIDE, SECTION_RHYTHM)} data-broker-premium-page="deals">
-      {/* Status-sentence header — per STYLESHEET.md §The status-sentence pattern */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Brokerage.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-none')} data-broker-premium-page="deals" data-broker-family="deal-board">
+      <header className="grid gap-7 border-b chippi-dashboard-divider pb-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" data-route-orientation="board">
+        <div className="max-w-3xl space-y-3">
+          <p className={BROKER_ORIENTATION}>Live deal board</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Deals" />
-        </h1>
-        <p className={BODY_MUTED}>{statusSentence}</p>
+          </h1>
+          <p className={cn(BODY_MUTED, 'text-base')}>{statusSentence}</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-7 lg:justify-end">
+          <div>
+            <p className={BROKER_ORIENTATION}>Active value</p>
+            <p className="mt-1 text-3xl tracking-tight tabular-nums" style={TITLE_FONT}>{formatCompact(totalValue)}</p>
+          </div>
+          <div>
+            <p className={BROKER_ORIENTATION}>Needs attention</p>
+            <p className="mt-1 text-3xl tracking-tight tabular-nums" style={TITLE_FONT}>{atRiskCount}</p>
+          </div>
+          <Link href="/broker/pipeline" className={PRIMARY_PILL}>Open pipeline report</Link>
+        </div>
       </header>
 
-      <BrokerKanbanBoard columns={columns} />
+      <section className={BROKER_BOARD_SHELL} data-primary-work-geometry="horizontal-kanban">
+        <BrokerKanbanBoard columns={columns} />
+      </section>
     </div>
   );
 }

@@ -2,13 +2,18 @@ import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { formatCompact } from '@/lib/formatting';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { RealtorsClient, type RealtorRow } from './realtors-client';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_DIRECTORY_SHELL,
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Real estate agents — Teams' };
 
@@ -302,15 +307,21 @@ export default async function BrokerRealtorsPage() {
     }
     return `${active.length} active. Team is on track.`;
   })();
+  const activeCount = realtors.filter((r) => r.onboard).length;
+  const attentionCount = realtors.filter((r) => r.health === 'needs-attention').length;
+  const totalPipeline = realtors.reduce((sum, realtor) => sum + realtor.pipeline, 0);
 
   return (
-    <div className={cn(BROKER_PAGE_READING, 'pb-56 md:pb-24')} data-broker-premium-page="realtors">
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Real estate agents.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl pb-56 md:pb-24')} data-broker-premium-page="realtors" data-broker-family="agent-directory">
+      <header className="grid gap-7 border-b chippi-dashboard-divider pb-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end" data-route-orientation="coaching-roster">
+        <div className="max-w-3xl space-y-3">
+          <p className={BROKER_ORIENTATION}>Agent performance</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Your team in flight" />
-        </h1>
-        <p className={cn(BODY_MUTED)}>{subtitle}</p>
+          </h1>
+          <p className={cn(BODY_MUTED, 'text-base')}>{subtitle}</p>
+        </div>
+        <Link href="/broker/invitations" className={PRIMARY_PILL}>Invite an agent</Link>
       </header>
 
       {members.length === 0 ? (
@@ -327,7 +338,18 @@ export default async function BrokerRealtorsPage() {
           </p>
         </div>
       ) : (
-        <RealtorsClient realtors={realtors} />
+        <section className={BROKER_DIRECTORY_SHELL} data-primary-work-geometry="coaching-directory">
+          <aside className="border-b chippi-dashboard-divider p-6 lg:border-b-0 lg:border-r">
+            <p className={BROKER_ORIENTATION}>Team pulse</p>
+            <dl className="mt-8 space-y-7">
+              <div><dt className="text-xs text-muted-foreground">Active agents</dt><dd className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{activeCount}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Need coaching</dt><dd className="mt-1 text-3xl tabular-nums" style={TITLE_FONT}>{attentionCount}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Team pipeline</dt><dd className="mt-1 text-2xl tabular-nums" style={TITLE_FONT}>{formatCompact(totalPipeline)}</dd></div>
+            </dl>
+            <Link href="/broker/analytics" className="mt-9 inline-flex text-sm font-medium underline underline-offset-4">Open team analytics</Link>
+          </aside>
+          <div className="min-w-0 p-5 sm:p-7"><RealtorsClient realtors={realtors} /></div>
+        </section>
       )}
     </div>
   );

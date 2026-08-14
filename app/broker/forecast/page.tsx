@@ -29,7 +29,11 @@ import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import type { Metadata } from 'next';
 import { ArrowUpRight } from 'lucide-react';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_FINANCE_HERO,
+  BROKER_PAGE_READING,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Revenue Forecast — Brokerage' };
 
@@ -484,14 +488,20 @@ export default async function BrokerForecastPage() {
   const hasAnything = wonCount > 0 || activeCount > 0;
 
   return (
-    <div className={cn(BROKER_PAGE_READING, SECTION_RHYTHM)} data-broker-premium-page="forecast">
-      {/* Status-sentence header */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>{brokerage.name}.</p>
-        <h1 className={H1} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl')} data-broker-premium-page="forecast" data-broker-family="revenue-forecast">
+      <header className={BROKER_FINANCE_HERO} data-route-orientation="forecast">
+        <div className="max-w-3xl space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-background/60">{brokerage.name} · revenue outlook</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-background sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text={`${monthName} revenue`} />
-        </h1>
-        <p className={BODY_MUTED}>{pace}</p>
+          </h1>
+          <p className="max-w-2xl text-base text-background/70">{pace}</p>
+        </div>
+        <div className="lg:text-right">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-background/55">Projected GCI</p>
+          <p className="mt-2 text-5xl tracking-[-0.045em] tabular-nums" style={TITLE_FONT}>{formatCurrency(totalForecast)}</p>
+          <p className="mt-2 text-sm text-background/60">{activeCount} active {pluralize(activeCount, 'deal')} in the model</p>
+        </div>
       </header>
 
       {!hasAnything ? (
@@ -502,7 +512,7 @@ export default async function BrokerForecastPage() {
           </p>
         </div>
       ) : (
-        <>
+        <div className="space-y-10" data-primary-work-geometry="forecast-story">
           {/* Focal projected number */}
           <section className="space-y-1">
             <p className={SECTION_LABEL}>Projected GCI, {monthName}</p>
@@ -774,7 +784,7 @@ export default async function BrokerForecastPage() {
             5% by health. Commission source: per-deal rate when set, otherwise brokerage default
             ({Math.round(defaultBrokerRate * 100)}%).
           </p>
-        </>
+        </div>
       )}
     </div>
   );

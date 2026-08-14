@@ -5,6 +5,7 @@ import { fetchRawAnalyticsData, buildPipelineAnalyticsData } from '@/lib/analyti
 import { PipelineView } from '@/components/analytics/pipeline-view';
 import { H1, TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { Reveal } from '@/components/motion';
+import { SupportingActionLink, SupportingOrientation, SupportingWorkArea } from '../../_components/supporting-page';
 
 export default async function PipelineAnalyticsPage({
   params,
@@ -23,7 +24,17 @@ export default async function PipelineAnalyticsPage({
     const data = buildPipelineAnalyticsData(raw);
     return (
       <Reveal variant="fade">
-        <PipelineView data={data} />
+        <div>
+          <SupportingOrientation
+            family="intelligence"
+            eyebrow="Analytics / Pipeline"
+            title="Where revenue is moving or stuck"
+            summary={`${data.totalDeals} deals account for ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data.totalPipelineValue)} in pipeline value.`}
+            nextAction={data.activeDeals > 0 ? 'Review the stage with the most value and assign one concrete next move.' : 'Create a deal to establish your first pipeline baseline.'}
+            action={<SupportingActionLink href={`/s/${slug}/deals`}>Work the pipeline</SupportingActionLink>}
+          />
+          <SupportingWorkArea><PipelineView data={data} /></SupportingWorkArea>
+        </div>
       </Reveal>
     );
   } catch (err) {

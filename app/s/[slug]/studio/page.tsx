@@ -10,7 +10,12 @@ import {
 } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal, StaggerReveal } from '@/components/motion';
-import { RealtorPage } from '../_components/realtor-page';
+import {
+  SupportingActionLink,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,45 +68,51 @@ export default async function StudioPage({
   ] as const;
 
   return (
-    <RealtorPage width="content" className={cn(PAGE_RHYTHM)}>
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Studio.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          <SplitReveal as="span" text="Make your listings shine" by="word" />
-        </h1>
-        <p className={BODY_MUTED}>
-          AI-generated photos, captions, and scheduled posts — all in one
-          workflow.
-        </p>
-      </header>
+    <SupportingPage family="studio" width="wide">
+      <SupportingOrientation
+        family="studio"
+        eyebrow="Studio / Campaign desk"
+        title={<SplitReveal as="span" text="Turn one listing into a week of marketing" by="word" />}
+        summary="Create the visual, write the caption, then schedule it without rebuilding the campaign in another tool."
+        nextAction="Start with the property or story that needs attention this week, then carry the result through to Schedule."
+        action={<SupportingActionLink href={`/s/${slug}/studio/create`}>Create campaign asset</SupportingActionLink>}
+        layout="split"
+      />
 
-      <section className="space-y-4">
-        <p className={SECTION_LABEL}>Workflows</p>
-        <StaggerReveal className="chippi-dashboard-panel overflow-hidden rounded-[1.75rem] divide-y chippi-dashboard-divider px-5 sm:px-7">
-          {workflows.map((w) => {
-            return (
-              <Link
-                key={w.href}
-                href={w.href}
-                className={cn(
-                  'group flex items-center justify-between gap-5 px-1 py-4',
-                  'transition-colors duration-150 hover:bg-foreground/[0.025]',
-                )}
-              >
+      <SupportingWorkArea className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+        <Link
+          href={`/s/${slug}/studio/create`}
+          className="group flex min-h-[25rem] flex-col justify-between rounded-[2rem] bg-foreground p-7 text-background transition-transform duration-200 hover:-translate-y-0.5 sm:p-9"
+        >
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/60">Start here</p>
+            <h2 className="mt-4 max-w-lg text-3xl leading-tight tracking-[-0.04em]">Create the lead image people stop scrolling for.</h2>
+          </div>
+          <div className="flex items-end justify-between gap-6">
+            <p className="max-w-sm text-sm leading-6 text-background/70">Describe the listing, neighborhood, or moment. Chippi creates a saved asset you can carry into the rest of Studio.</p>
+            <span className="shrink-0 rounded-full border border-background/20 px-4 py-2 text-sm font-medium">Open Create</span>
+          </div>
+        </Link>
+
+        <div className="border-y chippi-dashboard-divider divide-y chippi-dashboard-divider">
+          {workflows.slice(1).map((w, index) => (
+            <Link
+              key={w.href}
+              href={w.href}
+              className="group flex min-h-[6.25rem] items-center justify-between gap-5 px-1 py-5 transition-colors hover:bg-foreground/[0.025]"
+            >
+              <div className="flex min-w-0 items-start gap-4">
+                <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">0{index + 2}</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">{w.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {w.subtitle}
-                  </p>
+                  <p className="text-base font-medium text-foreground">{w.title}</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">{w.subtitle}</p>
                 </div>
-                <span className="shrink-0 text-xs text-muted-foreground transition-colors group-hover:text-foreground">
-                  Open
-                </span>
-              </Link>
-            );
-          })}
-        </StaggerReveal>
-      </section>
-    </RealtorPage>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground transition-colors group-hover:text-foreground">Open</span>
+            </Link>
+          ))}
+        </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

@@ -29,6 +29,14 @@ import {
   SECTION_RHYTHM,
   READING_MAX,
 } from '@/lib/typography';
+import {
+  SupportingActionLink,
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 /**
  * Settings — task-grouped tabs the realtor can hold in their head:
@@ -177,44 +185,47 @@ export default async function SettingsPage({
   } else {
     narration = 'Workspace settings.';
   }
+  const activeTabLabel = TABS.find((tab) => tab.id === activeTab)?.label ?? 'Workspace';
+  const nextActionByTab: Record<TabId, string> = {
+    workspace: 'Confirm the workspace identity and public slug before changing deeper controls.',
+    you: 'Make sure your public profile and AI personalization describe the same professional voice.',
+    connections: 'Connect the account Chippi needs for the next real action you want it to complete.',
+    memory: 'Remove anything stale so future work starts from current facts.',
+    privacy: 'Review notification and legal settings before expanding automation.',
+    developer: 'Check usage and revoke any key that no longer has a clear owner.',
+  };
 
   return (
-    <div data-realtor-page="today" className={`chippi-dashboard-canvas min-h-[calc(100vh-10rem)] pt-3 sm:pt-5 ${SECTION_RHYTHM} ${READING_MAX} pb-12`}>
-      {/* Page header */}
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>Settings.</p>
-        <SplitReveal
-          as="h1"
-          text="Settings"
-          className={cn(H1, '[font-family:var(--font-title)]')}
-        />
-        <p className={BODY_MUTED}>
-          {narration}
-          {(isTrialing || isActive || subStatus === 'inactive') && (
-            <>
-              {' '}
-              <a
-                href={`/s/${slug}/billing`}
-                className="underline underline-offset-2 text-foreground hover:text-foreground/80"
-              >
-                {subStatus === 'inactive' ? 'Start trial' : 'Manage billing'}
-              </a>
-            </>
-          )}
-        </p>
-      </header>
+    <SupportingPage family="control" width="wide">
+      <SupportingOrientation
+        family="control"
+        eyebrow={`Settings / ${activeTabLabel}`}
+        title={<SplitReveal as="span" text="Your workspace control desk" />}
+        summary={narration}
+        nextAction={nextActionByTab[activeTab]}
+        action={<SupportingActionLink href={`/s/${slug}/billing`}>{subStatus === 'inactive' ? 'Choose a plan' : 'Manage billing'}</SupportingActionLink>}
+        layout="rail"
+      />
+      <SupportingMetricBand>
+        <SupportingMetric label="Workspace" value={space.name} detail={`/${space.slug}`} />
+        <SupportingMetric label="Current area" value={activeTabLabel} detail="open controls" accent />
+        <SupportingMetric label="Billing" value={subStatus.replace('_', ' ')} detail={periodEnd ? `period ends ${new Date(periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'no billing date'} />
+        <SupportingMetric label="Control groups" value={TABS.length} detail="organized by outcome" />
+      </SupportingMetricBand>
+
+      <SupportingWorkArea className="grid gap-10 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-start">
 
       {/* Tab nav — horizontal scroll on mobile, fits comfortably on desktop.
           Active tab uses the foreground underline rule from STYLESHEET;
           the rest stay muted. Paper-flat, no pill chrome. */}
       <nav
-        className="relative border-b border-border/60"
+        className="relative border-b border-border/60 lg:sticky lg:top-8 lg:border-b-0"
         aria-label="Settings sections"
       >
         <div
           role="tablist"
           aria-label="Settings sections"
-          className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide snap-x snap-proximity"
+          className="flex items-center gap-1 overflow-x-auto -mb-px scrollbar-hide snap-x snap-proximity lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-visible"
         >
           {TABS.map((t) => {
             const isActiveTab = t.id === activeTab;
@@ -226,11 +237,11 @@ export default async function SettingsPage({
                 aria-current={isActiveTab ? 'page' : undefined}
                 aria-selected={isActiveTab}
                 className={cn(
-                  'inline-flex items-center px-3 py-2.5 text-sm whitespace-nowrap snap-start',
-                  'border-b-2 -mb-px transition-colors duration-150',
+                  'inline-flex items-center rounded-full px-3 py-2.5 text-sm whitespace-nowrap snap-start',
+                  'transition-colors duration-150 lg:rounded-xl',
                   isActiveTab
-                    ? 'border-foreground text-foreground font-medium'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                    ? 'bg-foreground text-background font-medium'
+                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
                 )}
               >
                 {t.label}
@@ -239,6 +250,8 @@ export default async function SettingsPage({
           })}
         </div>
       </nav>
+
+      <div className="min-w-0">
 
       {/* Workspace — space name, slug, and danger zone. Nothing else; this
           tab is identity, not configuration. */}
@@ -436,6 +449,8 @@ export default async function SettingsPage({
           </section>
         </StaggerReveal>
       )}
-    </div>
+      </div>
+      </SupportingWorkArea>
+    </SupportingPage>
   );
 }

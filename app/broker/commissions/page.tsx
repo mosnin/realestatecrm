@@ -3,9 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { CommissionsClient, type LedgerRow } from './commissions-client';
-import { H1, TITLE_FONT, BODY_MUTED, SECTION_RHYTHM } from '@/lib/typography';
+import { TITLE_FONT } from '@/lib/typography';
+import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_FINANCE_HERO,
+  BROKER_PAGE_WIDE,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Commissions — Teams' };
 
@@ -144,20 +148,28 @@ export default async function BrokerCommissionsPage() {
       : `${rowCount} ${rowCount === 1 ? 'deal' : 'deals'} on the ledger, snapshotted at close.`;
 
   return (
-    <div className={`${BROKER_PAGE_READING} ${SECTION_RHYTHM}`} data-broker-premium-page="commissions">
-      <header className="space-y-1.5">
-        <p className={BODY_MUTED}>{brokerage.name}.</p>
-        <h1 className={H1} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl')} data-broker-premium-page="commissions" data-broker-family="finance-ledger">
+      <header className={BROKER_FINANCE_HERO} data-route-orientation="ledger">
+        <div className="max-w-3xl space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-background/60">Brokerage money</p>
+          <h1 className="text-4xl tracking-[-0.04em] text-background sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Commissions" />
-        </h1>
-        <p className={BODY_MUTED}>{statusSentence}</p>
+          </h1>
+          <p className="max-w-2xl text-base text-background/70">{statusSentence}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-8 lg:text-right">
+          <div><p className="text-[11px] uppercase tracking-[0.14em] text-background/55">Agent default</p><p className="mt-2 text-3xl tabular-nums" style={TITLE_FONT}>{Math.round(defaultAgentRate * 100)}%</p></div>
+          <div><p className="text-[11px] uppercase tracking-[0.14em] text-background/55">Broker default</p><p className="mt-2 text-3xl tabular-nums" style={TITLE_FONT}>{Math.round(defaultBrokerRate * 100)}%</p></div>
+        </div>
       </header>
 
-      <CommissionsClient
-        ledger={ledger}
-        defaultAgentRate={defaultAgentRate}
-        defaultBrokerRate={defaultBrokerRate}
-      />
+      <section data-primary-work-geometry="commission-ledger">
+        <CommissionsClient
+          ledger={ledger}
+          defaultAgentRate={defaultAgentRate}
+          defaultBrokerRate={defaultBrokerRate}
+        />
+      </section>
     </div>
   );
 }

@@ -1,13 +1,19 @@
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import type { Metadata } from 'next';
-import { H1, TITLE_FONT, BODY_MUTED } from '@/lib/typography';
+import { TITLE_FONT, BODY_MUTED, PRIMARY_PILL } from '@/lib/typography';
 import { cn } from '@/lib/utils';
 import { SplitReveal } from '@/components/motion';
 import { BrokerLeadsClient, type LeadRow, type RealtorOption, type AssignedLeadProgress } from './broker-leads-client';
-import { BROKER_PAGE_READING } from '@/components/broker/premium';
+import {
+  BROKER_COMMAND_HERO,
+  BROKER_ORIENTATION,
+  BROKER_PAGE_WIDE,
+  BROKER_PANEL,
+} from '@/components/broker/premium';
 
 export const metadata: Metadata = { title: 'Leads — Teams' };
 
@@ -266,21 +272,45 @@ export default async function BrokerLeadsPage() {
   })();
 
   return (
-    <div className={BROKER_PAGE_READING} data-broker-premium-page="leads">
-      <header className="space-y-1.5">
-        <p className={cn(BODY_MUTED)}>Leads.</p>
-        <h1 className={cn(H1)} style={TITLE_FONT}>
+    <div className={cn(BROKER_PAGE_WIDE, 'max-w-7xl')} data-broker-premium-page="leads" data-broker-family="intake-command-center">
+      <header className={BROKER_COMMAND_HERO} data-route-orientation="intake">
+        <div className="max-w-3xl space-y-4">
+          <p className={BROKER_ORIENTATION}>Intake command center</p>
+          <h1 className="text-4xl tracking-[-0.035em] text-foreground sm:text-5xl" style={TITLE_FONT}>
           <SplitReveal as="span" text="Your brokerage’s intake" />
-        </h1>
-        <p className={cn(BODY_MUTED)}>{subtitle}</p>
+          </h1>
+          <p className={cn(BODY_MUTED, 'max-w-2xl text-base')}>{subtitle}</p>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Link href="/broker/settings/form-builder" className={PRIMARY_PILL}>
+              Open intake form
+            </Link>
+            <Link
+              href={`/broker/chippi?prompt=${encodeURIComponent('Review the unassigned brokerage leads and recommend who should receive each one.')}`}
+              className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+            >
+              Ask Chippi to review routing
+            </Link>
+          </div>
+        </div>
+        <aside className={cn(BROKER_PANEL, 'relative overflow-hidden')} aria-label="Routing summary">
+          <p className={BROKER_ORIENTATION}>Needs routing</p>
+          <p className="mt-3 text-5xl tracking-[-0.045em] tabular-nums" style={TITLE_FONT}>
+            {unassignedLeads.length}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {assignedLeads.length} already with the team · {realtors.length} available agents
+          </p>
+        </aside>
       </header>
 
-      <BrokerLeadsClient
-        unassignedLeads={unassignedLeads}
-        assignedLeads={assignedLeads}
-        realtors={realtors}
-        assignedLeadProgress={assignedLeadProgress}
-      />
+      <section data-primary-work-geometry="split-routing-queue">
+        <BrokerLeadsClient
+          unassignedLeads={unassignedLeads}
+          assignedLeads={assignedLeads}
+          realtors={realtors}
+          assignedLeadProgress={assignedLeadProgress}
+        />
+      </section>
     </div>
   );
 }

@@ -8,7 +8,13 @@ import { RoutinesManager } from '@/components/routines/routines-manager';
 import { TrustLadderBanner } from '@/components/workflows/trust-ladder-banner';
 import { AutomationsIntro } from '@/components/workflows/automations-intro';
 import { BODY_MUTED, H1, TITLE_FONT, SECTION_LABEL, CAPTION } from '@/lib/typography';
-import { RealtorPage } from '../_components/realtor-page';
+import {
+  SupportingMetric,
+  SupportingMetricBand,
+  SupportingOrientation,
+  SupportingPage,
+  SupportingWorkArea,
+} from '../_components/supporting-page';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Automations — Chippi' };
@@ -45,6 +51,25 @@ export default async function AutomationsPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  let workflowCount = 0;
+  let activeWorkflowCount = 0;
+  let routineCount = 0;
+  let activeRoutineCount = 0;
+  try {
+    const [workflows, activeWorkflows, routines, activeRoutines] = await Promise.all([
+      supabase.from('Workflow').select('*', { count: 'exact', head: true }).eq('spaceId', space.id),
+      supabase.from('Workflow').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).eq('enabled', true),
+      supabase.from('Routine').select('*', { count: 'exact', head: true }).eq('spaceId', space.id),
+      supabase.from('Routine').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).eq('enabled', true),
+    ]);
+    workflowCount = workflows.count ?? 0;
+    activeWorkflowCount = activeWorkflows.count ?? 0;
+    routineCount = routines.count ?? 0;
+    activeRoutineCount = activeRoutines.count ?? 0;
+  } catch (err) {
+    console.error('[automations] count query failed', err);
+  }
+
   // Standard dashboard page frame — the outer LayoutShell already supplies the
   // 1500px max width, horizontal padding, and scroll. This page renders a
   // Deals/People-style header (serif H1 + muted status line) and its sections
@@ -55,48 +80,60 @@ export default async function AutomationsPage({
   // same column and let only the builder/canvas working surfaces span the
   // full 1500px LayoutShell frame.
   return (
-    <RealtorPage width="full" className="space-y-10">
-      <header className="mx-auto w-full max-w-5xl space-y-1.5">
-        <p className={BODY_MUTED}>Automations.</p>
-        <h1 className={H1} style={TITLE_FONT}>
-          Things I run on my own
-        </h1>
-        <p className={BODY_MUTED}>
-          Standing orders — every run drafts, nothing goes out without your tap. Set them to run
-          when something happens, or on a schedule.
-        </p>
-      </header>
+    <SupportingPage family="operations" width="full">
+      <div className="mx-auto w-full max-w-6xl">
+        <SupportingOrientation
+          family="operations"
+          eyebrow="Automation / Standing orders"
+          title="Work that keeps moving after you leave"
+          summary={`${activeWorkflowCount + activeRoutineCount} automations are active across event triggers and scheduled routines.`}
+          nextAction={
+            workflowCount + routineCount === 0
+              ? 'Create one follow-up rule for a real moment that happens every week.'
+              : 'Test the highest-impact automation and confirm its latest outcome before adding another.'
+          }
+          action={
+            <div className="flex flex-wrap gap-2">
+              <a href="#workflows" className="inline-flex h-10 items-center rounded-full bg-foreground px-5 text-sm font-medium text-background">New event workflow</a>
+              <a href="#routines" className="inline-flex h-10 items-center rounded-full border chippi-dashboard-divider px-5 text-sm font-medium text-foreground">New routine</a>
+            </div>
+          }
+        />
 
-      {/* Earned-autonomy nudge — shows only when the realtor's real draft
-          track record has earned it; silent otherwise. */}
-      <div className="mx-auto w-full max-w-5xl">
-        <TrustLadderBanner />
+        <SupportingMetricBand>
+          <SupportingMetric label="Event workflows" value={workflowCount} detail="all rules" />
+          <SupportingMetric label="Active workflows" value={activeWorkflowCount} detail="listening now" accent />
+          <SupportingMetric label="Scheduled routines" value={routineCount} detail="all schedules" />
+          <SupportingMetric label="Active routines" value={activeRoutineCount} detail="queued to run" />
+        </SupportingMetricBand>
       </div>
 
-      <section id="workflows" className="scroll-mt-24 space-y-3">
-        <div className="mx-auto w-full max-w-5xl space-y-1">
-          <h2 className={SECTION_LABEL}>When something happens</h2>
-          <p className={CAPTION}>
-            React to an event — a new lead, a reply, a deal moving stage.
-          </p>
-        </div>
-        <Suspense fallback={null}>
-          <WorkflowsManager />
-        </Suspense>
-      </section>
+      <SupportingWorkArea className="mx-auto w-full max-w-6xl space-y-10">
+        <TrustLadderBanner />
 
-      <section id="routines" className="scroll-mt-24 space-y-3">
-        <div className="mx-auto w-full max-w-5xl space-y-1">
-          <h2 className={SECTION_LABEL}>On a schedule</h2>
-          <p className={CAPTION}>
-            A recurring beat — every morning, every weekday, every hour.
-          </p>
+        <div className="grid gap-10 xl:grid-cols-[minmax(0,1.18fr)_minmax(22rem,0.82fr)] xl:items-start">
+          <section id="workflows" className="scroll-mt-24 space-y-4">
+            <div className="space-y-1 border-b chippi-dashboard-divider pb-4">
+              <h2 className="text-xl font-medium tracking-[-0.02em] text-foreground">When something changes</h2>
+              <p className={CAPTION}>A new lead, an inbound reply, or a deal moving stage starts the work.</p>
+            </div>
+            <Suspense fallback={null}>
+              <WorkflowsManager />
+            </Suspense>
+          </section>
+
+          <section id="routines" className="scroll-mt-24 space-y-4 xl:border-l xl:border-border/60 xl:pl-8">
+            <div className="space-y-1 border-b chippi-dashboard-divider pb-4">
+              <h2 className="text-xl font-medium tracking-[-0.02em] text-foreground">On a recurring beat</h2>
+              <p className={CAPTION}>Morning prep, weekday follow-up, and every schedule you want Chippi to keep.</p>
+            </div>
+            <RoutinesManager apiBase="/api/routines" />
+          </section>
         </div>
-        <RoutinesManager apiBase="/api/routines" />
-      </section>
+      </SupportingWorkArea>
 
       {/* First-visit feature tour — self-dismissing, persisted per browser. */}
       <AutomationsIntro />
-    </RealtorPage>
+    </SupportingPage>
   );
 }
