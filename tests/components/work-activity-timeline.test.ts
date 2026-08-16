@@ -120,9 +120,10 @@ describe('WorkActivityTimeline presentation contract', () => {
     expect(html).not.toContain('bg-card');
     expect(html).toContain('aria-live="polite"');
     expect(html.match(/aria-live=/g)).toHaveLength(1);
-    expect(html).toContain('aria-label="Grounded work progress"');
+    expect(html).toContain('Running contact search');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('data-agent-activity-status="working"');
+    expect(html).not.toContain('aria-label="Grounded work progress"');
   });
 
   it('collapses a completed run into its grounded terminal summary', () => {
@@ -149,7 +150,8 @@ describe('WorkActivityTimeline presentation contract', () => {
       })],
     }));
 
-    expect(html).toContain('3 plan steps');
-    expect(html.match(/<li/g)).toHaveLength(1);
+    expect(html).toContain('Preparing 3 plan steps');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html.match(/<li/g)).toBeNull();
   });
 });

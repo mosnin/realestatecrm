@@ -1,6 +1,7 @@
+import * as React from 'react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { groupTranscriptItems } from '@/components/ai/blocks/group-transcript-items';
 import { Transcript } from '@/components/ai/blocks/transcript';
 import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
@@ -57,25 +58,38 @@ describe('groupTranscriptItems', () => {
     );
     expect(items).toEqual([]);
   });
+
+  it('keeps a work session on its own row next to the tool dropdown', () => {
+    const items = groupTranscriptItems([
+      { type: 'work_session', sessionId: 'sess_1', goal: 'Write the report', source: 'voice' },
+      tool('find_deal', 'complete', { callId: 'deal_1' }),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(['work-session', 'tool-group']);
+  });
 });
 
 describe('Transcript tool grouping', () => {
   it('renders one grouped disclosure for tools split by assistant text', () => {
-    const html = renderToStaticMarkup(createElement(Transcript, {
-      role: 'assistant',
-      blocks: [
-        { type: 'text', content: 'Looking that up.' },
-        tool('pipeline_summary', 'error', { callId: 'p1' }),
-        { type: 'text', content: 'Trying again.' },
-        tool('pipeline_summary', 'error', { callId: 'p2' }),
-        tool('find_deal', 'complete', { callId: 'd1' }),
-      ],
-    }));
+    vi.stubGlobal('React', React);
+    try {
+      const html = renderToStaticMarkup(createElement(Transcript, {
+        role: 'assistant',
+        blocks: [
+          { type: 'text', content: 'Looking that up.' },
+          tool('pipeline_summary', 'error', { callId: 'p1' }),
+          { type: 'text', content: 'Trying again.' },
+          tool('pipeline_summary', 'error', { callId: 'p2' }),
+          tool('find_deal', 'complete', { callId: 'd1' }),
+        ],
+      }));
 
-    expect(html).toContain('data-steps-count="2"');
-    expect(html.match(/data-steps-state=/g)).toHaveLength(1);
-    expect(html).not.toContain('data-beui-surface="tool-result"');
-    expect(html).not.toContain('JSON parsing');
-    expect(html).not.toMatch(/>failed</i);
+      expect(html).toContain('data-steps-count="2"');
+      expect(html.match(/data-steps-state=/g)).toHaveLength(1);
+      expect(html).not.toContain('data-beui-surface="tool-result"');
+      expect(html).not.toContain('JSON parsing');
+      expect(html).not.toMatch(/>failed</i);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

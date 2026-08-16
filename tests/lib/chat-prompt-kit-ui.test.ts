@@ -45,7 +45,7 @@ describe('chat Prompt Kit UI phases', () => {
     expect(toolCall).toContain('<AgentToolResult');
     expect(toolCall).toContain('status={resultStatus}');
     expect(toolGroup).toContain("import { Steps } from '@/components/ai/prompt-kit';");
-    expect(toolGroup).toContain('<Steps state={state} count={blocks.length}>');
+    expect(toolGroup).toContain('<Steps state={state} count={unique.length}>');
     expect(toolGroup).toContain('toolGroupOutcomeLabel(');
     expect(toolGroup).not.toContain("? 'Task completed'");
   });
