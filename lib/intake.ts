@@ -5,7 +5,13 @@ import { protocol, rootDomain } from '@/lib/utils';
  * Chippi uses path slugs (`/apply/:slug`) and never host-based tenant URLs.
  */
 export function normalizeSlug(raw: string) {
-  return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  // Login/layout pass the URL segment through here. A missing or non-string
+  // value must not throw — that used to surface as the full-screen
+  // "couldn't load your workspace" page after an otherwise successful sign-in.
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '');
 }
 
 const RESERVED_SLUGS = new Set([

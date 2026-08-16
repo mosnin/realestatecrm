@@ -14,6 +14,11 @@ describe('normalizeSlug', () => {
   it('trims whitespace', () => {
     expect(normalizeSlug('  spaces  ')).toBe('spaces');
   });
+
+  it('does not throw on missing or non-string input', () => {
+    expect(normalizeSlug(undefined as unknown as string)).toBe('');
+    expect(normalizeSlug(null as unknown as string)).toBe('');
+  });
 });
 
 describe('isValidSlug', () => {
