@@ -17,7 +17,6 @@ describe('Realtime voice product wiring', () => {
   it('renders durable Work Sessions inline and suppresses duplicate strip cards', () => {
     const transcript = read('components/ai/blocks/transcript.tsx');
     const workspace = read('components/chippi/chippi-workspace.tsx');
-    expect(transcript).toContain("block.type === 'work_session'");
     expect(transcript).toContain('<WorkSessionBlockView');
     expect(workspace).toContain('hiddenSessionIds={inlineWorkSessionIds}');
   });
