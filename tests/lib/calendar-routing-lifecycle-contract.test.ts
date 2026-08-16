@@ -61,7 +61,7 @@ describe('serverless calendar and routing lifecycle contracts', () => {
     const launch = readFileSync('lib/swarm-launch.ts', 'utf8');
     const taskStatus = readFileSync('app/api/agent/tasks/[taskId]/status/route.ts', 'utf8');
 
-    expect(delegation).toContain('createAndEnqueueSwarmRun');
+    expect(delegation).toContain('runDelegatedChildTurn');
     expect(launch).toContain("enqueueWorkerTask('swarm-run-timeout'");
     expect(launch).toContain("enqueueWorkerTask('swarm-run-launch'");
     expect(delegation).not.toContain('fetch(modalSwarmUrl');

@@ -42,7 +42,8 @@ describe('Chippi direct-action product copy', () => {
   it('keeps Review checkpoints visible while autonomous Work stays direct', () => {
     expect(workspace).toContain('const pendingConfirmation = pendingApproval;');
     expect(workspace).toContain("(chatMode === 'work' && workExecutionMode === 'review')) && (");
-    expect(workspace).toContain('isTail && pendingConfirmation && !isStreaming');
+    expect(workspace).toContain('isTail && pendingConfirmation');
+    expect(workspace).toContain('busy: approvalBusy');
     expect(workspace).toContain('disabled={pendingConfirmation !== null || rateLimitSeconds > 0}');
   });
 
