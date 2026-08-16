@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const runMock = vi.hoisted(() => vi.fn());
+const recordUsageMock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => undefined));
+const loadMetaMock = vi.hoisted(() =>
+  vi.fn(async (..._args: unknown[]) => ({ tools: [], liveToolkits: [] as string[], unavailableToolkits: [] as string[] })),
+);
+const persistChildMock = vi.hoisted(() => vi.fn());
+const waitChildMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@openai/agents', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@openai/agents')>();
@@ -10,6 +16,33 @@ vi.mock('@openai/agents', async (importOriginal) => {
 vi.mock('@/lib/ai-tools/agent-model', () => ({
   getAgentModel: () => 'test-model',
 }));
+
+vi.mock('@/lib/usage/record-chat-usage', () => ({
+  recordChatUsage: (...args: unknown[]) => recordUsageMock(...(args as [])),
+}));
+
+vi.mock('@/lib/ai-tools/integration-meta-tools', () => ({
+  loadIntegrationMetaTools: (...args: unknown[]) => loadMetaMock(...(args as [])),
+}));
+
+vi.mock('@/lib/ai-tools/sdk-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai-tools/sdk-bridge')>();
+  return {
+    ...actual,
+    restoreRunState: vi.fn(async () => ({})),
+    findRunInterruption: vi.fn(() => ({ rawItem: { callId: 'c-approve' } })),
+    applyApprovalDecision: vi.fn((state: unknown) => state),
+  };
+});
+
+vi.mock('@/lib/ai-tools/delegate-child-pause', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai-tools/delegate-child-pause')>();
+  return {
+    ...actual,
+    persistChildPausedRun: (...args: unknown[]) => persistChildMock(...(args as [])),
+    waitForChildApprovalDecision: (...args: unknown[]) => waitChildMock(...(args as [])),
+  };
+});
 
 import {
   buildDelegateChildPrompt,
@@ -30,6 +63,11 @@ function makeCtx(): ToolContext {
 
 beforeEach(() => {
   runMock.mockReset();
+  recordUsageMock.mockClear();
+  loadMetaMock.mockClear();
+  persistChildMock.mockReset();
+  waitChildMock.mockReset();
+  loadMetaMock.mockResolvedValue({ tools: [], liveToolkits: [], unavailableToolkits: [] });
 });
 
 describe('delegated specialist run', () => {
@@ -80,5 +118,105 @@ describe('delegated specialist run', () => {
     expect(runMock.mock.calls[0][2]).toEqual(
       expect.objectContaining({ maxTurns: DELEGATE_CHILD_MAX_TURNS, stream: true }),
     );
+  });
+
+  it('loads connected-app meta-tools from the specialist brief', async () => {
+    loadMetaMock.mockResolvedValue({
+      tools: [],
+      liveToolkits: ['gmail'],
+      unavailableToolkits: [],
+    });
+    async function* stream() {}
+    runMock.mockResolvedValue({
+      toStream: () => stream(),
+      completed: Promise.resolve(),
+      finalOutput: 'Sent the Gmail follow-up.',
+    });
+
+    await runDelegatedChildTurn({
+      ctx: makeCtx(),
+      goal: 'Email Sarah from Gmail about Friday.',
+    });
+
+    expect(loadMetaMock).toHaveBeenCalledWith(
+      expect.objectContaining({ space: expect.objectContaining({ id: 'space_1' }) }),
+      { userMessage: 'Email Sarah from Gmail about Friday.' },
+    );
+    const agent = runMock.mock.calls[0]?.[0] as { instructions?: string };
+    expect(agent.instructions).toContain('gmail');
+    expect(agent.instructions).toContain('find_integration_tool');
+  });
+
+  it('records ChatUsage for specialist model calls', async () => {
+    async function* stream() {}
+    runMock.mockResolvedValue({
+      toStream: () => stream(),
+      completed: Promise.resolve(),
+      finalOutput: 'Jane is first.',
+      rawResponses: [{ usage: { inputTokens: 12, outputTokens: 3, cost: 0.004 } }],
+    });
+
+    await runDelegatedChildTurn({
+      ctx: { ...makeCtx(), conversationId: 'conv_1', continuationIdempotencySeed: 'seed-1' },
+      goal: 'Who should I call?',
+    });
+
+    expect(recordUsageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space_1',
+        conversationId: 'conv_1',
+        promptTokens: 12,
+        completionTokens: 3,
+        costUsd: 0.004,
+        route: 'agent',
+        runtime: 'ts',
+        idempotencyKey: 'delegate-child:seed-1:0',
+      }),
+    );
+  });
+
+  it('pauses for approval, waits, then continues the same child', async () => {
+    persistChildMock.mockResolvedValue({
+      pausedRunId: 'pause_child',
+      approvals: [
+        { callId: 'c-approve', toolName: 'send_email', arguments: { to: 'a@b.c' }, summary: 'Email a' },
+      ],
+    });
+    waitChildMock.mockResolvedValue({ callId: 'c-approve', approved: true });
+
+    async function* empty() {}
+    runMock
+      .mockResolvedValueOnce({
+        toStream: () => empty(),
+        completed: Promise.resolve(),
+        finalOutput: '',
+        interruptions: [{ rawItem: { callId: 'c-approve' }, name: 'send_email', arguments: '{}' }],
+        state: { toString: () => 'child-state' },
+      })
+      .mockResolvedValueOnce({
+        toStream: () => empty(),
+        completed: Promise.resolve(),
+        finalOutput: 'Email sent to Jane.',
+      });
+
+    const onPermissionRequired = vi.fn();
+    const out = await runDelegatedChildTurn({
+      ctx: { ...makeCtx(), onPermissionRequired },
+      goal: 'Email Jane the tour details',
+    });
+
+    expect(persistChildMock).toHaveBeenCalledTimes(1);
+    expect(waitChildMock).toHaveBeenCalledTimes(1);
+    expect(onPermissionRequired).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'pause_child',
+        callId: 'c-approve',
+        name: 'send_email',
+        inline: true,
+      }),
+    );
+    expect(out.ok).toBe(true);
+    expect(out.summary).toContain('Email sent');
+    expect(runMock).toHaveBeenCalledTimes(2);
   });
 });

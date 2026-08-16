@@ -65,6 +65,28 @@ export interface ToolContext {
    *  the idle watchdog and the thinking indicator from this callback so a
    *  waiting `delegate_task` does not look stalled. */
   onProgress?: (label: string) => void;
+  /** Mid-turn approval for a nested specialist. The parent stream is still
+   *  open, so the pump emits `permission_required` without pausing the
+   *  parent ConversationTurn. */
+  onPermissionRequired?: (event: {
+    requestId: string;
+    callId: string;
+    name: string;
+    args: Record<string, unknown>;
+    summary: string;
+    inline?: boolean;
+    otherPendingCalls?: Array<{
+      callId: string;
+      name: string;
+      args: Record<string, unknown>;
+      summary: string;
+    }>;
+  }) => void;
+  onPermissionResolved?: (event: {
+    requestId: string;
+    callId: string;
+    decision: 'approved' | 'denied';
+  }) => void;
   /** Server-resolved conversation binding for tools that continue durable work. */
   conversationId?: string;
   /** True only when the user explicitly selected the product's Work mode. */

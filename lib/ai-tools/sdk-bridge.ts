@@ -549,3 +549,33 @@ export function applyApprovalDecision(
   }
   return state;
 }
+
+/**
+ * Fish the matching approval item out of a rehydrated RunState. The SDK's
+ * RunState exposes a `_currentStep` / interruptions accessor that varies
+ * subtly across versions; we try the documented public surface first
+ * (`getInterruptions()`), then fall back to scanning known internal arrays.
+ */
+export function findRunInterruption(
+  state: RunState<unknown, AnyAgent>,
+  callId: string,
+): Parameters<RunState<unknown, AnyAgent>['approve']>[0] | undefined {
+  const anyState = state as unknown as {
+    getInterruptions?: () => Array<{ rawItem?: { callId?: string; id?: string } }>;
+    _currentStep?: { interruptions?: Array<{ rawItem?: { callId?: string; id?: string } }> };
+  };
+
+  let pool: Array<{ rawItem?: { callId?: string; id?: string } }> = [];
+  if (typeof anyState.getInterruptions === 'function') {
+    pool = anyState.getInterruptions() ?? [];
+  } else if (anyState._currentStep?.interruptions) {
+    pool = anyState._currentStep.interruptions ?? [];
+  }
+  const found = pool.find((it) => {
+    const id = it.rawItem?.callId ?? it.rawItem?.id;
+    return id === callId;
+  });
+  return found as
+    | Parameters<RunState<unknown, AnyAgent>['approve']>[0]
+    | undefined;
+}

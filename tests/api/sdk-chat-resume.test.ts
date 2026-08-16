@@ -35,9 +35,20 @@ const { streamResumeMock } = vi.hoisted(() => ({
 }));
 const { assertEnabledMock } = vi.hoisted(() => ({ assertEnabledMock: vi.fn(async () => undefined) }));
 const { workbenchEnabledMock } = vi.hoisted(() => ({ workbenchEnabledMock: vi.fn(() => true) }));
+const { continueChildMock } = vi.hoisted(() => ({
+  continueChildMock: vi.fn(async (..._args: unknown[]) => ({
+    ok: true,
+    summary: 'Specialist finished after approval.',
+    toolNames: ['send_email'],
+  })),
+}));
+
 vi.mock('@/lib/ai-tools/sdk-chat-stream', () => ({
   streamTsChatTurn: vi.fn(),
   streamTsResumeTurn: streamResumeMock,
+}));
+vi.mock('@/lib/ai-tools/delegate-run', () => ({
+  continueDelegatedChildAfterDecision: (...args: unknown[]) => continueChildMock(...(args as [])),
 }));
 vi.mock('@/lib/agent/kill-switch', () => ({ assertSpaceEnabled: assertEnabledMock }));
 vi.mock('@/lib/chippi/workbench-flag', () => ({ isWorkbenchEnabled: workbenchEnabledMock }));
@@ -93,6 +104,8 @@ vi.mock('@/lib/supabase', () => {
 
 import { POST } from '@/app/api/ai/task/resume/[pausedRunId]/route';
 import { requireAuth } from '@/lib/api-auth';
+import { wrapChildRunState } from '@/lib/ai-tools/delegate-child-pause';
+import { resumePausedConversationTurnV2 } from '@/lib/chat/turn-control';
 
 const mockedAuth = vi.mocked(requireAuth);
 
@@ -138,6 +151,7 @@ interface PausedRow {
   activeWorkbookContext?: unknown;
   status: string;
   expiresAt: string;
+  updatedAt?: string;
 }
 const ROW: PausedRow = {
   id: 'run_1',
@@ -417,5 +431,54 @@ describe('POST /api/ai/task/resume/[pausedRunId] — happy path', () => {
     expect(res.status).toBe(409);
     expect(streamResumeMock).not.toHaveBeenCalled();
     expect(updateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/ai/task/resume/[pausedRunId] — specialist child pause', () => {
+  function childRow(updatedAt: string): PausedRow {
+    return {
+      ...ROW,
+      runState: wrapChildRunState({ goal: 'Email Jane', state: 'child-sdk-state' }),
+      approvals: [
+        {
+          callId: 'call_xyz',
+          toolName: 'send_email',
+          arguments: { to: 'a@b.c' },
+          summary: 'Email a@b.c',
+          kind: 'delegate_child',
+          delegateGoal: 'Email Jane',
+        } as PausedRow['approvals'][number] & { kind: string },
+      ],
+      updatedAt,
+    };
+  }
+
+  it('hands the decision to a live waiter without resuming the parent turn', async () => {
+    queueRow(childRow(new Date().toISOString()));
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, kind: 'delegate_child' });
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(continueChildMock).not.toHaveBeenCalled();
+    expect(vi.mocked(resumePausedConversationTurnV2)).not.toHaveBeenCalled();
+  });
+
+  it('continues the specialist when the in-request waiter is gone', async () => {
+    queueRow(childRow(new Date(Date.now() - 60_000).toISOString()));
+    queueSpace(SPACE);
+    const res = await POST(makeReq({ approved: true }), params('run_1'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/text\/event-stream/);
+    expect(continueChildMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goal: 'Email Jane',
+        serializedState: 'child-sdk-state',
+        callId: 'call_xyz',
+        decision: { approved: true },
+      }),
+    );
+    expect(streamResumeMock).not.toHaveBeenCalled();
+    expect(vi.mocked(resumePausedConversationTurnV2)).not.toHaveBeenCalled();
   });
 });

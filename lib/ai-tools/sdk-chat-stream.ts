@@ -44,6 +44,7 @@ import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/a
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
 import type { MultimodalAttachment } from '@/lib/chat/multimodal';
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
+import { sumSdkTurnUsage } from '@/lib/ai-tools/turn-usage';
 import { markTurnEnded } from '@/lib/chat/turn-presence';
 import { DEFAULT_CHAT_MODEL } from '@/lib/chat-models';
 import {
@@ -425,35 +426,10 @@ interface SdkResultLike {
       inputTokens?: number;
       outputTokens?: number;
       inputTokensDetails?: Record<string, number> | Array<Record<string, number>>;
+      cost?: number;
+      costUsd?: number;
     };
   }>;
-}
-
-/** Sum token usage across every model call in the turn. Returns zeros when
- *  the provider didn't report usage (recordChatUsage no-ops on all-zero, so
- *  this is safe to call unconditionally). Reads the cached-input count from
- *  inputTokensDetails in either the object or array shape the SDK uses. */
-function sumTurnUsage(result: SdkResultLike): {
-  promptTokens: number;
-  completionTokens: number;
-  cachedTokens: number;
-} {
-  let promptTokens = 0;
-  let completionTokens = 0;
-  let cachedTokens = 0;
-  for (const r of result.rawResponses ?? []) {
-    const u = r?.usage;
-    if (!u) continue;
-    promptTokens += u.inputTokens ?? 0;
-    completionTokens += u.outputTokens ?? 0;
-    const d = u.inputTokensDetails;
-    const details = Array.isArray(d) ? d : d ? [d] : [];
-    for (const entry of details) {
-      cachedTokens +=
-        Number(entry?.cached_tokens ?? entry?.cachedTokens ?? 0) || 0;
-    }
-  }
-  return { promptTokens, completionTokens, cachedTokens };
 }
 
 function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
@@ -826,9 +802,32 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // visible event fires. Superseded client-side by tool_call_start
       // labels and the first text_delta.
       const idleWatchdog = createIdleWatchdog(input.abortController);
+      input.ctx.conversationId = input.ctx.conversationId ?? input.conversationId;
       input.ctx.onProgress = (label) => {
         idleWatchdog.heartbeat();
         pushEvent({ type: 'status', label });
+      };
+      input.ctx.onPermissionRequired = (event) => {
+        idleWatchdog.heartbeat();
+        pushEvent({
+          type: 'permission_required',
+          requestId: event.requestId,
+          callId: event.callId,
+          name: event.name,
+          args: event.args,
+          summary: event.summary,
+          inline: event.inline,
+          otherPendingCalls: event.otherPendingCalls,
+        });
+      };
+      input.ctx.onPermissionResolved = (event) => {
+        idleWatchdog.heartbeat();
+        pushEvent({
+          type: 'permission_resolved',
+          requestId: event.requestId,
+          callId: event.callId,
+          decision: event.decision,
+        });
       };
       pushEvent({ type: 'status', label: 'Thinking…' });
 
@@ -953,7 +952,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // the stream. recordChatUsage no-ops when the provider reported no
         // usage (all-zero), so this is safe to call unconditionally.
         {
-          const usage = sumTurnUsage(result);
+          const usage = sumSdkTurnUsage(result);
           void recordChatUsage({
             spaceId: input.ctx.space.id,
             userId: input.ctx.userId,
@@ -962,6 +961,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             promptTokens: usage.promptTokens,
             completionTokens: usage.completionTokens,
             cachedTokens: usage.cachedTokens,
+            costUsd: usage.costUsd,
             route: 'agent',
             runtime: 'ts',
           }).catch(() => {});

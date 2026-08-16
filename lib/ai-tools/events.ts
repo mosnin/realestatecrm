@@ -149,6 +149,9 @@ export interface PermissionRequiredEvent extends BaseEvent {
   args: Record<string, unknown>;
   /** Short "what will happen if you approve?" sentence for the UI. */
   summary: string;
+  /** True when the parent stream is still open (specialist pause). The
+   *  client POSTs the decision without starting a second SSE turn. */
+  inline?: boolean;
   /** How the UI should render the approval preview. */
   display?: ToolResult['display'];
   /**

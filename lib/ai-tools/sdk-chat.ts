@@ -25,14 +25,20 @@
  *     bridge stay pure and testable.
  */
 
-import { Agent, run, type RunState, type Tool as SdkTool, type AgentInputItem, type Model } from '@openai/agents';
+import { Agent, run, type Tool as SdkTool, type AgentInputItem, type Model } from '@openai/agents';
 import {
   toSdkTool,
   restoreRunState,
   applyApprovalDecision,
+  findRunInterruption,
   type ApprovalDecision,
   type ToolResultSink,
 } from './sdk-bridge';
+import {
+  loadIntegrationMetaTools,
+  type IntegrationLoadResult,
+} from './integration-meta-tools';
+export { loadIntegrationMetaTools, type IntegrationLoadResult };
 import { getAgentModel } from './agent-model';
 import { resolveChatModel } from '@/lib/llm';
 import { decideReasoningEffort, reasoningBodyParams } from '@/lib/chat/auto-think';
@@ -50,7 +56,6 @@ import type { ToolContext, ToolDefinition } from './types';
 import { activeToolkits, markExpiredByToolkit } from '@/lib/integrations/connections';
 import { composioConfigured } from '@/lib/integrations/composio';
 import { buildToolkitAgentTools } from '@/lib/integrations/agent-tools';
-import { buildIntegrationSearchTools } from '@/lib/integrations/agent-search-tools';
 import { logger } from '@/lib/logger';
 import { isComposioAuthError } from '@/lib/integrations/composio-errors';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
@@ -283,23 +288,6 @@ export async function loadIntegrationTools(ctx: ToolContext): Promise<SdkTool[]>
   return (await loadIntegrationToolsDetailed(ctx)).tools;
 }
 
-/** What a turn's integration load actually produced — the prompt builder
- *  uses this so the model is told the LIVE truth instead of a cached or
- *  silently-degraded picture. */
-export interface IntegrationLoadResult {
-  tools: SdkTool[];
-  /** Toolkits whose tools are attached THIS turn. */
-  liveToolkits: string[];
-  /** Toolkits the realtor has connected but whose tools could not be
-   *  loaded this turn for a TRANSIENT reason (Composio down, server key
-   *  missing). Auth-dead connections are excluded — those flip to
-   *  'expired' and stop being "connected". The prompt tells the model to
-   *  describe these as temporarily unavailable, NOT as disconnected —
-   *  "I don't have your Gmail" to a realtor who connected Gmail is the
-   *  single most-reported integration bug. */
-  unavailableToolkits: string[];
-}
-
 export async function loadIntegrationToolsDetailed(
   ctx: ToolContext,
 ): Promise<IntegrationLoadResult> {
@@ -403,48 +391,6 @@ export async function loadIntegrationToolsDetailed(
  */
 export function isAuthLikeError(err: unknown): boolean {
   return isComposioAuthError(err);
-}
-
-/**
- * Integration tools for a chat turn — the SCALABLE path (token redesign).
- * Instead of pre-loading every connected toolkit's actions (~30 schemas × N
- * toolkits, re-shipped every step), attach two meta-tools — find_integration_tool
- * + call_integration_tool — that search and execute on demand. Build-time cost
- * is ~0 (no Composio fetch here); the action schema is fetched only when the
- * model actually calls find_integration_tool. Still reports the connected
- * toolkits so the prompt can tell the model which apps are reachable.
- */
-export async function loadIntegrationMetaTools(
-  ctx: ToolContext,
-  options: { userMessage?: string } = {},
-): Promise<IntegrationLoadResult> {
-  let toolkits: string[];
-  try {
-    toolkits = (await activeToolkits({ spaceId: ctx.space.id, userId: ctx.userId })) ?? [];
-  } catch (err) {
-    logger.warn('[sdk-chat] activeToolkits lookup failed — no integration tools', {
-      spaceId: ctx.space.id,
-      err: err instanceof Error ? err.message : String(err),
-    });
-    return { tools: [], liveToolkits: [], unavailableToolkits: [] };
-  }
-  if (toolkits.length === 0) return { tools: [], liveToolkits: [], unavailableToolkits: [] };
-  if (!composioConfigured()) {
-    logger.error(
-      '[sdk-chat] COMPOSIO_API_KEY not configured but this workspace has connected toolkits — integration tools unavailable until it is set',
-      { spaceId: ctx.space.id, toolkits },
-    );
-    return { tools: [], liveToolkits: [], unavailableToolkits: toolkits };
-  }
-  return {
-    tools: buildIntegrationSearchTools(ctx, toolkits, {
-      // Only a fresh turn supplies the exact current message. Resume and all
-      // other callers omit it, which intentionally creates no Work write grant.
-      userMessage: options.userMessage,
-    }),
-    liveToolkits: toolkits,
-    unavailableToolkits: [],
-  };
 }
 
 // ── Fresh-turn entry point ─────────────────────────────────────────────────
@@ -601,7 +547,7 @@ export async function resumeChatTurn(input: ResumeChatTurnInput) {
   // exposes pending approvals via `state.getInterruptions()` in newer
   // versions, but to stay compatible we extract from a typed run helper
   // — which the bridge handles via `applyApprovalDecision`.
-  const item = findInterruption(state, input.callId);
+  const item = findRunInterruption(state, input.callId);
   if (!item) {
     throw new Error(`No pending approval matching callId=${input.callId}`);
   }
@@ -613,41 +559,4 @@ export async function resumeChatTurn(input: ResumeChatTurnInput) {
     maxTurns: resolveChatMaxTurns(input.ctx.workMode),
   });
   return { result, agent };
-}
-
-// ── Internals ──────────────────────────────────────────────────────────────
-
-/**
- * Fish the matching approval item out of a rehydrated RunState. The SDK's
- * RunState exposes a `_currentStep` / interruptions accessor that varies
- * subtly across versions; we try the documented public surface first
- * (`getInterruptions()`), then fall back to scanning known internal arrays.
- *
- * If neither path finds anything, we return undefined and the caller
- * surfaces a clear error — this is the only failure mode a stale
- * approval ID can produce, and we'd rather fail loud than silently
- * resume without applying the decision.
- */
-function findInterruption(
-  state: RunState<unknown, Agent<unknown, 'text'>>,
-  callId: string,
-): Parameters<RunState<unknown, Agent<unknown, 'text'>>['approve']>[0] | undefined {
-  const anyState = state as unknown as {
-    getInterruptions?: () => Array<{ rawItem?: { callId?: string; id?: string } }>;
-    _currentStep?: { interruptions?: Array<{ rawItem?: { callId?: string; id?: string } }> };
-  };
-
-  let pool: Array<{ rawItem?: { callId?: string; id?: string } }> = [];
-  if (typeof anyState.getInterruptions === 'function') {
-    pool = anyState.getInterruptions() ?? [];
-  } else if (anyState._currentStep?.interruptions) {
-    pool = anyState._currentStep.interruptions ?? [];
-  }
-  const found = pool.find((it) => {
-    const id = it.rawItem?.callId ?? it.rawItem?.id;
-    return id === callId;
-  });
-  return found as
-    | Parameters<RunState<unknown, Agent<unknown, 'text'>>['approve']>[0]
-    | undefined;
 }
