@@ -111,7 +111,7 @@ describe('DashboardLayout login gate', () => {
   it('renders the workspace error when the user lookup throws', async () => {
     loadDashboardUserMock.mockRejectedValue(new Error('db down'));
     const ui = (await renderLayout()) as ReactElement;
-    expect(treeHas(ui, 'couldn&apos;t load your workspace')).toBe(true);
+    expect(treeHas(ui, "couldn't load your workspace")).toBe(true);
     expect(treeHas(ui, '/s/acme')).toBe(true);
     expect(redirectMock).not.toHaveBeenCalled();
   });
@@ -126,7 +126,7 @@ describe('DashboardLayout login gate', () => {
     });
     getSpaceFromSlugMock.mockRejectedValue(new Error('space query failed'));
     const ui = (await renderLayout()) as ReactElement;
-    expect(treeHas(ui, 'couldn&apos;t load your workspace')).toBe(true);
+    expect(treeHas(ui, "couldn't load your workspace")).toBe(true);
   });
 
   it('sends a signed-in user with no row to setup, not the error screen', async () => {
@@ -149,7 +149,7 @@ describe('DashboardLayout login gate', () => {
       ownerId: 'user-1',
     });
     const ui = (await renderLayout()) as ReactElement;
-    expect(treeHas(ui, 'couldn&apos;t load your workspace')).toBe(false);
+    expect(treeHas(ui, "couldn't load your workspace")).toBe(false);
     expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
   });
 });

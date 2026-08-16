@@ -84,7 +84,7 @@ describe('AuthRedirectPage', () => {
 
     const ui = (await renderRedirect()) as React.ReactElement;
     const html = JSON.stringify(ui);
-    expect(html).toContain('couldn&apos;t load your workspace');
+    expect(html).toContain("couldn't load your workspace");
     expect(redirectMock).not.toHaveBeenCalled();
   });
 });
