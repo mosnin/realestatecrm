@@ -2,6 +2,8 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * /auth/redirect?intent=realtor|broker
  *
@@ -22,12 +24,47 @@ export default async function AuthRedirectPage({
 
   const { intent } = await searchParams;
 
-  // Look up the user row
-  const { data: user } = await supabase
-    .from('User')
-    .select('id, accountType')
-    .eq('clerkId', userId)
-    .maybeSingle();
+  // Look up the user row. A query ERROR is not "no user" — treating it as
+  // missing used to send existing realtors into /setup (which can upsert a
+  // second User row) instead of retrying the workspace load. If `accountType`
+  // is missing in this environment, retry with just `id`.
+  let user: { id: string; accountType?: string | null } | null = null;
+  {
+    const full = await supabase
+      .from('User')
+      .select('id, accountType')
+      .eq('clerkId', userId)
+      .maybeSingle();
+    if (full.error) {
+      const core = await supabase
+        .from('User')
+        .select('id')
+        .eq('clerkId', userId)
+        .maybeSingle();
+      if (core.error) {
+        console.error('[auth/redirect] User lookup failed', { clerkId: userId, error: full.error });
+        return (
+          <div className="flex min-h-screen items-center justify-center bg-background">
+            <div className="text-center space-y-4 p-8">
+              <h1 className="text-xl font-semibold">Something went wrong</h1>
+              <p className="text-sm text-muted-foreground">
+                We couldn&apos;t load your workspace. This is usually temporary.
+              </p>
+              <a
+                href="/auth/redirect"
+                className="inline-block px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Try again
+              </a>
+            </div>
+          </div>
+        );
+      }
+      user = core.data as { id: string } | null;
+    } else {
+      user = full.data as { id: string; accountType?: string | null } | null;
+    }
+  }
 
   if (!user) {
     // New user — check if they have a pending invitation before sending to setup.

@@ -1,7 +1,8 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
-import { getSpaceFromSlug } from '@/lib/space';
+import { getSpaceFromSlug, loadDashboardUser } from '@/lib/space';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { SidebarCollapseProvider } from '@/components/dashboard/sidebar-collapse';
 import { MobileNav } from '@/components/dashboard/mobile-nav';
@@ -26,6 +27,10 @@ import { FprScript } from '@/components/affiliate/fpr-script';
 import { hasCurrentSubscription } from '@/lib/api-auth';
 import { realtimeVoiceGatewayReady } from '@/lib/realtime/voice-feature';
 
+// Auth + tenant lookups must never be statically cached. A build-time
+// supabase miss used to bake the "couldn't load your workspace" screen
+// into the route HTML, so every post-login visit showed it.
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({
   children,
@@ -44,36 +49,9 @@ export default async function DashboardLayout({
   // Gate: user must exist in our DB. On DB error, render error UI
   // (NOT .catch(() => null) which caused redirect loops, NOT throw which
   // shows the generic "Application error" page).
-  let dbUser: {
-    id: string;
-    name: string | null;
-    onboard: boolean;
-    isPlatformAdmin: boolean;
-    space: { id: string } | null;
-  } | null | undefined;
+  let dbUser: Awaited<ReturnType<typeof loadDashboardUser>>;
   try {
-    const { data: row, error } = await supabase
-      .from('User')
-      .select('id, onboard, platformRole, name')
-      .eq('clerkId', userId)
-      .maybeSingle();
-    if (error) throw error;
-    if (row) {
-      const { data: spaceRow } = await supabase
-        .from('Space')
-        .select('id')
-        .eq('ownerId', row.id)
-        .maybeSingle();
-      dbUser = {
-        id: row.id as string,
-        name: (row.name as string | null) ?? null,
-        onboard: row.onboard as boolean,
-        isPlatformAdmin: row.platformRole === 'admin',
-        space: spaceRow ? { id: spaceRow.id as string } : null,
-      };
-    } else {
-      dbUser = null;
-    }
+    dbUser = await loadDashboardUser(userId);
   } catch (err) {
     console.error('[layout] DB query failed', { clerkId: userId, slug, error: err });
     return (
@@ -294,7 +272,9 @@ export default async function DashboardLayout({
       {/* Collapse state is shared between the sidebar and the header's panel
           toggle, so the provider wraps both. */}
       <SidebarCollapseProvider>
-        <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} activeWorkflowCount={activeWorkflowCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
+        <Suspense fallback={null}>
+          <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} activeWorkflowCount={activeWorkflowCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
+        </Suspense>
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <PlatformBanner />
           <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} accountName={dbUser.name} isBroker={isBroker} brokerageName={brokerageName} isPlatformAdmin={dbUser.isPlatformAdmin} />
