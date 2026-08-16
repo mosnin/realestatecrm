@@ -33,9 +33,45 @@ describe('WorkActivityTimeline normalization', () => {
     ]);
 
     expect(visible.map((item) => item.label)).toEqual([
-      'Workspace context ready',
       'Send email finished',
     ]);
+  });
+
+  it('hides request, workspace, and model receipts', () => {
+    const visible = selectVisibleWorkActivities([
+      event({ phase: 'request', status: 'completed', label: 'Request received' }),
+      event({ phase: 'context', status: 'completed', label: 'Workspace context ready' }),
+      event({ phase: 'provider', status: 'active', label: 'Model activity started' }),
+      event({ phase: 'tool', status: 'completed', label: 'Pipeline summary finished', toolName: 'pipeline_summary' }),
+    ]);
+    expect(visible.map((item) => item.label)).toEqual(['Pipeline summary finished']);
+  });
+
+  it('collapses retries of the same tool into one receipt', () => {
+    const visible = selectVisibleWorkActivities([
+      event({
+        phase: 'tool',
+        status: 'failed',
+        label: 'Pipeline summary failed',
+        toolCallId: 'call_1',
+        toolName: 'pipeline_summary',
+      }),
+      event({
+        phase: 'tool',
+        status: 'failed',
+        label: 'Pipeline summary failed',
+        toolCallId: 'call_2',
+        toolName: 'pipeline_summary',
+      }),
+      event({
+        phase: 'tool',
+        status: 'completed',
+        label: 'Find deal finished',
+        toolCallId: 'call_3',
+        toolName: 'find_deal',
+      }),
+    ]);
+    expect(visible.map((item) => item.toolName)).toEqual(['pipeline_summary', 'find_deal']);
   });
 
   it('bounds tool-heavy turns to the most recent visible receipts', () => {
@@ -85,7 +121,7 @@ describe('WorkActivityTimeline presentation contract', () => {
     expect(html).toContain('aria-live="polite"');
     expect(html.match(/aria-live=/g)).toHaveLength(1);
     expect(html).toContain('aria-label="Grounded work progress"');
-    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('data-agent-activity-status="working"');
   });
 

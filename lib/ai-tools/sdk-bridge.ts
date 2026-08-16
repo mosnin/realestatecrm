@@ -42,6 +42,7 @@ import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@op
 import { z } from 'zod';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
+import { coerceToolArguments } from './coerce-tool-args';
 
 const DEFAULT_MODEL = 'gpt-5-mini';
 
@@ -146,7 +147,10 @@ export function toSdkTool<TArgs, TData>(
           }
         }
 
-        const result: ToolResult = await def.handler(input as never, ctx);
+        const result: ToolResult = await def.handler(
+          coerceToolArguments(input, def.parameters) as never,
+          ctx,
+        );
         // Route the structured payload to the stream pump's sink (keyed by
         // SDK call id) so the rich card gets `data`/`display` while the model
         // only ever sees the summary string below.
@@ -289,7 +293,9 @@ function stripIncompatibleConstraints(
   } else if (innerType === 'number' || innerType === 'int' || innerType === 'bigint') {
     rebuilt = z.number();
   } else if (innerType === 'boolean') {
-    rebuilt = z.boolean();
+    // Models frequently emit "true"/"false" strings for required booleans.
+    // Accept both so the SDK does not reject the call before execute().
+    rebuilt = z.union([z.boolean(), z.string(), z.number()]);
   } else if (innerType === 'enum' || innerType === 'nativeEnum') {
     // Enums are strict-compatible — keep them. The list of valid values
     // is what the model needs to see.

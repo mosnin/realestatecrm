@@ -28,14 +28,19 @@ export interface AgentActivityDisclosureProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   collapseOnComplete?: boolean;
+  /**
+   * When true (default), a live turn cannot be collapsed. Work chat passes
+   * false so the activity log starts as one summary line instead of a
+   * full-height receipt.
+   */
+  keepOpenWhileWorking?: boolean;
   className?: string;
   contentClassName?: string;
 }
 
 /**
- * A single activity disclosure with an invariant that live work cannot be
- * hidden. Once the terminal receipt arrives, it becomes an ordinary
- * user-controlled disclosure and may collapse into its compact summary.
+ * A single activity disclosure. Live work stays expandable; the Work
+ * surface opts out of forcing it open so the chat stays readable.
  */
 export function AgentActivityDisclosure({
   title,
@@ -47,6 +52,7 @@ export function AgentActivityDisclosure({
   defaultOpen = false,
   onOpenChange,
   collapseOnComplete = true,
+  keepOpenWhileWorking = true,
   className,
   contentClassName,
 }: AgentActivityDisclosureProps) {
@@ -54,13 +60,13 @@ export function AgentActivityDisclosure({
   const contentId = useId();
   const controlled = open !== undefined;
   const [internalOpen, setInternalOpen] = useState(
-    status === 'working' || defaultOpen,
+    (keepOpenWhileWorking && status === 'working') || defaultOpen,
   );
   const previousStatus = useRef(status);
 
   useEffect(() => {
     if (status === 'working') {
-      if (!controlled) setInternalOpen(true);
+      if (keepOpenWhileWorking && !controlled) setInternalOpen(true);
     } else if (
       previousStatus.current === 'working' &&
       collapseOnComplete
@@ -69,11 +75,12 @@ export function AgentActivityDisclosure({
       onOpenChange?.(false);
     }
     previousStatus.current = status;
-  }, [collapseOnComplete, controlled, onOpenChange, status]);
+  }, [collapseOnComplete, controlled, keepOpenWhileWorking, onOpenChange, status]);
 
-  const expanded = status === 'working' || (controlled ? open : internalOpen);
+  const forceOpen = keepOpenWhileWorking && status === 'working';
+  const expanded = forceOpen || (controlled ? open : internalOpen);
   const setExpanded = (next: boolean) => {
-    if (status === 'working') return;
+    if (forceOpen) return;
     if (!controlled) setInternalOpen(next);
     onOpenChange?.(next);
   };
@@ -91,7 +98,7 @@ export function AgentActivityDisclosure({
         type="button"
         aria-expanded={expanded}
         aria-controls={contentId}
-        aria-disabled={status === 'working'}
+        aria-disabled={forceOpen || undefined}
         onClick={() => setExpanded(!expanded)}
         className={cn(
           'flex w-full items-start justify-between gap-3 px-0 py-3.5 text-left',
@@ -126,7 +133,7 @@ export function AgentActivityDisclosure({
           }}
           className={cn(
             'mt-0.5 size-3.5 shrink-0 text-muted-foreground/55',
-            status === 'working' && 'opacity-35',
+            forceOpen && 'opacity-35',
           )}
           fill="none"
         >
