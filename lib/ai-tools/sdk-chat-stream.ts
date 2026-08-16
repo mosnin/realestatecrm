@@ -334,27 +334,48 @@ class StreamStalledError extends Error {
  * StreamStalledError, which the pump's catch turns into a terminal error
  * event. A settled `p` clears the timer so a healthy stream pays nothing.
  */
-function withIdleTimeout<T>(p: Promise<T>, abortController: AbortController): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      try {
-        abortController.abort();
-      } catch {
-        /* already aborted */
-      }
-      reject(new StreamStalledError());
-    }, PUMP_IDLE_TIMEOUT_MS);
-    p.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
+function createIdleWatchdog(abortController: AbortController) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onStall: ((error: StreamStalledError) => void) | undefined;
+
+  const trip = () => {
+    try {
+      abortController.abort();
+    } catch {
+      /* already aborted */
+    }
+    onStall?.(new StreamStalledError());
+  };
+
+  const heartbeat = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(trip, PUMP_IDLE_TIMEOUT_MS);
+  };
+
+  const stop = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    onStall = undefined;
+  };
+
+  function wrap<T>(p: Promise<T>): Promise<T> {
+    heartbeat();
+    return new Promise<T>((resolve, reject) => {
+      onStall = reject;
+      p.then(
+        (v) => {
+          stop();
+          resolve(v);
+        },
+        (e) => {
+          stop();
+          reject(e);
+        },
+      );
+    });
+  }
+
+  return { wrap, heartbeat, stop };
 }
 
 interface BuildStreamInput {
@@ -654,8 +675,9 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           callIdToToolName.set(event.callId, event.name);
 
           // Open a tool-call block for persistence; settled on its result.
-          // delegate_task is excluded — it persists as a subagent_task block.
-          if (event.name !== DELEGATE_TASK_TOOL_NAME) {
+          // Waiting delegate_task renders as a compact specialist row.
+          // Legacy swarm launches still add a subagent_task card below.
+          {
             const block: ToolCallBlock = {
               type: 'tool_call',
               callId: event.callId,
@@ -803,6 +825,11 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
       // spend seconds in context assembly + the first model call before any
       // visible event fires. Superseded client-side by tool_call_start
       // labels and the first text_delta.
+      const idleWatchdog = createIdleWatchdog(input.abortController);
+      input.ctx.onProgress = (label) => {
+        idleWatchdog.heartbeat();
+        pushEvent({ type: 'status', label });
+      };
       pushEvent({ type: 'status', label: 'Thinking…' });
 
       let result: SdkResultLike;
@@ -888,7 +915,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
           if (stopRequested) break;
           // Each read is raced against the idle watchdog — a stalled stream
           // rejects with StreamStalledError instead of parking forever.
-          const { done, value } = await withIdleTimeout(reader.read(), input.abortController);
+          const { done, value } = await idleWatchdog.wrap(reader.read());
           if (done) break;
           leaseGuardian?.assertActive();
           if (!providerActivityEmitted) {
@@ -915,7 +942,7 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
         // Block until the SDK declares the run complete so result.interruptions
         // and result.state are stable before we read them. Same watchdog — the
         // SDK can finish the stream yet never resolve `completed`.
-        await withIdleTimeout(result.completed, input.abortController);
+        await idleWatchdog.wrap(result.completed);
 
         // Record token usage for this turn — the in-process agent path's
         // equivalent of what the direct path (record-chat-usage) and the Modal

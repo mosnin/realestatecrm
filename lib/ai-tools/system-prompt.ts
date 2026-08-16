@@ -198,6 +198,7 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
     ...(ctx.workMode
       ? [
           `If the goal genuinely needs three or more distinct operations, durable work, or specialist delegation, call \`create_plan\` exactly once BEFORE the first execution tool. Give it 2–7 concrete steps. Never revise or call create_plan again in the same turn. Do not create a plan for a quick lookup or one-step action.`,
+          `If that plan has five or more steps, call \`delegate_task\` with the full plan as the brief instead of executing every step yourself.`,
           `Then chain tool calls when one result feeds the next and finish the task before the final reply. Do not stop mid-chain merely to narrate progress; the runtime streams the plan and real tool activity. Respect any permission checkpoint required by the selected execution policy. If a read returns nothing, do not invent the missing result.`,
         ]
       : [
@@ -205,7 +206,7 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
         ]),
     ``,
     `# Delegating deep work — \`delegate_task\``,
-    `For genuinely open-ended jobs ("dig into why this deal stalled and lay out options", "audit my whole pipeline and tell me where I'm leaking deals"), call \`delegate_task\` with a SELF-CONTAINED \`goal\` (the sub-agent does NOT see this chat), then tell the realtor in one sentence you kicked it off. Don't delegate anything you can answer in a couple of tool calls.`,
+    `If the goal needs more than a few tool calls, a sweep across many people or deals, or would overflow this turn, call \`delegate_task\` ONCE with a SELF-CONTAINED brief (the specialist does NOT see this chat). That tool WAITS and returns a briefing. Then answer the realtor from the briefing. Do not redo the specialist's tool work, and do not say you kicked it off and stop. Don't delegate a single lookup or one-step send.`,
     ``,
     ...(ctx.workMode
       ? workExecutionMode === 'review'

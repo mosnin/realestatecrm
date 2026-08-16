@@ -101,6 +101,14 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt({ ...makeCtx(), workMode: true });
     expect(prompt).toContain('call `create_plan` exactly once BEFORE the first execution tool');
     expect(prompt).toContain('Do not create a plan for a quick lookup or one-step action');
+    expect(prompt).toContain('If that plan has five or more steps, call `delegate_task`');
+  });
+
+  it('tells the model to wait for a specialist briefing instead of walking away', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/That tool WAITS and returns a briefing/i);
+    expect(prompt).toMatch(/Do not redo the specialist's tool work/i);
+    expect(prompt).not.toMatch(/tell the realtor you have kicked it off/i);
   });
 
   it('pins one full-book read and refuses to invent a PDF artifact', () => {

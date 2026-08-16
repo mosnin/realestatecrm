@@ -61,6 +61,10 @@ export interface ToolContext {
   };
   /** The AbortSignal for the current turn — handlers should respect it. */
   signal: AbortSignal;
+  /** Live status line for a nested specialist. The stream pump heartbeats
+   *  the idle watchdog and the thinking indicator from this callback so a
+   *  waiting `delegate_task` does not look stalled. */
+  onProgress?: (label: string) => void;
   /** Server-resolved conversation binding for tools that continue durable work. */
   conversationId?: string;
   /** True only when the user explicitly selected the product's Work mode. */

@@ -340,8 +340,7 @@ export function ToolCallBlockView({
   // Prose hint derived from args — non-monospace, human readable.
   const argsHint = argsProseHint(block.args);
 
-  const argsEntries = Object.entries(block.args ?? {});
-  const hasDetails = argsEntries.length > 0 || !!block.result?.summary || !!block.result?.error;
+  const hasDetails = !!block.result?.summary || !!block.result?.error;
   const generatedMedia = block.name === 'generate_studio_image' || block.display === 'generated-image';
   const copyText = hasDetails
     ? JSON.stringify(
@@ -376,16 +375,6 @@ export function ToolCallBlockView({
         >
           {hasDetails ? (
             <div className="space-y-2.5">
-              {argsEntries.length > 0 ? (
-                <div>
-                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Arguments
-                  </p>
-                  <pre className="overflow-x-auto whitespace-pre-wrap break-words border-y border-border/40 bg-transparent py-2 font-mono text-[11px] text-foreground/80">
-                    {JSON.stringify(block.args, null, 2)}
-                  </pre>
-                </div>
-              ) : null}
               {block.result?.summary ? (
                 <div>
                   <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
