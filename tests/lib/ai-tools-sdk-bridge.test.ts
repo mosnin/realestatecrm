@@ -345,6 +345,30 @@ describe('toSdkTool', () => {
 
     expect(out).toBe('Error: rude_op failed — something exploded');
   });
+
+  it('coerces a string boolean so pipeline_summary-style args still execute', async () => {
+    const handler = vi.fn(async (args: { includeLostWon?: boolean }) => ({
+      summary: `lostWon=${String(args.includeLostWon)}`,
+    }));
+    const def = defineTool({
+      name: 'pipeline_summary',
+      description: 'pipeline snapshot',
+      parameters: z.object({
+        includeLostWon: z.boolean().optional().default(false),
+      }),
+      requiresApproval: false,
+      handler,
+    });
+
+    const sdk = toSdkTool(def, makeCtx());
+    const out = await sdk.invoke(
+      new RunContext(),
+      JSON.stringify({ includeLostWon: 'false' }),
+    );
+
+    expect(handler).toHaveBeenCalledWith({ includeLostWon: false }, expect.anything());
+    expect(out).toBe('lostWon=false');
+  });
 });
 
 describe('toSdkTool — strict-mode schema rewriting', () => {

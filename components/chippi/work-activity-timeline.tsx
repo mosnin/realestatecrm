@@ -20,6 +20,15 @@ import { SECTION_LABEL } from '@/lib/typography';
 /** Keep the live receipt readable even during tool-heavy turns. */
 export const MAX_VISIBLE_WORK_ACTIVITIES = 8;
 
+/** Request / workspace / model receipts are internal. The timeline only
+ *  shows plan, tools, specialists, and the terminal outcome. */
+const TIMELINE_PHASES = new Set<WorkActivityPhase>([
+  'plan',
+  'tool',
+  'specialist',
+  'terminal',
+]);
+
 const PHASE_LABEL: Record<WorkActivityPhase, string> = {
   request: 'Request',
   context: 'Workspace',
@@ -38,10 +47,12 @@ const STATUS_LABEL: Record<Exclude<WorkActivityStatus, 'active'>, string> = {
 };
 
 function activityKey(event: WorkActivityEvent): string {
-  // A call id is the strongest lifecycle correlation: its active receipt is
-  // replaced by the actual result. Phase-only runtime boundaries (request,
-  // context, provider, terminal) collapse to their most recent receipt.
-  return event.toolCallId ?? event.subagentRunId ?? event.phase;
+  // Retries of the same tool collapse to one row. Call ids stay unique per
+  // attempt, so toolName is the correlation that keeps the log short.
+  if (event.phase === 'tool' || event.phase === 'plan') {
+    return event.toolName ?? event.toolCallId ?? event.phase;
+  }
+  return event.subagentRunId ?? event.phase;
 }
 
 /**
@@ -61,7 +72,9 @@ export function selectVisibleWorkActivities(
   const currentWorkId = events.at(-1)?.workId;
   if (!currentWorkId) return [];
 
-  const current = events.filter((event) => event.workId === currentWorkId);
+  const current = events.filter(
+    (event) => event.workId === currentWorkId && TIMELINE_PHASES.has(event.phase),
+  );
   const latestByKey = new Map<string, { event: WorkActivityEvent; index: number }>();
 
   current.forEach((event, index) => {
@@ -132,6 +145,8 @@ export function WorkActivityTimeline({
         title={<span className={SECTION_LABEL}>Work activity</span>}
         status={disclosureStatus}
         collapseOnComplete
+        keepOpenWhileWorking={false}
+        defaultOpen={false}
         meta={`${visible.length} ${visible.length === 1 ? 'step' : 'steps'}`}
         summary={
           <>

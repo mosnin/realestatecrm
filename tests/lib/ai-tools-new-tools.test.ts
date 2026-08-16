@@ -99,4 +99,37 @@ describe('pipelineSummaryTool', () => {
   it('is auto-run', () => {
     expect(pipelineSummaryTool.requiresApproval).toBe(false);
   });
+
+  it('treats a string includeLostWon as a boolean so the snapshot still runs', async () => {
+    mockRows = [
+      {
+        id: 'd1',
+        title: 'Active',
+        status: 'active',
+        value: 100_000,
+        closeDate: null,
+        followUpAt: null,
+        updatedAt: new Date().toISOString(),
+        nextAction: null,
+        nextActionDueAt: null,
+      },
+      {
+        id: 'd2',
+        title: 'Won',
+        status: 'won',
+        value: 250_000,
+        closeDate: null,
+        followUpAt: null,
+        updatedAt: new Date().toISOString(),
+        nextAction: null,
+        nextActionDueAt: null,
+      },
+    ];
+    const result = await pipelineSummaryTool.handler(
+      { includeLostWon: 'false' as unknown as boolean },
+      makeCtx(),
+    );
+    expect(result.display).not.toBe('error');
+    expect(result.summary).toMatch(/1 active deal/);
+  });
 });

@@ -150,6 +150,29 @@ describe('executeTool', () => {
     expect(out.result?.summary).toBe('Hello, Jane.');
   });
 
+  it('coerces a string boolean before zod parse so the handler still runs', async () => {
+    const handler = vi.fn(async (args: { includeLostWon?: boolean }) => ({
+      summary: `lostWon=${String(args.includeLostWon)}`,
+    }));
+    currentTool = defineTool({
+      name: 'pipeline_summary',
+      description: 't',
+      parameters: z.object({
+        includeLostWon: z.boolean().optional().default(false),
+      }),
+      requiresApproval: false,
+      handler,
+    });
+    const out = await executeTool(
+      'pipeline_summary',
+      { includeLostWon: 'false' },
+      makeCtx(),
+    );
+    expect(out.ok).toBe(true);
+    expect(out.args).toEqual({ includeLostWon: false });
+    expect(handler).toHaveBeenCalledWith({ includeLostWon: false }, expect.anything());
+  });
+
   it('returns rate_limited and does NOT run the handler when the per-tool limit is exceeded', async () => {
     const handler = vi.fn(async () => ({ summary: 'should not run' }));
     currentTool = defineTool({
