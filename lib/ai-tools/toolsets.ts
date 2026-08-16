@@ -172,10 +172,11 @@ export function isUnsupportedPdfDeliverableIntent(message: string): boolean {
 }
 
 /**
- * Work mode executes mutations without the legacy approval pause, so the
- * model must not receive a whole mutation family for one explicit verb. These
- * rules turn a concrete request into the exact mutating tools that can satisfy
- * it. Read-only tools remain available for grounding and entity resolution.
+ * Work mode executes mutations without the legacy approval pause. These
+ * rules turn a concrete request into the mutating tools that may run
+ * without another confirmation. Read-only tools remain available for
+ * grounding. Sibling mutators stay in the catalog so a multi-step ask
+ * ("email Sarah and schedule a tour") can still find every needed tool.
  *
  * Automation creation has priority: text such as "create an automation that
  * emails every new lead" describes the automation's behavior, not three
@@ -195,6 +196,42 @@ const IMAGE_GENERATION_INTENT =
   /\b(?:generate|create|make|design)\b[\s\S]{0,70}\b(?:image|graphic|visual|flyer|social\s+post|listing\s+photo)\b|\b(?:image|graphic|visual|flyer|social\s+post)\b[\s\S]{0,50}\b(?:generate|create|make|design)\b/i;
 const EXPLICIT_BROWSER_CONTROL_INTENT =
   /\b(?:use|open|control|drive|navigate|browse|search|check|visit|go\s+to|fill(?:\s+out|\s+in)?)\b[\s\S]{0,80}\b(?:browser|website|web\s?page|url|zillow|redfin|trulia|realtor\.com)\b|\b(?:browser|website|web\s?page|url|zillow|redfin|trulia|realtor\.com)\b[\s\S]{0,50}\b(?:open|navigate|browse|search|check|visit|fill)\b/i;
+const TOUR_SCHEDULE_INTENT =
+  /\b(?:schedule|book|set[\s-]?up)\b[\s\S]{0,60}\b(?:tour|showing|visit|walk-?through|open house)\b/i;
+const TOUR_RESCHEDULE_INTENT =
+  /\breschedule\b[\s\S]{0,50}\b(?:tour|showing|visit|walk-?through|open house)\b/i;
+const FOLLOWUP_SET_INTENT =
+  /\b(?:set|create|add|schedule)\b[\s\S]{0,40}\bfollow[\s-]?up\b|\bremind\b[\s\S]{0,40}\b(?:me|them|him|her|to)\b/i;
+const DEAL_CREATE_INTENT = /\b(?:create|add|open)\b[\s\S]{0,40}\bdeal\b/i;
+const NOTE_INTENT = /\b(?:add|leave|log|write)\b[\s\S]{0,40}\bnote\b/i;
+const LOG_CALL_INTENT = /\b(?:log|record)\b[\s\S]{0,40}\b(?:a\s+)?call\b/i;
+
+/**
+ * Follow-ups like "continue" or "do the next one" do not restate the Work
+ * goal. Tool-set selection always unions the goal; direct-execution grants
+ * only fall back to the goal for these continuation phrases so a new question
+ * cannot inherit the previous mutation.
+ */
+const WORK_CONTINUATION_RE =
+  /^(?:yes|yeah|yep|yup|ok|okay|sure|please(?:\s+do)?|do it|go ahead|continue|keep going|next|proceed|do the next(?: one)?|finish(?: it)?|keep at it)(?:[.!]|\s|$)/i;
+
+/** Reads the Work prompt names every turn. Always load them in Work so the
+ *  model is never told to call a tool that is not in this turn's list. */
+const WORK_PROMPTED_READ_TOOLS: readonly string[] = [
+  'analyze_property_values',
+  'workspace_stats',
+  'get_weather',
+  'find_property',
+  'find_tours',
+];
+
+export function isWorkContinuationMessage(message: string): boolean {
+  return WORK_CONTINUATION_RE.test((message ?? '').trim());
+}
+
+function catalogSource(message: string, conversationGoal?: string): string {
+  return [message ?? '', conversationGoal ?? ''].filter((part) => part.trim()).join('\n');
+}
 
 const DESTRUCTIVE_WORK_TOOL_NAMES = new Set<string>([
   'archive_person',
@@ -234,7 +271,8 @@ const DESTRUCTIVE_WORK_INTENTS: ReadonlyArray<readonly [string, RegExp]> = [
 /**
  * Null means there is no single explicit mutation contract for this turn.
  * An empty set means the explicit request is read-only and therefore should
- * expose no mutator. A non-empty set is the exact mutation allowlist.
+ * expose no mutator. A non-empty set is the direct-execution allowlist —
+ * sibling mutators selected by keyword toolsets stay in the catalog.
  */
 function selectWorkMutationScope(message: string): Set<string> | null {
   const text = message ?? '';
@@ -276,6 +314,32 @@ function selectWorkMutationScope(message: string): Set<string> | null {
     scoped = true;
     allowed.add('generate_studio_image');
   }
+  if (TOUR_SCHEDULE_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('schedule_tour');
+  }
+  if (TOUR_RESCHEDULE_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('reschedule_tour');
+  }
+  if (FOLLOWUP_SET_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('set_followup');
+  }
+  if (DEAL_CREATE_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('create_deal');
+  }
+  if (NOTE_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('note_on_person');
+    allowed.add('note_on_deal');
+    allowed.add('note_on_property');
+  }
+  if (LOG_CALL_INTENT.test(text)) {
+    scoped = true;
+    allowed.add('log_call');
+  }
 
   for (const [toolName, pattern] of DESTRUCTIVE_WORK_INTENTS) {
     if (!pattern.test(text)) continue;
@@ -291,11 +355,25 @@ function selectWorkMutationScope(message: string): Set<string> | null {
  * with the already-selected catalog prevents an intent regex from granting a
  * capability that was not actually exposed to the agent on this turn.
  */
+function selectWorkMutationScopeForTurn(
+  message: string,
+  conversationGoal?: string,
+): Set<string> | null {
+  const messageScope = selectWorkMutationScope(message);
+  if (!conversationGoal || !isWorkContinuationMessage(message)) {
+    return messageScope;
+  }
+  const goalScope = selectWorkMutationScope(conversationGoal);
+  if (!messageScope && !goalScope) return null;
+  return new Set<string>([...(messageScope ?? []), ...(goalScope ?? [])]);
+}
+
 export function selectDirectExecutionToolNames(
   message: string,
   selectedTools: readonly ToolDefinition[],
+  conversationGoal?: string,
 ): string[] {
-  const mutationScope = selectWorkMutationScope(message);
+  const mutationScope = selectWorkMutationScopeForTurn(message, conversationGoal);
   if (!mutationScope) return [];
   return selectedTools
     .filter(
@@ -334,10 +412,14 @@ export function selectToolsets(message: string): string[] {
  */
 export function getChatTools(
   message: string,
-  capabilities: { workspaceContinuationEligible?: boolean; workMode?: boolean } = {},
+  capabilities: {
+    workspaceContinuationEligible?: boolean;
+    workMode?: boolean;
+    conversationGoal?: string;
+  } = {},
 ): ToolDefinition[] {
   const wanted = new Set<string>([...CORE_TOOL_NAMES, ...orphanNames()]);
-  for (const ts of selectToolsets(message)) {
+  for (const ts of selectToolsets(catalogSource(message, capabilities.conversationGoal))) {
     for (const n of TOOLSETS[ts] ?? []) wanted.add(n);
   }
 
@@ -367,6 +449,7 @@ export function getChatTools(
     wanted.delete('send_email');
     wanted.delete('send_sms');
     wanted.delete('send_property_packet');
+    wanted.delete('add_person');
   }
 
   if (capabilities.workMode) {
@@ -376,13 +459,17 @@ export function getChatTools(
     // before genuinely multi-step execution without relying on brittle words
     // such as "plan" or "batch" in the user's request.
     wanted.add('create_plan');
+    for (const toolName of WORK_PROMPTED_READ_TOOLS) wanted.add(toolName);
 
     // A plan for an artifact format the runtime cannot produce is misleading
     // activity, not progress. sdk-chat.ts also fixes tool_choice to `none` for
     // this exact intent, making the capability response deterministic.
     if (isUnsupportedPdfDeliverable) wanted.delete('create_plan');
 
-    const mutationScope = selectWorkMutationScope(text);
+    const mutationScope = selectWorkMutationScopeForTurn(
+      text,
+      capabilities.conversationGoal,
+    );
 
     // Destructive tools are never incidental Work-mode siblings. They enter
     // the catalog only when the user explicitly names that destructive verb
@@ -391,13 +478,15 @@ export function getChatTools(
       if (!mutationScope?.has(toolName)) wanted.delete(toolName);
     }
 
-    // For a concrete Work-mode action, retain all useful reads but expose only
-    // the mutation(s) selected above. This is catalog scoping, not a draft or
-    // approval fallback: the requested mutation still executes directly.
+    // An empty scope is an explicit read-only contract (valuation, CMA).
+    // A non-empty scope is the direct-execution allowlist only — do not
+    // delete sibling mutators the keyword toolsets already selected. Stripping
+    // them made multi-step Work ("email Sarah and schedule a tour") and
+    // goal follow-ups report that those tools did not exist.
     if (mutationScope) {
-      for (const tool of ALL_TOOLS) {
-        if (tool.requiresApproval !== false && !mutationScope.has(tool.name)) {
-          wanted.delete(tool.name);
+      if (mutationScope.size === 0) {
+        for (const tool of ALL_TOOLS) {
+          if (tool.requiresApproval !== false) wanted.delete(tool.name);
         }
       }
       for (const toolName of mutationScope) wanted.add(toolName);

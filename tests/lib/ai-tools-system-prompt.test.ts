@@ -29,6 +29,21 @@ describe('buildSystemPrompt', () => {
     // carry the same contract. Match either phrasing so future small edits
     // don't break the test, but a wholesale removal will.
     expect(prompt).toMatch(/never invent|don'?t fabricate|do not speculate/i);
+    expect(prompt).toMatch(/never tell the realtor you have no tools/i);
+  });
+
+  it('does not send the model to find_integration_tool when none are attached', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/do not call `find_integration_tool`/i);
+    expect(prompt).not.toMatch(/call `find_integration_tool` with a short description/i);
+  });
+
+  it('points at find_integration_tool only when connected apps are live this turn', () => {
+    const prompt = buildSystemPrompt(makeCtx(), {
+      integrations: { liveToolkits: ['gmail'], unavailableToolkits: [] },
+    });
+    expect(prompt).toContain('call `find_integration_tool` with a short description');
+    expect(prompt).not.toMatch(/do not call `find_integration_tool`/i);
   });
 
   it('mentions that mutating tools prompt for approval', () => {

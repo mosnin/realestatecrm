@@ -78,15 +78,20 @@ const DEFAULT_MAX_TOKENS = 4_096;
  * own internal default; we set ours explicitly so a model that decides
  * to spelunk the catalog can't run our token bill into the ground.
  *
- * Why 8, not 15: the SDK re-sends the FULL transcript (system prompt +
+ * Why 10/12, not 15: the SDK re-sends the FULL transcript (system prompt +
  * every tool schema + all accumulated tool outputs) on EVERY inner step
- * — token cost grows quadratically with the cap. 8 still covers the real
- * multi-step workflows (look up a person → read activity → find deal →
- * draft a follow-up is 4-5 steps); anything deeper belongs on
- * delegate_task, which runs in its own bounded Modal context instead of
- * re-billing this conversation's transcript.
+ * — token cost grows quadratically with the cap. Chat at 10 covers the
+ * real multi-step workflows (look up a person → read activity → find deal
+ * → draft a follow-up is 4-5 steps). Work spends a step on `create_plan`
+ * before execution, so it gets 12; 6 was cutting those turns off mid-chain.
+ * Anything deeper belongs on delegate_task.
  */
-const MAX_TURNS_PER_TURN = 6;
+export const CHAT_MAX_TURNS = 10;
+export const WORK_MAX_TURNS = 12;
+
+export function resolveChatMaxTurns(workMode?: boolean): number {
+  return workMode === true ? WORK_MAX_TURNS : CHAT_MAX_TURNS;
+}
 
 /**
  * Cap on prior turns re-sent to the model per reply (token redesign L3). The
@@ -159,6 +164,7 @@ export function buildChatAgent(
       ? getChatTools(opts.userMessage, {
           workspaceContinuationEligible: ctx.workspaceContinuationEligible,
           workMode: ctx.workMode,
+          conversationGoal: ctx.conversationGoal,
         })
       : ALL_TOOLS.filter(
           (tool) =>
@@ -166,13 +172,14 @@ export function buildChatAgent(
             (tool.name !== 'start_work_session' || ctx.workMode),
         );
   // Never carry a prior turn's authorization forward. The exact current user
-  // message and the already-scoped native catalog jointly produce this turn's
-  // direct-execution grant; Work mode by itself grants nothing.
+  // message (and a continuation of the active Work goal) plus the already-
+  // scoped native catalog jointly produce this turn's direct-execution grant;
+  // Work mode by itself grants nothing.
   const turnCtx: ToolContext = {
     ...ctx,
     directExecutionToolNames:
       ctx.workMode === true && ctx.workExecutionMode !== 'review' && opts.userMessage != null
-        ? selectDirectExecutionToolNames(opts.userMessage, selectedDomain)
+        ? selectDirectExecutionToolNames(opts.userMessage, selectedDomain, ctx.conversationGoal)
         : [],
   };
   const domainTools = selectedDomain.filter((t) => !['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()).map((t: ToolDefinition) =>
@@ -544,7 +551,7 @@ export async function runChatTurn(input: RunChatTurnInput) {
   const result = await run(agent, items, {
     stream: true,
     signal: input.ctx.signal,
-    maxTurns: MAX_TURNS_PER_TURN,
+    maxTurns: resolveChatMaxTurns(input.ctx.workMode),
   });
   return { result, agent };
 }
@@ -603,7 +610,7 @@ export async function resumeChatTurn(input: ResumeChatTurnInput) {
   const result = await run(agent, state, {
     stream: true,
     signal: input.ctx.signal,
-    maxTurns: MAX_TURNS_PER_TURN,
+    maxTurns: resolveChatMaxTurns(input.ctx.workMode),
   });
   return { result, agent };
 }

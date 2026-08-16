@@ -1,41 +1,111 @@
 /**
- * Pins the chat agent's per-turn tool-call ceiling. The constant lives
- * in `lib/ai-tools/sdk-chat.ts` and gets passed as `maxTurns` to the
- * SDK's `run()`. Without a hard cap a model that decides to spelunk the
- * tool catalog can run our token bill into the ground.
- *
- * If a future refactor changes the ceiling, this test forces the
- * decision to be deliberate: the new value lives in source, the test
- * follows. It must not silently drift.
+ * Pins the chat agent's per-turn tool-call ceiling and checks that both
+ * entry points thread it into the SDK `run()` call. Work spends a step on
+ * `create_plan` before execution, so it gets a higher cap than Chat.
  */
 
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const runMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@openai/agents', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@openai/agents')>();
+  return { ...actual, run: (...args: unknown[]) => runMock(...args) };
+});
+
+vi.mock('@/lib/integrations/connections', () => ({
+  activeToolkits: vi.fn(async () => []),
+  markExpiredByToolkit: vi.fn(),
+}));
+
+vi.mock('@/lib/ai-tools/personalized-prompt', () => ({
+  buildPersonalizedSnapshot: vi.fn(async () => {
+    throw new Error('skip snapshot');
+  }),
+  renderSnapshot: vi.fn(() => ''),
+}));
+
+vi.mock('@/lib/ai-tools/agent-model', () => ({
+  getAgentModel: () => 'test-model',
+}));
+
+const restoreRunStateMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    getInterruptions: () => [{ rawItem: { callId: 'call_1' } }],
+  })),
+);
+const applyApprovalDecisionMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/ai-tools/sdk-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/ai-tools/sdk-bridge')>();
+  return {
+    ...actual,
+    restoreRunState: restoreRunStateMock,
+    applyApprovalDecision: applyApprovalDecisionMock,
+  };
+});
+
+import {
+  CHAT_MAX_TURNS,
+  WORK_MAX_TURNS,
+  resolveChatMaxTurns,
+  runChatTurn,
+  resumeChatTurn,
+} from '@/lib/ai-tools/sdk-chat';
+import type { ToolContext } from '@/lib/ai-tools/types';
+
+function makeCtx(workMode = false): ToolContext {
+  return {
+    userId: 'user_1',
+    space: { id: 'space_1', slug: 'jane', name: 'Jane Realty', ownerId: 'u1' },
+    signal: new AbortController().signal,
+    workMode,
+  };
+}
+
+beforeEach(() => {
+  runMock.mockReset();
+  runMock.mockResolvedValue({ toStream: async function* () {}, completed: Promise.resolve() });
+});
 
 describe('sdk-chat tool-call ceiling', () => {
-  it('caps tool-call iterations at 6 per turn', () => {
-    // Deliberately lowered 15 → 8 → 6 across the agent token redesign: the SDK
-    // re-sends the full transcript + every tool schema on EVERY inner step,
-    // so cost grows quadratically with the cap. With toolset retrieval and the
-    // integration meta-tools (find/call), most real workflows resolve in a
-    // couple of calls; 6 still covers genuine multi-step work and deeper jobs
-    // belong on delegate_task.
-    const source = readFileSync(
-      join(__dirname, '..', '..', 'lib', 'ai-tools', 'sdk-chat.ts'),
-      'utf-8',
-    );
-    expect(source).toMatch(/MAX_TURNS_PER_TURN\s*=\s*6\b/);
+  it('gives Work more inner steps than Chat so create_plan does not consume the whole budget', () => {
+    expect(CHAT_MAX_TURNS).toBeGreaterThanOrEqual(10);
+    expect(WORK_MAX_TURNS).toBeGreaterThan(CHAT_MAX_TURNS);
+    expect(resolveChatMaxTurns(false)).toBe(CHAT_MAX_TURNS);
+    expect(resolveChatMaxTurns(undefined)).toBe(CHAT_MAX_TURNS);
+    expect(resolveChatMaxTurns(true)).toBe(WORK_MAX_TURNS);
   });
 
-  it('passes the cap to run() on the fresh-turn path', () => {
-    const source = readFileSync(
-      join(__dirname, '..', '..', 'lib', 'ai-tools', 'sdk-chat.ts'),
-      'utf-8',
+  it('passes the Chat cap into run() on a fresh turn', async () => {
+    await runChatTurn({ ctx: makeCtx(false), userMessage: 'who are my leads' });
+    expect(runMock).toHaveBeenCalledTimes(1);
+    expect(runMock.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ maxTurns: CHAT_MAX_TURNS, stream: true }),
     );
-    // Both runChatTurn and resumeChatTurn must thread the cap into the
-    // SDK call. If a new entry point gets added, it should also pass it.
-    const callsWithCap = source.match(/maxTurns:\s*MAX_TURNS_PER_TURN/g) ?? [];
-    expect(callsWithCap.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('passes the Work cap into run() on a fresh Work turn', async () => {
+    await runChatTurn({
+      ctx: makeCtx(true),
+      userMessage: 'Email Sarah and schedule a tour',
+    });
+    expect(runMock).toHaveBeenCalledTimes(1);
+    expect(runMock.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ maxTurns: WORK_MAX_TURNS, stream: true }),
+    );
+  });
+
+  it('passes the Work cap into run() on resume', async () => {
+    await resumeChatTurn({
+      ctx: makeCtx(true),
+      serializedState: '{}',
+      decision: { approved: true },
+      callId: 'call_1',
+    });
+    expect(runMock).toHaveBeenCalledTimes(1);
+    expect(runMock.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ maxTurns: WORK_MAX_TURNS, stream: true }),
+    );
   });
 });

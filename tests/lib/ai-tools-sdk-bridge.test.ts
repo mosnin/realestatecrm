@@ -193,6 +193,25 @@ describe('toSdkTool', () => {
     await expect(sdk.needsApproval(new RunContext(), { id: 'p_1' })).resolves.toBe(true);
   });
 
+  it('keeps the active Work goal tools available on a continuation follow-up', () => {
+    const agent = buildChatAgent(
+      {
+        ...makeCtx(),
+        workMode: true,
+        conversationGoal: 'Email Sarah and schedule a tour at Oak Street',
+      },
+      {
+        model: 'gpt-5-mini',
+        instructions: 'Test agent.',
+        userMessage: 'Continue',
+      },
+    );
+    const names = agent.tools.map((tool) => tool.name);
+    expect(names).toContain('send_email');
+    expect(names).toContain('schedule_tour');
+    expect(names).toContain('analyze_property_values');
+  });
+
   it('derives the Work execution grant from the exact current user message', async () => {
     const agent = buildChatAgent(
       { ...makeCtx(), workMode: true, directExecutionToolNames: ['delete_contact'] },

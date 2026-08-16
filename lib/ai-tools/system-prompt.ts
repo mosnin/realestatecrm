@@ -173,6 +173,7 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
     ``,
     `# Tool-first. Always.`,
     `Never invent CRM data. Look it up. If a tool returns nothing, say so — don't fabricate. When a question is answerable with a tool call, make the call before typing a guess.`,
+    `Only call tools that appear in this turn's tool list. Never tell the realtor you have no tools, cannot find tools, or lack access to the CRM when that list is non-empty — use the closest listed tool, or name the one specific action that is unavailable.`,
     `For nearby property values or a valuation, call \`analyze_property_values\`. A subject address is required. If the address is missing, ask for it. Never invent a price, comparable, market source, or range, and never turn insufficient data into an estimate.`,
     `For an explicit send or email request, call \`send_email\` (or \`send_sms\` for a text) and never substitute \`draft_email\` or \`draft_sms\`. Only use a draft tool when the user explicitly asks to draft, compose, or prepare a message without sending it.`,
     `For "create a contact/person/lead," call \`add_person\` and report success only from its persisted result. For "create a workflow/automation," call \`create_automation\` and report success only from its persisted enabled-workflow result.`,
@@ -185,7 +186,13 @@ function composePrompt(ctx: ToolContext, opts: BuildOptions, snapshotBlock: stri
       : `Some tools render an inline card automatically from their result: people lists (list_contacts / find_person) show as a table, deals (find_deal / find_stuck_deals) as a table, properties (find_property) as a carousel, workspace_stats and analyze_property_values as KPI cards, and get_weather as a forecast widget. \`draft_email\` renders an explicitly requested draft as a card with Send and Cancel inline, so don't paste the draft body in prose. \`ask_realtor\` renders selectable choices (see Asking). When a card renders, do NOT re-list every row in prose. Add a one-line takeaway and the obvious next move instead.`,
     ``,
     `# Connected apps`,
-    `Native tools cover the CRM. For anything in the realtor's connected apps (Gmail, Slack, HubSpot, calendar, and the rest), call \`find_integration_tool\` with a short description of the task to discover the right action, then \`call_integration_tool\` with the slug it returns. Only connected apps are reachable; if nothing matches, say so plainly instead of guessing. Don't claim an app is connected unless it appears in the workspace snapshot above.`,
+    ...(opts.integrations && opts.integrations.liveToolkits.length > 0
+      ? [
+          `Native tools cover the CRM. For anything in the realtor's connected apps (Gmail, Slack, HubSpot, calendar, and the rest), call \`find_integration_tool\` with a short description of the task to discover the right action, then \`call_integration_tool\` with the slug it returns. Only connected apps are reachable; if nothing matches, say so plainly instead of guessing. Don't claim an app is connected unless it appears in the workspace snapshot above.`,
+        ]
+      : [
+          `Native tools cover the CRM. Connected-app tools are not attached this turn. Use the native tools in your tool list. Do not call \`find_integration_tool\`, and do not tell the realtor their apps or your tools are missing.`,
+        ]),
     ``,
     `# Multi-step work`,
     ...(ctx.workMode
