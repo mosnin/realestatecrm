@@ -51,6 +51,16 @@ import {
   parseWorkExecutionMode,
 } from '@/lib/chat/work-execution-mode';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
+import {
+  claimChildPausedRun,
+  isChildWaiterFresh,
+  isDelegateChildPausedRun,
+  streamChildTakeoverBriefing,
+  unwrapChildRunState,
+  writeChildApprovalDecision,
+  type ChildStoredApproval,
+} from '@/lib/ai-tools/delegate-child-pause';
+import { continueDelegatedChildAfterDecision } from '@/lib/ai-tools/delegate-run';
 
 const resumeBodySchema = z.object({
   approved: z.boolean(),
@@ -72,6 +82,7 @@ interface PausedRunRow {
   activeWorkbookContext?: unknown;
   status: 'pending' | 'resumed' | 'cancelled' | 'expired';
   expiresAt: string | null;
+  updatedAt?: string | null;
 }
 
 interface PersistedActiveWorkbookContext {
@@ -153,8 +164,8 @@ export async function POST(
   // migration is applied. Once Workbench is enabled, the field is mandatory
   // for an approved transform and validation below fails closed if absent.
   const pausedColumns = isWorkbenchEnabled()
-    ? 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt'
-    : 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, status, expiresAt';
+    ? 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt, updatedAt'
+    : 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, status, expiresAt, updatedAt';
   const { data: row, error } = await supabase
     .from('AgentPausedRun')
     .select(pausedColumns)
@@ -275,6 +286,53 @@ export async function POST(
       return NextResponse.json({ error: 'That workbook is no longer available for this approval. Reopen and inspect it again.' }, { status: 409 });
     }
     ctx.activeWorkbook = activeWorkbook;
+  }
+
+  if (isDelegateChildPausedRun(paused)) {
+    const envelope = unwrapChildRunState(paused.runState);
+    if (!envelope) {
+      return NextResponse.json({ error: 'Specialist checkpoint is unreadable' }, { status: 409 });
+    }
+    const written = await writeChildApprovalDecision({
+      pausedRunId: paused.id,
+      spaceId: paused.spaceId,
+      userId: paused.userId,
+      approvals: paused.approvals as ChildStoredApproval[],
+      callId,
+      decision: body.approved
+        ? { approved: true }
+        : { approved: false, message: body.message },
+    });
+    if (!written) {
+      return NextResponse.json({ error: 'Run is already resumed or no longer active' }, { status: 409 });
+    }
+    if (isChildWaiterFresh(paused.updatedAt)) {
+      return NextResponse.json({ ok: true, kind: 'delegate_child' });
+    }
+    const claimed = await claimChildPausedRun({
+      pausedRunId: paused.id,
+      spaceId: paused.spaceId,
+    });
+    if (!claimed) {
+      return NextResponse.json({ ok: true, kind: 'delegate_child' });
+    }
+    ctx.conversationId = paused.conversationId ?? undefined;
+    const child = await continueDelegatedChildAfterDecision({
+      ctx,
+      goal: envelope.goal,
+      serializedState: envelope.state,
+      callId,
+      decision: body.approved
+        ? { approved: true }
+        : { approved: false, message: body.message },
+      pausedRunId: paused.id,
+    });
+    return streamChildTakeoverBriefing({
+      conversationId: paused.conversationId ?? '',
+      spaceId: paused.spaceId,
+      summary: child.summary,
+      ok: child.ok,
+    });
   }
 
   // New durable turns resume the approval row and exact ConversationTurn in

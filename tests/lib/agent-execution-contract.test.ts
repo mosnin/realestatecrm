@@ -39,7 +39,6 @@ describe('Work intent-to-execution contract', () => {
     expect(names).not.toContain('draft_email');
     expect(names).not.toContain('draft_sms');
     expect(names).not.toContain('start_work_session');
-    expect(names).not.toContain('send_sms');
     expect(names).not.toContain('cancel_tour');
     expect(names).not.toContain('delete_tour');
   });

@@ -30,7 +30,8 @@ describe('Chippi Work execution controls', () => {
 
   it('renders real permission checkpoints in Chat, Review, and destructive Autonomous work', () => {
     expect(workspace).toContain('const pendingConfirmation = pendingApproval');
-    expect(workspace).toContain('isTail && pendingConfirmation && !isStreaming');
+    expect(workspace).toContain('isTail && pendingConfirmation');
+    expect(workspace).toContain('busy: approvalBusy');
     expect(workspace).toContain("workExecutionMode === 'review'");
   });
 

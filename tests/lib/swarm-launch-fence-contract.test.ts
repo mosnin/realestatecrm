@@ -7,17 +7,20 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 describe('specialist SwarmRun durable launch fence contract', () => {
   it('moves both producers onto the Cloudflare swarm-run-launch queue', () => {
     const route = read('app/api/swarm/route.ts');
-    const delegate = read('lib/ai-tools/tools/delegate-task.ts');
+    const realtime = read('app/api/ai/realtime-delegate/route.ts');
+    const chatDelegate = read('lib/ai-tools/tools/delegate-task.ts');
     const launch = read('lib/swarm-launch.ts');
 
     expect(route).toContain('createAndEnqueueSwarmRun');
-    expect(delegate).toContain('createAndEnqueueSwarmRun');
+    expect(realtime).toContain('createAndEnqueueSwarmRun');
     expect(launch).toContain("enqueueWorkerTask('swarm-run-launch'");
     expect(launch).toContain("enqueueWorkerTask('swarm-run-timeout'");
     expect(route).not.toContain('fetch(runtime.url');
-    expect(delegate).not.toContain('fetch(modalSwarmUrl');
+    expect(realtime).not.toContain('fetch(modalSwarmUrl');
+    expect(chatDelegate).not.toContain('fetch(modalSwarmUrl');
     expect(route).not.toContain('after(() => triggerTask)');
-    expect(delegate).not.toContain('after(() => triggerTask)');
+    expect(chatDelegate).not.toContain('after(() => triggerTask)');
+    expect(chatDelegate).toContain('runDelegatedChildTurn');
   });
 
   it('uses a strict internal task route and the same token for delayed timeout recovery', () => {

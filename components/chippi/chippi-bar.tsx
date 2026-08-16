@@ -189,6 +189,7 @@ export function ChippiBar({ slug }: Props) {
     messages,
     isStreaming,
     pendingApproval,
+    approvalBusy,
     liveCallIds,
     error,
     send,
@@ -359,13 +360,13 @@ export function ChippiBar({ slug }: Props) {
                           streaming={msg.streaming && turnActive}
                           liveCallIds={liveCallIds}
                           pendingApproval={
-                            isTail && pendingApproval && !isStreaming
+                            isTail && pendingApproval
                               ? {
                                   prompt: pendingApproval,
                                   onApprove: approve,
                                   onDeny: deny,
                                   onAlwaysAllow: alwaysAllow,
-                                  busy: isStreaming,
+                                  busy: approvalBusy,
                                 }
                               : undefined
                           }

@@ -36,6 +36,8 @@ export interface PermissionPromptData {
     args: Record<string, unknown>;
     summary: string;
   }>;
+  /** Specialist pause while the parent turn is still streaming. */
+  inline?: boolean;
 }
 
 /**

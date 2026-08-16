@@ -172,10 +172,13 @@ describe('toolsets — per-turn selection', () => {
         .filter((tool) => tool.requiresApproval !== false)
         .map((tool) => tool.name);
 
-    it('exposes only add_person for explicit contact creation', () => {
-      expect(
-        mutationNamesFor('Create a contact named Jane Smith with jane@example.com'),
-      ).toEqual(['add_person']);
+    it('authorizes add_person for explicit contact creation without destructive siblings', () => {
+      const message = 'Create a contact named Jane Smith with jane@example.com';
+      const tools = getChatTools(message, { workMode: true });
+      expect(tools.map((tool) => tool.name)).toContain('add_person');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(['add_person']);
+      expect(mutationNamesFor(message)).not.toContain('delete_contact');
+      expect(mutationNamesFor(message)).not.toContain('archive_person');
     });
 
     it('keeps property-value analysis grounded and read-only', () => {
@@ -186,16 +189,69 @@ describe('toolsets — per-turn selection', () => {
       expect(tools.filter((tool) => tool.requiresApproval !== false)).toEqual([]);
     });
 
-    it('exposes only send_email for an explicit email send', () => {
-      expect(
-        mutationNamesFor("Send an email to Jane about tomorrow's showing"),
-      ).toEqual(['send_email']);
+    it('authorizes send_email for an explicit email send without stripping other useful mutators', () => {
+      const message = "Send an email to Jane about tomorrow's showing";
+      const tools = getChatTools(message, { workMode: true });
+      expect(tools.map((tool) => tool.name)).toContain('send_email');
+      expect(tools.map((tool) => tool.name)).toContain('schedule_tour');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(['send_email']);
+      expect(mutationNamesFor(message)).not.toContain('cancel_tour');
+      expect(mutationNamesFor(message)).not.toContain('delete_tour');
+    });
+
+    it('keeps both send_email and schedule_tour for a multi-step Work request', () => {
+      const message = 'Email Sarah and schedule a tour for Friday';
+      const tools = getChatTools(message, { workMode: true });
+      const names = tools.map((tool) => tool.name);
+      expect(names).toContain('send_email');
+      expect(names).toContain('schedule_tour');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(
+        expect.arrayContaining(['send_email', 'schedule_tour']),
+      );
+      expect(selectDirectExecutionToolNames(message, tools)).toHaveLength(2);
+    });
+
+    it('keeps goal tools available on a short Work follow-up', () => {
+      const goal = 'Email Sarah and schedule a tour at the Oak Street listing';
+      const tools = getChatTools('Continue', { workMode: true, conversationGoal: goal });
+      const names = tools.map((tool) => tool.name);
+      expect(names).toContain('send_email');
+      expect(names).toContain('schedule_tour');
+      expect(selectDirectExecutionToolNames('Continue', tools, goal)).toEqual(
+        expect.arrayContaining(['send_email', 'schedule_tour']),
+      );
+      expect(selectDirectExecutionToolNames('Continue', tools, goal)).toHaveLength(2);
+    });
+
+    it('does not inherit the goal mutation grant for a new question', () => {
+      const goal = 'Email Sarah about the showing';
+      const tools = getChatTools("What's the weather in Austin?", {
+        workMode: true,
+        conversationGoal: goal,
+      });
+      expect(selectDirectExecutionToolNames("What's the weather in Austin?", tools, goal)).toEqual(
+        [],
+      );
+      expect(tools.map((tool) => tool.name)).toContain('get_weather');
+    });
+
+    it('always loads the reads the Work prompt names', () => {
+      const names = getChatTools('find Jane', { workMode: true }).map((tool) => tool.name);
+      expect(names).toContain('analyze_property_values');
+      expect(names).toContain('workspace_stats');
+      expect(names).toContain('get_weather');
+      expect(names).toContain('find_property');
+      expect(names).toContain('find_tours');
+      expect(names).toContain('create_plan');
     });
 
     it('treats an automation description as one automation mutation', () => {
-      expect(
-        mutationNamesFor('Create an automation that emails every new lead immediately'),
-      ).toEqual(['create_automation']);
+      const message = 'Create an automation that emails every new lead immediately';
+      const tools = getChatTools(message, { workMode: true });
+      expect(tools.map((tool) => tool.name)).toContain('create_automation');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(['create_automation']);
+      expect(mutationNamesFor(message)).not.toContain('send_email');
+      expect(mutationNamesFor(message)).not.toContain('add_person');
     });
 
     it.each([
@@ -206,8 +262,22 @@ describe('toolsets — per-turn selection', () => {
       ['cancel the tour for Friday', 'cancel_tour'],
       ['delete the tour for Friday', 'delete_tour'],
       ['delete the property at 10 Main Street', 'delete_property'],
-    ])('exposes only the requested destructive tool: %s', (message, expected) => {
-      expect(mutationNamesFor(message)).toEqual([expected]);
+    ])('authorizes only the requested destructive tool: %s', (message, expected) => {
+      const tools = getChatTools(message, { workMode: true });
+      const names = tools.map((tool) => tool.name);
+      expect(names).toContain(expected);
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual([expected]);
+      for (const other of [
+        'delete_contact',
+        'archive_person',
+        'merge_persons',
+        'delete_deal',
+        'cancel_tour',
+        'delete_tour',
+        'delete_property',
+      ]) {
+        if (other !== expected) expect(names).not.toContain(other);
+      }
     });
 
     it('does not expose destructive siblings for ordinary Work-mode requests', () => {
@@ -233,8 +303,9 @@ describe('toolsets — per-turn selection', () => {
     it('does not mistake contact context or an email-address lookup for a mutation', () => {
       const logMessage = 'Log a call with the new lead Jane';
       const logTools = getChatTools(logMessage, { workMode: true });
-      expect(selectDirectExecutionToolNames(logMessage, logTools)).toEqual([]);
+      expect(selectDirectExecutionToolNames(logMessage, logTools)).toEqual(['log_call']);
       expect(logTools.map((tool) => tool.name)).toContain('log_call');
+      expect(selectDirectExecutionToolNames(logMessage, logTools)).not.toContain('add_person');
 
       const lookupMessage = 'Email addresses for the new leads';
       const lookupTools = getChatTools(lookupMessage, { workMode: true });

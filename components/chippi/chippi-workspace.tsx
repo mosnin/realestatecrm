@@ -563,6 +563,7 @@ export function ChippiWorkspace({
     setMessages,
     isStreaming,
     pendingApproval,
+    approvalBusy,
     liveCallIds,
     error: agentError,
     streamingReasoning,
@@ -2022,14 +2023,14 @@ export function ChippiWorkspace({
                               }}
                               onOpenWorkbench={workbenchEnabled ? openWorkbenchArtifact : undefined}
                               pendingApproval={
-                                isTail && pendingConfirmation && !isStreaming
+                                isTail && pendingConfirmation
                                   ? {
                                       prompt: pendingConfirmation,
                                       onApprove: approveCelebrating,
                                       onDeny: deny,
                                       onAlwaysAllow:
                                         chatMode === 'chat' ? alwaysAllowCelebrating : undefined,
-                                      busy: isStreaming,
+                                      busy: approvalBusy,
                                     }
                                   : undefined
                               }

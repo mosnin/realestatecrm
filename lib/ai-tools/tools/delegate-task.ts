@@ -1,35 +1,22 @@
 /**
- * `delegate_task` — the orchestration tool. Chippi calls this on its own when
- * a request needs DEPTH: a multi-step investigation, a parallelizable sweep, a
- * "go figure this out and report back" job that would otherwise burn the whole
- * chat turn. It is Chippi's version of Claude Code's Task tool.
+ * `delegate_task` — Claude Code / Cowork-style Task tool.
  *
- * What it does:
- *   1. Creates a SwarmRun row (status 'queued') for the realtor's space.
- *   2. Enqueues a token-fenced Cloudflare task. The worker invokes the same
- *      authenticated Modal runtime used by `/api/swarm`; provider/model routing
- *      is selected by the specialist runtime configuration.
- *   3. Returns the run handle (runId + goal) so the chat UI can render a LIVE
- *      task card that subscribes to /api/swarm/[runId]/stream and updates as
- *      the sub-agents plan → work → complete.
+ * The parent chat turn hands a self-contained brief to an isolated specialist
+ * and WAITS for a briefing. The child runs in a fresh context with its own
+ * tool budget so a long job does not replay the parent transcript on every
+ * step. Progress heartbeats keep the thinking indicator and idle watchdog
+ * alive. The parent then answers the realtor from the briefing.
  *
- * Why this is read-only from the approval system's POV: delegating does not
- * itself mutate workspace state. The sub-agent run is a separate, observable
- * job the realtor watches inline. The orchestrator stays in the chat with the
- * realtor and continues to gate any DIRECT mutation it makes through the normal
- * approval flow. (Note: the Modal swarm runner today runs research-style
- * sub-agents without the workspace tool catalog — see swarm_orchestrator.py.
- * Wiring the full Chippi tool set + approvals into the Modal sub-agents is a
- * Python-side change tracked separately; this tool is the orchestration +
- * inline-progress wedge on the TypeScript side.)
+ * Modal swarm launch remains available for voice / floor-manager specialists
+ * (`createAndEnqueueSwarmRun`). Interactive chat uses the waiting child so
+ * the realtor gets one answer, not a "I kicked it off" dead-end.
  *
  * Scoped to ctx.space.id. The handler ignores any spaceId in args.
  */
 
 import { z } from 'zod';
-import { logger } from '@/lib/logger';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
-import { createAndEnqueueSwarmRun } from '@/lib/swarm-launch';
+import { runDelegatedChildTurn } from '../delegate-run';
 import { defineTool, type ToolContext } from '../types';
 
 const parameters = z.object({
@@ -49,8 +36,8 @@ const parameters = z.object({
 type DelegateArgs = z.infer<typeof parameters>;
 
 export interface DelegateTaskData {
-  /** SwarmRun id — the chat UI opens /api/swarm/{runId}/stream to watch it. */
-  runId: string;
+  /** Present only for legacy fire-and-forget swarm launches. */
+  runId?: string;
   goal: string;
 }
 
@@ -90,10 +77,11 @@ export function buildDelegateTaskTool() {
   return defineTool<typeof parameters, DelegateTaskData>({
     name: 'delegate_task',
     description:
-      'Spawn a deeper sub-agent to work on an in-depth, multi-step task and report back. ' +
-      'Its progress streams live in this chat. Use ONLY for tasks that need real depth or ' +
-      'parallel work — answer simple questions yourself instead. After calling this, tell the ' +
-      'realtor you have kicked it off; the live task card shows the rest.',
+      'Hand a long or multi-step job to an isolated specialist and WAIT for its briefing. ' +
+      'Use when the work needs more than a few tool calls, a sweep across many people or deals, ' +
+      'or would overflow this turn. The specialist does not see this chat — write a self-contained ' +
+      'brief. After this tool returns, answer the realtor from the briefing. Do not redo the work. ' +
+      'Do not use this for a single lookup or one-step send.',
     parameters,
     riskLevel: 'safe',
     requiresApproval: false,
@@ -117,35 +105,16 @@ export function buildDelegateTaskTool() {
         };
       }
 
-      const launch = await createAndEnqueueSwarmRun({
-        spaceId: ctx.space.id,
-        goal,
-        conversationId: ctx.conversationId,
-      });
-      if (launch.state === 'concurrent') {
+      const child = await runDelegatedChildTurn({ ctx, goal });
+      if (!child.ok) {
         return {
-          summary: 'Error: another specialist task is already active in this workspace.',
+          summary: child.summary,
           display: 'error',
         };
       }
-      if (launch.state === 'unavailable' || launch.state === 'failed') {
-        logger.error('[delegate_task] durable SwarmRun launch failed', {
-          spaceId: ctx.space.id,
-          state: launch.state,
-          error: launch.error,
-        });
-        return {
-          summary: 'Error: I couldn’t start the delegated task. I’ll try to handle it directly.',
-          display: 'error',
-        };
-      }
-      const runId = launch.runId;
-
-      const shortGoal = goal.length > 120 ? `${goal.slice(0, 117)}…` : goal;
       return {
-        // The marker is parsed + stripped by the stream pump before display.
-        summary: `Delegated to a sub-agent. Working on it now: ${shortGoal} ${encodeSubagentRunId(runId)}`,
-        data: { runId, goal },
+        summary: child.summary,
+        data: { goal },
         display: 'plain',
       };
     },

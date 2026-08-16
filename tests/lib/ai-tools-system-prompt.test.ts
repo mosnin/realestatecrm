@@ -29,6 +29,21 @@ describe('buildSystemPrompt', () => {
     // carry the same contract. Match either phrasing so future small edits
     // don't break the test, but a wholesale removal will.
     expect(prompt).toMatch(/never invent|don'?t fabricate|do not speculate/i);
+    expect(prompt).toMatch(/never tell the realtor you have no tools/i);
+  });
+
+  it('does not send the model to find_integration_tool when none are attached', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/do not call `find_integration_tool`/i);
+    expect(prompt).not.toMatch(/call `find_integration_tool` with a short description/i);
+  });
+
+  it('points at find_integration_tool only when connected apps are live this turn', () => {
+    const prompt = buildSystemPrompt(makeCtx(), {
+      integrations: { liveToolkits: ['gmail'], unavailableToolkits: [] },
+    });
+    expect(prompt).toContain('call `find_integration_tool` with a short description');
+    expect(prompt).not.toMatch(/do not call `find_integration_tool`/i);
   });
 
   it('mentions that mutating tools prompt for approval', () => {
@@ -86,6 +101,14 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt({ ...makeCtx(), workMode: true });
     expect(prompt).toContain('call `create_plan` exactly once BEFORE the first execution tool');
     expect(prompt).toContain('Do not create a plan for a quick lookup or one-step action');
+    expect(prompt).toContain('If that plan has five or more steps, call `delegate_task`');
+  });
+
+  it('tells the model to wait for a specialist briefing instead of walking away', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/That tool WAITS and returns a briefing/i);
+    expect(prompt).toMatch(/Do not redo the specialist's tool work/i);
+    expect(prompt).not.toMatch(/tell the realtor you have kicked it off/i);
   });
 
   it('pins one full-book read and refuses to invent a PDF artifact', () => {

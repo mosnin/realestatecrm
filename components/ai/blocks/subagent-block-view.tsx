@@ -27,6 +27,7 @@ const SUBAGENT_TOOL_NAMES = new Set<string>([
   'analyze_pipeline',
   'research_person',
   'planner',
+  'delegate_task',
 ]);
 
 export function isSubagentTool(name: string): boolean {
@@ -37,7 +38,7 @@ function getTaskDescription(
   args: Record<string, unknown> | undefined | null,
 ): string | undefined {
   if (!args) return undefined;
-  const v = args.input ?? args.task ?? args.description ?? args.query;
+  const v = args.goal ?? args.input ?? args.task ?? args.description ?? args.query;
   if (typeof v !== 'string') return undefined;
   return v.length > 80 ? `${v.slice(0, 77)}…` : v;
 }
@@ -58,9 +59,20 @@ export function SubagentBlockView({ block, live }: SubagentBlockViewProps) {
 
   // Labels chosen so the screen-glance reads as "<verb> Subagent · <task>"
   // — the task fills the description slot the ToolGroup primitive exposes.
-  const completeLabel = isError ? 'Subagent failed' : 'Completed Subagent';
-  const shimmerLabel = 'Running Subagent';
-  const interruptedLabel = isError && task ? `Subagent failed · ${task}` : 'Subagent failed';
+  const isDelegate = block.name === 'delegate_task';
+  const completeLabel = isError
+    ? isDelegate
+      ? 'Specialist failed'
+      : 'Subagent failed'
+    : isDelegate
+      ? 'Specialist finished'
+      : 'Completed Subagent';
+  const shimmerLabel = isDelegate ? 'Specialist working' : 'Running Subagent';
+  const interruptedLabel = isError && task
+    ? `${isDelegate ? 'Specialist failed' : 'Subagent failed'} · ${task}`
+    : isDelegate
+      ? 'Specialist failed'
+      : 'Subagent failed';
 
   return (
     <ToolGroup

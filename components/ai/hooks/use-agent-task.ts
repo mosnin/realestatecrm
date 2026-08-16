@@ -140,6 +140,8 @@ export interface UseAgentTaskResult {
   setMessages: React.Dispatch<React.SetStateAction<UiMessage[]>>;
   isStreaming: boolean;
   pendingApproval: PermissionPromptData | null;
+  /** True while an inline specialist approval POST is in flight. */
+  approvalBusy: boolean;
   liveCallIds: Set<string>;
   error: string | null;
   /** Accumulated reasoning tokens for the current streaming turn. Empty string when not streaming. */
@@ -303,6 +305,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState(false);
   // Synchronous mirror of isStreaming — send() consults this (not the state)
   // so the queue drain scheduled in consumeStream's finally can't race a
   // stale closure into re-queueing forever.
@@ -683,6 +686,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           args: event.args,
           summary: event.summary,
           otherPendingCalls: event.otherPendingCalls,
+          inline: event.inline,
         });
         return;
       }
@@ -1420,9 +1424,36 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     if (conversationId) await loadDurableTurns(conversationId);
   }, [durableTurnQueueEnabled, loadDurableTurns]);
 
+  const submitInlineDecision = useCallback(
+    async (requestId: string, body: Record<string, unknown>) => {
+      setApprovalBusy(true);
+      try {
+        const response = await fetch(`${resumeEndpointBase}/${encodeURIComponent(requestId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+          setError('That approval could not be recorded. Try again.');
+        }
+      } catch {
+        setError('That approval could not be recorded. Try again.');
+      } finally {
+        setApprovalBusy(false);
+      }
+    },
+    [resumeEndpointBase],
+  );
+
   const approve = useCallback(
     async (requestId: string, editedArgs?: Record<string, unknown>) => {
-      if (isStreaming) return;
+      if (isStreamingRef.current) {
+        await submitInlineDecision(requestId, {
+          approved: true,
+          ...(editedArgs ? { editedArgs } : {}),
+        });
+        return;
+      }
       // Start a new assistant bubble for the continuation. Matches the
       // server's persistence model (it saves a second Message row).
       const contId = newId();
@@ -1445,12 +1476,15 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         activeTurnIdRef.current ?? `legacy-resume:${requestId}`,
       );
     },
-    [isStreaming, consumeStream, resumeEndpointBase],
+    [consumeStream, resumeEndpointBase, submitInlineDecision],
   );
 
   const deny = useCallback(
     async (requestId: string) => {
-      if (isStreaming) return;
+      if (isStreamingRef.current) {
+        await submitInlineDecision(requestId, { approved: false });
+        return;
+      }
       // Snapshot the prompt before the stream's `permission_resolved` event
       // clears it — we use the snapshot to pre-populate PermissionBlocks
       // on the continuation bubble so the denial is visible immediately,
@@ -1499,7 +1533,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         activeTurnIdRef.current ?? `legacy-resume:${requestId}`,
       );
     },
-    [isStreaming, pendingApproval, consumeStream, resumeEndpointBase],
+    [pendingApproval, consumeStream, resumeEndpointBase, submitInlineDecision],
   );
 
   const alwaysAllow = useCallback(
@@ -1581,7 +1615,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       return;
     }
     if (conversationMode === 'work') return;
-    if (isStreaming) return;
+    if (isStreaming && !pendingApproval.inline) return;
     if (pendingApproval.name === 'apply_workbook_transformation') return;
     if (!allowedTools.has(pendingApproval.name)) return;
     if (autoApprovedRef.current === pendingApproval.requestId) return;
@@ -1594,6 +1628,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     setMessages,
     isStreaming,
     pendingApproval,
+    approvalBusy,
     liveCallIds,
     error,
     streamingReasoning,

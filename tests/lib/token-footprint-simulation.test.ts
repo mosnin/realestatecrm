@@ -140,7 +140,7 @@ describe('per-turn token footprint — OLD agent vs NEW agent', () => {
     // also ran sub-agents, each its OWN loop with its OWN catalog. Compare
     // like-for-like at the step level, then show the loop multiplier.
     const OLD_STEPS = 15; // old maxTurns before the trims
-    const NEW_STEPS = 6;  // current MAX_TURNS_PER_TURN
+    const NEW_STEPS = 10; // current CHAT_MAX_TURNS
     const oldPerResponse = oldPerStep * OLD_STEPS;
     const newPerResponse = newPerStep * NEW_STEPS;
 

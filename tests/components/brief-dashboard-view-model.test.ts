@@ -51,8 +51,17 @@ function dashboard(overrides: Partial<DashboardData> = {}): DashboardData {
 
 describe('BriefDashboard Today view model', () => {
   it('compares local calendar days instead of elapsed 24-hour windows', () => {
-    expect(daysSince('2026-08-12T20:00:00-04:00', new Date('2026-08-13T08:00:00-04:00'))).toBe(1);
-    expect(daysSince('2026-03-07T23:30:00-05:00', new Date('2026-03-09T00:30:00-04:00'))).toBe(2);
+    const previousEvening = new Date(2026, 7, 12, 20, 0, 0);
+    const nextMorning = new Date(2026, 7, 13, 8, 0, 0);
+    expect(daysSince(previousEvening.toISOString(), nextMorning)).toBe(1);
+
+    const sameDayEarly = new Date(2026, 7, 13, 0, 30, 0);
+    const sameDayLate = new Date(2026, 7, 13, 23, 30, 0);
+    expect(daysSince(sameDayEarly.toISOString(), sameDayLate)).toBe(0);
+
+    const saturdayNight = new Date(2026, 2, 7, 23, 30, 0);
+    const mondayMorning = new Date(2026, 2, 9, 0, 30, 0);
+    expect(daysSince(saturdayNight.toISOString(), mondayMorning)).toBe(2);
   });
   it('uses real open pipeline value as the focal metric and keeps four live outcome links', () => {
     const view = buildBriefDashboardViewModel('oak', dashboard());

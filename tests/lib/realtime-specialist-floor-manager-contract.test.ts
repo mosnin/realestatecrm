@@ -1,14 +1,53 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+const runDelegatedChildTurnMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/ai-tools/delegate-run', () => ({
+  runDelegatedChildTurn: (...args: unknown[]) => runDelegatedChildTurnMock(...(args as [])),
+}));
+
+vi.mock('@/lib/agent/kill-switch', () => ({
+  assertSpaceEnabled: vi.fn(async () => undefined),
+}));
+
+import { buildDelegateTaskTool } from '@/lib/ai-tools/tools/delegate-task';
+import type { ToolContext } from '@/lib/ai-tools/types';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 
+function makeCtx(): ToolContext {
+  return {
+    userId: 'user_1',
+    space: { id: 'space_1', slug: 'jane', name: 'Jane Realty', ownerId: 'u1' },
+    signal: new AbortController().signal,
+    conversationId: 'conv_server',
+  };
+}
+
 describe('Realtime specialist floor-manager durable contract', () => {
-  it('links future delegated runs to server-held conversation context', () => {
-    const delegate = read('lib/ai-tools/tools/delegate-task.ts');
-    expect(delegate).toContain('conversationId: ctx.conversationId');
-    expect(delegate).not.toContain('conversationId: args.');
+  beforeEach(() => {
+    runDelegatedChildTurnMock.mockReset();
+    runDelegatedChildTurnMock.mockResolvedValue({
+      ok: true,
+      summary: 'Done.',
+      toolNames: [],
+    });
+  });
+
+  it('links chat specialists to server-held conversation context, never a model-authored id', async () => {
+    const tool = buildDelegateTaskTool();
+    expect(Object.keys(tool.parameters.shape)).toEqual(['goal']);
+    await tool.handler(
+      { goal: 'Email Jane', conversationId: 'conv_spoofed' } as { goal: string },
+      makeCtx(),
+    );
+    expect(runDelegatedChildTurnMock).toHaveBeenCalledWith({
+      ctx: expect.objectContaining({ conversationId: 'conv_server' }),
+      goal: 'Email Jane',
+    });
+    expect(JSON.stringify(runDelegatedChildTurnMock.mock.calls[0])).not.toContain('conv_spoofed');
   });
 
   it('adds nullable conversation linkage and a service-only idempotent cancellation receipt', () => {
