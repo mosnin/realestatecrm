@@ -23,18 +23,18 @@ describe('getSuggestionsForTurn', () => {
 
   it('returns the curated set for the last completed tool, capped at 4', () => {
     const out = getSuggestionsForTurn([toolCall('schedule_tour')]);
-    expect(out).toEqual(['Send a confirmation', 'Add follow-up reminder', 'Block prep time']);
-    expect(out.length).toBeLessThanOrEqual(4);
+    expect(out).toEqual(['Send a confirmation', 'Add follow-up reminder']);
+    expect(out.length).toBeLessThanOrEqual(2);
   });
 
   it('keys off the LAST completed tool call when several fired', () => {
     const out = getSuggestionsForTurn([toolCall('search_contacts'), toolCall('draft_email')]);
-    expect(out).toEqual(['Send it', 'Adjust the tone', 'Save as template']); // draft_email, the last one
+    expect(out).toEqual(['Send it', 'Adjust the tone']); // draft_email, the last one
   });
 
   it('skips an incomplete/errored tool call and uses the prior completed one', () => {
     const out = getSuggestionsForTurn([toolCall('search_deals'), toolCall('draft_email', 'error')]);
-    expect(out).toEqual(['Show stuck deals', 'Find overdue follow-ups', "What's closing this week?"]); // search_deals
+    expect(out).toEqual(['Show stuck deals', 'Find overdue follow-ups']); // search_deals
   });
 
   it('falls back to the default for an unknown tool name', () => {

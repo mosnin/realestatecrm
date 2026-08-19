@@ -11,6 +11,7 @@
 
 import { DataTable } from '@/components/tool-ui/data-table';
 import { safeParseSerializableDataTable } from '@/components/tool-ui/data-table/schema';
+import { CompactResultList } from './compact-result-list';
 import { buildContactsTable, type ContactRowInput } from './tool-ui-mappers';
 
 export function ContactsTableResult({ contacts }: { contacts: ContactRowInput[] }) {
@@ -19,8 +20,18 @@ export function ContactsTableResult({ contacts }: { contacts: ContactRowInput[] 
   const parsed = safeParseSerializableDataTable(payload);
   if (!parsed) return null;
   return (
-    <div className="mt-2">
-      <DataTable {...parsed} />
-    </div>
+    <CompactResultList
+      noun="person"
+      plural="people"
+      items={contacts.map((contact) => ({
+        id: contact.id,
+        title: contact.name,
+        subtitle: [contact.scoreLabel, contact.email].filter(Boolean).join(' · ') || undefined,
+      }))}
+    >
+      <div className="mt-2 md:mt-0">
+        <DataTable {...parsed} />
+      </div>
+    </CompactResultList>
   );
 }

@@ -1,8 +1,6 @@
 /**
- * Suggested follow-up actions — the 2-4 chip row that appears after an
- * assistant turn. Curated by the last tool name in the turn. Static for
- * v1; an LLM-driven follow-up generator can replace this later without
- * touching the render layer.
+ * Suggested follow-up actions — the two-chip row that appears after an
+ * assistant turn. Curated by the last tool name in the turn.
  *
  * Design intent (Jobs): the chips remove a typing step for the realtor's
  * next move. Each chip is the ENTIRE next prompt — clicking it fires the
@@ -50,11 +48,10 @@ const DEFAULT_SUGGESTIONS = [
 /**
  * Pick suggestions for the latest assistant turn. Reads the last tool call
  * by position and returns its curated set. Returns an empty array when the
- * turn shouldn't show any (e.g. errored). Capped to 4 chips — Jobs lens:
- * configuration is failure to decide.
+ * turn shouldn't show any (e.g. errored). Capped to two chips.
  */
 export function getSuggestionsForTurn(blocks: MessageBlock[] | null | undefined): string[] {
-  if (!blocks || blocks.length === 0) return DEFAULT_SUGGESTIONS;
+  if (!blocks || blocks.length === 0) return DEFAULT_SUGGESTIONS.slice(0, 2);
   // Walk backwards for the last *completed* tool call. Errors / denials don't
   // produce a useful next-action context — fall back to the default set.
   for (let i = blocks.length - 1; i >= 0; i--) {
@@ -63,8 +60,8 @@ export function getSuggestionsForTurn(blocks: MessageBlock[] | null | undefined)
     const tc = b as ToolCallBlock;
     if (tc.status !== 'complete') continue;
     const set = SUGGESTIONS_BY_TOOL[tc.name];
-    if (set) return set.slice(0, 4);
-    return DEFAULT_SUGGESTIONS;
+    if (set) return set.slice(0, 2);
+    return DEFAULT_SUGGESTIONS.slice(0, 2);
   }
-  return DEFAULT_SUGGESTIONS;
+  return DEFAULT_SUGGESTIONS.slice(0, 2);
 }

@@ -44,13 +44,11 @@ describe('Chippi direct-action product copy', () => {
     expect(workspace).toContain("(chatMode === 'work' && workExecutionMode === 'review')) && (");
     expect(workspace).toContain('isTail && pendingConfirmation');
     expect(workspace).toContain('busy: approvalBusy');
-    expect(workspace).toContain('disabled={pendingConfirmation !== null || rateLimitSeconds > 0}');
+    expect(workspace).toContain('disabled={rateLimitSeconds > 0}');
   });
 
   it('uses confirmation language in Chat without claiming sends are only drafts', () => {
-    expect(permissionPrompt).toContain("isSendEmail ? 'Allow this email to send?'");
-    expect(permissionPrompt).toContain("isSendSms ? 'Allow this text to send?'");
-    expect(permissionPrompt).toContain(": 'Allow this tool to run?'");
+    expect(permissionPrompt).toContain('permissionPromptTitle(prompt.name, prompt.summary)');
     expect(permissionPrompt).toContain("isSendTool ? 'Allow and send'");
     expect(permissionPrompt).not.toMatch(/draft: review and send|approve before running/i);
   });

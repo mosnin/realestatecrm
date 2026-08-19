@@ -13,10 +13,9 @@ interface SplitPanelState {
   leftWidthPercent: number; // 0-100, default 58
 }
 
-// v2: the default tab changed from the 'people' CRM iframe to 'activity'
-// (Chippi's live work). Bumping the key drops stale persisted state so
-// existing users land on the new default once instead of keeping 'people'.
-const STORAGE_KEY = 'chippi-split-panel-v2';
+// v3: keep the Activity tab, but do not reopen a persisted split. The
+// chat thread is the default surface; the pane opens only when asked.
+const STORAGE_KEY = 'chippi-split-panel-v3';
 const DEFAULTS: SplitPanelState = {
   isSplit: false,
   rightTab: 'activity',

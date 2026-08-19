@@ -11,6 +11,8 @@
 
 import { DataTable } from '@/components/tool-ui/data-table';
 import { safeParseSerializableDataTable } from '@/components/tool-ui/data-table/schema';
+import { formatCurrency } from '@/lib/formatting';
+import { CompactResultList } from './compact-result-list';
 import { buildDealsTable, type DealRowInput } from './tool-ui-mappers';
 
 export function DealsTableResult({ deals }: { deals: DealRowInput[] }) {
@@ -19,8 +21,22 @@ export function DealsTableResult({ deals }: { deals: DealRowInput[] }) {
   const parsed = safeParseSerializableDataTable(payload);
   if (!parsed) return null;
   return (
-    <div className="mt-2">
-      <DataTable {...parsed} />
-    </div>
+    <CompactResultList
+      noun="deal"
+      items={deals.map((deal) => ({
+        id: deal.id,
+        title: deal.title,
+        subtitle: [
+          deal.stageName,
+          typeof deal.value === 'number' ? formatCurrency(deal.value) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+      }))}
+    >
+      <div className="mt-2 md:mt-0">
+        <DataTable {...parsed} />
+      </div>
+    </CompactResultList>
   );
 }

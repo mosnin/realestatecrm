@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Transcript } from '@/components/ai/blocks/transcript';
+import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
 import { ThinkingOrb, type OrbState } from 'thinking-orbs';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
@@ -47,6 +48,7 @@ import type { BrowserActionLogEntry } from '@/components/chippi/browser-control-
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 import { WorkExecutionModeMenu } from '@/components/chippi/work-execution-mode-menu';
+import { ChatModeChip } from '@/components/chippi/chat-mode-chip';
 import { WorkActivityTimeline } from '@/components/chippi/work-activity-timeline';
 import { useChatLiveEdge } from '@/components/chippi/use-chat-live-edge';
 import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
@@ -63,6 +65,13 @@ import {
   type ResearchSourceLink,
 } from '@/lib/chippi/research-workspace';
 import { consumeWorkDraftHandoff } from '@/lib/chippi/work-draft-handoff';
+import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
+import {
+  emptyStateSubtitle,
+  shouldShowFollowUpSuggestions,
+  shouldShowInlineWorkActivity,
+  shouldShowPlanCard,
+} from '@/lib/chippi/chat-ux';
 
 /**
  * Legacy on-the-wire message shape from /api/ai/messages. The DB now also
@@ -1619,10 +1628,9 @@ export function ChippiWorkspace({
         onSteer={chatMode === 'work' ? handleSteer : undefined}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
-        // NOT locked while streaming — typing stays live and Enter (or the
-        // queue button) holds the message for the next turn (useAgentTask
-        // owns the queue). Chat confirmations + rate limits still lock it.
-        disabled={pendingConfirmation !== null || rateLimitSeconds > 0}
+        // NOT locked while streaming or waiting on an approval — typing
+        // stays live and Enter queues the next thought. Rate limits still lock it.
+        disabled={rateLimitSeconds > 0}
         isLoading={turnActive}
         prefill={prefill ?? undefined}
         skills={skills}
@@ -1888,11 +1896,14 @@ export function ChippiWorkspace({
                     initial={{ opacity: 0, y: -4 }}
                     animate={{ opacity: greeting ? 1 : 0, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
-                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-6 sm:mb-8"
+                    className="text-center text-[2.25rem] sm:text-[2.75rem] tracking-tight leading-tight text-foreground mb-3 sm:mb-4"
                     style={{ fontFamily: 'var(--font-title)' }}
                   >
                     {greeting || ' '}
                   </motion.h1>
+                  <p className="mb-6 text-center text-[13px] text-muted-foreground sm:mb-8">
+                    {emptyStateSubtitle(chatMode)}
+                  </p>
                 </div>
               </motion.div>
             ) : (
@@ -1914,9 +1925,12 @@ export function ChippiWorkspace({
               >
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-6 truncate">
-                    {conversations.find((c) => c.id === activeConversationId)?.title ?? ''}
-                  </p>
+                  <div className="mb-6 flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      {conversations.find((c) => c.id === activeConversationId)?.title ?? ''}
+                    </p>
+                    <ChatModeChip mode={chatMode} />
+                  </div>
                 )}
 
                 <div className="space-y-7">
@@ -1965,10 +1979,15 @@ export function ChippiWorkspace({
                             className="mt-[3px]"
                           />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
-                            {isTail && chatMode === 'work' && workActivities.length > 0 && (
+                            {shouldShowInlineWorkActivity({
+                              chatMode,
+                              isTail,
+                              turnActive,
+                              eventCount: workActivities.length,
+                            }) && (
                               <WorkActivityTimeline events={workActivities} />
                             )}
-                            {isTail && showThinking && activePlan && planBlocks.length === 0 && (
+                            {isTail && showThinking && activePlan && planBlocks.length === 0 && shouldShowPlanCard(activePlan.steps.length) && (
                               <PlanCard
                                 task={activePlan.task}
                                 steps={activePlan.steps}
@@ -1983,7 +2002,7 @@ export function ChippiWorkspace({
                                 the Modal runtime path. */}
                             {planBlocks.map((planBlock) => {
                               const plan = parsePlanResult(planBlock.result?.data ?? planBlock.args);
-                              if (!plan) return null;
+                              if (!plan || !shouldShowPlanCard(plan.steps.length)) return null;
                               // Animate steps in while the message is still
                               // streaming; show settled state for history.
                               const isAnimating = !!(msg.streaming && turnActive);
@@ -2019,7 +2038,7 @@ export function ChippiWorkspace({
                               )}
                               liveCallIds={liveCallIds}
                               onUserIntent={(text) => {
-                                void handleSend(text, [], undefined);
+                                void handleSend(text, [], undefined, chatMode);
                               }}
                               onOpenWorkbench={workbenchEnabled ? openWorkbenchArtifact : undefined}
                               pendingApproval={
@@ -2046,6 +2065,20 @@ export function ChippiWorkspace({
                             />
                             {/* Inline retry button — shown on the tail error
                                 message so the realtor doesn't have to retype. */}
+                            {shouldShowFollowUpSuggestions({
+                              isTail,
+                              role: 'assistant',
+                              turnActive,
+                              hasError: Boolean(agentError),
+                              pendingApproval: pendingConfirmation !== null,
+                            }) && (
+                              <SuggestedActions
+                                suggestions={getSuggestionsForTurn(msg.blocks)}
+                                onSelect={(text) => {
+                                  void handleSend(text, [], undefined, chatMode);
+                                }}
+                              />
+                            )}
                             {isTail && agentError && !isStreaming && lastUserMsgRef.current && (
                               <button
                                 type="button"
@@ -2075,7 +2108,7 @@ export function ChippiWorkspace({
                           liveCallIds={liveCallIds}
                           localUrls={attachmentPreviewUrls}
                           onUserIntent={(text) => {
-                            void handleSend(text, [], undefined);
+                            void handleSend(text, [], undefined, chatMode);
                           }}
                           onOpenWorkbench={workbenchEnabled ? openWorkbenchArtifact : undefined}
                         />
