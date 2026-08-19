@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   .print-btn:hover { background: #1d4ed8; }
   .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 11px; }
   .signature { margin-top: 30px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
-  .signature .sig-name { font-size: 18px; font-family: 'Georgia', serif; font-style: italic; }
+  .signature .sig-name { font-size: 18px; font-family: "Times New Roman MT", "Times New Roman", Times, serif; font-style: italic; }
 </style>
 </head><body>
 <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>

@@ -9,6 +9,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+import { FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
 
 export default function GlobalError({
   error,
@@ -32,14 +33,13 @@ export default function GlobalError({
           justifyContent: 'center',
           background: '#fff',
           color: '#111',
-          fontFamily:
-            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+          fontFamily: FONT_SANS_STACK,
         }}
       >
         <div style={{ textAlign: 'center', padding: '2rem', maxWidth: 420 }}>
           <h1
             style={{
-              fontFamily: 'Tinos, Times, serif',
+              fontFamily: FONT_SERIF_STACK,
               fontSize: '1.5rem',
               fontWeight: 600,
               margin: '0 0 0.5rem',
