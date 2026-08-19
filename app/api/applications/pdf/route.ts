@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
 
 /**
  * GET — Generate a plain-text formatted rental application for download.
@@ -51,8 +52,8 @@ export async function GET(req: NextRequest) {
 <title>Rental Application — ${contact.name}</title>
 <style>
   @media print { body { margin: 0; } .no-print { display: none; } }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 30px; color: #1a1a1a; font-size: 13px; line-height: 1.5; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
+  body { font-family: ${FONT_SANS_STACK}; max-width: 800px; margin: 0 auto; padding: 40px 30px; color: #1a1a1a; font-size: 13px; line-height: 1.5; }
+  h1 { font-family: ${FONT_SERIF_STACK}; font-size: 22px; margin: 0 0 4px; }
   h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #666; border-bottom: 2px solid #eee; padding-bottom: 6px; margin-top: 28px; }
   .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 3px solid #333; }
   .header p { margin: 2px 0; color: #666; font-size: 12px; }
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
   .print-btn:hover { background: #1d4ed8; }
   .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #eee; text-align: center; color: #999; font-size: 11px; }
   .signature { margin-top: 30px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
-  .signature .sig-name { font-size: 18px; font-family: "Times New Roman MT", "Times New Roman", Times, serif; font-style: italic; }
+  .signature .sig-name { font-size: 18px; font-family: ${FONT_SERIF_STACK}; font-style: italic; }
 </style>
 </head><body>
 <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>

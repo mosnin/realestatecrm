@@ -34,6 +34,7 @@ import { logger } from '@/lib/logger';
 import { formatCurrency } from '@/lib/formatting';
 import type { CmaPayload, CmaComp } from '@/lib/cma-types';
 import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
+import { FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
 
 export const runtime = 'nodejs';
 
@@ -222,7 +223,7 @@ body {
   margin: 0;
   background: #f7f7f8;
   color: #111113;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  font-family: ${FONT_SANS_STACK};
   font-size: 15px;
   line-height: 1.5;
 }
@@ -232,7 +233,7 @@ main {
   padding: 48px 24px 64px;
 }
 h1 {
-  font-family: "Times New Roman MT", "Times New Roman", Times, serif;
+  font-family: ${FONT_SERIF_STACK};
   font-size: 32px;
   line-height: 1.15;
   letter-spacing: -0.01em;
@@ -253,7 +254,7 @@ section { margin-bottom: 28px; }
   text-align: center;
 }
 .range-value {
-  font-family: "Times New Roman MT", "Times New Roman", Times, serif;
+  font-family: ${FONT_SERIF_STACK};
   font-size: 30px;
   letter-spacing: -0.01em;
   margin: 4px 0;
@@ -271,7 +272,7 @@ section { margin-bottom: 28px; }
 .stat { background: #ffffff; padding: 14px 16px; }
 .stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6f76; margin: 0; }
 .stat-value {
-  font-family: "Times New Roman MT", "Times New Roman", Times, serif;
+  font-family: ${FONT_SERIF_STACK};
   font-size: 22px;
   margin: 4px 0 0;
   font-variant-numeric: tabular-nums;

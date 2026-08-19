@@ -1118,7 +1118,6 @@
 /* The studio brand display face: headings on the marketing/auth site. */
 .font-brand {
   font-family: var(--font-brand);
-  font-variation-settings: "slnt" 0, "CRSV" 0.5, "ELSH" 0, "ELXP" 0;
   letter-spacing: 0.01em;
 }
 

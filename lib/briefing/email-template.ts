@@ -15,6 +15,7 @@
  */
 
 import type { Brief } from './types';
+import { FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
@@ -48,7 +49,7 @@ export function briefEmailHtml(params: BriefEmailHtmlParams): string {
 
   return `<!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -56,7 +57,7 @@ export function briefEmailHtml(params: BriefEmailHtmlParams): string {
           Chippi · ${esc(dateLine)}
         </td></tr>
         <tr><td style="padding:0 32px 24px">
-          <h1 style="margin:0;font-size:24px;line-height:1.25;color:#111827;font-family:Times,serif;font-weight:normal">${esc(brief.headline)}</h1>
+          <h1 style="margin:0;font-size:24px;line-height:1.25;color:#111827;font-family:${FONT_SERIF_STACK};font-weight:normal">${esc(brief.headline)}</h1>
           ${subhead}
         </td></tr>
         <tr><td style="padding:0 32px 28px">
