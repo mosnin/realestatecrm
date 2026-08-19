@@ -14,7 +14,13 @@ import { safeParseSerializableDataTable } from '@/components/tool-ui/data-table/
 import { CompactResultList } from './compact-result-list';
 import { buildContactsTable, type ContactRowInput } from './tool-ui-mappers';
 
-export function ContactsTableResult({ contacts }: { contacts: ContactRowInput[] }) {
+export function ContactsTableResult({
+  contacts,
+  onUserIntent,
+}: {
+  contacts: ContactRowInput[];
+  onUserIntent?: (text: string) => void;
+}) {
   if (!contacts?.length) return null;
   const payload = buildContactsTable(contacts);
   const parsed = safeParseSerializableDataTable(payload);
@@ -23,6 +29,14 @@ export function ContactsTableResult({ contacts }: { contacts: ContactRowInput[] 
     <CompactResultList
       noun="person"
       plural="people"
+      onItemClick={
+        onUserIntent
+          ? (id) => {
+              const contact = contacts.find((row) => row.id === id);
+              onUserIntent(contact?.name ? `Tell me about ${contact.name}` : `Tell me about this person`);
+            }
+          : undefined
+      }
       items={contacts.map((contact) => ({
         id: contact.id,
         title: contact.name,

@@ -125,11 +125,11 @@ function richResultFor(
   const data = block.result.data as Record<string, unknown> | undefined;
   if (!data) return null;
   if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-    return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
+    return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} onUserIntent={onUserIntent} />;
   }
   if (block.display === 'deals') {
     const deals = normalizeDealRows(data);
-    return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
+    return deals.length > 0 ? <DealsTableResult deals={deals} onUserIntent={onUserIntent} /> : null;
   }
   if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
     return <ToursResult data={data as { tours: never[] }} />;

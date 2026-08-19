@@ -37,6 +37,25 @@ describe('getSuggestionsForTurn', () => {
     expect(out).toEqual(['Show stuck deals', 'Find overdue follow-ups']); // search_deals
   });
 
+  it('grounds chips in the first person or deal the tool returned', () => {
+    expect(getSuggestionsForTurn([
+      {
+        type: 'tool_call',
+        name: 'search_contacts',
+        status: 'complete',
+        result: { ok: true, summary: '2 people', data: { contacts: [{ id: '1', name: 'Sam Chen' }] } },
+      } as never,
+    ])).toEqual(['Text Sam', "Show Sam's deals"]);
+    expect(getSuggestionsForTurn([
+      {
+        type: 'tool_call',
+        name: 'search_deals',
+        status: 'complete',
+        result: { ok: true, summary: '1 deal', data: { deals: [{ id: 'd1', title: 'Oak Street' }] } },
+      } as never,
+    ])).toEqual(["What's stuck on Oak Street?", 'Find overdue follow-ups']);
+  });
+
   it('falls back to the default for an unknown tool name', () => {
     const def = getSuggestionsForTurn(null);
     expect(getSuggestionsForTurn([toolCall('some_unmapped_tool')])).toEqual(def);

@@ -249,11 +249,11 @@ export function ToolCallBlockView({
     // Contacts / deals → tool-ui DataTable. Properties → tool-ui ItemCarousel.
     // Analytics → tool-ui StatsDisplay. Weather (tour prep) → WeatherWidget.
     if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-      return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
+      return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} onUserIntent={onUserIntent} />;
     }
     if (block.display === 'deals') {
       const deals = normalizeDealRows(data);
-      return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
+      return deals.length > 0 ? <DealsTableResult deals={deals} onUserIntent={onUserIntent} /> : null;
     }
     if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
       return <ToursResult data={data as { tours: never[] }} />;

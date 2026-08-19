@@ -14,7 +14,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolApproval, type ToolApprovalStatus } from '@/components/ai/agent-status';
-import { permissionArgFields, permissionPromptTitle } from '@/lib/ai-tools/permission-copy';
+import {
+  looksTechnical,
+  permissionArgFields,
+  permissionPromptDescription,
+  permissionPromptTitle,
+} from '@/lib/ai-tools/permission-copy';
 
 /** SMS one-segment budget (GSM-7). Long-form is 153/segment after the first. */
 const SMS_SOFT_LIMIT = 160;
@@ -54,7 +59,11 @@ export interface PermissionPromptData {
 function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactElement | null {
   const a = prompt.args as Record<string, unknown>;
   if (prompt.name === 'send_email') {
-    const to = typeof a.toEmail === 'string' ? a.toEmail : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const to = typeof a.toEmail === 'string' && !looksTechnical(a.toEmail)
+      ? a.toEmail
+      : typeof a.contactId === 'string'
+        ? 'Selected contact'
+        : '—';
     const subject = typeof a.subject === 'string' ? a.subject : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
@@ -74,7 +83,11 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
     );
   }
   if (prompt.name === 'send_sms') {
-    const to = typeof a.toPhone === 'string' ? a.toPhone : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const to = typeof a.toPhone === 'string' && !looksTechnical(a.toPhone)
+      ? a.toPhone
+      : typeof a.contactId === 'string'
+        ? 'Selected contact'
+        : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
       <div className="mt-2.5 space-y-1.5 bg-transparent py-1 text-[12px]">
@@ -128,15 +141,15 @@ function InlineComposeCard({
 }) {
   const to =
     kind === 'email'
-      ? typeof args.toEmail === 'string'
+      ? typeof args.toEmail === 'string' && !looksTechnical(args.toEmail)
         ? args.toEmail
         : typeof args.contactId === 'string'
-          ? `Contact ${String(args.contactId).slice(0, 8)}`
+          ? 'Selected contact'
           : '—'
-      : typeof args.toPhone === 'string'
+      : typeof args.toPhone === 'string' && !looksTechnical(args.toPhone)
         ? args.toPhone
         : typeof args.contactId === 'string'
-          ? `Contact ${String(args.contactId).slice(0, 8)}`
+          ? 'Selected contact'
           : '—';
 
   const smsLen = body.length;
@@ -386,8 +399,8 @@ export function PermissionPromptView({
   return (
     <ToolApproval
       tool={prompt.name}
-      title={permissionPromptTitle(prompt.name, prompt.summary)}
-      description={prompt.summary}
+      title={permissionPromptTitle(prompt.name, prompt.summary, prompt.args)}
+      description={permissionPromptDescription(prompt.summary)}
       status={approvalStatus}
       defaultOpen
       actions={
@@ -459,7 +472,7 @@ export function PermissionPromptView({
             {prompt.otherPendingCalls!.map((call) => (
               <div key={call.callId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock size={10} className="shrink-0" />
-                <span>{call.name}</span>
+                <span>{permissionPromptTitle(call.name, call.summary, call.args)}</span>
               </div>
             ))}
           </div>

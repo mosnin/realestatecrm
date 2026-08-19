@@ -47,6 +47,7 @@ export function PropertiesCarouselResult({
     <CompactResultList
       noun="property"
       plural="properties"
+      onItemClick={interactive ? ask : undefined}
       items={properties.map((property) => ({
         id: property.id,
         title: property.address,

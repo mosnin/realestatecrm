@@ -48,7 +48,7 @@ describe('Chippi direct-action product copy', () => {
   });
 
   it('uses confirmation language in Chat without claiming sends are only drafts', () => {
-    expect(permissionPrompt).toContain('permissionPromptTitle(prompt.name, prompt.summary)');
+    expect(permissionPrompt).toContain('permissionPromptTitle(');
     expect(permissionPrompt).toContain("isSendTool ? 'Allow and send'");
     expect(permissionPrompt).not.toMatch(/draft: review and send|approve before running/i);
   });

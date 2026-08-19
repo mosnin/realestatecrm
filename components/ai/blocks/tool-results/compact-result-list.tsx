@@ -15,12 +15,14 @@ export function CompactResultList({
   noun,
   plural,
   className,
+  onItemClick,
   children,
 }: {
   items: CompactResultItem[];
   noun: string;
   plural?: string;
   className?: string;
+  onItemClick?: (id: string) => void;
   /** Full table / carousel shown on desktop, and on mobile after expand. */
   children: ReactNode;
 }) {
@@ -34,14 +36,31 @@ export function CompactResultList({
     <div className={cn('mt-2', className)}>
       <div className={cn(expanded ? 'hidden' : 'md:hidden')}>
         <ul className="divide-y divide-border/40 border-y border-border/40">
-          {preview.map((item) => (
-            <li key={item.id} className="py-2">
-              <p className="truncate text-[13px] font-medium text-foreground/90">{item.title}</p>
-              {item.subtitle ? (
-                <p className="truncate text-[11px] text-muted-foreground">{item.subtitle}</p>
-              ) : null}
-            </li>
-          ))}
+          {preview.map((item) => {
+            const row = (
+              <>
+                <p className="truncate text-[13px] font-medium text-foreground/90">{item.title}</p>
+                {item.subtitle ? (
+                  <p className="truncate text-[11px] text-muted-foreground">{item.subtitle}</p>
+                ) : null}
+              </>
+            );
+            return (
+              <li key={item.id}>
+                {onItemClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onItemClick(item.id)}
+                    className="w-full py-2 text-left"
+                  >
+                    {row}
+                  </button>
+                ) : (
+                  <div className="py-2">{row}</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {remaining > 0 ? (
           <button
@@ -49,7 +68,7 @@ export function CompactResultList({
             onClick={() => setExpanded(true)}
             className="mt-2 text-[12px] font-medium text-foreground/80 underline underline-offset-4"
           >
-            Show all {countLabel(items.length, noun, plural)}
+            Open {countLabel(items.length, noun, plural)}
           </button>
         ) : null}
       </div>

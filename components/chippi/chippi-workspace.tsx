@@ -1697,7 +1697,7 @@ export function ChippiWorkspace({
         && !conversationModeLocked
         && !historyReloading
         && !isLoadingConversation && (
-        <div className="absolute left-1/2 top-1.5 z-20 -translate-x-1/2 sm:top-2">
+        <div className="absolute left-1/2 top-1.5 z-20 hidden -translate-x-1/2 sm:top-2 sm:block">
           <ChatWorkModeSwitch
             mode={chatMode}
             onChange={selectChatMode}
@@ -1901,6 +1901,9 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
+                  <div className="mb-3 flex justify-center">
+                    <ChatModeChip mode={chatMode} />
+                  </div>
                   <p className="mb-6 text-center text-[13px] text-muted-foreground sm:mb-8">
                     {emptyStateSubtitle(chatMode)}
                   </p>

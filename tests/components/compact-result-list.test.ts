@@ -21,8 +21,25 @@ describe('CompactResultList', () => {
         children: createElement('div', null, 'full table'),
       }));
       expect(html).toContain('Sam Chen');
-      expect(html).toContain('Show all 5 people');
+      expect(html).toContain('Open 5 people');
       expect(html).toContain('full table');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('lets a preview row fire the next ask', () => {
+    vi.stubGlobal('React', React);
+    try {
+      const html = renderToStaticMarkup(createElement(CompactResultList, {
+        noun: 'person',
+        plural: 'people',
+        onItemClick: () => undefined,
+        items: [{ id: '1', title: 'Sam Chen', subtitle: 'Hot' }],
+        children: createElement('div', null, 'full table'),
+      }));
+      expect(html).toContain('type="button"');
+      expect(html).toContain('Sam Chen');
     } finally {
       vi.unstubAllGlobals();
     }
