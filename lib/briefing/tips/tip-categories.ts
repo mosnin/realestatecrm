@@ -151,8 +151,9 @@ export async function tipWonDealReviewAsk(spaceId: string): Promise<Signal[]> {
       .gte('createdAt', deal.closeDate)
       .limit(20);
 
-    const hasReviewMention = (notes ?? []).some((n) => {
-      const txt = ((n as { content: string }).content ?? '').toLowerCase();
+    const noteRows = (notes ?? []) as Array<{ content: string | null }>;
+    const hasReviewMention = noteRows.some((n) => {
+      const txt = (n.content ?? '').toLowerCase();
       return txt.includes('review') || txt.includes('testimonial');
     });
     if (hasReviewMention) continue;
