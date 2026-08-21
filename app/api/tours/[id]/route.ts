@@ -147,7 +147,7 @@ export async function PATCH(
       spaceId: ctx.space.id,
       type: 'follow_up',
       content: `Auto follow-up set for 24h after tour completion${data.propertyAddress ? ` — ${data.propertyAddress}` : ''}`,
-    }).then(({ error: actErr }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });
+    }).then(({ error: actErr }: { error: unknown }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });
   }
 
   // Auto-set follow-up for no-shows (48h later)
