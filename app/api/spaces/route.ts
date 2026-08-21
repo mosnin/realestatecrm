@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { audit } from '@/lib/audit';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import type { SpaceSetting } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -20,8 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   const [settingsRes, ownerRes] = await Promise.all([
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: userSpace.id })
       .select(
         'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, digestCadence, phoneNumber, timezone,' +
         'briefEnabled, briefHour, briefEmail, briefSms,' +
@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
         'intakeDisclaimerText, intakeFooterLinks,' +
         'myConnections'
       )
-      .eq('spaceId', userSpace.id)
       .maybeSingle(),
     supabase
       .from('User')
@@ -336,8 +335,7 @@ export async function PATCH(req: NextRequest) {
     settingsPayload.tourBlockedDates = validDates;
   }
 
-  const { error: settingsError } = await supabase
-    .from('SpaceSetting')
+  const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .upsert(settingsPayload, { onConflict: 'spaceId' })
     .select();
   if (settingsError) {

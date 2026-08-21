@@ -96,10 +96,8 @@ export async function GET() {
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('SpaceSetting')
+      const { data: settingsData, error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .select('*')
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (settingsError) throw settingsError;
       settings = settingsData as SpaceSetting | null;
@@ -226,10 +224,8 @@ export async function POST(req: NextRequest) {
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('SpaceSetting')
+      const { data: settingsData, error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .select('*')
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (settingsError) throw settingsError;
       settings = settingsData as SpaceSetting | null;
@@ -289,8 +285,7 @@ export async function POST(req: NextRequest) {
       if (updateError) throw updateError;
 
       if (space) {
-        const { error: settingsError } = await supabase
-          .from('SpaceSetting')
+        const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
           .upsert(
             {
               id: crypto.randomUUID(),
@@ -411,8 +406,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (space) {
-        const { error: settingsError } = await supabase
-          .from('SpaceSetting')
+        const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
           .upsert(
             {
               id: crypto.randomUUID(),
@@ -502,8 +496,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. Create SpaceSetting
-      const { error: settingsInsertErr } = await supabase
-        .from('SpaceSetting')
+      const { error: settingsInsertErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
         .insert({
           id: settingsId,
           spaceId,
@@ -555,8 +548,7 @@ export async function POST(req: NextRequest) {
 
       if (!space) return NextResponse.json({ error: 'No space found' }, { status: 400 });
 
-      const { error: notifError } = await supabase
-        .from('SpaceSetting')
+      const { error: notifError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .upsert(
           {
             id: crypto.randomUUID(),
@@ -568,12 +560,10 @@ export async function POST(req: NextRequest) {
         .select();
       if (notifError) throw notifError;
 
-      const { error: connError } = await supabase
-        .from('SpaceSetting')
+      const { error: connError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .update({
           myConnections: JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' }),
-        })
-        .eq('spaceId', space.id);
+        });
       if (connError) throw connError;
 
       return NextResponse.json({ success: true });
@@ -711,8 +701,7 @@ export async function POST(req: NextRequest) {
         profileUpdate.leadSources = leadSources.filter((s) => typeof s === 'string').slice(0, 20);
       }
 
-      const { error: profileErr } = await supabase
-        .from('AIUserProfile')
+      const { error: profileErr } = await tenantTable(supabase, 'AIUserProfile', { spaceId: space.id })
         .upsert(
           {
             id: crypto.randomUUID(),

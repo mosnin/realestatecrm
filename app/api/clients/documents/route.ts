@@ -6,6 +6,7 @@ import { clientOwnsContact } from '@/lib/client-portal-data';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   uploadObject,
   deleteObject,
@@ -130,8 +131,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
-  const { data: doc, error } = await supabase
-    .from('ClientDocument')
+  const { data: doc, error } = await tenantTable(supabase, 'ClientDocument', { spaceId })
     .insert({
       contactId,
       spaceId,

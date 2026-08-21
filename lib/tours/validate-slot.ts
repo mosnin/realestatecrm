@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Server-side re-validation that a requested tour `startsAt` corresponds to a
@@ -46,10 +47,8 @@ export async function validateTourSlot(
   propertyProfileId: string | null,
 ): Promise<ValidateSlotResult> {
   // ── Load space settings (same fields available/route.ts reads) ──────────────
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('tourDuration, tourStartHour, tourEndHour, tourDaysAvailable, timezone, tourBufferMinutes, tourBlockedDates')
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   let duration = settings?.tourDuration ?? 30;

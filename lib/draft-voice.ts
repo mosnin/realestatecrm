@@ -33,6 +33,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 export interface VoiceSample {
   subject: string | null;
@@ -127,10 +128,8 @@ export async function getRecentVoiceSamples(
   // SELECT only the two columns we return — explicitly NOT contactId/dealId,
   // not subject-of-deal title, not anything that could leak who the prior
   // draft was for. Defense at the query layer.
-  const { data, error } = await supabase
-    .from('AgentDraft')
+  const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('subject, content')
-    .eq('spaceId', spaceId)
     .eq('channel', 'email')
     .eq('feedback_action', 'edited_and_approved')
     .in('status', ['sent', 'approved'])

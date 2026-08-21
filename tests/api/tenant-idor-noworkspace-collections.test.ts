@@ -62,6 +62,30 @@ vi.mock('@/lib/intake', () => ({
 vi.mock('@/lib/net/ssrf-guard', () => ({
   assertPublicHttpTarget: vi.fn(async () => ({ ok: true })),
 }));
+vi.mock('@/lib/work-sessions/start', () => ({ startWorkSession: vi.fn() }));
+vi.mock('@/lib/property-analysis', () => ({
+  analyzeProperty: vi.fn(),
+  missingResearchKeys: vi.fn(() => []),
+}));
+vi.mock('@/lib/areas', () => ({
+  normalizeArea: vi.fn(),
+  parseAreaQuery: vi.fn(),
+}));
+vi.mock('@/lib/area-analysis', () => ({ missingResearchKeys: vi.fn(() => []) }));
+vi.mock('@/lib/area-report-store', () => ({ getOrCreateAreaReport: vi.fn() }));
+vi.mock('@/lib/offers', () => ({
+  listOffers: vi.fn(),
+  listOffersForDeal: vi.fn(),
+  createOffer: vi.fn(),
+  OFFER_STATUSES: ['draft', 'sent', 'accepted', 'rejected', 'withdrawn', 'expired'],
+}));
+vi.mock('@/lib/integrations/composio', () => ({ executeToolForEntity: vi.fn() }));
+vi.mock('@/lib/calendar/mirror', () => ({
+  PROVIDER_TOOL_SLUGS: {},
+  findCalendarConnection: vi.fn(),
+  writeEventThrough: vi.fn(),
+}));
+vi.mock('@/lib/calendar/event-validation', () => ({ validateCreatePayload: vi.fn() }));
 vi.mock('@/lib/data-export', () => ({ exportSpaceData: vi.fn(async () => ({})) }));
 vi.mock('@/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 vi.mock('@/lib/integrations/connections', () => ({ activeToolkits: vi.fn(async () => []) }));
@@ -191,6 +215,13 @@ import { GET as compareApplicants } from '@/app/api/applications/compare/route';
 import { GET as listPackets, POST as postPacket } from '@/app/api/properties/[id]/packets/route';
 import { GET as getFormAnalytics } from '@/app/api/form-analytics/route';
 import { POST as postFormOptimize } from '@/app/api/form-config/optimize/route';
+import { GET as listWaitlist } from '@/app/api/tours/waitlist/route';
+import { GET as listWorkSessions, POST as postWorkSession } from '@/app/api/work-sessions/route';
+import { GET as getWorkSessionArtifact } from '@/app/api/work-sessions/[id]/artifact/route';
+import { POST as analyzeProperty } from '@/app/api/properties/[id]/analyze/route';
+import { POST as analyzeArea } from '@/app/api/areas/analyze/route';
+import { GET as listOffers, POST as postOffer } from '@/app/api/offers/route';
+import { GET as listCalendarEvents, POST as postCalendarEvent } from '@/app/api/calendar/events/route';
 import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -1214,5 +1245,111 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('SpaceSetting');
+  });
+
+  it('GET /api/tours/waitlist 404s and does not query TourWaitlist', async () => {
+    const res = await listWaitlist(new NextRequest('http://localhost/api/tours/waitlist?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('TourWaitlist');
+  });
+
+  it('GET /api/work-sessions 404s and does not query WorkSession', async () => {
+    const res = await listWorkSessions(new NextRequest('http://localhost/api/work-sessions?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('WorkSession');
+  });
+
+  it('POST /api/work-sessions 404s and does not insert WorkSession', async () => {
+    const res = await postWorkSession(
+      new NextRequest('http://localhost/api/work-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', goal: 'Chase VICTIM at 123 Victim Lane' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('WorkSession');
+  });
+
+  it('GET /api/work-sessions/[id]/artifact 404s and does not query File', async () => {
+    const res = await getWorkSessionArtifact(
+      new NextRequest('http://localhost/api/work-sessions/ws_victim/artifact?slug=victim'),
+      { params: Promise.resolve({ id: 'ws_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('WorkSession');
+    expect(fromMockTables).not.toContain('File');
+  });
+
+  it('POST /api/properties/[id]/analyze 404s and does not query Property', async () => {
+    const res = await analyzeProperty(
+      new NextRequest('http://localhost/api/properties/prop_victim/analyze', { method: 'POST' }),
+      { params: Promise.resolve({ id: 'prop_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Property');
+  });
+
+  it('POST /api/areas/analyze 404s and does not query Property', async () => {
+    const res = await analyzeArea(
+      new NextRequest('http://localhost/api/areas/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '123 Victim Lane' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Property');
+    expect(fromMockTables).not.toContain('AreaReport');
+  });
+
+  it('GET /api/offers 404s and does not list Offer', async () => {
+    const res = await listOffers(new NextRequest('http://localhost/api/offers'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Offer');
+  });
+
+  it('POST /api/offers 404s and does not insert Offer', async () => {
+    const res = await postOffer(
+      new NextRequest('http://localhost/api/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buyerName: 'VICTIM', amount: 500000 }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Offer');
+  });
+
+  it('GET /api/calendar/events 404s and does not query CalendarEvent', async () => {
+    const res = await listCalendarEvents(
+      new NextRequest('http://localhost/api/calendar/events?slug=victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CalendarEvent');
+    expect(fromMockTables).not.toContain('CalendarEventMirror');
+  });
+
+  it('POST /api/calendar/events 404s and does not write CalendarEvent', async () => {
+    const res = await postCalendarEvent(
+      new NextRequest('http://localhost/api/calendar/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', title: 'Chase VICTIM' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CalendarEvent');
+    expect(fromMockTables).not.toContain('CalendarEventMirror');
   });
 });

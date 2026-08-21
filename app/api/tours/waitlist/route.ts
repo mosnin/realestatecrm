@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
 
 /** GET — list waitlist entries (authenticated, space owner) */
 export async function GET(req: NextRequest) {
@@ -13,10 +14,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('TourWaitlist')
+  const { data, error } = await tenantTable(supabase, 'TourWaitlist', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .in('status', ['waiting', 'notified'])
     .order('preferredDate', { ascending: true });
   if (error) throw error;
@@ -54,10 +53,8 @@ export async function POST(req: NextRequest) {
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
   // Check for duplicate
-  const { data: existing } = await supabase
-    .from('TourWaitlist')
+  const { data: existing } = await tenantTable(supabase, 'TourWaitlist', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .eq('guestEmail', guestEmail.trim().toLowerCase())
     .eq('preferredDate', preferredDate)
     .eq('status', 'waiting')
@@ -67,8 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'You are already on the waitlist for this date' }, { status: 409 });
   }
 
-  const { data, error } = await supabase
-    .from('TourWaitlist')
+  const { data, error } = await tenantTable(supabase, 'TourWaitlist', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

@@ -12,6 +12,7 @@ import {
 import { normalizeArea } from '@/lib/areas';
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -157,11 +158,9 @@ async function persist(
   // but still stamps analyzedAt so the UI shows the attempt).
   if (extra.analysis !== undefined) update.analysis = extra.analysis;
 
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: ownerSpaceId })
     .update(update)
     .eq('id', id)
-    .eq('spaceId', ownerSpaceId)
     .select(`${SELECT}, analysis, analyzedAt`)
     .single();
 
