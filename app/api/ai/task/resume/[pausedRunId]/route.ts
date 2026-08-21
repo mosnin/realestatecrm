@@ -30,6 +30,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
@@ -223,11 +224,9 @@ export async function POST(
   let workMode = false;
   let workExecutionMode = DEFAULT_WORK_EXECUTION_MODE;
   if (paused.conversationId) {
-    const { data: conversation, error: conversationError } = await supabase
-      .from('Conversation')
+    const { data: conversation, error: conversationError } = await tenantTable(supabase, 'Conversation', { spaceId: paused.spaceId })
       .select('title, mode, executionMode')
       .eq('id', paused.conversationId)
-      .eq('spaceId', paused.spaceId)
       .maybeSingle();
     if (conversationError || !conversation || isReservedConversationTitle(conversation.title)) {
       return NextResponse.json(

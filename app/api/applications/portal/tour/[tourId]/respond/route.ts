@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -132,11 +133,9 @@ export async function POST(
   // both insert their receipt message — cluttering the realtor's thread
   // with duplicates. With CAS, only the first writer's UPDATE returns a
   // row; the second sees zero affected rows and skips the message insert.
-  const { data: updated, error: updateError } = await supabase
-    .from('Tour')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'Tour', { spaceId: contact.spaceId })
     .update({ status: targetStatus, updatedAt: new Date().toISOString() })
     .eq('id', tourId)
-    .eq('spaceId', contact.spaceId)
     .eq('status', tour.status)
     .select('id');
   if (updateError) {

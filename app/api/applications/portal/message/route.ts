@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -132,10 +133,8 @@ async function notifyRealtorOfMessage(
 
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('notifications, businessName')
-      .eq('spaceId', spaceId)
       .maybeSingle(),
   ]);
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -89,10 +90,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch business name for display
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
     .select('businessName')
-    .eq('spaceId', contact.spaceId)
     .maybeSingle();
 
   return NextResponse.json({

@@ -51,11 +51,9 @@ export async function runStudioEdit(args: {
   // fit under fal's input ceiling. Skipping the category check sends fal a
   // PDF or a 4K video and bills the failed call.
   const MAX_EDIT_BYTES = 20 * 1024 * 1024;
-  const { data: source } = await supabase
-    .from('File')
+  const { data: source } = await tenantTable(supabase, 'File', { spaceId: args.spaceId })
     .select('storageKey, category, sizeBytes')
     .eq('id', args.sourceFileId)
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   if (!source?.storageKey) {
     throw new StudioGenerationError('The image to edit was not found.', 404);

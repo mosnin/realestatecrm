@@ -54,11 +54,9 @@ async function attachmentBlocks(
 ): Promise<MessageBlock[]> {
   if (!ids || ids.length === 0) return [];
   try {
-    const { data, error } = await supabase
-      .from('Attachment')
+    const { data, error } = await tenantTable(supabase, 'Attachment', { spaceId })
       .select('id, filename, "mimeType", "sizeBytes"')
-      .in('id', ids)
-      .eq('spaceId', spaceId);
+      .in('id', ids);
     if (error) {
       logger.warn('[tools.persistence] attachment block resolve failed', { spaceId }, error);
       return [];
