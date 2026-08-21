@@ -17,7 +17,7 @@ export async function PATCH(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const { data: existingRows, error: existingError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
@@ -116,7 +116,7 @@ export async function DELETE(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // targetStageId is taken from the query string (e.g. ?targetStageId=...).

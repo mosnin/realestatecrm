@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function PATCH(req: NextRequest) {
   const authResult = await requireAuth();
@@ -10,7 +11,7 @@ export async function PATCH(req: NextRequest) {
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const body = await req.json();
@@ -31,10 +32,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Validate all stageIds belong to the caller's space
-  const { data: existingStages, error: fetchError } = await supabase
-    .from('DealStage')
+  const { data: existingStages, error: fetchError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .in('id', stageIds);
 
   if (fetchError) throw fetchError;
@@ -48,11 +47,9 @@ export async function PATCH(req: NextRequest) {
   // Update each stage's position to its index in the ordered array; surface any DB errors
   const results = await Promise.all(
     stageIds.map((id, index) =>
-      supabase
-        .from('DealStage')
+      tenantTable(supabase, 'DealStage', { spaceId: space.id })
         .update({ position: index })
-        .eq('id', id)
-        .eq('spaceId', space.id),
+        .eq('id', id),
     ),
   );
   const firstError = results.find((r) => r.error)?.error;

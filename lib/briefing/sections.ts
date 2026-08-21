@@ -17,6 +17,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { dealHealth } from '@/lib/deals/health';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Deal } from '@/lib/types';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -56,12 +57,10 @@ type DealRow = Pick<
 export async function composePipelineSummary(
   spaceId: string,
 ): Promise<PipelineSummary | null> {
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(
       'id, status, stageChangedAt, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt',
     )
-    .eq('spaceId', spaceId)
     .eq('status', 'active');
 
   if (error || !data || data.length === 0) return null;
@@ -159,10 +158,8 @@ export async function composeOvernight(
     Date.now() - OVERNIGHT_WINDOW_HOURS * 60 * 60 * 1000,
   ).toISOString();
 
-  const { data, error } = await supabase
-    .from('AgentActivityLog')
+  const { data, error } = await tenantTable(supabase, 'AgentActivityLog', { spaceId })
     .select('actionType')
-    .eq('spaceId', spaceId)
     .eq('outcome', 'completed')
     .gte('createdAt', since);
 

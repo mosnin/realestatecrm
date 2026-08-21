@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data: deal, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id, spaceId, stageId, position')

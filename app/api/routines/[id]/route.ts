@@ -66,7 +66,7 @@ export async function PATCH(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
@@ -137,7 +137,7 @@ export async function DELETE(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data, error } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .delete()
@@ -163,7 +163,7 @@ export async function POST(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data: routine } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .select('id, instruction')

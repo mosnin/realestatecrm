@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { ensureDefaultPipelines } from '@/lib/pipelines';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Pipeline } from '@/lib/types';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -47,18 +48,16 @@ export async function POST(req: NextRequest) {
       : null;
 
   // Get the max position to append at end
-  const { data: last, error: lastError } = await supabase
-    .from('Pipeline')
+  const { data: last, error: lastError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .select('position')
-    .eq('spaceId', space.id)
     .order('position', { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
-  const position = last && last.length > 0 ? last[0].position + 1 : 0;
+  const lastRows = (last ?? []) as { position: number }[];
+  const position = lastRows.length > 0 ? lastRows[0].position + 1 : 0;
 
   const id = crypto.randomUUID();
-  const { data: pipeline, error: insertError } = await supabase
-    .from('Pipeline')
+  const { data: pipeline, error: insertError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .insert({
       id,
       spaceId: space.id,

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Shift every unchecked, dated checklist item on a deal by N days.
@@ -24,11 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

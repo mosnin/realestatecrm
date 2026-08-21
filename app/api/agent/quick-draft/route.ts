@@ -31,6 +31,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
@@ -153,11 +154,9 @@ export async function POST(req: NextRequest) {
   let dealId: string | null = null;
 
   if (body.context === 'deal') {
-    const { data: deal } = await supabase
-      .from('Deal')
+    const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('id, contactId')
       .eq('id', body.id)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     dealId = (deal as { id: string }).id;

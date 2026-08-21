@@ -109,11 +109,9 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     type StageRow = { id: string; name: string; pipelineType: string | null };
     let stage: StageRow | null = null;
     if (args.stageId) {
-      const { data: row, error: stageErr } = await supabase
-        .from('DealStage')
+      const { data: row, error: stageErr } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
         .select('id, name, pipelineType')
         .eq('id', args.stageId)
-        .eq('spaceId', ctx.space.id)
         .maybeSingle();
       if (stageErr) {
         return { summary: `Stage lookup failed: ${stageErr.message}`, display: 'error' };
@@ -123,10 +121,8 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
 
     if (!stage) {
       const preferredPipeline = buyerAmongContacts ? 'buyer' : 'seller';
-      const { data: defaults } = await supabase
-        .from('DealStage')
+      const { data: defaults } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
         .select('id, name, pipelineType')
-        .eq('spaceId', ctx.space.id)
         .eq('pipelineType', preferredPipeline)
         .order('position', { ascending: true })
         .limit(1);
@@ -136,10 +132,8 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
       } else {
         // Workspace has no buyer/seller pipeline configured — fall back
         // to whatever stage exists at position 0.
-        const { data: anyStage } = await supabase
-          .from('DealStage')
+        const { data: anyStage } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
           .select('id, name, pipelineType')
-          .eq('spaceId', ctx.space.id)
           .order('position', { ascending: true })
           .limit(1);
         const anyRows = (anyStage ?? []) as StageRow[];
@@ -163,10 +157,8 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     let finalStageId = stage.id;
     let finalStage: StageRow = stage;
     if (buyerAmongContacts && stage.pipelineType !== 'buyer') {
-      const { data: buyerStages } = await supabase
-        .from('DealStage')
+      const { data: buyerStages } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
         .select('id, name, pipelineType')
-        .eq('spaceId', ctx.space.id)
         .eq('pipelineType', 'buyer')
         .order('position', { ascending: true })
         .limit(1);

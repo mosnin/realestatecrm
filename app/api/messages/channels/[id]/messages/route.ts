@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: Params) {
   const url = new URL(req.url);
   const before = url.searchParams.get('before') ?? undefined;
   const [messages, reads] = await Promise.all([
-    listMessages(id, { before }),
+    listMessages(membership.channel.brokerageId, id, { before }),
     channelReadState(id),
   ]);
 

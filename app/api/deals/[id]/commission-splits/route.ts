@@ -5,15 +5,14 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidCommissionParty, type CommissionBasis } from '@/lib/commissions';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveDeal(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return null;
   return space;

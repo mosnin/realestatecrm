@@ -30,7 +30,7 @@ export async function GET(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Fetch the task and verify it belongs to the calling user's space.
@@ -84,7 +84,7 @@ export async function DELETE(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Verify the task belongs to the calling user's space before mutating.

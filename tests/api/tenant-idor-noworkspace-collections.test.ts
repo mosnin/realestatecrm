@@ -60,6 +60,28 @@ vi.mock('@/lib/usage/today-token-usage', () => ({
   getTodayTokenUsage: vi.fn(async () => ({ total: 0 })),
 }));
 vi.mock('@/lib/agent/quick-draft', () => ({ composeQuickDraft: vi.fn() }));
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: vi.fn(async () => ({ userId: 'u_caller' })),
+}));
+vi.mock('@/lib/redis', () => ({
+  redis: {
+    zremrangebyscore: vi.fn(),
+    zrange: vi.fn(),
+    lrange: vi.fn(),
+  },
+}));
+vi.mock('@/lib/agent/task-state-machine', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/agent/task-state-machine')>(
+    '@/lib/agent/task-state-machine',
+  );
+  return { ...actual, transitionTask: vi.fn() };
+});
+vi.mock('@/lib/routines', () => ({
+  fireRoutineRun: vi.fn(),
+  ROUTINE_CADENCES: ['daily', 'weekly', 'monthly', 'custom'],
+  ROUTINE_WEEKDAYS: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+  ROUTINE_MAX_DAY_OF_MONTH: 28,
+}));
 
 const { fromMock, fromMockTables } = vi.hoisted(() => {
   const fromMockTables: string[] = [];
@@ -116,6 +138,15 @@ import { POST as postDraftFeedback } from '@/app/api/agent/drafts/feedback/route
 import { GET as getAblyToken } from '@/app/api/ably/token/route';
 import { POST as postRunNow } from '@/app/api/agent/run-now/route';
 import { POST as postQuickDraft } from '@/app/api/agent/quick-draft/route';
+import { PATCH as patchRoutineById, DELETE as deleteRoutineById, POST as runRoutineById } from '@/app/api/routines/[id]/route';
+import { PATCH as patchPipelineById, DELETE as deletePipelineById } from '@/app/api/pipelines/[id]/route';
+import { PATCH as reorderDeals } from '@/app/api/deals/reorder/route';
+import { PATCH as patchStageById, DELETE as deleteStageById } from '@/app/api/stages/[id]/route';
+import { PATCH as reorderStages } from '@/app/api/stages/reorder/route';
+import { GET as getAgentTask, DELETE as deleteAgentTask } from '@/app/api/agent/tasks/[taskId]/route';
+import { PATCH as patchTaskStatus, POST as postTaskStatus } from '@/app/api/agent/tasks/[taskId]/status/route';
+import { GET as getActiveRuns } from '@/app/api/agent/active-runs/route';
+import { GET as getAgentStream } from '@/app/api/agent/stream/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -537,5 +568,180 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(fromMockTables).not.toContain('Contact');
     expect(fromMockTables).not.toContain('Deal');
     expect(fromMockTables).not.toContain('AgentDraft');
+  });
+
+  it('PATCH /api/routines/[id] 404s and does not write Routine', async () => {
+    const res = await patchRoutineById(
+      new NextRequest('http://localhost/api/routines/rtn_victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: false }),
+      }),
+      { params: Promise.resolve({ id: 'rtn_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Routine');
+  });
+
+  it('DELETE /api/routines/[id] 404s and does not delete Routine', async () => {
+    const res = await deleteRoutineById(
+      new NextRequest('http://localhost/api/routines/rtn_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'rtn_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Routine');
+  });
+
+  it('POST /api/routines/[id] 404s and does not run a routine', async () => {
+    const res = await runRoutineById(
+      new NextRequest('http://localhost/api/routines/rtn_victim', { method: 'POST' }),
+      { params: Promise.resolve({ id: 'rtn_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Routine');
+  });
+
+  it('PATCH /api/pipelines/[id] 404s and does not write Pipeline', async () => {
+    const res = await patchPipelineById(
+      new NextRequest('http://localhost/api/pipelines/pipe_victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'stolen' }),
+      }),
+      { params: Promise.resolve({ id: 'pipe_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Pipeline');
+  });
+
+  it('DELETE /api/pipelines/[id] 404s and does not delete Pipeline', async () => {
+    const res = await deletePipelineById(
+      new NextRequest('http://localhost/api/pipelines/pipe_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'pipe_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Pipeline');
+    expect(fromMockTables).not.toContain('DealStage');
+  });
+
+  it('PATCH /api/deals/reorder 404s and does not query Deal', async () => {
+    const res = await reorderDeals(
+      new NextRequest('http://localhost/api/deals/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: 'deal_victim', newStageId: 'stage_victim', newPosition: 0 }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('DealStage');
+  });
+
+  it('PATCH /api/stages/[id] 404s and does not write DealStage', async () => {
+    const res = await patchStageById(
+      new NextRequest('http://localhost/api/stages/stage_victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'stolen' }),
+      }),
+      { params: Promise.resolve({ id: 'stage_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('DealStage');
+  });
+
+  it('DELETE /api/stages/[id] 404s and does not delete DealStage', async () => {
+    const res = await deleteStageById(
+      new NextRequest('http://localhost/api/stages/stage_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'stage_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('DealStage');
+    expect(fromMockTables).not.toContain('Deal');
+  });
+
+  it('PATCH /api/stages/reorder 404s and does not write DealStage', async () => {
+    const res = await reorderStages(
+      new NextRequest('http://localhost/api/stages/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stageIds: ['stage_victim'] }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('DealStage');
+  });
+
+  it('GET /api/agent/tasks/[taskId] 404s and does not query AgentTask', async () => {
+    const res = await getAgentTask(
+      new NextRequest('http://localhost/api/agent/tasks/task_victim'),
+      { params: Promise.resolve({ taskId: 'task_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentTask');
+    expect(fromMockTables).not.toContain('ExecutionStep');
+  });
+
+  it('DELETE /api/agent/tasks/[taskId] 404s and does not cancel a task', async () => {
+    const res = await deleteAgentTask(
+      new NextRequest('http://localhost/api/agent/tasks/task_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ taskId: 'task_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentTask');
+  });
+
+  it('PATCH /api/agent/tasks/[taskId]/status 404s and does not query AgentTask', async () => {
+    const res = await patchTaskStatus(
+      new NextRequest('http://localhost/api/agent/tasks/task_victim/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      }),
+      { params: Promise.resolve({ taskId: 'task_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentTask');
+    expect(fromMockTables).not.toContain('AgentActivityLog');
+  });
+
+  it('POST /api/agent/tasks/[taskId]/status 404s and does not query AgentTask', async () => {
+    const res = await postTaskStatus(
+      new NextRequest('http://localhost/api/agent/tasks/task_victim/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'paused' }),
+      }),
+      { params: Promise.resolve({ taskId: 'task_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentTask');
+  });
+
+  it('GET /api/agent/active-runs 404s and does not mint a run list', async () => {
+    const res = await getActiveRuns();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+  });
+
+  it('GET /api/agent/stream 404s and does not open a tenant stream', async () => {
+    const res = await getAgentStream(
+      new NextRequest('http://localhost/api/agent/stream?runId=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
+    );
+    expect(res.status).toBe(404);
+    noPii(await res.text());
   });
 });

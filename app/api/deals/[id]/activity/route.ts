@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveDealSpace(dealId: string, userId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: dealRows, error } = await supabase
-    .from('Deal')
+  const { data: dealRows, error } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('spaceId')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .limit(1);
   if (error) throw error;
   if (!dealRows?.length) return null;

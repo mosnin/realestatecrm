@@ -297,11 +297,9 @@ export async function PATCH(
     // Validate stageId belongs to this space BEFORE any mutations so an
     // invalid stageId cannot leave the row in a partially-updated state.
     if (body.stageId !== undefined) {
-      const { data: stageCheck } = await supabase
-        .from('DealStage')
+      const { data: stageCheck } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
         .select('id')
         .eq('id', body.stageId)
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (!stageCheck) {
         return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });

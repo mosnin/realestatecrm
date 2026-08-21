@@ -5,7 +5,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { enqueueTask } from '@/lib/agent/task-state-machine';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 // ── GET /api/agent/tasks?spaceId=... ─────────────────────────────────────────
@@ -41,10 +41,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
-  const { data: tasks, error } = await supabase
-    .from('AgentTask')
+  const { data: tasks, error } = await tenantTable(supabase, 'AgentTask', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false })
     .limit(50);
 
@@ -102,8 +100,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Fetch the newly-created row so we can return canonical fields.
-    const { data: task, error: fetchError } = await unscoped(supabase
-      .from('AgentTask'), 'post-fetch: caller verified parent scope before this id query')
+    const { data: task, error: fetchError } = await tenantTable(supabase, 'AgentTask', { spaceId })
       .select('id, status, title, goalDescription, createdAt')
       .eq('id', taskId)
       .single();

@@ -15,6 +15,7 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { deleteConnection as composioDelete } from './composio';
+import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
 
 
@@ -38,10 +39,8 @@ export interface BrokerageIntegrationConnectionRow {
 export async function listBrokerageConnections(
   brokerageId: string,
 ): Promise<BrokerageIntegrationConnectionRow[]> {
-  const { data, error } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'BrokerageIntegrationConnection', { brokerageId })
     .select('*')
-    .eq('brokerageId', brokerageId)
     .order('createdAt', { ascending: false });
   if (error) {
     logger.warn('[integrations.brokerage-connections] list failed', {
@@ -62,10 +61,8 @@ export async function listBrokerageConnectionsForUser(args: {
   brokerageId: string;
   userId: string;
 }): Promise<BrokerageIntegrationConnectionRow[]> {
-  const { data, error } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'BrokerageIntegrationConnection', { brokerageId: args.brokerageId })
     .select('*')
-    .eq('brokerageId', args.brokerageId)
     .eq('userId', args.userId)
     .order('createdAt', { ascending: false });
   if (error) {
@@ -104,10 +101,8 @@ export async function findActiveBrokerageConnection(args: {
   userId: string;
   toolkit: string;
 }): Promise<BrokerageIntegrationConnectionRow | null> {
-  const { data } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data } = await tenantTable(supabase, 'BrokerageIntegrationConnection', { brokerageId: args.brokerageId })
     .select('*')
-    .eq('brokerageId', args.brokerageId)
     .eq('userId', args.userId)
     .eq('toolkit', args.toolkit)
     .eq('status', 'active')
@@ -127,8 +122,7 @@ export async function insertBrokerageConnection(args: {
   composioConnectionId: string;
   label?: string;
 }): Promise<BrokerageIntegrationConnectionRow | null> {
-  const { data, error } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'BrokerageIntegrationConnection', { brokerageId: args.brokerageId })
     .insert({
       brokerageId: args.brokerageId,
       userId: args.userId,
@@ -172,8 +166,14 @@ export async function upsertBrokerageByComposioId(args: {
 }): Promise<BrokerageIntegrationConnectionRow | null> {
   const existing = await findBrokerageByComposioId(args.composioConnectionId);
   if (existing) {
-    const { error } = await unscoped(supabase
-      .from('BrokerageIntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
+    if (existing.brokerageId !== args.brokerageId) {
+      logger.error('[integrations.brokerage-connections] upsertByComposioId refused cross-tenant row', {
+        id: existing.id,
+        expectedBrokerageId: args.brokerageId,
+      });
+      return null;
+    }
+    const { error } = await tenantTable(supabase, 'BrokerageIntegrationConnection', { brokerageId: args.brokerageId })
       .update({
         label: args.label ?? existing.label ?? null,
         status: 'active',
