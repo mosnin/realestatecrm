@@ -43,6 +43,7 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { escapeIlikePattern } from '@/lib/ilike';
 import type { DealStageKind } from '@/lib/types';
 
 /* ─── Public, client-safe shapes ────────────────────────────────────────────
@@ -101,14 +102,6 @@ export interface ClientDealDetail extends ClientDealSummary {
 
 /* ─── Internal helpers ──────────────────────────────────────────────────────*/
 
-/** Escape LIKE/ILIKE metacharacters so a full email matches literally (still
- *  case-insensitively). `%` and `_` are legal in email local parts; without
- *  this a client registered as `%@gmail.com` would match every gmail Contact.
- *  Mirrors the guard in lib/client-portal-data.ts. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
 /** Canonical pipeline order. Used only as a tiebreaker when stages share a
  *  position (shouldn't happen) and to map a stage kind → client progress. The
  *  PRIMARY ordering of the timeline is always DealStage.position. */
@@ -157,7 +150,7 @@ async function ownedContactIds(email: string): Promise<string[]> {
   const { data } = await supabase
     .from('Contact')
     .select('id')
-    .ilike('email', escapeLike(lower));
+    .ilike('email', escapeIlikePattern(lower));
   return (data ?? []).map((c) => c.id as string);
 }
 

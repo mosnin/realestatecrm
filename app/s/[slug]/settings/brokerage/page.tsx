@@ -16,6 +16,7 @@ import {
 } from '@/lib/typography';
 import { Reveal, StaggerReveal, SplitReveal } from '@/components/motion';
 import { cn } from '@/lib/utils';
+import { escapeIlikePattern } from '@/lib/ilike';
 
 export default async function BrokerageInvitesPage({
   params,
@@ -81,7 +82,7 @@ export default async function BrokerageInvitesPage({
     const { data, error } = await supabase
       .from('Invitation')
       .select('id, email, roleToAssign, token, status, expiresAt, createdAt, Brokerage(id, name)')
-      .ilike('email', userEmail)
+      .ilike('email', escapeIlikePattern(userEmail))
       .eq('status', 'pending')
       .order('createdAt', { ascending: false });
     if (error) throw error;

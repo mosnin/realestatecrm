@@ -38,6 +38,7 @@ import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
 import { recordInboundMessage } from '@/lib/inbox';
 import { normalizeEmail } from '@/lib/contact-dedup';
+import { escapeIlikePattern } from '@/lib/ilike';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { CalendarProvider } from '@/lib/calendar/mirror';
 import type { IntegrationConnectionRow } from './connections';
@@ -1114,15 +1115,6 @@ function normalizeSenderEmail(raw: string | null): string {
 }
 
 /**
- * Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
- * case-insensitively). Mirrors the cross-client guard in lib/client-portal-data.ts
- * — `%`/`_` are legal in email local-parts and would otherwise be wildcards.
- */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
-/**
  * Resolve a Contact by email WITHIN a single space (case-insensitive). Mirrors
  * the email-match guard used by the client portal / dedup: lower+trim, then an
  * `ilike` on the escaped literal so it stays an exact (not pattern) match.
@@ -1137,7 +1129,7 @@ async function resolveContactByEmail(
     .from('Contact')
     .select('id')
     .eq('spaceId', spaceId)
-    .ilike('email', escapeLike(normalizedEmail))
+    .ilike('email', escapeIlikePattern(normalizedEmail))
     .maybeSingle();
   if (error) throw error;
   return data ? ((data as { id: string }).id) : null;

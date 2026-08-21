@@ -6,6 +6,7 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { escapeIlikePattern } from '@/lib/ilike';
 
 export interface PortalApplication {
   contactId: string;
@@ -45,16 +46,12 @@ type SpaceRel = { name?: string | null; slug?: string | null } | null;
  * session email — it is the only authorization check, so never pass an
  * unverified or caller-supplied address here.
  */
-/** Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
- *  case-insensitively) rather than as a pattern. `%` and `_` are legal in email
- *  local parts and were a wildcard-injection hole in the cross-client guard
- *  (e.g. a client registered as `%@gmail.com` would match every gmail contact). */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
 export async function getClientPortalData(email: string): Promise<ClientPortalData> {
   const lower = email.trim().toLowerCase();
+  // `_`/`%` are legal in email local-parts. Without escaping, a client
+  // registered as `jane_doe@x.com` matches every `janeXdoe@x.com` tour —
+  // including other tenants. Contact lookup was already escaped; Tour was not.
+  const emailLiteral = escapeIlikePattern(lower);
 
   const [{ data: contacts }, { data: tours }] = await Promise.all([
     supabase
@@ -62,13 +59,13 @@ export async function getClientPortalData(email: string): Promise<ClientPortalDa
       .select(
         'id, name, email, applicationStatus, applicationStatusNote, applicationRef, spaceId, createdAt, Space(name, slug)',
       )
-      .ilike('email', escapeLike(lower))
+      .ilike('email', emailLiteral)
       .order('createdAt', { ascending: false }),
     supabase
       .from('Tour')
       .select('id, propertyAddress, startsAt, status, spaceId, contactId, guestEmail, Space(name, slug)')
-      .ilike('guestEmail', lower)
-      .order('startsAt', { ascending: false }),
+      .ilike('guestEmail', emailLiteral)
+      .order('createdAt', { ascending: false }),
   ]);
 
   const applications: PortalApplication[] = (contacts ?? []).map((c) => {
@@ -118,7 +115,7 @@ export async function clientOwnsContact(email: string, contactId: string): Promi
     .from('Contact')
     .select('id')
     .eq('id', contactId)
-    .ilike('email', escapeLike(lower))
+    .ilike('email', escapeIlikePattern(lower))
     .maybeSingle();
   return Boolean(data);
 }

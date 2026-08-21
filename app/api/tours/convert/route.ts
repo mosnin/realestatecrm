@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { escapeIlikePattern } from '@/lib/ilike';
 
 /**
  * Convert a completed tour into a deal.
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       .from('Contact')
       .select('id')
       .eq('spaceId', space.id)
-      .ilike('email', tour.guestEmail)
+      .ilike('email', escapeIlikePattern(String(tour.guestEmail ?? '')))
       .maybeSingle();
 
     if (contactRow) {

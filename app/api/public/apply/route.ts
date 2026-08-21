@@ -21,6 +21,7 @@ import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/li
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { logger } from '@/lib/logger';
 import { recordConsent } from '@/lib/messaging/compliance';
+import { escapeIlikePattern } from '@/lib/ilike';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -441,7 +442,9 @@ export async function POST(req: NextRequest) {
         .from('Contact')
         .select('id, name, applicationRef')
         .eq('spaceId', space.id)
-        .ilike('email', contactEmail)
+        // Escape `_`/`%` — they are legal in emails and would otherwise
+        // wildcard-match another applicant (`jane_doe@` → `jane.doe@`).
+        .ilike('email', escapeIlikePattern(contactEmail))
         .contains('tags', ['application-link'])
         .order('createdAt', { ascending: false })
         .limit(1);

@@ -135,9 +135,18 @@ describe('getClientDeals — resolves only the client\'s own linked deals', () =
 
     // The Contact lookup used ilike on the email (case-insensitive boundary).
     expect(filtersOn('Contact', 'email').some((c) => c.method === 'ilike')).toBe(true);
+    expect(filtersOn('Contact', 'email')[0].value).toBe('buyer@example.com');
     // Deals were resolved THROUGH DealContact scoped to the owned contact id.
     expect(filtersOn('DealContact', 'contactId')).toEqual([
       { table: 'DealContact', method: 'in', column: 'contactId', value: ['c_mine'] },
+    ]);
+  });
+
+  it('escapes `_` in the verified email so it cannot wildcard-match another contact', async () => {
+    seed('Contact', { data: [] });
+    await getClientDeals('jane_doe@example.com');
+    expect(filtersOn('Contact', 'email')).toEqual([
+      { table: 'Contact', method: 'ilike', column: 'email', value: 'jane\\_doe@example.com' },
     ]);
   });
 

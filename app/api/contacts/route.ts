@@ -7,6 +7,7 @@ import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { fireFirstTouch } from '@/lib/leads/first-touch';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
+import { escapeIlikePattern } from '@/lib/ilike';
 import type { Contact } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
       .from('Contact')
       .select('id')
       .eq('spaceId', space.id)
-      .ilike('email', emailVal)
+      .ilike('email', escapeIlikePattern(emailVal))
       .limit(1)
       .maybeSingle();
     if (!dupErr && existing) {
