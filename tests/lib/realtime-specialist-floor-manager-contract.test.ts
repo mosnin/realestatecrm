@@ -38,7 +38,16 @@ describe('Realtime specialist floor-manager durable contract', () => {
 
   it('links chat specialists to server-held conversation context, never a model-authored id', async () => {
     const tool = buildDelegateTaskTool();
-    expect(Object.keys(tool.parameters.shape)).toEqual(['goal']);
+    // conversationId is not a tool input — Zod 4 ZodType has no `.shape`,
+    // so assert via parse: extra keys are dropped, only `goal` remains.
+    const parsed = tool.parameters.safeParse({
+      goal: 'Email Jane',
+      conversationId: 'conv_spoofed',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).toEqual({ goal: 'Email Jane' });
+    }
     await tool.handler(
       { goal: 'Email Jane', conversationId: 'conv_spoofed' } as { goal: string },
       makeCtx(),
