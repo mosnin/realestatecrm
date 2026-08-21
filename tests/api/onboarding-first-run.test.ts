@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server';
 
 const { authMock, ensureDefaultPipelinesMock, userUpdates } = vi.hoisted(() => ({
   authMock: vi.fn(async () => ({ userId: 'clerk_1' })),
-  ensureDefaultPipelinesMock: vi.fn(async () => []),
+  ensureDefaultPipelinesMock: vi.fn<(spaceId: string) => Promise<unknown[]>>(async () => []),
   userUpdates: [] as Record<string, unknown>[],
 }));
 
@@ -33,7 +33,7 @@ vi.mock('@/lib/onboarding', () => ({
 }));
 
 vi.mock('@/lib/pipelines', () => ({
-  ensureDefaultPipelines: (...args: unknown[]) => ensureDefaultPipelinesMock(...args),
+  ensureDefaultPipelines: (spaceId: string) => ensureDefaultPipelinesMock(spaceId),
 }));
 
 vi.mock('@/lib/billing/grants', () => ({

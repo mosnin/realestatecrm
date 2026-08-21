@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: any;
   try {
     body = await req.json();
   } catch {

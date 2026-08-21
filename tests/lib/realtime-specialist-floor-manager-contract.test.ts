@@ -38,7 +38,8 @@ describe('Realtime specialist floor-manager durable contract', () => {
 
   it('links chat specialists to server-held conversation context, never a model-authored id', async () => {
     const tool = buildDelegateTaskTool();
-    expect(Object.keys(tool.parameters.shape)).toEqual(['goal']);
+    const params = tool.parameters as { shape?: Record<string, unknown> };
+    expect(Object.keys(params.shape ?? {})).toEqual(['goal']);
     await tool.handler(
       { goal: 'Email Jane', conversationId: 'conv_spoofed' } as { goal: string },
       makeCtx(),

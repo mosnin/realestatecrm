@@ -150,14 +150,12 @@ interface LooseBuilder {
   select: (columns?: string, options?: unknown) => LooseFilter;
   update: (values: Record<string, unknown>) => LooseFilter;
   delete: () => LooseFilter;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   insert: (values: Record<string, unknown> | Record<string, unknown>[]) => any;
 }
 interface LooseFilter {
   // Return `any` so callers can keep chaining `.eq('id', …).maybeSingle()`
   // after the pre-applied tenant scope — the real PostgREST builder supports
   // that; a tighter type here blocked tenantTable() adoption.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   eq: (column: string, value: string) => any;
 }
 interface LooseClient {
