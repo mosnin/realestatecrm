@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { resolveEffectivePrefs, normalizeCadence } from '@/lib/notify-prefs';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Per-member notification preference override.
@@ -70,10 +71,8 @@ export async function GET(req: NextRequest) {
 
   const [effective, overrideRes] = await Promise.all([
     resolveEffectivePrefs(space.id, userId),
-    supabase
-      .from('NotificationPreference')
+    tenantTable(supabase, 'NotificationPreference', { spaceId: space.id })
       .select('channels, eventTypes, digestCadence')
-      .eq('spaceId', space.id)
       .eq('userId', userId)
       .maybeSingle(),
   ]);

@@ -13,7 +13,6 @@ import { dealHasOpenSignatureRequests } from '@/lib/esign';
 import { normalizeCloseReason } from '@/lib/close-reason';
 import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import type { Deal, DealStage } from '@/lib/types';
-import { unscoped } from '@/lib/supabase-guard';
 import { tenantTable } from '@/lib/tenant-db';
 
 
@@ -42,7 +41,7 @@ export async function GET(
   const { deal } = ctx;
 
   const [stageResult, dcResult, activityResult] = await Promise.all([
-    unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', deal.stageId).maybeSingle(),
+    tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id }).select('*').eq('id', deal.stageId).maybeSingle(),
     supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
     tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
   ]);
@@ -480,8 +479,8 @@ export async function PATCH(
     // Auto-log stage_change and status_change activities
     const activityInserts: Array<{ id: string; dealId: string; spaceId: string; type: string; content: string; metadata: Record<string, unknown> }> = [];
     if (stageChanged) {
-      const { data: newStageRow } = await unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('name').eq('id', body.stageId).maybeSingle();
-      const { data: oldStageRow } = await unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('name').eq('id', existing.stageId).maybeSingle();
+      const { data: newStageRow } = await tenantTable(supabase, 'DealStage', { spaceId: space.id }).select('name').eq('id', body.stageId).maybeSingle();
+      const { data: oldStageRow } = await tenantTable(supabase, 'DealStage', { spaceId: space.id }).select('name').eq('id', existing.stageId).maybeSingle();
       activityInserts.push({
         id: crypto.randomUUID(),
         dealId: id,
@@ -553,7 +552,7 @@ export async function PATCH(
       // Non-fatal: a failed activity insert must never fail the edit. Mirrors
       // the AI tools, which log a warning and move on.
       try {
-        const { error: activityErr } = await supabase.from('DealActivity').insert(activityInserts);
+        const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: space.id }).insert(activityInserts);
         if (activityErr) {
           console.error('[deals/PATCH] activity insert failed:', activityErr);
         }
@@ -564,8 +563,7 @@ export async function PATCH(
 
     // Get stage for the include
     const stageIdToFetch = body.stageId ?? existing.stageId;
-    const { data: stageRow, error: stageError } = await unscoped(supabase
-      .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
+    const { data: stageRow, error: stageError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
       .select('*')
       .eq('id', stageIdToFetch)
       .single();

@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { transitionTask } from '@/lib/agent/task-state-machine';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 // ── GET /api/agent/tasks/[taskId] ─────────────────────────────────────────────
@@ -34,11 +34,9 @@ export async function GET(
   }
 
   // Fetch the task and verify it belongs to the calling user's space.
-  const { data: task, error: taskError } = await supabase
-    .from('AgentTask')
+  const { data: task, error: taskError } = await tenantTable(supabase, 'AgentTask', { spaceId: space.id })
     .select('*')
     .eq('id', taskId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (taskError) {
@@ -50,8 +48,7 @@ export async function GET(
   }
 
   // Fetch execution steps ordered by step index.
-  const { data: steps, error: stepsError } = await unscoped(supabase
-    .from('ExecutionStep'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: steps, error: stepsError } = await tenantTable(supabase, 'ExecutionStep', { spaceId: space.id })
     .select('*')
     .eq('taskId', taskId)
     .order('stepIndex', { ascending: true });
@@ -91,11 +88,9 @@ export async function DELETE(
   }
 
   // Verify the task belongs to the calling user's space before mutating.
-  const { data: task, error: fetchError } = await supabase
-    .from('AgentTask')
+  const { data: task, error: fetchError } = await tenantTable(supabase, 'AgentTask', { spaceId: space.id })
     .select('id')
     .eq('id', taskId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (fetchError) {

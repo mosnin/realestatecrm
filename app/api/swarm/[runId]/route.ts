@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 // ── GET /api/swarm/[runId] ────────────────────────────────────────────────────
 // Fetch a swarm run and its member list.
@@ -22,13 +23,11 @@ export async function GET(
   }
 
   // Fetch the run and verify it belongs to the calling user's space.
-  const { data: run, error: runError } = await supabase
-    .from('SwarmRun')
+  const { data: run, error: runError } = await tenantTable(supabase, 'SwarmRun', { spaceId: space.id })
     .select(
       'id,spaceId,goal,status,plan,result,errorMessage,totalCostCents,createdAt,completedAt',
     )
     .eq('id', runId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (runError) {

@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { parseYouTubeId } from '@/lib/profile-page';
+import { tenantTable } from '@/lib/tenant-db';
 import { SOCIAL_PLATFORMS, type SocialPlatform } from '@/components/profile-page/public-profile';
 
 export const runtime = 'nodejs';
@@ -80,20 +81,16 @@ export async function GET() {
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const [{ data }, { data: settingsRow }, { data: propertyRows }] = await Promise.all([
-    supabase.from('ProfilePage').select(SELECT).eq('spaceId', space.id).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'ProfilePage', { spaceId: space.id }).select(SELECT).maybeSingle(),
+    tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .select(SETTINGS_SELECT)
-      .eq('spaceId', space.id)
       .maybeSingle(),
     // The picker shows every active listing in the space. Capped at 50 —
     // beyond that the realtor isn't picking from a list any more, they're
     // hunting, and that belongs in the listings management surface, not
     // here.
-    supabase
-      .from('Property')
+    tenantTable(supabase, 'Property', { spaceId: space.id })
       .select('id, address, city, stateRegion, listPrice, photos')
-      .eq('spaceId', space.id)
       .eq('listingStatus', 'active')
       .order('updatedAt', { ascending: false })
       .limit(AVAILABLE_PROPERTIES_CAP),
@@ -215,10 +212,8 @@ export async function PATCH(req: NextRequest) {
     if (raw.length === 0) {
       patch.featuredPropertyIds = [];
     } else {
-      const { data: validRows } = await supabase
-        .from('Property')
+      const { data: validRows } = await tenantTable(supabase, 'Property', { spaceId: space.id })
         .select('id')
-        .eq('spaceId', space.id)
         .eq('listingStatus', 'active')
         .in('id', raw);
       const valid = new Set((validRows ?? []).map((r: { id: string }) => r.id));

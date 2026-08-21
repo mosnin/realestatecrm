@@ -13,6 +13,7 @@ import {
   isWorkspaceRunRecoveryEnabled,
   isWorkspaceRunsEnabledForSpace,
 } from '@/lib/chippi/workspace-run-flag';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MAX_GOAL = 1_000;
 const LAUNCH_LEASE_MS = 120_000;
@@ -46,7 +47,7 @@ function evidence(value: unknown): string { if (!value) return 'No property anal
 async function preparePacket(spaceId: string, goal: string) {
   const [spaceResult, propertiesResult] = await Promise.all([
     supabase.from('Space').select('name').eq('id', spaceId).maybeSingle(),
-    supabase.from('Property').select('*').eq('spaceId', spaceId).order('updatedAt', { ascending: false }).limit(50),
+    tenantTable(supabase, 'Property', { spaceId }).select('*').order('updatedAt', { ascending: false }).limit(50),
   ]);
   if (spaceResult.error) throw spaceResult.error;
   if (propertiesResult.error) throw propertiesResult.error;
@@ -66,23 +67,23 @@ async function preparePacket(spaceId: string, goal: string) {
   };
 }
 export async function createWorkspaceRun(input: { id: string; workSessionId: string; spaceId: string; goal: string }) {
-  const { data, error } = await supabase.from('WorkspaceRun').insert({ id: input.id, workSessionId: input.workSessionId, spaceId: input.spaceId, goal: input.goal.slice(0, MAX_GOAL) }).select('*').maybeSingle();
+  const { data, error } = await tenantTable(supabase, 'WorkspaceRun', { spaceId: input.spaceId }).insert({ id: input.id, workSessionId: input.workSessionId, spaceId: input.spaceId, goal: input.goal.slice(0, MAX_GOAL) }).select('*').maybeSingle();
   if (data) return data;
   if (error && error.code !== '23505') throw error;
-  const { data: existing, error: lookupError } = await supabase.from('WorkspaceRun').select('*').eq('workSessionId', input.workSessionId).eq('spaceId', input.spaceId).single();
+  const { data: existing, error: lookupError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId: input.spaceId }).select('*').eq('workSessionId', input.workSessionId).single();
   if (!existing) throw lookupError ?? new Error('workspace run was not persisted'); return existing;
 }
 export async function getWorkspaceRun(runId: string, spaceId: string): Promise<WorkspaceRunView | null> {
-  const { data: run, error: runError } = await supabase.from('WorkspaceRun').select('*').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  const { data: run, error: runError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId }).select('*').eq('id', runId).maybeSingle();
   if (runError) throw runError;
   if (!run) return null;
   const receiptQuery = isWorkspaceRunRecoveryEnabled() && isWorkspaceRunsEnabledForSpace(spaceId)
-    ? supabase.from('WorkspaceRunLaunchReceipt').select('attempt,state,reason,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(3)
+    ? tenantTable(supabase, 'WorkspaceRunLaunchReceipt', { spaceId }).select('attempt,state,reason,createdAt').eq('runId', runId).order('createdAt', { ascending: false }).limit(3)
     : Promise.resolve({ data: [], error: null });
   const [eventResult, fileResult, taskResult, receiptResult] = await Promise.all([
     supabase.from('WorkspaceRunEvent').select('*').eq('runId', runId).order('sequence').limit(100),
-    supabase.from('WorkspaceRunFile').select('*').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(16),
-    supabase.from('WorkspaceRunTask').select('id,sequence,instruction,commandPlan,executionPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).eq('spaceId', spaceId).order('sequence', { ascending: false }).limit(12),
+    tenantTable(supabase, 'WorkspaceRunFile', { spaceId }).select('*').eq('runId', runId).order('createdAt', { ascending: false }).limit(16),
+    tenantTable(supabase, 'WorkspaceRunTask', { spaceId }).select('id,sequence,instruction,commandPlan,executionPlan,status,output,error,cancellationRequestedAt,createdAt').eq('runId', runId).order('sequence', { ascending: false }).limit(12),
     receiptQuery,
   ]);
   const dependencyError = eventResult.error ?? fileResult.error ?? taskResult.error ?? receiptResult.error;
@@ -102,7 +103,7 @@ async function hydrateWorkspaceTasks(rows: any[], spaceId: string): Promise<Work
   const ids = rows.map((row) => row.id);
   const [{ data: events }, { data: files }] = await Promise.all([
     supabase.from('WorkspaceRunTaskEvent').select('*').in('taskId', ids).order('createdAt', { ascending: false }).limit(120),
-    supabase.from('WorkspaceRunTaskFile').select('*').in('taskId', ids).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(24),
+    tenantTable(supabase, 'WorkspaceRunTaskFile', { spaceId }).select('*').in('taskId', ids).order('createdAt', { ascending: false }).limit(24),
   ]);
   return rows.map((row) => ({
     ...row,
@@ -121,7 +122,7 @@ export { validateWorkspaceTaskPlan } from './typed-plan';
 const TASK_PLAN_PROMPT = `You create a bounded private workspace continuation plan. Return ONLY JSON with keys summary, title, evidence, nextSteps, operations. evidence must be 1-3 exact verbatim quotes from supplied private files, each as {"file":"exact supplied filename","quote":"exact text from that file"}. nextSteps must be 1-5 short grounded recommendations. operations must contain 2-3 unique entries selected only from: {"id":"report","type":"grounded_markdown_report"}; {"id":"comps","type":"comps_csv_projection","source":"comps.csv","columns":["exact header"],"sort":{"column":"selected header","direction":"asc"},"rowLimit":1}; {"id":"actions","type":"json_action_register"}. Include the CSV operation only when comps.csv is supplied. Do not invent facts, code, commands, paths, or operation types. The fixed isolated interpreter revalidates the plan.`;
 
 export async function findWorkspaceRunTaskByIdempotency(runId: string, spaceId: string, idempotencyKey: string): Promise<{ id: string; status: string; instruction: string } | null> {
-  const { data } = await supabase.from('WorkspaceRunTask').select('id,status,instruction').eq('runId', runId).eq('spaceId', spaceId).eq('idempotencyKey', idempotencyKey).maybeSingle();
+  const { data } = await tenantTable(supabase, 'WorkspaceRunTask', { spaceId }).select('id,status,instruction').eq('runId', runId).eq('idempotencyKey', idempotencyKey).maybeSingle();
   return data as { id: string; status: string; instruction: string } | null;
 }
 
@@ -210,14 +211,14 @@ export async function enqueueWorkspaceRunTask(input: { runId: string; spaceId: s
 }
 
 export async function workspaceTaskFiles(runId: string, spaceId: string): Promise<Array<{ name: string; content: string }>> {
-  const { data: completedTasks, error: completedTasksError } = await supabase.from('WorkspaceRunTask').select('id').eq('runId', runId).eq('spaceId', spaceId).eq('status', 'completed').order('sequence', { ascending: false }).limit(MAX_TASK_FILES);
+  const { data: completedTasks, error: completedTasksError } = await tenantTable(supabase, 'WorkspaceRunTask', { spaceId }).select('id').eq('runId', runId).eq('status', 'completed').order('sequence', { ascending: false }).limit(MAX_TASK_FILES);
   if (completedTasksError) throw completedTasksError;
   const taskIds = (completedTasks ?? []).map((task: any) => task.id);
   const taskFileQuery = taskIds.length
-    ? supabase.from('WorkspaceRunTaskFile').select('name,fileId').eq('spaceId', spaceId).in('taskId', taskIds).order('createdAt', { ascending: false }).limit(MAX_TASK_FILES)
+    ? tenantTable(supabase, 'WorkspaceRunTaskFile', { spaceId }).select('name,fileId').in('taskId', taskIds).order('createdAt', { ascending: false }).limit(MAX_TASK_FILES)
     : Promise.resolve({ data: [] as any[] });
   const [rootFileResult, taskFileResult] = await Promise.all([
-    supabase.from('WorkspaceRunFile').select('name,fileId').eq('runId', runId).eq('spaceId', spaceId).order('createdAt', { ascending: false }).limit(MAX_TASK_FILES),
+    tenantTable(supabase, 'WorkspaceRunFile', { spaceId }).select('name,fileId').eq('runId', runId).order('createdAt', { ascending: false }).limit(MAX_TASK_FILES),
     taskFileQuery,
   ]);
   if (rootFileResult.error) throw rootFileResult.error;
@@ -227,7 +228,7 @@ export async function workspaceTaskFiles(runId: string, spaceId: string): Promis
   const rows = [...(rootFiles ?? []), ...(taskFiles ?? [])].filter((row: any) => typeof row.fileId === 'string').slice(0, MAX_TASK_FILES);
   if (!rows.length) throw new Error('The completed workspace has no private files to continue.');
   const ids = [...new Set(rows.map((row: any) => row.fileId))];
-  const { data: objects, error } = await supabase.from('File').select('id,name,storageKey,sizeBytes').in('id', ids).eq('spaceId', spaceId).limit(MAX_TASK_FILES);
+  const { data: objects, error } = await tenantTable(supabase, 'File', { spaceId }).select('id,name,storageKey,sizeBytes').in('id', ids).limit(MAX_TASK_FILES);
   if (error) throw error;
   const byId = new Map((objects ?? []).map((file: any) => [file.id, file]));
   const result: Array<{ name: string; content: string }> = [];
@@ -249,7 +250,7 @@ export async function dispatchWorkspaceRunTask(input: { taskId: string; runId: s
   const { data: claimed, error: claimError } = await supabase.rpc('claim_workspace_run_task_launch', { p_task_id: input.taskId, p_space_id: input.spaceId, p_token: launchToken });
   if (claimError) throw claimError;
   if (!claimed) {
-    const { data: pending, error: pendingError } = await supabase.from('WorkspaceRunTask').select('status,launchToken,modalAcceptedAt').eq('id', input.taskId).eq('spaceId', input.spaceId).maybeSingle();
+    const { data: pending, error: pendingError } = await tenantTable(supabase, 'WorkspaceRunTask', { spaceId: input.spaceId }).select('status,launchToken,modalAcceptedAt').eq('id', input.taskId).maybeSingle();
     if (pendingError) throw pendingError;
     if (pending?.status === 'launching' && pending.launchToken && !pending.modalAcceptedAt) {
       await scheduleWorkspaceTaskRecovery(input.taskId, input.runId, input.spaceId, pending.launchToken);
@@ -262,7 +263,7 @@ export async function dispatchWorkspaceRunTask(input: { taskId: string; runId: s
   let task: any; let files: Array<{ name: string; content: string }>;
   try {
     const resolved = await Promise.all([
-      supabase.from('WorkspaceRunTask').select('sequence,instruction,commandPlan,executionPlan').eq('id', input.taskId).eq('spaceId', input.spaceId).maybeSingle(),
+      tenantTable(supabase, 'WorkspaceRunTask', { spaceId: input.spaceId }).select('sequence,instruction,commandPlan,executionPlan').eq('id', input.taskId).maybeSingle(),
       workspaceTaskFiles(input.runId, input.spaceId),
     ]);
     if (resolved[0].error) throw resolved[0].error;
@@ -333,11 +334,9 @@ export async function failSilentAcceptedWorkspaceRunTask(input: { taskId: string
   return data === true;
 }
 export async function rearmRunningWorkspaceTaskTimeout(input: { taskId: string; spaceId: string; launchToken: string }): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('WorkspaceRunTask')
+  const { data, error } = await tenantTable(supabase, 'WorkspaceRunTask', { spaceId: input.spaceId })
     .select('status, launchToken, modalAcceptedAt, cancellationRequestedAt')
     .eq('id', input.taskId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
   if (error) throw error;
   const task = data as {
@@ -388,7 +387,7 @@ export async function kickWorkspaceRunTask(input: { taskId: string; runId: strin
   after(async () => { await dispatchWorkspaceRunTask(input); });
 }
 export async function requestWorkspaceRunCancellation(runId: string, spaceId: string): Promise<boolean> {
-  const { data: run, error: lookupError } = await supabase.from('WorkspaceRun').select('workSessionId').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  const { data: run, error: lookupError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId }).select('workSessionId').eq('id', runId).maybeSingle();
   if (lookupError || !run) return false;
   const { data, error } = await supabase.rpc('cancel_workspace_run_and_session', { p_session_id: run.workSessionId, p_space_id: spaceId });
   if (error) throw error; return data === true;
@@ -403,7 +402,7 @@ export async function dispatchWorkspaceRun(input: { runId: string; spaceId: stri
   if (!claimed) {
     // A prior delivery may have claimed the lease but crashed before queuing
     // recovery. Repair that precise send window using its durable token.
-    const { data: pending, error: pendingError } = await supabase.from('WorkspaceRun').select('status,launchToken').eq('id', input.runId).eq('spaceId', input.spaceId).maybeSingle();
+    const { data: pending, error: pendingError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId: input.spaceId }).select('status,launchToken').eq('id', input.runId).maybeSingle();
     if (pendingError) throw pendingError;
     if (pending?.status === 'launching' && pending.launchToken) await scheduleWorkspaceLaunchRecovery(input.workSessionId, input.runId, pending.launchToken);
     return;

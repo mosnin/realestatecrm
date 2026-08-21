@@ -141,7 +141,7 @@ export async function PATCH(
       .then(({ error: fuErr }: { error: unknown }) => { if (fuErr) console.error('[tour] Follow-up set failed:', fuErr); });
 
     // Log activity on the contact
-    supabase.from('ContactActivity').insert({
+    tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       contactId: data.contactId,
       spaceId: ctx.space.id,

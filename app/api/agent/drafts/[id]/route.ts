@@ -214,7 +214,7 @@ export async function PATCH(
     // consistent. Best-effort, like the agent/send write.
     if (existing.contactId) {
       try {
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId: space.id }).insert({
           id: crypto.randomUUID(),
           spaceId: space.id,
           contactId: existing.contactId,

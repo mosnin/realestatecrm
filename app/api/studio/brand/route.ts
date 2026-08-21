@@ -11,6 +11,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -28,10 +29,8 @@ export async function GET() {
   const space = await getSpaceForUser(authResult.userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data, error } = await supabase
-    .from('StudioBrand')
+  const { data, error } = await tenantTable(supabase, 'StudioBrand', { spaceId: space.id })
     .select('colors, voice, handles')
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (error) {
     logger.error('[studio.brand] read failed', { spaceId: space.id }, error);

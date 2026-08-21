@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many key generations. Try again later.' }, { status: 429 });
 
   // Limit total keys per space to 20
-  const { count } = await supabase.from('McpApiKey').select('*', { count: 'exact', head: true }).eq('spaceId', space.id);
+  const { count } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id }).select('*', { count: 'exact', head: true });
   if ((count ?? 0) >= 20) return NextResponse.json({ error: 'Maximum 20 API keys per workspace' }, { status: 400 });
 
   let name = 'Default';
@@ -69,8 +69,7 @@ export async function POST(req: NextRequest) {
   // carry NULL expiresAt and live until manually revoked.
   const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await supabase
-    .from('McpApiKey')
+  const { data, error } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       name,
