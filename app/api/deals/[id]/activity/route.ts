@@ -28,11 +28,9 @@ export async function GET(
   const space = await resolveDealSpace(id, userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('DealActivity')
+  const { data, error } = await tenantTable(supabase, 'DealActivity', { spaceId: space.id })
     .select('*')
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
   if (error) throw error;
 
@@ -76,8 +74,7 @@ export async function POST(
     }
   }
 
-  const { data, error } = await supabase
-    .from('DealActivity')
+  const { data, error } = await tenantTable(supabase, 'DealActivity', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,

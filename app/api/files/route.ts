@@ -15,6 +15,7 @@ import crypto from 'crypto';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import {
@@ -81,19 +82,15 @@ export async function GET(req: NextRequest) {
   // route to the right endpoint.
   const [fileRes, attachmentRes] = await Promise.all([
     (() => {
-      let q = supabase
-        .from('File')
+      let q = tenantTable(supabase, 'File', { spaceId: space.id })
         .select('id, name, mimeType, category, sizeBytes, isPublic, storageKey, createdAt')
-        .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
         .limit(500);
       if (category) q = q.eq('category', category);
       return q;
     })(),
-    supabase
-      .from('Attachment')
+    tenantTable(supabase, 'Attachment', { spaceId: space.id })
       .select('id, filename, mimeType, sizeBytes, storagePath, createdAt')
-      .eq('spaceId', space.id)
       .order('createdAt', { ascending: false })
       .limit(500),
   ]);
@@ -283,11 +280,9 @@ export async function POST(req: NextRequest) {
   // Quota check — sum existing rows + new size against the plan limit.
   const planId = ((space as unknown) as { planId?: string }).planId ?? 'free';
   const quota = quotaForPlan(planId);
-  const { data: existing } = await supabase
-    .from('File')
-    .select('sizeBytes')
-    .eq('spaceId', space.id);
-  const usedBytes = (existing ?? []).reduce(
+  const { data: existing } = await tenantTable(supabase, 'File', { spaceId: space.id })
+    .select('sizeBytes');
+  const usedBytes = ((existing ?? []) as { sizeBytes?: number }[]).reduce(
     (sum, r) => sum + Number(r.sizeBytes ?? 0),
     0,
   );
@@ -322,8 +317,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('File')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .insert({
       id,
       spaceId: space.id,

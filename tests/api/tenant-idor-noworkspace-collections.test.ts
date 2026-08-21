@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 vi.mock('next/server', async (importOriginal) => {
   const actual = await importOriginal<typeof import('next/server')>();
@@ -147,11 +147,16 @@ import { GET as getAgentTask, DELETE as deleteAgentTask } from '@/app/api/agent/
 import { PATCH as patchTaskStatus, POST as postTaskStatus } from '@/app/api/agent/tasks/[taskId]/status/route';
 import { GET as getActiveRuns } from '@/app/api/agent/active-runs/route';
 import { GET as getAgentStream } from '@/app/api/agent/stream/route';
-import { requireAuth } from '@/lib/api-auth';
+import { GET as getDealActivity, POST as postDealActivity } from '@/app/api/deals/[id]/activity/route';
+import { GET as getCommissionSplits, POST as postCommissionSplits } from '@/app/api/deals/[id]/commission-splits/route';
+import { POST as shiftChecklist } from '@/app/api/deals/[id]/checklist/shift/route';
+import { GET as listNotes, POST as postNote } from '@/app/api/notes/route';
+import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
 const mockRequireAuth = vi.mocked(requireAuth);
 const mockGetSpaceForUser = vi.mocked(getSpaceForUser);
+const mockRequireSpaceOwner = vi.mocked(requireSpaceOwner);
 
 function noPii(body: string) {
   expect(body).not.toContain('VICTIM');
@@ -168,6 +173,7 @@ beforeEach(() => {
   fromMockTables.length = 0;
   mockRequireAuth.mockResolvedValue({ userId: 'u_caller' });
   mockGetSpaceForUser.mockResolvedValue(null);
+  mockRequireSpaceOwner.mockResolvedValue(NextResponse.json({ error: 'Not found' }, { status: 404 }));
 });
 
 describe('no workspace — leftover PII collections 404 without an existence oracle', () => {
@@ -743,5 +749,92 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     );
     expect(res.status).toBe(404);
     noPii(await res.text());
+  });
+
+  it('GET /api/deals/[id]/activity 404s and does not query DealActivity', async () => {
+    const res = await getDealActivity(
+      new NextRequest('http://localhost/api/deals/deal_victim/activity'),
+      { params: Promise.resolve({ id: 'deal_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('DealActivity');
+  });
+
+  it('POST /api/deals/[id]/activity 404s and does not insert DealActivity', async () => {
+    const res = await postDealActivity(
+      new NextRequest('http://localhost/api/deals/deal_victim/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'note', content: 'Call VICTIM at 555-0100' }),
+      }),
+      { params: Promise.resolve({ id: 'deal_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('DealActivity');
+  });
+
+  it('GET /api/deals/[id]/commission-splits 404s and does not query CommissionSplit', async () => {
+    const res = await getCommissionSplits(
+      new NextRequest('http://localhost/api/deals/deal_victim/commission-splits'),
+      { params: Promise.resolve({ id: 'deal_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('CommissionSplit');
+  });
+
+  it('POST /api/deals/[id]/commission-splits 404s and does not insert CommissionSplit', async () => {
+    const res = await postCommissionSplits(
+      new NextRequest('http://localhost/api/deals/deal_victim/commission-splits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ party: 'agent', label: 'VICTIM split', basis: 'percent', percentOfGci: 50 }),
+      }),
+      { params: Promise.resolve({ id: 'deal_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('CommissionSplit');
+  });
+
+  it('POST /api/deals/[id]/checklist/shift 404s and does not write DealChecklistItem', async () => {
+    const res = await shiftChecklist(
+      new NextRequest('http://localhost/api/deals/deal_victim/checklist/shift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: 7 }),
+      }),
+      { params: Promise.resolve({ id: 'deal_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('DealChecklistItem');
+  });
+
+  it('GET /api/notes 404s and does not query Note', async () => {
+    const res = await listNotes(new NextRequest('http://localhost/api/notes?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Note');
+  });
+
+  it('POST /api/notes 404s and does not insert Note', async () => {
+    const res = await postNote(
+      new NextRequest('http://localhost/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', title: 'Chase VICTIM' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Note');
   });
 });

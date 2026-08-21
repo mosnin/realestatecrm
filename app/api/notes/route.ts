@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
 
 // GET /api/notes?slug=xxx — list all notes for a workspace
 export async function GET(req: NextRequest) {
@@ -12,10 +13,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('Note')
+  const { data, error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .select('id, title, icon, sortOrder, updatedAt')
-    .eq('spaceId', space.id)
     .order('sortOrder', { ascending: true });
 
   if (error) return NextResponse.json({ error: 'Failed to load notes' }, { status: 500 });
@@ -38,18 +37,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Get max sortOrder
-  const { data: maxRow } = await supabase
-    .from('Note')
+  const { data: maxRow } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .select('sortOrder')
-    .eq('spaceId', space.id)
     .order('sortOrder', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const sortOrder = (maxRow?.sortOrder ?? 0) + 1;
+  const sortOrder = ((maxRow as { sortOrder?: number } | null)?.sortOrder ?? 0) + 1;
 
-  const { data, error } = await supabase
-    .from('Note')
+  const { data, error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .insert({ spaceId: space.id, title: (title || 'Untitled').slice(0, 200), content: '', sortOrder })
     .select()
     .single();

@@ -27,11 +27,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const space = await resolveDeal(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('CommissionSplit')
+  const { data, error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: space.id })
     .select('*')
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: true });
 
   if (error) {
@@ -82,8 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     paidAt = d.toISOString();
   }
 
-  const { data, error } = await supabase
-    .from('CommissionSplit')
+  const { data, error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,

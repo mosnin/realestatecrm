@@ -241,11 +241,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 });
     }
     const trimmed = propertyId.slice(0, 64);
-    const { data: propRow, error: propErr } = await supabase
-      .from('Property')
+    const { data: propRow, error: propErr } = await tenantTable(supabase, 'Property', { spaceId: space.id })
       .select('id')
       .eq('id', trimmed)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (propErr) throw propErr;
     if (!propRow) return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 });

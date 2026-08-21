@@ -344,11 +344,9 @@ export async function PATCH(
           return NextResponse.json({ error: 'Invalid propertyId' }, { status: 400 });
         }
         const trimmed = body.propertyId.slice(0, 64);
-        const { data: propRow, error: propErr } = await supabase
-          .from('Property')
+        const { data: propRow, error: propErr } = await tenantTable(supabase, 'Property', { spaceId: space.id })
           .select('id')
           .eq('id', trimmed)
-          .eq('spaceId', space.id)
           .maybeSingle();
         if (propErr) {
           console.error('[deals/PATCH] property validation error:', propErr);
@@ -379,16 +377,14 @@ export async function PATCH(
       const wantedRaw = body.contactIds as string[];
       let wantedIds: Set<string>;
       if (wantedRaw.length > 0) {
-        const { data: validContacts, error: vcError } = await supabase
-          .from('Contact')
+        const { data: validContacts, error: vcError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
           .select('id')
-          .in('id', wantedRaw)
-          .eq('spaceId', space.id);
+          .in('id', wantedRaw);
         if (vcError) {
           console.error('[deals/PATCH] contact validation error:', vcError);
           return NextResponse.json({ error: 'Failed to validate contacts' }, { status: 500 });
         }
-        wantedIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
+        wantedIds = new Set(((validContacts ?? []) as { id: string }[]).map((c) => c.id));
       } else {
         wantedIds = new Set();
       }

@@ -13,6 +13,7 @@ import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 import { z } from 'zod';
 import { readJsonWithLimit, parseOrBadRequest, BODY_LIMITS } from '@/lib/validation';
 import { createAndEnqueueSwarmRun, swarmLaunchConfigured } from '@/lib/swarm-launch';
+import { tenantTable } from '@/lib/tenant-db';
 
 /** Shape guard for a swarm run. The 2000-char goal limit and "required"
  *  ordering are preserved below; this bounds the field types and caps the
@@ -53,10 +54,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from('SwarmRun')
+  const { data, error } = await tenantTable(supabase, 'SwarmRun', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false })
     .limit(20);
 

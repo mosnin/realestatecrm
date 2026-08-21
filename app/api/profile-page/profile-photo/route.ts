@@ -18,6 +18,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { uploadObject, buildKey, getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -104,15 +105,12 @@ export async function POST(req: NextRequest) {
   // Capture the previous key before the upsert overwrites it — same
   // orphan-on-replace fix as cover-photo. DELETE intentionally keeps the
   // object for revert; POST is an explicit replacement signal.
-  const { data: existing } = await supabase
-    .from('ProfilePage')
+  const { data: existing } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .select('profilePhotoUrl')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const previousKey = (existing as { profilePhotoUrl?: string | null } | null)?.profilePhotoUrl ?? null;
 
-  const { error: dbErr } = await supabase
-    .from('ProfilePage')
+  const { error: dbErr } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .upsert(
       {
         spaceId: space.id,
@@ -161,8 +159,7 @@ export async function DELETE() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error: dbErr } = await supabase
-    .from('ProfilePage')
+  const { error: dbErr } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .upsert(
       {
         spaceId: space.id,

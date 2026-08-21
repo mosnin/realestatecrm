@@ -133,10 +133,8 @@ export async function POST(req: NextRequest) {
   // No new DB constraint: case-mismatched emails would be rejected by a
   // unique index, which may not be desired across all data.
   if (emailVal) {
-    const { data: existing, error: dupErr } = await supabase
-      .from('Contact')
+    const { data: existing, error: dupErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .eq('spaceId', space.id)
       .ilike('email', emailVal)
       .limit(1)
       .maybeSingle();

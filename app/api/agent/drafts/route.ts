@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
@@ -15,15 +16,13 @@ export async function GET(req: NextRequest) {
   const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '50', 10);
   const limit = Math.min(isNaN(limitParam) ? 50 : limitParam, 100);
 
-  const { data, error } = await supabase
-    .from('AgentDraft')
+  const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .select(`
       id, contactId, dealId, channel, subject, content, reasoning,
       priority, status, confidence, expiresAt, createdAt, updatedAt,
       triggerSource,
       Contact:contactId ( id, name, email, phone )
     `)
-    .eq('spaceId', space.id)
     .eq('status', status)
     .order('priority', { ascending: false })
     .order('createdAt', { ascending: false })

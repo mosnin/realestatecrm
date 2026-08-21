@@ -243,8 +243,7 @@ export async function POST(req: NextRequest) {
     // Prefix the client request UUID with the tenant so the existing globally
     // unique AgentDraft constraint becomes the authoritative double-send lock.
     const idempotencyKey = `quick-draft:${space.id}:${sendBody.idempotencyKey}`;
-    const { data: inserted, error: insertError } = await supabase
-      .from('AgentDraft')
+    const { data: inserted, error: insertError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
       .insert({
         spaceId: space.id,
         contactId,
@@ -261,11 +260,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if ((insertError as { code?: string } | null)?.code === '23505') {
-      const { data: existing } = await supabase
-        .from('AgentDraft')
+      const { data: existing } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
         .select('id, status')
         .eq('idempotencyKey', idempotencyKey)
-        .eq('spaceId', space.id)
         .maybeSingle();
 
       if (existing) {
@@ -292,11 +289,9 @@ export async function POST(req: NextRequest) {
     // Hydrate contact for delivery (needs email/phone).
     let contact = { name: subjectLabel, email: null as string | null, phone: null as string | null };
     if (contactId) {
-      const { data: row } = await supabase
-        .from('Contact')
+      const { data: row } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
         .select('name, email, phone')
         .eq('id', contactId)
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (row) contact = row as typeof contact;
     }
@@ -309,11 +304,9 @@ export async function POST(req: NextRequest) {
     );
 
     const finalStatus = deliveryResult.sent ? 'sent' : 'approved';
-    const { error: patchError } = await supabase
-      .from('AgentDraft')
+    const { error: patchError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
       .update({ status: finalStatus, updatedAt: now })
-      .eq('id', draftId)
-      .eq('spaceId', space.id);
+      .eq('id', draftId);
     if (patchError) {
       logger.error('[quick-draft] status update failed', { err: patchError.message });
     }
