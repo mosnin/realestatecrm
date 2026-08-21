@@ -751,14 +751,14 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Instant First Touch (fire-and-forget) ──────────────────────────────
-    // Compose a grounded intro draft + "first touch ready" push while the
-    // lead is still warm. Placed after scoring so the draft grounds on the
-    // scored contact. fireFirstTouch never throws and registers its own
-    // after() keep-alive — zero latency added to the applicant's response.
+    // Compose a grounded intro and (by default) send it while the lead is
+    // still warm. Placed after scoring so the draft grounds on the scored
+    // contact. fireFirstTouch never throws and registers its own after()
+    // keep-alive — zero latency added to the applicant's response.
     // The try/catch is belt-and-suspenders: a bug in that module must never
     // fail the submission.
     try {
-      void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+      void fireFirstTouch({ spaceId: space.id, contactId: contact.id, origin: 'inbound' });
     } catch (e) {
       logger.error('[apply] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
     }

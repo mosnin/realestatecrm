@@ -685,7 +685,7 @@ export async function POST(req: NextRequest) {
     // and registers its own after() keep-alive — zero latency added to the
     // applicant's response. try/catch is belt-and-suspenders.
     try {
-      void fireFirstTouch({ spaceId: spaceIdForInsert, contactId: contact.id });
+      void fireFirstTouch({ spaceId: spaceIdForInsert, contactId: contact.id, origin: 'inbound' });
     } catch (e) {
       logger.error('[apply/brokerage] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
     }

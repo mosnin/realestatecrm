@@ -225,8 +225,8 @@ export default function PropertiesPage() {
             <div className="mt-8 border-t border-neutral-200 pt-6">
               <div className="grid gap-6 sm:grid-cols-2">
                 <div>
-                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
-                  <p className="mt-1 text-xs text-neutral-600">Integrations across CRMs, email, and calendar</p>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">OAuth</span>
+                  <p className="mt-1 text-xs text-neutral-600">CRMs, email, and calendar — no keys to copy</p>
                 </div>
                 <div>
                   <span className="text-2xl font-semibold tracking-tight text-zinc-950">24/7</span>

@@ -509,7 +509,7 @@ function IntegrationsPanel() {
   return (
     <>
       <PanelHead title="Integrations" cta="Add tool" />
-      <motion.p variants={cardV} className="mt-3 text-[12px] text-white/45">Connected through Composio. 50+ apps available.</motion.p>
+      <motion.p variants={cardV} className="mt-3 text-[12px] text-white/45">Connected through Composio. Inbox, calendar, CRM, e-sign, and more.</motion.p>
       <div className="mt-3 grid grid-cols-2 gap-2.5">
         {APPS.map((a) => {
           const Icon = a.icon;

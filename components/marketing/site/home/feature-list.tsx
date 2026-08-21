@@ -47,7 +47,7 @@ const ROWS: Row[] = [
   {
     title: 'Connected to your stack',
     label: 'Gmail · Outlook · CRM',
-    desc: '50+ integrations, two minutes to connect, no migration.',
+    desc: 'Inbox, calendar, CRM, e-sign — connect in about two minutes, no migration.',
     href: '/integrations',
   },
   {

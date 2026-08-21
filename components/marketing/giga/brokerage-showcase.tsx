@@ -97,7 +97,7 @@ const STEPS: ShowcaseStep[] = [
           {[
             { n: '$4.2M', l: 'Volume' },
             { n: '18', l: 'Closed' },
-            { n: '94%', l: 'Reply rate' },
+            { n: 'On', l: 'First touch' },
           ].map((s) => (
             <div key={s.l} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-center">
               <span className="block text-[18px] font-semibold leading-none text-white">{s.n}</span>

@@ -21,7 +21,7 @@ import {
 import { FeatureShowcase, Frost, Row, type ShowcaseStep } from './feature-showcase';
 
 const TOP_FEATURES = [
-  { icon: Boxes, title: '50+ apps', desc: 'The tools you already pay for, connected through Composio.' },
+  { icon: Boxes, title: 'Your stack', desc: 'The tools you already pay for, connected through Composio.' },
   { icon: ArrowLeftRight, title: 'Two-way sync', desc: 'Chippi reads from and writes back to each tool as it works.' },
   { icon: Gauge, title: 'Two-minute setup', desc: 'Connect with a click; no engineering, no spreadsheets.' },
 ];

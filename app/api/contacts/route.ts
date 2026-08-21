@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
   // route that deliberately does NOT get this). fireFirstTouch never throws
   // and registers its own after() keep-alive, so it adds zero latency here.
   try {
-    void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+    void fireFirstTouch({ spaceId: space.id, contactId: contact.id, origin: 'manual' });
   } catch (e) { console.error('[contacts] first-touch dispatch failed:', e); }
 
   // Also dispatch the lead_created WORKFLOW trigger for manually-created leads.

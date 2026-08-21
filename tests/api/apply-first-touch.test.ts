@@ -176,6 +176,7 @@ describe('POST /api/public/apply — instant first touch wiring', () => {
     expect(fireFirstTouchMock).toHaveBeenCalledWith({
       spaceId: 'space_1',
       contactId: 'contact_1',
+      origin: 'inbound',
     });
   });
 

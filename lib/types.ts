@@ -191,6 +191,8 @@ export type SpaceSetting = {
   notifyTourBookings: boolean;
   notifyNewDeals: boolean;
   notifyFollowUps: boolean;
+  /** Default true: inbound first-touch intros send after compose. */
+  autoFirstTouchSend: boolean;
   // Notification digest (opt-in roll-up; default 'off' = per-event sends).
   // The space-level default cadence; members can override via NotificationPreference.
   digestCadence: 'off' | 'daily' | 'weekly';

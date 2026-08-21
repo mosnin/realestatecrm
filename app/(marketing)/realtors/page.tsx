@@ -86,8 +86,8 @@ const BENTO_CELLS = [
  * this site already stands behind, nothing invented. */
 const BAND_STATS: { value: string; label: string }[] = [
   { value: '24/7', label: 'Working your book around the clock' },
-  { value: '100%', label: 'Every send in your voice, on the record' },
-  { value: '50+', label: 'Tools connect in two minutes' },
+  { value: 'Logged', label: 'Every send on the record' },
+  { value: 'OAuth', label: 'Inbox, calendar, CRM, e-sign' },
 ];
 
 /* The first day, in three steps, white shadow steps, tinted-circle icons. */
@@ -329,9 +329,9 @@ export default function RealtorsPage() {
                     </p>
                   </div>
                   <div>
-                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">Logged</span>
                     <p className="mt-1 text-xs text-neutral-600">
-                      Every send in your voice, on the record
+                      Every send on the record, in your workspace
                     </p>
                   </div>
                 </div>
@@ -475,7 +475,7 @@ export default function RealtorsPage() {
       {/* Plugs into your stack, pastel-gradient band, the color break that
           snaps the white run between the white steps and the white feature
           list. Soft pastel wash + a page-local skeleton of the connected
-          stack. Honest counts: 50+ tools, two minutes to connect. */}
+          stack. Honest: the catalog is the tools you already pay for. */}
       <section className="mt-24 px-4 sm:mt-32 sm:px-6">
         <FadeUp>
           <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
@@ -494,8 +494,8 @@ export default function RealtorsPage() {
                 </p>
                 <div className="mt-8 grid max-w-md grid-cols-2 gap-6 border-t border-black/10 pt-6">
                   <div>
-                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
-                    <p className="mt-1 text-xs text-neutral-600">Tools connect in two minutes</p>
+                    <span className="text-2xl font-semibold tracking-tight text-zinc-950">Gmail</span>
+                    <p className="mt-1 text-xs text-neutral-600">Inbox, calendar, CRM, e-sign</p>
                   </div>
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">OAuth</span>

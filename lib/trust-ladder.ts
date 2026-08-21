@@ -1,8 +1,10 @@
 /**
  * Trust ladder — earned autonomy, lane by lane.
  *
- * Every automation starts in draft-only: Chippi prepares, the realtor approves,
- * nothing sends on its own. Autonomy is then EARNED, not configured. As a lane
+ * Most automations start in draft-only: Chippi prepares, the realtor approves.
+ * The one default-on send is inbound first touch (SpaceSetting.autoFirstTouchSend),
+ * which sends and tells you — the `notify` rung — and can be turned off.
+ * Later lanes still earn autonomy. As a lane
  * accumulates a track record of drafts the realtor approved *unchanged*, Chippi
  * offers to graduate exactly that lane one step up the ladder — and the realtor
  * can take it back anytime.

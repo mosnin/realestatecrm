@@ -127,8 +127,8 @@ const STAGE_STORY: { kicker: string; title: string; body: string }[] = [
 /* Honest facts, no invented conversion metrics. */
 const FACTS: { value: string; label: string }[] = [
   { value: '24/7', label: 'The board stays current around the clock' },
-  { value: '100%', label: 'Every send in your voice, on the record' },
-  { value: '50+', label: 'Integrations across email, calendar, and CRMs' },
+  { value: 'Logged', label: 'Every send on the record' },
+  { value: 'OAuth', label: 'Email, calendar, and CRMs you already pay for' },
 ];
 
 /* The 2×2 bento, owner image slots, FeaturesBento style exactly. */
@@ -375,9 +375,9 @@ export default function DealsPage() {
                   </p>
                 </div>
                 <div>
-                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">100%</span>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">Logged</span>
                   <p className="mt-1 text-xs text-neutral-600">
-                    Every send in your voice, on the record
+                    Every send on the record, in your workspace
                   </p>
                 </div>
               </div>
