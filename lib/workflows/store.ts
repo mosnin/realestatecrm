@@ -63,7 +63,7 @@ export async function listWorkflows(spaceId: string): Promise<WorkflowRecord[]> 
     .select(SELECT)
     .order('createdAt', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => mapRow(r as Record<string, unknown>));
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => mapRow(r));
 }
 
 /** Load one workflow by id, scoped to the space. Null when not found/owned. */
@@ -302,17 +302,14 @@ export async function listAllWorkflowRuns(
   if (error) throw error;
   if (!runs || runs.length === 0) return [];
 
-  const workflowIds = [...new Set(runs.map((r) => (r as Record<string, unknown>).workflowId as string))];
+  const workflowIds = [...new Set((runs as Record<string, unknown>[]).map((r) => r.workflowId as string))];
   const { data: wfs, error: wErr } = await tenantTable(supabase, 'Workflow', { spaceId })
     .select('id, name')
     .in('id', workflowIds);
   if (wErr) throw wErr;
 
   const nameMap = new Map<string, string>(
-    (wfs ?? []).map((w) => {
-      const row = w as { id: string; name: string };
-      return [row.id, row.name];
-    }),
+    ((wfs ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name]),
   );
 
   return (runs as unknown as WorkflowRunRecord[]).map((r) => ({
