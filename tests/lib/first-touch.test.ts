@@ -55,7 +55,19 @@ vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
 vi.mock('@/lib/push', () => ({ sendPushToSpace: sendPushMock }));
 vi.mock('@/lib/notifications', () => ({ createAppNotification: createAppNotificationMock }));
 vi.mock('@/lib/agent/quick-draft', () => ({ composeQuickDraft: composeMock }));
-vi.mock('@/lib/delivery', () => ({ sendDraft: sendDraftMock }));
+vi.mock('@/lib/delivery', () => ({
+  sendDraft: sendDraftMock,
+  describeDelivery: (r: { method?: string; fallback?: boolean }) =>
+    r.method === 'gmail'
+      ? 'from your Gmail'
+      : r.method === 'outlook'
+        ? 'from your Outlook'
+        : r.method === 'sms'
+          ? 'by text'
+          : r.fallback
+            ? "from Chippi's sender (your inbox failed — reconnect to send as yourself)"
+            : "from Chippi's sender (connect Gmail or Outlook to send as yourself)",
+}));
 vi.mock('@/lib/messaging/compliance', () => ({ checkSendAllowed: checkSendAllowedMock }));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMessageSafeMock }));
 vi.mock('@/lib/logger', () => ({

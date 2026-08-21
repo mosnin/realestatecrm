@@ -49,7 +49,7 @@ import { createAppNotification } from '@/lib/notifications';
 import { composeQuickDraft } from '@/lib/agent/quick-draft';
 import { leadSourceLabel } from '@/lib/lead-source';
 import { checkSendAllowed, type MessageCategory } from '@/lib/messaging/compliance';
-import { sendDraft, type DeliveryResult } from '@/lib/delivery';
+import { describeDelivery, sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { recordOutboundMessageSafe } from '@/lib/inbox';
 import type { InboxChannel } from '@/lib/types';
 
@@ -176,16 +176,6 @@ interface ContactRow {
   name: string | null;
   email: string | null;
   phone: string | null;
-}
-
-function deliveryVoice(result: DeliveryResult): string {
-  if (result.method === 'gmail') return 'from your Gmail';
-  if (result.method === 'outlook') return 'from your Outlook';
-  if (result.method === 'sms') return 'by text';
-  if (result.fallback) {
-    return "from Chippi's sender (your inbox failed — reconnect to send as yourself)";
-  }
-  return "from Chippi's sender (connect Gmail or Outlook to send as yourself)";
 }
 
 async function notifyRealtor(args: {
@@ -497,7 +487,7 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
       spaceId,
       slug: space.slug,
       title: `New lead: ${leadName} — first touch sent`,
-      body: `Intro ${channelWord} sent ${deliveryVoice(sendResult.delivery)}.`,
+      body: `Intro ${channelWord} sent ${describeDelivery(sendResult.delivery)}.`,
     });
     logger.info('[first-touch] sent', {
       spaceId,

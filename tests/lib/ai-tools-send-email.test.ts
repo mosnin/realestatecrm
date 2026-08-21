@@ -34,8 +34,43 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: vi.fn((table: string) => makeChain(table)) } };
 });
 
-const { sendEmailFromCRMMock } = vi.hoisted(() => ({ sendEmailFromCRMMock: vi.fn(async () => undefined) }));
-vi.mock('@/lib/email', () => ({ sendEmailFromCRM: sendEmailFromCRMMock }));
+const { sendEmailFromCRMMock, sendDraftMock, checkSendAllowedMock, recordOutboundMock } = vi.hoisted(() => ({
+  sendEmailFromCRMMock: vi.fn(async () => undefined),
+  sendDraftMock: vi.fn(async () => ({ sent: true, method: 'gmail' as const })),
+  checkSendAllowedMock: vi.fn(async () => ({ allowed: true })),
+  recordOutboundMock: vi.fn(async () => ({ threadId: 't1', messageId: 'm1', deduped: false })),
+}));
+vi.mock('@/lib/email', () => ({
+  sendEmailFromCRM: sendEmailFromCRMMock,
+  ComplianceBlockedError: class ComplianceBlockedError extends Error {
+    reason: string;
+    durableDisposition = 'terminal_failure' as const;
+    constructor(reason: string, detail: string) {
+      super(detail);
+      this.reason = reason;
+      this.name = 'ComplianceBlockedError';
+    }
+  },
+  EmailSendError: class EmailSendError extends Error {
+    durableDisposition: string;
+    constructor(message: string, _cause?: unknown, durableDisposition = 'retryable') {
+      super(message);
+      this.name = 'EmailSendError';
+      this.durableDisposition = durableDisposition;
+    }
+  },
+}));
+vi.mock('@/lib/delivery', () => ({
+  sendDraft: sendDraftMock,
+  describeDelivery: (r: { method?: string; fallback?: boolean }) =>
+    r.method === 'gmail'
+      ? 'from your Gmail'
+      : r.fallback
+        ? "from Chippi's sender (your inbox failed — reconnect to send as yourself)"
+        : "from Chippi's sender (connect Gmail or Outlook to send as yourself)",
+}));
+vi.mock('@/lib/messaging/compliance', () => ({ checkSendAllowed: checkSendAllowedMock }));
+vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMock }));
 
 import { sendEmailTool } from '@/lib/ai-tools/tools/send-email';
 import type { ToolContext } from '@/lib/ai-tools/types';
@@ -51,6 +86,11 @@ function makeCtx(): ToolContext {
 beforeEach(() => {
   mockByTable = {};
   sendEmailFromCRMMock.mockClear();
+  sendDraftMock.mockClear();
+  checkSendAllowedMock.mockClear();
+  recordOutboundMock.mockClear();
+  sendDraftMock.mockResolvedValue({ sent: true, method: 'gmail' });
+  checkSendAllowedMock.mockResolvedValue({ allowed: true });
 });
 
 describe('sendEmailTool schema', () => {
@@ -107,15 +147,32 @@ describe('sendEmailTool handler — contactId path', () => {
       makeCtx(),
     );
 
-    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
-    expect((sendEmailFromCRMMock.mock.calls as unknown[][])[0][0]).toMatchObject({
-      toEmail: 'jane@example.com',
-      fromName: 'Jane Realty',
-      subject: 'Tour Friday',
-    });
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).toHaveBeenCalledTimes(1);
+    expect(sendDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: 'email',
+        subject: 'Tour Friday',
+        content: 'Looking forward to it.',
+      }),
+      expect.objectContaining({ email: 'jane@example.com' }),
+      'Jane Realty',
+      { spaceId: 'space_1', userId: 'user_1' },
+    );
     expect(result.summary).toContain('jane@example.com');
+    expect(result.summary).toContain('from your Gmail');
     expect(result.display).toBe('success');
-    expect((result.data as { contactId: string }).contactId).toBe('c_1');
+    expect((result.data as { contactId: string; method: string }).contactId).toBe('c_1');
+    expect((result.data as { method: string }).method).toBe('gmail');
+    expect(recordOutboundMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space_1',
+        contactId: 'c_1',
+        channel: 'email',
+        metadata: expect.objectContaining({ source: 'send_email', method: 'gmail' }),
+      }),
+      expect.objectContaining({ route: 'tools.send_email' }),
+    );
   });
 
   it('refuses to send when the contact has no email', async () => {
@@ -129,6 +186,7 @@ describe('sendEmailTool handler — contactId path', () => {
       makeCtx(),
     );
     expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
     expect(result.summary).toMatch(/no email on file/);
     expect(result.display).toBe('error');
   });
@@ -140,6 +198,7 @@ describe('sendEmailTool handler — contactId path', () => {
       makeCtx(),
     );
     expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
     expect(result.summary).toMatch(/No contact with id/);
     expect(result.display).toBe('error');
   });
@@ -155,8 +214,12 @@ describe('sendEmailTool handler — toEmail path', () => {
       { toEmail: 'stranger@elsewhere.com', subject: 'Hi', body: 'Hi.' },
       makeCtx(),
     );
-    expect(sendEmailFromCRMMock).toHaveBeenCalledWith(
-      expect.objectContaining({ toEmail: 'stranger@elsewhere.com' }),
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'Hi.' }),
+      expect.objectContaining({ email: 'stranger@elsewhere.com' }),
+      'Jane Realty',
+      { spaceId: 'space_1', userId: 'user_1' },
     );
     expect(result.display).toBe('success');
     expect((result.data as { contactId: string | null }).contactId).toBeNull();
@@ -186,7 +249,7 @@ describe('sendEmailTool handler — idempotency key', () => {
     );
 
     // Different bodies must NOT be deduped — both go out.
-    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(2);
+    expect(sendDraftMock).toHaveBeenCalledTimes(2);
     expect(first.display).toBe('success');
     expect(second.display).toBe('success');
   });
@@ -206,7 +269,7 @@ describe('sendEmailTool handler — idempotency key', () => {
     const second = await sendEmailTool.handler(args, makeCtx());
 
     // True retry of an identical message must collapse to one delivery.
-    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
+    expect(sendDraftMock).toHaveBeenCalledTimes(1);
     expect(first.display).toBe('success');
     expect(second.display).toBe('success');
   });
@@ -228,10 +291,7 @@ describe('sendEmailTool handler — idempotency key', () => {
       ctx,
     );
 
-    expect(sendEmailFromCRMMock).toHaveBeenCalledTimes(1);
-    expect(sendEmailFromCRMMock).toHaveBeenCalledWith(
-      expect.objectContaining({ idempotencyKey: 'work-session-action-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
-    );
+    expect(sendDraftMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -241,7 +301,7 @@ describe('sendEmailTool handler — errors', () => {
       Contact: { single: null },
       SpaceSetting: { single: null },
     };
-    sendEmailFromCRMMock.mockRejectedValueOnce(new Error('Resend quota exhausted'));
+    sendDraftMock.mockResolvedValueOnce({ sent: false, method: 'email', error: 'Resend quota exhausted' });
 
     const result = await sendEmailTool.handler(
       { toEmail: 'a@b.com', subject: 'Hi', body: 'Hi.' },
@@ -256,7 +316,7 @@ describe('sendEmailTool handler — errors', () => {
       Contact: { single: null },
       SpaceSetting: { single: null },
     };
-    sendEmailFromCRMMock.mockRejectedValueOnce(new Error('Resend temporarily unavailable'));
+    sendDraftMock.mockResolvedValueOnce({ sent: false, method: 'email', error: 'Resend temporarily unavailable' });
     const ctx = makeCtx();
     ctx.executionIdempotencyKey = 'work-session-action-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
@@ -271,7 +331,7 @@ describe('sendEmailTool handler — errors', () => {
       Contact: { single: null },
       SpaceSetting: { single: null },
     };
-    sendEmailFromCRMMock.mockRejectedValueOnce(Object.assign(
+    sendDraftMock.mockRejectedValueOnce(Object.assign(
       new Error('same key used with changed payload'),
       { durableDisposition: 'reconciliation_required' },
     ));
@@ -285,5 +345,49 @@ describe('sendEmailTool handler — errors', () => {
       display: 'error',
       durableExecutionDisposition: 'reconciliation_required',
     });
+  });
+
+  it('names a compliance hold instead of claiming a send', async () => {
+    mockByTable = {
+      Contact: { single: null },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+    };
+    checkSendAllowedMock.mockResolvedValue({
+      allowed: false,
+      reason: 'quiet_hours',
+      detail: 'Outside the 8:00-21:00 window in America/New_York.',
+    });
+
+    const result = await sendEmailTool.handler(
+      { toEmail: 'night@example.com', subject: 'Hi', body: 'Hi.' },
+      makeCtx(),
+    );
+
+    expect(sendDraftMock).not.toHaveBeenCalled();
+    expect(result.display).toBe('error');
+    expect(result.summary).toMatch(/Blocked because quiet hours/);
+    expect(result.summary).toContain('Outside the 8:00-21:00 window');
+  });
+
+  it('labels a platform-sender fallback instead of claiming inbox send', async () => {
+    mockByTable = {
+      Contact: { single: { id: 'c_1', email: 'jane@example.com', name: 'Jane' } },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+    };
+    sendDraftMock.mockResolvedValueOnce({
+      sent: true,
+      method: 'email',
+      fallback: true,
+      primaryError: 'inbox_send_failed',
+    });
+
+    const result = await sendEmailTool.handler(
+      { contactId: 'c_1', subject: 'Hi', body: 'Hi.' },
+      makeCtx(),
+    );
+
+    expect(result.display).toBe('success');
+    expect(result.summary).toContain("Chippi's sender");
+    expect((result.data as { fallback?: boolean }).fallback).toBe(true);
   });
 });
