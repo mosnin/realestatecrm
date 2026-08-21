@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;
@@ -28,8 +29,7 @@ export async function POST(req: NextRequest) {
   const key = `DIRECTIVE:${space.id}`;
 
   // Upsert — only one active directive at a time
-  const { error } = await supabase
-    .from('AgentMemory')
+  const { error } = await tenantTable(supabase, 'AgentMemory', { spaceId: space.id })
     .upsert({
       spaceId: space.id,
       entityType: 'space',

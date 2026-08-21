@@ -200,14 +200,12 @@ export async function writeChildApprovalDecision(input: {
   decision: ApprovalDecision;
 }): Promise<boolean> {
   const next = applyDecisionToApprovals(input.approvals, input.callId, input.decision);
-  const { data, error } = await supabase
-    .from('AgentPausedRun')
+  const { data, error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.spaceId })
     .update({
       approvals: next,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', input.pausedRunId)
-    .eq('spaceId', input.spaceId)
     .eq('userId', input.userId)
     .eq('status', 'pending')
     .select('id');
@@ -225,14 +223,12 @@ export async function claimChildPausedRun(input: {
   pausedRunId: string;
   spaceId: string;
 }): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('AgentPausedRun')
+  const { data, error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.spaceId })
     .update({
       status: 'resumed',
       updatedAt: new Date().toISOString(),
     })
     .eq('id', input.pausedRunId)
-    .eq('spaceId', input.spaceId)
     .eq('status', 'pending')
     .select('id');
   if (error) {
@@ -249,11 +245,9 @@ export async function heartbeatChildPausedRun(input: {
   pausedRunId: string;
   spaceId: string;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('AgentPausedRun')
+  const { error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.spaceId })
     .update({ updatedAt: new Date().toISOString() })
     .eq('id', input.pausedRunId)
-    .eq('spaceId', input.spaceId)
     .eq('status', 'pending');
   if (error) {
     logger.warn('[delegate-child] heartbeat failed', {
@@ -269,15 +263,13 @@ export async function storeChildPausedResult(input: {
   ok: boolean;
   summary: string;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('AgentPausedRun')
+  const { error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.spaceId })
     .update({
       runState: wrapChildResult({ ok: input.ok, summary: input.summary }),
       status: 'resumed',
       updatedAt: new Date().toISOString(),
     })
-    .eq('id', input.pausedRunId)
-    .eq('spaceId', input.spaceId);
+    .eq('id', input.pausedRunId);
   if (error) {
     logger.warn('[delegate-child] store result failed', {
       pausedRunId: input.pausedRunId,
@@ -294,11 +286,9 @@ async function loadChildPausedRow(input: {
   approvals: ChildStoredApproval[];
   runState: string;
 } | null> {
-  const { data, error } = await supabase
-    .from('AgentPausedRun')
+  const { data, error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.spaceId })
     .select('status, approvals, runState')
     .eq('id', input.pausedRunId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
   if (error) {
     logger.warn('[delegate-child] load paused row failed', {

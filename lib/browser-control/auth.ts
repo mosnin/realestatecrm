@@ -170,11 +170,9 @@ export async function rotateToken(
 ): Promise<{ token: string; tokenPrefix: string } | null> {
   const { raw, hash, prefix } = mintExtToken();
 
-  const { data, error } = await supabase
-    .from('BrowserLink')
+  const { data, error } = await tenantTable(supabase, 'BrowserLink', { spaceId: opts.spaceId })
     .update({ tokenHash: hash, tokenPrefix: prefix })
     .eq('id', linkId)
-    .eq('spaceId', opts.spaceId)
     .is('revokedAt', null)
     .select('id')
     .maybeSingle();

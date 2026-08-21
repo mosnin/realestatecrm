@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import {
   ROUTINE_CADENCES,
@@ -59,12 +60,10 @@ export async function GET() {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('Routine')
+  const { data, error } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .select(SELECT)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: true });
 
   if (error) {
@@ -80,7 +79,7 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -111,10 +110,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Cap routines per space — a wall of standing instructions is its own mess.
-  const { count } = await supabase
-    .from('Routine')
-    .select('id', { count: 'exact', head: true })
-    .eq('spaceId', space.id);
+  const { count } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
+    .select('id', { count: 'exact', head: true });
   if ((count ?? 0) >= MAX_ROUTINES) {
     return NextResponse.json(
       { error: `You've reached the limit of ${MAX_ROUTINES} routines.` },
@@ -122,8 +119,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
-    .from('Routine')
+  const { data, error } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       instruction: instruction.slice(0, MAX_INSTRUCTION),

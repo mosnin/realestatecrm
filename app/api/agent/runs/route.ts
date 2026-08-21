@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -16,13 +17,11 @@ export async function GET() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Most recent 5 distinct runIds from the activity log
-  const { data } = await supabase
-    .from('AgentActivityLog')
+  const { data } = await tenantTable(supabase, 'AgentActivityLog', { spaceId: space.id })
     .select('runId, agentType, createdAt')
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(20);
 

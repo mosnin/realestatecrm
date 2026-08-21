@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const read = await readJsonWithLimit(req, BODY_LIMITS.smallJson);
   if (!read.ok) return read.response;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { LEVENSHTEIN_CAP } from '@/lib/draft-feedback';
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let body: Record<string, unknown>;
   try {
@@ -61,11 +62,9 @@ export async function POST(req: NextRequest) {
   // Only record feedback on drafts that are still pending. If the draft has
   // already terminated, this ping is stale — drop it on the floor instead of
   // overwriting the terminal feedback_action.
-  const { data: existing } = await supabase
-    .from('AgentDraft')
+  const { data: existing } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .select('id, status, feedback_action')
     .eq('id', draftId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -78,11 +77,9 @@ export async function POST(req: NextRequest) {
   if (decisionMs !== null) patch.decision_ms = decisionMs;
   if (editDistance !== null) patch.edit_distance = editDistance;
 
-  const { error } = await supabase
-    .from('AgentDraft')
+  const { error } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .update(patch)
-    .eq('id', draftId)
-    .eq('spaceId', space.id);
+    .eq('id', draftId);
 
   if (error) {
     return NextResponse.json({ error: 'Failed to record feedback' }, { status: 500 });

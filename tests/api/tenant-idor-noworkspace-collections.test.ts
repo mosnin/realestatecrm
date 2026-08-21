@@ -52,12 +52,20 @@ vi.mock('@/lib/briefing/delivery', () => ({
   getAppOrigin: vi.fn(() => 'https://app.example'),
 }));
 vi.mock('@/lib/activity/query', () => ({ getUnifiedActivity: vi.fn() }));
+vi.mock('@/lib/realtime/ably', () => ({
+  createSpaceTokenRequest: vi.fn(async () => null),
+  publishSpaceEvent: vi.fn(),
+}));
+vi.mock('@/lib/usage/today-token-usage', () => ({
+  getTodayTokenUsage: vi.fn(async () => ({ total: 0 })),
+}));
+vi.mock('@/lib/agent/quick-draft', () => ({ composeQuickDraft: vi.fn() }));
 
 const { fromMock, fromMockTables } = vi.hoisted(() => {
   const fromMockTables: string[] = [];
   const fromMock = vi.fn((table: string) => {
     const chain: Record<string, unknown> = {};
-    const passthrough = ['select', 'order', 'limit', 'in', 'insert', 'upsert', 'not', 'is', 'neq', 'update', 'delete'];
+    const passthrough = ['select', 'order', 'limit', 'in', 'insert', 'upsert', 'not', 'is', 'neq', 'update', 'delete', 'gte', 'like'];
     for (const m of passthrough) chain[m] = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
     chain.maybeSingle = vi.fn(async () => ({ data: null }));
@@ -96,6 +104,18 @@ import { POST as postBriefingTest } from '@/app/api/agent/briefing/test/route';
 import { GET as getSwarm } from '@/app/api/swarm/[runId]/route';
 import { GET as getSwarmStream } from '@/app/api/swarm/[runId]/stream/route';
 import { POST as cancelSwarm } from '@/app/api/swarm/[runId]/cancel/route';
+import { GET as getSettings, PATCH as patchSettings } from '@/app/api/agent/settings/route';
+import { GET as getUsage } from '@/app/api/agent/usage/route';
+import { GET as getPortfolio } from '@/app/api/agent/portfolio/route';
+import { POST as postDirective } from '@/app/api/agent/directive/route';
+import { GET as getAgentActivity } from '@/app/api/agent/activity/route';
+import { GET as getRuns } from '@/app/api/agent/runs/route';
+import { GET as getPriority } from '@/app/api/agent/priority/route';
+import { GET as listRoutines, POST as postRoutine } from '@/app/api/routines/route';
+import { POST as postDraftFeedback } from '@/app/api/agent/drafts/feedback/route';
+import { GET as getAblyToken } from '@/app/api/ably/token/route';
+import { POST as postRunNow } from '@/app/api/agent/run-now/route';
+import { POST as postQuickDraft } from '@/app/api/agent/quick-draft/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -387,5 +407,135 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('SwarmRun');
+  });
+
+  it('GET /api/agent/settings 404s and does not query AgentSettings', async () => {
+    const res = await getSettings(new NextRequest('http://localhost/api/agent/settings'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentSettings');
+  });
+
+  it('PATCH /api/agent/settings 404s and does not upsert AgentSettings', async () => {
+    const res = await patchSettings(
+      new NextRequest('http://localhost/api/agent/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentSettings');
+  });
+
+  it('GET /api/agent/usage 404s and does not query ChatUsage', async () => {
+    const res = await getUsage();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('ChatUsage');
+    expect(fromMockTables).not.toContain('AgentSettings');
+  });
+
+  it('GET /api/agent/portfolio 404s and does not query Contact or Deal', async () => {
+    const res = await getPortfolio();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('Deal');
+  });
+
+  it('POST /api/agent/directive 404s and does not write AgentMemory', async () => {
+    const res = await postDirective(
+      new NextRequest('http://localhost/api/agent/directive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directive: 'Chase VICTIM at 555-0100' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/agent/activity 404s and does not query AgentActivityLog', async () => {
+    const res = await getAgentActivity(new NextRequest('http://localhost/api/agent/activity'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentActivityLog');
+  });
+
+  it('GET /api/agent/runs 404s and does not query AgentActivityLog', async () => {
+    const res = await getRuns();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentActivityLog');
+  });
+
+  it('GET /api/agent/priority 404s and does not query AgentMemory', async () => {
+    const res = await getPriority(new NextRequest('http://localhost/api/agent/priority'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/routines 404s and does not query Routine', async () => {
+    const res = await listRoutines();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Routine');
+  });
+
+  it('POST /api/routines 404s and does not insert Routine', async () => {
+    const res = await postRoutine(
+      new NextRequest('http://localhost/api/routines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction: 'Follow up with VICTIM every morning' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Routine');
+  });
+
+  it('POST /api/agent/drafts/feedback 404s and does not query AgentDraft', async () => {
+    const res = await postDraftFeedback(
+      new NextRequest('http://localhost/api/agent/drafts/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftId: 'draft_victim', action: 'held' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentDraft');
+  });
+
+  it('GET /api/ably/token 404s and does not mint a space token', async () => {
+    const res = await getAblyToken();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+  });
+
+  it('POST /api/agent/run-now 404s and does not start a run', async () => {
+    const res = await postRunNow();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+  });
+
+  it('POST /api/agent/quick-draft 404s and does not query Contact or Deal', async () => {
+    const res = await postQuickDraft(
+      new NextRequest('http://localhost/api/agent/quick-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context: 'person', id: 'c_victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('AgentDraft');
   });
 });

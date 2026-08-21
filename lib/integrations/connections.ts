@@ -160,10 +160,8 @@ async function ensureTriggersRegistered(connection: IntegrationConnectionRow): P
 
 /** All connections for a space, regardless of status. UI filters as needed. */
 export async function listConnections(spaceId: string): Promise<IntegrationConnectionRow[]> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false });
   if (error) {
     logger.warn('[integrations.connections] list failed', { spaceId, err: error.message });
@@ -178,10 +176,8 @@ export async function activeToolkits(args: {
   spaceId: string;
   userId: string;
 }): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('toolkit')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('status', 'active');
   if (error) {
@@ -289,8 +285,7 @@ export async function insertConnection(args: {
    *  API key). Omit for Composio-backed connections. */
   secretCiphertext?: string;
 }): Promise<IntegrationConnectionRow | null> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .insert({
       spaceId: args.spaceId,
       userId: args.userId,
@@ -446,10 +441,8 @@ export async function findActive(args: {
   userId: string;
   toolkit: string;
 }): Promise<IntegrationConnectionRow | null> {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('*')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('toolkit', args.toolkit)
     .eq('status', 'active')
@@ -465,10 +458,8 @@ export async function findPending(args: {
   userId: string;
   toolkit: string;
 }): Promise<IntegrationConnectionRow[]> {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('*')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('toolkit', args.toolkit)
     .eq('status', 'pending');

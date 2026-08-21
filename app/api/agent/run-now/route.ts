@@ -26,7 +26,7 @@ export async function POST() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Rate limit: max 5 runs per space per minute. Routed through the shared
   // helper so it fails CLOSED to an in-memory counter when KV is unconfigured,

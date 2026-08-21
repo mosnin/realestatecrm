@@ -27,6 +27,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { unscoped } from '@/lib/supabase-guard';
 import {
@@ -83,10 +84,8 @@ export async function findCalendarConnection(
 ): Promise<CalendarConnection | null> {
   if (!composioConfigured()) return null;
 
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('id, userId, toolkit')
-    .eq('spaceId', spaceId)
     .in('toolkit', CALENDAR_TOOLKITS as readonly string[])
     .eq('status', 'active')
     .order('toolkit', { ascending: true }) // 'googlecalendar' < 'outlook_calendar'
@@ -208,8 +207,7 @@ export async function writeEventThrough(
   // 2. Always log the mirror row, even when the external write failed.
   //    Intent is the unit of forensics: if Chippi tried to put a tour on
   //    the calendar at 3pm and Google was down, we still want to know.
-  const { data: mirrorRow, error: mirrorErr } = await supabase
-    .from('CalendarEventMirror')
+  const { data: mirrorRow, error: mirrorErr } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId: input.spaceId })
     .insert({
       spaceId: input.spaceId,
       externalProvider: input.connection.toolkit,
@@ -254,10 +252,8 @@ async function findTourMirror(
   spaceId: string,
   sourceTourId: string,
 ): Promise<{ id: string; externalEventId: string; externalProvider: CalendarProvider } | null> {
-  const { data, error } = await supabase
-    .from('CalendarEventMirror')
+  const { data, error } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId })
     .select('id, externalEventId, externalProvider')
-    .eq('spaceId', spaceId)
     .eq('sourceTourId', sourceTourId)
     .not('externalEventId', 'is', null)
     .order('createdAt', { ascending: false })
