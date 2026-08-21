@@ -117,9 +117,8 @@ export async function POST(req: NextRequest) {
     console.error('[deals/bulk] load error:', loadErr);
     return NextResponse.json({ error: 'Failed to load deals' }, { status: 500 });
   }
-  const byId = new Map(
-    (rows ?? []).map((r) => [r.id as string, r as { id: string; status: string }]),
-  );
+  const loaded = (rows ?? []) as { id: string; status: string }[];
+  const byId = new Map(loaded.map((r) => [r.id, r]));
 
   const results: PerIdResult[] = [];
   const nowIso = new Date().toISOString();

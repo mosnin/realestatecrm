@@ -96,7 +96,14 @@ export async function rosterForBrokerage(brokerageId: string): Promise<Messaging
   const { data: memberships } = await tenantTable(supabase, 'BrokerageMembership', { brokerageId })
     .select('userId, role, User!inner(id, name, email, avatar, lastSeenAt)');
   if (!memberships) return [];
-  return memberships.map((m) => {
+  const membershipRows = memberships as Array<{
+    userId: string;
+    role: MessagingMember['role'];
+    User:
+      | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }
+      | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }[];
+  }>;
+  return membershipRows.map((m) => {
     // PostgREST types embedded to-one relations as arrays; it's an object at
     // runtime. Normalize either shape.
     const rel = (m as unknown as { User: { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null } | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }[] }).User;
