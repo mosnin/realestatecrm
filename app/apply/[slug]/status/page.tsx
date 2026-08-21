@@ -239,6 +239,8 @@ export default async function ApplicationStatusPage({
           status: contact.applicationStatus ?? 'received',
           statusNote: contact.applicationStatusNote,
           applicationRef: contact.applicationRef ?? ref,
+          // Ref-only status must not serialize form PII into RSC props.
+          // Portal APIs already require statusPortalToken for this payload.
           applicationData: portalMode
             ? ((contact as { applicationData?: Record<string, unknown> | null }).applicationData ??
               null)
