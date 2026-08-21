@@ -9,11 +9,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
-  deleteGoogleEvent: vi.fn(async () => true),
-  updateGoogleEvent: vi.fn(async () => true),
-  findCalendarConnection: vi.fn(),
-  deleteEventThrough: vi.fn(async () => ({ externalOk: true })),
-  updateEventThrough: vi.fn(async () => ({ externalOk: true })),
+  deleteGoogleEvent: vi.fn(async (_input?: unknown) => true),
+  updateGoogleEvent: vi.fn(async (_input?: unknown) => true),
+  findCalendarConnection: vi.fn(async (_spaceId?: unknown) => ({
+    id: 'conn',
+    userId: 'u_1',
+    toolkit: 'googlecalendar',
+  })),
+  deleteEventThrough: vi.fn(async (_input?: unknown) => ({ externalOk: true })),
+  updateEventThrough: vi.fn(async (_input?: unknown) => ({ externalOk: true })),
   tourUpdate: vi.fn(() => ({
     eq: () => ({
       eq: () => Promise.resolve({ error: null }),
@@ -22,13 +26,13 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/gcal-helpers', () => ({
-  deleteGoogleEvent: (...a: unknown[]) => h.deleteGoogleEvent(...a),
-  updateGoogleEvent: (...a: unknown[]) => h.updateGoogleEvent(...a),
+  deleteGoogleEvent: (input: unknown) => h.deleteGoogleEvent(input),
+  updateGoogleEvent: (input: unknown) => h.updateGoogleEvent(input),
 }));
 vi.mock('@/lib/calendar/mirror', () => ({
-  findCalendarConnection: (...a: unknown[]) => h.findCalendarConnection(...a),
-  deleteEventThrough: (...a: unknown[]) => h.deleteEventThrough(...a),
-  updateEventThrough: (...a: unknown[]) => h.updateEventThrough(...a),
+  findCalendarConnection: (spaceId: unknown) => h.findCalendarConnection(spaceId),
+  deleteEventThrough: (input: unknown) => h.deleteEventThrough(input),
+  updateEventThrough: (input: unknown) => h.updateEventThrough(input),
 }));
 vi.mock('@/lib/supabase', () => ({
   supabase: {

@@ -93,14 +93,14 @@ vi.mock('@/lib/gcal-helpers', () => ({
   deleteGoogleEvent: (...a: unknown[]) => deleteGoogleEvent(...a),
 }));
 
-const tourWindowConflicts = vi.fn(async () => false);
+const tourWindowConflicts = vi.fn(async (_input?: unknown) => false);
 vi.mock('@/lib/tours/conflicts', () => ({
-  tourWindowConflicts: (...a: unknown[]) => tourWindowConflicts(...a),
+  tourWindowConflicts: (input: unknown) => tourWindowConflicts(input),
 }));
 
-const dropTourCalendarArtifacts = vi.fn(async () => undefined);
+const dropTourCalendarArtifacts = vi.fn(async (_input?: unknown) => undefined);
 vi.mock('@/lib/tours/calendar-propagate', () => ({
-  dropTourCalendarArtifacts: (...a: unknown[]) => dropTourCalendarArtifacts(...a),
+  dropTourCalendarArtifacts: (input: unknown) => dropTourCalendarArtifacts(input),
   moveTourCalendarArtifacts: vi.fn(async () => undefined),
 }));
 
@@ -353,7 +353,7 @@ describe('delete_tour — drops both calendar systems', () => {
 
     expect(res.display).toBe('success');
     expect(dropTourCalendarArtifacts).toHaveBeenCalledTimes(1);
-    expect(dropTourCalendarArtifacts.mock.calls[0][0]).toMatchObject({
+    expect(dropTourCalendarArtifacts).toHaveBeenCalledWith({
       spaceId: 's_1',
       tourId: 't_1',
       googleEventId: 'gcal_123',

@@ -9,8 +9,8 @@ import { NextRequest } from 'next/server';
 const h = vi.hoisted(() => ({
   tour: null as Record<string, unknown> | null,
   updateError: null as { message: string } | null,
-  drop: vi.fn(async () => undefined),
-  notifyOwner: vi.fn(async () => undefined),
+  drop: vi.fn(async (_input?: unknown) => undefined),
+  notifyOwner: vi.fn(async (_input?: unknown) => undefined),
   after: vi.fn((fn: () => unknown) => {
     void fn();
   }),
@@ -27,11 +27,11 @@ vi.mock('@/lib/rate-limit', () => ({
 }));
 
 vi.mock('@/lib/tours/calendar-propagate', () => ({
-  dropTourCalendarArtifacts: (...a: unknown[]) => h.drop(...a),
+  dropTourCalendarArtifacts: (input: unknown) => h.drop(input),
 }));
 
 vi.mock('@/lib/notify', () => ({
-  notifyTourCancelledOwner: (...a: unknown[]) => h.notifyOwner(...a),
+  notifyTourCancelledOwner: (input: unknown) => h.notifyOwner(input),
 }));
 
 vi.mock('@/lib/supabase', () => {
@@ -82,13 +82,13 @@ describe('POST /api/tours/manage cancel', () => {
     const res = await POST(makeReq({ token: 'tok', action: 'cancel' }));
     expect(res.status).toBe(200);
     expect(h.drop).toHaveBeenCalledTimes(1);
-    expect(h.drop.mock.calls[0][0]).toMatchObject({
+    expect(h.drop).toHaveBeenCalledWith({
       spaceId: 's_1',
       tourId: 't_1',
       googleEventId: 'gcal_1',
     });
     expect(h.notifyOwner).toHaveBeenCalledTimes(1);
-    expect(h.notifyOwner.mock.calls[0][0]).toMatchObject({
+    expect(h.notifyOwner).toHaveBeenCalledWith({
       spaceId: 's_1',
       tourData: expect.objectContaining({ guestName: 'Sam Lee', tourId: 't_1' }),
     });

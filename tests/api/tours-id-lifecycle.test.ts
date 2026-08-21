@@ -21,11 +21,11 @@ const h = vi.hoisted(() => ({
     googleEventId: 'gcal_1',
     contactId: null,
   } as Record<string, unknown>,
-  conflicts: vi.fn(async () => false),
-  drop: vi.fn(async () => undefined),
-  move: vi.fn(async () => undefined),
-  notifyCancelled: vi.fn(async () => undefined),
-  notifyRescheduled: vi.fn(async () => undefined),
+  conflicts: vi.fn(async (_input?: unknown) => false),
+  drop: vi.fn(async (_input?: unknown) => undefined),
+  move: vi.fn(async (_input?: unknown) => undefined),
+  notifyCancelled: vi.fn(async (_input?: unknown) => undefined),
+  notifyRescheduled: vi.fn(async (_input?: unknown) => undefined),
   after: vi.fn((fn: () => unknown) => {
     void fn();
   }),
@@ -45,17 +45,17 @@ vi.mock('@/lib/space', () => ({
 }));
 
 vi.mock('@/lib/tours/conflicts', () => ({
-  tourWindowConflicts: (...a: unknown[]) => h.conflicts(...a),
+  tourWindowConflicts: (input: unknown) => h.conflicts(input),
 }));
 
 vi.mock('@/lib/tours/calendar-propagate', () => ({
-  dropTourCalendarArtifacts: (...a: unknown[]) => h.drop(...a),
-  moveTourCalendarArtifacts: (...a: unknown[]) => h.move(...a),
+  dropTourCalendarArtifacts: (input: unknown) => h.drop(input),
+  moveTourCalendarArtifacts: (input: unknown) => h.move(input),
 }));
 
 vi.mock('@/lib/tour-notify', () => ({
-  notifyTourCancelled: (...a: unknown[]) => h.notifyCancelled(...a),
-  notifyTourRescheduled: (...a: unknown[]) => h.notifyRescheduled(...a),
+  notifyTourCancelled: (input: unknown) => h.notifyCancelled(input),
+  notifyTourRescheduled: (input: unknown) => h.notifyRescheduled(input),
 }));
 
 vi.mock('@/lib/supabase', () => {
