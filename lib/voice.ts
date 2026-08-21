@@ -20,6 +20,8 @@
  */
 
 import { logger } from '@/lib/logger';
+import { toE164 } from '@/lib/phone';
+export { toE164 };
 
 const TELNYX_API_BASE = 'https://api.telnyx.com/v2';
 
@@ -53,9 +55,6 @@ if (!isVoiceConfigured()) {
     '[voice] Telnyx Voice not configured — calls will no-op. Set TELNYX_API_KEY, TELNYX_VOICE_CONNECTION_ID and TELNYX_FROM_NUMBER.',
   );
 }
-
-/** Re-export so existing call sites keep importing from this module. */
-export { toE164 } from '@/lib/phone';
 
 // Premium-rate prefixes blocked to prevent toll fraud (mirrors lib/sms.ts).
 const PREMIUM_PREFIXES = ['+1900', '+1976', '+44870', '+44871', '+44872', '+44090', '+44091'];
