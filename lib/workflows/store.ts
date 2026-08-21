@@ -16,6 +16,7 @@
 import { supabase } from '@/lib/supabase';
 import type { WorkflowRow } from './executor';
 import type { WorkflowDefinition } from './schema';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Cap on workflows per space — a wall of standing automations is its own mess,
@@ -58,10 +59,8 @@ function mapRow(row: Record<string, unknown>): WorkflowRecord {
 
 /** List the space's workflows, newest first. */
 export async function listWorkflows(spaceId: string): Promise<WorkflowRecord[]> {
-  const { data, error } = await supabase
-    .from('Workflow')
+  const { data, error } = await tenantTable(supabase, 'Workflow', { spaceId })
     .select(SELECT)
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => mapRow(r as Record<string, unknown>));
@@ -72,11 +71,9 @@ export async function getWorkflow(
   spaceId: string,
   id: string,
 ): Promise<WorkflowRecord | null> {
-  const { data, error } = await supabase
-    .from('Workflow')
+  const { data, error } = await tenantTable(supabase, 'Workflow', { spaceId })
     .select(SELECT)
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (error) throw error;
   return data ? mapRow(data as Record<string, unknown>) : null;
@@ -92,8 +89,7 @@ export async function createWorkflow(
   input: { name: string; description?: string; definition: WorkflowDefinition; enabled?: boolean; notifyOnError?: boolean },
 ): Promise<WorkflowRecord> {
   const { name, description, definition, enabled = true, notifyOnError = false } = input;
-  const { data, error } = await supabase
-    .from('Workflow')
+  const { data, error } = await tenantTable(supabase, 'Workflow', { spaceId })
     .insert({
       spaceId,
       name,
@@ -153,11 +149,9 @@ export async function updateWorkflow(
     update.version = await nextVersion(spaceId, id);
   }
 
-  const { data, error } = await supabase
-    .from('Workflow')
+  const { data, error } = await tenantTable(supabase, 'Workflow', { spaceId })
     .update(update)
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .select(SELECT)
     .maybeSingle();
   if (error) throw error;
@@ -167,11 +161,9 @@ export async function updateWorkflow(
 /** Read the current version (scoped) and return current + 1 for a bump. A
  *  missing row falls back to 1 — the update itself will then match nothing. */
 async function nextVersion(spaceId: string, id: string): Promise<number> {
-  const { data } = await supabase
-    .from('Workflow')
+  const { data } = await tenantTable(supabase, 'Workflow', { spaceId })
     .select('version')
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   const current = (data as { version?: number } | null)?.version ?? 0;
   return current + 1;
@@ -179,11 +171,9 @@ async function nextVersion(spaceId: string, id: string): Promise<number> {
 
 /** Delete a workflow, scoped by id + spaceId. True when a matching row existed. */
 export async function deleteWorkflow(spaceId: string, id: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('Workflow')
+  const { data, error } = await tenantTable(supabase, 'Workflow', { spaceId })
     .delete()
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .select('id');
   if (error) throw error;
   return (data ?? []).length > 0;
@@ -191,10 +181,8 @@ export async function deleteWorkflow(spaceId: string, id: string): Promise<boole
 
 /** Count the space's workflows — used by the create cap. */
 export async function countWorkflows(spaceId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('Workflow')
-    .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId);
+  const { count, error } = await tenantTable(supabase, 'Workflow', { spaceId })
+    .select('id', { count: 'exact', head: true });
   if (error) throw error;
   return count ?? 0;
 }
@@ -279,11 +267,9 @@ export async function listWorkflowRuns(
   if (!owned) return [];
 
   const capped = Math.max(1, Math.min(limit, MAX_WORKFLOW_RUNS));
-  const { data, error } = await supabase
-    .from('WorkflowRun')
+  const { data, error } = await tenantTable(supabase, 'WorkflowRun', { spaceId })
     .select(RUN_SELECT)
     .eq('workflowId', workflowId)
-    .eq('spaceId', spaceId)
     .order('startedAt', { ascending: false })
     .limit(capped);
   if (error) throw error;
@@ -309,20 +295,16 @@ export async function listAllWorkflowRuns(
   limit = 50,
 ): Promise<GlobalWorkflowRunRecord[]> {
   const capped = Math.max(1, Math.min(limit, 100));
-  const { data: runs, error } = await supabase
-    .from('WorkflowRun')
+  const { data: runs, error } = await tenantTable(supabase, 'WorkflowRun', { spaceId })
     .select(RUN_SELECT)
-    .eq('spaceId', spaceId)
     .order('startedAt', { ascending: false })
     .limit(capped);
   if (error) throw error;
   if (!runs || runs.length === 0) return [];
 
   const workflowIds = [...new Set(runs.map((r) => (r as Record<string, unknown>).workflowId as string))];
-  const { data: wfs, error: wErr } = await supabase
-    .from('Workflow')
+  const { data: wfs, error: wErr } = await tenantTable(supabase, 'Workflow', { spaceId })
     .select('id, name')
-    .eq('spaceId', spaceId)
     .in('id', workflowIds);
   if (wErr) throw wErr;
 
@@ -349,11 +331,9 @@ export async function getWorkflowRunSteps(
   spaceId: string,
   runId: string,
 ): Promise<WorkflowRunStepRecord[]> {
-  const { data: run, error: runErr } = await supabase
-    .from('WorkflowRun')
+  const { data: run, error: runErr } = await tenantTable(supabase, 'WorkflowRun', { spaceId })
     .select('id')
     .eq('id', runId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (runErr) throw runErr;
   if (!run) return [];

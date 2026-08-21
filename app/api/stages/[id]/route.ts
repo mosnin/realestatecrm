@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function PATCH(
   req: NextRequest,
@@ -19,13 +20,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('DealStage')
+  const { data: existingRows, error: existingError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (existingError) throw existingError;
-  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!existingRows || existingRows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const existing = existingRows[0];
 
@@ -56,15 +55,13 @@ export async function PATCH(
     else return NextResponse.json({ error: 'Invalid kind' }, { status: 400 });
   }
 
-  const { data: stage, error: updateError } = await supabase
-    .from('DealStage')
+  const { data: stage, error: updateError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .update({
       name: body.name !== undefined ? body.name.trim() : existing.name,
       color: safeColor,
       ...(kindUpdate !== undefined && { kind: kindUpdate }),
     })
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
   if (updateError) throw updateError;
@@ -131,13 +128,11 @@ export async function DELETE(
       ? rawTargetStageId.trim()
       : null;
 
-  const { data: existingRows, error: existingError } = await supabase
-    .from('DealStage')
+  const { data: existingRows, error: existingError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (existingError) throw existingError;
-  if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!existingRows || existingRows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const stage = existingRows[0];
 
@@ -145,10 +140,8 @@ export async function DELETE(
   // We intentionally fail closed if the count comes back null/undefined: a
   // missing count must not be coerced to zero, because that would let the
   // subsequent DELETE cascade through and destroy any deals in the stage.
-  const { count: dealCount, error: countError } = await supabase
-    .from('Deal')
+  const { count: dealCount, error: countError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', space.id)
     .eq('stageId', id);
   if (countError) throw countError;
   if (dealCount === null || dealCount === undefined) {
@@ -176,11 +169,9 @@ export async function DELETE(
     }
 
     // Validate target stage: must exist, same space, same pipeline.
-    const { data: targetRows, error: targetError } = await supabase
-      .from('DealStage')
+    const { data: targetRows, error: targetError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
       .select('id, spaceId, pipelineType, pipelineId')
-      .eq('id', targetStageId)
-      .eq('spaceId', space.id);
+      .eq('id', targetStageId);
     if (targetError) throw targetError;
     if (!targetRows.length) {
       return NextResponse.json({ error: 'Target stage not found' }, { status: 400 });
@@ -198,19 +189,15 @@ export async function DELETE(
     }
 
     // Migrate deals first. If this fails, no state has changed.
-    const { error: migrateError } = await supabase
-      .from('Deal')
+    const { error: migrateError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .update({ stageId: targetStageId })
-      .eq('spaceId', space.id)
       .eq('stageId', id);
     if (migrateError) throw migrateError;
   }
 
-  const { error: deleteError } = await supabase
-    .from('DealStage')
+  const { error: deleteError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (deleteError) throw deleteError;
 
   void audit({

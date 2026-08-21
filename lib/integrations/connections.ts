@@ -11,6 +11,7 @@ import { after } from 'next/server';
 import { deleteConnection as composioDelete, listConnectedAccountsForEntity } from './composio';
 import { findIntegration } from './catalog';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export type IntegrationStatus = 'active' | 'pending' | 'expired' | 'revoked' | 'failed';
@@ -207,6 +208,15 @@ export async function findByComposioId(composioConnectionId: string) {
 export async function getById(id: string) {
   const { data } = await unscoped(supabase
     .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  return (data ?? null) as IntegrationConnectionRow | null;
+}
+
+/** Space-first lookup — a foreign id is indistinguishable from missing. */
+export async function getByIdForSpace(id: string, spaceId: string) {
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('*')
     .eq('id', id)
     .maybeSingle();

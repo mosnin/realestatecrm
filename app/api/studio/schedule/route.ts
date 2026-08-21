@@ -19,7 +19,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { inngest } from '@/lib/inngest/client';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export const runtime = 'nodejs';
@@ -51,10 +51,8 @@ export async function GET() {
 
   const [platforms, postsRes] = await Promise.all([
     connectedSocials(space.id, auth.userId),
-    supabase
-      .from('StudioPost')
+    tenantTable(supabase, 'StudioPost', { spaceId: space.id })
       .select('id, caption, platforms, scheduledAt, status, createdAt')
-      .eq('spaceId', space.id)
       .order('scheduledAt', { ascending: true })
       .limit(100),
   ]);
@@ -152,11 +150,9 @@ export async function POST(req: NextRequest) {
   // Create / Edit / Library, or a fresh upload.
   let fileId: string;
   if (fileIdInput) {
-    const { data: existing } = await supabase
-      .from('File')
+    const { data: existing } = await tenantTable(supabase, 'File', { spaceId: space.id })
       .select('id')
       .eq('id', fileIdInput)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!existing) {
       return NextResponse.json({ error: 'That image was not found.' }, { status: 400 });
@@ -188,7 +184,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Couldn't schedule the post — usually temporary." }, { status: 500 });
     }
 
-    const { error: fileErr } = await supabase.from('File').insert({
+    const { error: fileErr } = await tenantTable(supabase, 'File', { spaceId: space.id }).insert({
       id: fileId,
       spaceId: space.id,
       userId,
@@ -206,8 +202,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data: post, error: postErr } = await supabase
-    .from('StudioPost')
+  const { data: post, error: postErr } = await tenantTable(supabase, 'StudioPost', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,
@@ -236,15 +231,13 @@ export async function POST(req: NextRequest) {
     });
     const eventId = sent.ids?.[0];
     if (eventId) {
-      await unscoped(supabase
-        .from('StudioPost'), 'post-fetch: caller verified parent scope before this id query')
+      await tenantTable(supabase, 'StudioPost', { spaceId: space.id })
         .update({ inngestEventId: eventId })
         .eq('id', post.id);
     }
   } catch (err) {
     logger.error('[studio.schedule] inngest send failed', { spaceId: space.id }, err as Error);
-    await unscoped(supabase
-      .from('StudioPost'), 'post-fetch: caller verified parent scope before this id query')
+    await tenantTable(supabase, 'StudioPost', { spaceId: space.id })
       .update({ status: 'failed', updatedAt: new Date().toISOString() })
       .eq('id', post.id);
     return NextResponse.json(
@@ -270,11 +263,21 @@ export async function DELETE(req: NextRequest) {
   // Only a still-scheduled post in this space can be canceled. The Inngest
   // publish function skips any post that is not 'scheduled', so flipping the
   // status is the whole cancel mechanism.
-  const { data, error } = await supabase
-    .from('StudioPost')
+  const { data: existing } = await tenantTable(supabase, 'StudioPost', { spaceId: space.id })
+    .select('id, status')
+    .eq('id', id)
+    .maybeSingle();
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (existing.status !== 'scheduled') {
+    return NextResponse.json(
+      { error: 'That post can no longer be canceled.' },
+      { status: 409 },
+    );
+  }
+
+  const { data, error } = await tenantTable(supabase, 'StudioPost', { spaceId: space.id })
     .update({ status: 'canceled', updatedAt: new Date().toISOString() })
     .eq('id', id)
-    .eq('spaceId', space.id)
     .eq('status', 'scheduled')
     .select('id')
     .maybeSingle();

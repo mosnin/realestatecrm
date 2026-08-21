@@ -5,7 +5,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { TEMPLATES, materializeTemplate, type ChecklistKind, type TemplateId } from '@/lib/deals/checklist';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 const VALID_KINDS: ChecklistKind[] = [
@@ -22,11 +22,9 @@ const VALID_KINDS: ChecklistKind[] = [
 async function resolveDealAndSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: deal, error } = await supabase
-    .from('Deal')
+  const { data: deal, error } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id, spaceId, closeDate')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (error) throw error;
   if (!deal) return null;
@@ -42,8 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const ctx = await resolveDealAndSpace(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await unscoped(supabase
-    .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
+  const { data, error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: ctx.space.id })
     .select('*')
     .eq('dealId', id)
     .order('position', { ascending: true });
@@ -82,8 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (typeof body.seed === 'string' && body.seed in TEMPLATES) {
     const templateId = body.seed as TemplateId;
     // Refuse if items already exist — template seed is additive-by-intent.
-    const { count } = await unscoped(supabase
-      .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
+    const { count } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
       .eq('dealId', id);
     if ((count ?? 0) > 0) {
@@ -101,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       position: m.position,
     }));
 
-    const { data, error } = await supabase.from('DealChecklistItem').insert(rows).select();
+    const { data, error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id }).insert(rows).select();
     if (error) {
       logger.error('[deals/checklist] seed failed', { dealId: id }, error);
       return NextResponse.json({ error: 'Failed to seed checklist' }, { status: 500 });
@@ -124,8 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     dueAt = d.toISOString();
   }
 
-  const { data: maxRow } = await unscoped(supabase
-    .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: maxRow } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
     .select('position')
     .eq('dealId', id)
     .order('position', { ascending: false })
@@ -133,8 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .maybeSingle();
   const nextPosition = (maxRow?.position ?? -1) + 1;
 
-  const { data, error } = await supabase
-    .from('DealChecklistItem')
+  const { data, error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,

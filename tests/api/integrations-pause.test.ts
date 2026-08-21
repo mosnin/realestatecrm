@@ -17,9 +17,9 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
-const { getByIdMock } = vi.hoisted(() => ({ getByIdMock: vi.fn() }));
+const { getByIdForSpaceMock } = vi.hoisted(() => ({ getByIdForSpaceMock: vi.fn() }));
 vi.mock('@/lib/integrations/connections', () => ({
-  getById: getByIdMock,
+  getByIdForSpace: getByIdForSpaceMock,
   revoke: vi.fn(),
 }));
 
@@ -76,7 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
   mockGetSpaceForUser.mockResolvedValue(SPACE);
-  getByIdMock.mockResolvedValue(fakeRow());
+  getByIdForSpaceMock.mockResolvedValue(fakeRow());
   setPausedMock.mockResolvedValue({ updated: 2 });
 });
 
@@ -91,18 +91,18 @@ describe('PATCH /api/integrations/[id]', () => {
   });
 
   it('404 when the row does not exist', async () => {
-    getByIdMock.mockResolvedValue(null);
+    getByIdForSpaceMock.mockResolvedValue(null);
     const [req, ctx] = makeReq('missing', { paused: true });
     const res = await PATCH(req, ctx);
     expect(res.status).toBe(404);
     expect(setPausedMock).not.toHaveBeenCalled();
   });
 
-  it('403 when the row belongs to another space (id-guess privilege boundary)', async () => {
-    getByIdMock.mockResolvedValue(fakeRow({ spaceId: 'other_space' }));
+  it('404 when the row belongs to another space (no existence oracle)', async () => {
+    getByIdForSpaceMock.mockResolvedValue(null);
     const [req, ctx] = makeReq('conn_1', { paused: true });
     const res = await PATCH(req, ctx);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(setPausedMock).not.toHaveBeenCalled();
   });
 

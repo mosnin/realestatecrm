@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export async function PATCH(req: NextRequest) {
@@ -23,44 +23,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'newPosition must be a non-negative integer' }, { status: 400 });
   }
 
-  // Verify the deal exists and belongs to this user's space
-  const { data: deal, error: dealError } = await unscoped(supabase
-    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { data: deal, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id, spaceId, stageId, position')
     .eq('id', dealId)
     .maybeSingle();
   if (dealError) throw dealError;
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const space = await getSpaceForUser(userId);
-  if (!space || deal.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  // Verify the target stage belongs to the same space
-  const { data: stage, error: stageError } = await unscoped(supabase
-    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: stage, error: stageError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('id, spaceId')
     .eq('id', newStageId)
     .maybeSingle();
   if (stageError) throw stageError;
-  if (!stage || stage.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  if (!stage) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Re-verify the deal STILL belongs to this space immediately before the
   // RPC — closes the TOCTOU window between the lookup above and the RPC.
   // The RPC itself updates by id alone; without this check a between-
   // check-and-write reassignment could let realtor A reorder realtor B's
   // pipeline.
-  const { data: dealStill } = await supabase
-    .from('Deal')
+  const { data: dealStill } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!dealStill) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Atomically shift affected deals and move the deal via a DB function.
@@ -77,8 +67,7 @@ export async function PATCH(req: NextRequest) {
     throw rpcError;
   }
 
-  const { data: updated, error: fetchError } = await unscoped(supabase
-    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: updated, error: fetchError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('*')
     .eq('id', dealId)
     .single();
