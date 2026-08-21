@@ -73,12 +73,13 @@ export async function assertCanSpend(spaceId: string, workflow: Workflow, units 
     // only the up-front gate is skipped. Checked after the enforcement guard so it
     // adds zero overhead while CREDITS_ENFORCED is off.
     if (await isPlatformAdmin()) return;
-    const { account, subscriptionStatus, subscriptionPeriodEnd, isComped } =
+    const { account, subscriptionStatus, subscriptionPeriodEnd, isComped, isUnlimited } =
       await resolveBillingAccount(spaceId);
-    // Complimentary (admin-granted) accounts get unlimited usage — never blocked
-    // by the subscription or credit gate, same posture as the platform-admin
-    // exemption above. Demos must never hit a wall.
-    if (isComped) return;
+    // Complimentary (admin-granted) and application-owner accounts get
+    // unlimited usage — never blocked by the subscription or credit gate,
+    // same posture as the platform-admin exemption above. Demos and the
+    // app owner must never hit a wall.
+    if (isComped || isUnlimited) return;
     // Dunning gate: refuse premium AI for a delinquent status or stale paid
     // period, even if credits remain. The period-aware rule lives in one place.
     // This runs only under CREDITS_ENFORCED and after the admin exemption, matching
@@ -114,9 +115,13 @@ export async function chargeWorkflow(
 ): Promise<void> {
   if (!CREDITS_ENFORCED) return;
   try {
-    const { account, isComped } = await resolveBillingAccount(spaceId);
-    // Comp accounts are free — never debited.
-    if (isComped) return;
+    // Session admin: don't debit a customer (or the admin's own) balance
+    // while the application owner is testing. Usage is still recorded
+    // elsewhere; only the spend gate is skipped.
+    if (await isPlatformAdmin()) return;
+    const { account, isComped, isUnlimited } = await resolveBillingAccount(spaceId);
+    // Comp / owner-admin accounts are free — never debited.
+    if (isComped || isUnlimited) return;
     await spendCredits(account, workflow, {
       units: opts?.units,
       spaceId,

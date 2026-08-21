@@ -135,6 +135,25 @@ describe('credit enforcement (meter)', () => {
     expect(spendMock).not.toHaveBeenCalled();
   });
 
+  it('chargeWorkflow skips the debit for a session platform admin (unlimited owner access)', async () => {
+    isAdminMock.mockResolvedValue(true);
+    const { chargeWorkflow } = await loadMeter(true);
+    await chargeWorkflow('sp1', 'chat_turn', { userId: 'admin' });
+    expect(spendMock).not.toHaveBeenCalled();
+    expect(resolveMock).not.toHaveBeenCalled();
+  });
+
+  it('chargeWorkflow skips the debit when the funding account is unlimited', async () => {
+    resolveMock.mockResolvedValue({
+      account: { type: 'space', id: 'sp1' },
+      isComped: false,
+      isUnlimited: true,
+    });
+    const { chargeWorkflow } = await loadMeter(true);
+    await chargeWorkflow('sp1', 'chat_turn');
+    expect(spendMock).not.toHaveBeenCalled();
+  });
+
   it('chargeWorkflow never throws even if the debit fails (metering must not break work)', async () => {
     spendMock.mockRejectedValue(new Error('db down'));
     const { chargeWorkflow } = await loadMeter(true);

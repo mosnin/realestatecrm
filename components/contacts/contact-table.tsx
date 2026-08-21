@@ -56,6 +56,7 @@ import { downloadCSV } from '@/lib/csv';
 import type { SavedView } from '@/lib/types';
 import { countLabel } from '@/lib/formatting';
 import { CONTACT_STAGES } from '@/lib/constants';
+import { LEAD_SOURCE_LABEL, isLeadSource } from '@/lib/lead-source';
 import { CsvImportModal } from './csv-import-modal';
 import { DuplicatesPanel } from './duplicates-panel';
 import { toast } from 'sonner';
@@ -78,8 +79,9 @@ type Client = {
   notes: string | null;
   tags: string[];
   followUpAt: string | null;
-  leadType: 'rental' | 'buyer';
+  leadType: 'rental' | 'buyer' | 'seller';
   leadScore: number | null;
+  source?: string | null;
 };
 
 const STAGES = CONTACT_STAGES;
@@ -133,8 +135,10 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   const [contacts, setContacts] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer' | 'seller'>('all');
   const [tagFilter, setTagFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'snoozed' | 'archived' | 'all'>('active');
   // Popover-based tag filter. Replaces the previous always-on chip strip,
   // which became unreadable noise once a workspace accumulated >10 tags.
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
@@ -224,6 +228,8 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
     typeFilter?: string;
     leadTypeFilter?: typeof leadTypeFilter;
     tagFilter?: string;
+    sourceFilter?: string;
+    statusFilter?: typeof statusFilter;
     sortBy?: typeof sortBy;
   };
 
@@ -261,6 +267,8 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
       typeFilter,
       leadTypeFilter,
       tagFilter,
+      sourceFilter,
+      statusFilter,
       sortBy,
     };
     setSavingView(true);
@@ -293,6 +301,8 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
     setTypeFilter(f.typeFilter ?? 'ALL');
     setLeadTypeFilter(f.leadTypeFilter ?? 'all');
     setTagFilter(f.tagFilter ?? '');
+    setSourceFilter(f.sourceFilter ?? '');
+    setStatusFilter(f.statusFilter ?? 'active');
     if (f.sortBy) setSortBy(f.sortBy);
   }
 
@@ -322,9 +332,11 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
           slug,
           search,
           type: typeFilter,
+          status: statusFilter,
           limit: String(pageSize),
           offset: String(offset),
         });
+        if (sourceFilter) params.set('source', sourceFilter);
         const res = await fetch(`/api/contacts?${params}`);
         if (!res.ok) throw new Error('contacts_fetch_failed');
         const page = (await res.json()) as Client[];
@@ -342,7 +354,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
     } finally {
       if (requestId === contactsRequestRef.current) setLoading(false);
     }
-  }, [slug, search, typeFilter]);
+  }, [slug, search, typeFilter, statusFilter, sourceFilter]);
 
   useEffect(() => {
     fetchContacts();
@@ -667,7 +679,8 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
         if (leadTypeFilter === 'new') return c.tags.includes('new-lead');
         return c.leadType === leadTypeFilter;
       })
-      .filter((c) => !tagFilter || c.tags.includes(tagFilter));
+      .filter((c) => !tagFilter || c.tags.includes(tagFilter))
+      .filter((c) => !sourceFilter || c.source === sourceFilter);
     if (sortBy === 'agent-priority') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
     } else if (sortBy === 'oldest') {
@@ -694,7 +707,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   );
 
   const leadTypeChips: {
-    key: 'all' | 'new' | 'rental' | 'buyer';
+    key: 'all' | 'new' | 'rental' | 'buyer' | 'seller';
     label: string;
     count: number;
   }[] = [
@@ -713,6 +726,11 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
       key: 'buyer',
       label: 'Buyer',
       count: contacts.filter((c) => c.leadType === 'buyer').length,
+    },
+    {
+      key: 'seller',
+      label: 'Seller',
+      count: contacts.filter((c) => c.leadType === 'seller').length,
     },
   ];
 
@@ -875,6 +893,84 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
                         className={cn(typeFilter === key && 'font-semibold')}
                       >
                         {stageLabels[key]}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+                    >
+                      <span className="text-muted-foreground">Status:</span>
+                      {statusFilter === 'active'
+                        ? 'Active'
+                        : statusFilter === 'snoozed'
+                          ? 'Snoozed'
+                          : statusFilter === 'archived'
+                            ? 'Archived'
+                            : 'All'}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    {([
+                      ['active', 'Active'],
+                      ['snoozed', 'Snoozed'],
+                      ['archived', 'Archived'],
+                      ['all', 'All'],
+                    ] as const).map(([key, label]) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onSelect={() => setStatusFilter(key)}
+                        className={cn(statusFilter === key && 'font-semibold')}
+                      >
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/[0.04]"
+                    >
+                      <span className="text-muted-foreground">Source:</span>
+                      {sourceFilter
+                        ? isLeadSource(sourceFilter)
+                          ? LEAD_SOURCE_LABEL[sourceFilter]
+                          : sourceFilter
+                        : 'All'}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      onSelect={() => setSourceFilter('')}
+                      className={cn(!sourceFilter && 'font-semibold')}
+                    >
+                      All sources
+                    </DropdownMenuItem>
+                    {(
+                      [
+                        'web_form',
+                        'brokerage_form',
+                        'api',
+                        'import',
+                        'referral',
+                        'manual',
+                        'agent',
+                        'other',
+                      ] as const
+                    ).map((key) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onSelect={() => setSourceFilter(key)}
+                        className={cn(sourceFilter === key && 'font-semibold')}
+                      >
+                        {LEAD_SOURCE_LABEL[key]}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>

@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import type { PlanId } from '@/lib/plans';
 import type { BillingAccount } from '@/lib/billing/credits';
 import { isAccountComped, getCompSpacePlan, COMP_BROKERAGE_PLAN } from '@/lib/billing/comp';
+import { isSpaceOwnerUnlimited, OWNER_ADMIN_SPACE_PLAN } from '@/lib/billing/entitlements';
 
 export interface BillingContext {
   account: BillingAccount;
@@ -28,6 +29,12 @@ export interface BillingContext {
   /** True when the account has admin-granted complimentary (free) access —
    *  unlimited usage, no Stripe required. Independent of subscriptionStatus. */
   isComped: boolean;
+  /**
+   * True when the space owner is a live platform admin (application owner).
+   * Same unlimited usage as comp, but sourced from User.platformRole rather
+   * than Space.compAccess. Never implies cross-tenant data access.
+   */
+  isUnlimited: boolean;
 }
 
 const BROKERAGE_PLANS = new Set<string>(['team', 'team_plus']);
@@ -47,6 +54,23 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
   if (error) throw error;
   if (!space) throw new Error(`resolveBillingAccount: space ${spaceId} not found`);
 
+  // Application-owner / platform-admin bypass: if THIS space's owner is a
+  // live admin, the workspace reports the top solo/pro tier and is treated
+  // as unlimited. Checked before brokerage pooling so an admin testing from
+  // a brokerage-linked space cannot drain a customer credit pool. Fail-closed
+  // (isSpaceOwnerUnlimited returns false on lookup errors) so a User-table
+  // blip never grants this to a paying customer.
+  if (await isSpaceOwnerUnlimited(space.ownerId as string)) {
+    return {
+      account: { type: 'space', id: space.id as string },
+      plan: OWNER_ADMIN_SPACE_PLAN,
+      subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
+      subscriptionPeriodEnd: (space.stripePeriodEnd as string) ?? null,
+      isComped: false,
+      isUnlimited: true,
+    };
+  }
+
   // Complimentary access overrides Stripe entirely: the space funds itself, with
   // no spend gate, at its comp plan — Space.compPlan when an invite code pinned
   // one (e.g. the $97 'solo' tier), else the demo default (COMP_SPACE_PLAN).
@@ -61,6 +85,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
       subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
       subscriptionPeriodEnd: (space.stripePeriodEnd as string) ?? null,
       isComped: true,
+      isUnlimited: true,
     };
   }
 
@@ -89,6 +114,7 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
           subscriptionStatus: (brokerage.stripeSubscriptionStatus as string) ?? null,
           subscriptionPeriodEnd: (brokerage.stripePeriodEnd as string) ?? null,
           isComped: brokerageComped,
+          isUnlimited: brokerageComped,
         };
       }
     }
@@ -100,5 +126,6 @@ export async function resolveBillingAccount(spaceId: string): Promise<BillingCon
     subscriptionStatus: (space.stripeSubscriptionStatus as string) ?? null,
     subscriptionPeriodEnd: (space.stripePeriodEnd as string) ?? null,
     isComped: false,
+    isUnlimited: false,
   };
 }
