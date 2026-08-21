@@ -89,11 +89,9 @@ export const draftOfferTool = defineTool<typeof parameters, DraftOfferResult>({
 
   async handler(args, ctx) {
     // Space-scoped lookup. A deal outside the caller's space isn't found.
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, value, address')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };

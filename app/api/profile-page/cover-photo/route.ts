@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let formData: FormData;
   try {
@@ -187,7 +187,7 @@ export async function DELETE() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // We don't delete the underlying object — the realtor may want to revert,
   // and the row is the source of truth for what's "live." Lifecycle cleanup

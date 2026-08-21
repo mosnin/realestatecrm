@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Type-to-confirm, re-checked server-side. The client also enforces this,
   // but the server is the boundary that matters.

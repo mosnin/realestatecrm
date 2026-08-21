@@ -150,6 +150,12 @@ import { noteOnPersonTool } from '@/lib/ai-tools/tools/note-on-person';
 import { logEmailSentTool } from '@/lib/ai-tools/tools/log-email-sent';
 import { logSmsSentTool } from '@/lib/ai-tools/tools/log-sms-sent';
 import { sendPropertyPacketTool } from '@/lib/ai-tools/tools/send-property-packet';
+import { noteOnDealTool } from '@/lib/ai-tools/tools/note-on-deal';
+import { addChecklistItemTool } from '@/lib/ai-tools/tools/add-checklist-item';
+import { requestDealReviewTool } from '@/lib/ai-tools/tools/request-deal-review';
+import { draftOfferTool } from '@/lib/ai-tools/tools/draft-offer';
+import { draftCounterOfferTool } from '@/lib/ai-tools/tools/draft-counter-offer';
+import { draftContingencyTool } from '@/lib/ai-tools/tools/draft-contingency';
 import type { ToolContext } from '@/lib/ai-tools/types';
 
 function makeCtx(): ToolContext {
@@ -254,6 +260,26 @@ function seedVictimWorld() {
     ],
     ContactActivity: [],
     DealContact: [],
+    Deal: [
+      {
+        id: 'deal_victim',
+        spaceId: VICTIM_SPACE,
+        title: 'VICTIM $500,000',
+        address: '123 Victim Lane',
+        value: 500000,
+      },
+      {
+        id: 'deal_own',
+        spaceId: CALLER_SPACE,
+        title: 'Own Deal',
+        address: '10 Own St',
+        value: 100000,
+      },
+    ],
+    DealChecklistItem: [],
+    DealActivity: [],
+    AgentDraft: [],
+    DealReviewRequest: [],
   };
 }
 
@@ -484,5 +510,64 @@ describe('Contact tool IDOR — foreign personId does not mutate', () => {
     expect(result.display).toBe('error');
     noPii(result.summary);
     expect(writesOn('Contact').filter((w) => w.op === 'delete')).toEqual([]);
+  });
+});
+
+describe('Deal tool IDOR — foreign dealId does not mutate', () => {
+  it('note_on_deal misses a foreign deal and does not insert activity', async () => {
+    const result = await noteOnDealTool.handler(
+      { dealId: 'deal_victim', content: 'offer incoming' },
+      makeCtx(),
+    );
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('DealActivity')).toEqual([]);
+  });
+
+  it('add_checklist_item misses a foreign deal and does not insert', async () => {
+    const result = await addChecklistItemTool.handler(
+      { dealId: 'deal_victim', kind: 'custom', label: 'Order inspection' },
+      makeCtx(),
+    );
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('DealChecklistItem')).toEqual([]);
+  });
+
+  it('request_deal_review misses a foreign deal and does not insert', async () => {
+    const result = await requestDealReviewTool.handler(
+      { dealId: 'deal_victim', reason: 'Need broker eyes on this price' },
+      makeCtx(),
+    );
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('DealReviewRequest')).toEqual([]);
+  });
+
+  it('draft_offer misses a foreign deal and does not insert a draft', async () => {
+    const result = await draftOfferTool.handler({ dealId: 'deal_victim', price: 500000 }, makeCtx());
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('AgentDraft')).toEqual([]);
+  });
+
+  it('draft_counter_offer misses a foreign deal and does not insert a draft', async () => {
+    const result = await draftCounterOfferTool.handler(
+      { dealId: 'deal_victim', counterPrice: 510000 },
+      makeCtx(),
+    );
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('AgentDraft')).toEqual([]);
+  });
+
+  it('draft_contingency misses a foreign deal and does not insert a draft', async () => {
+    const result = await draftContingencyTool.handler(
+      { dealId: 'deal_victim', contingencyType: 'inspection' },
+      makeCtx(),
+    );
+    expect(result.display).toBe('error');
+    noPii(result.summary);
+    expect(writesOn('AgentDraft')).toEqual([]);
   });
 });

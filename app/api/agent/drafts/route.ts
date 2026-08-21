@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const status = req.nextUrl.searchParams.get('status') ?? 'pending';
   const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '50', 10);

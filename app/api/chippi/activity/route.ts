@@ -5,7 +5,7 @@
  * caller's Space → call getUnifiedActivity scoped to space.id. There is no way
  * to read another space's feed: the spaceId handed to the query is the caller's
  * own, and every source query inside the query layer carries an `.eq('spaceId')`
- * guard. A user with no space gets a 403.
+ * guard. A user with no space gets a 404.
  *
  * Query params (all optional):
  *   limit    — page size (default 50, capped 100 by the query layer)
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const params = req.nextUrl.searchParams;
 

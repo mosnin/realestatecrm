@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const status = req.nextUrl.searchParams.get('status') ?? 'active';
   const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '20', 10);
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = await req.json();
   const { goalType, description, instructions, contactId, dealId, priority } = body;
