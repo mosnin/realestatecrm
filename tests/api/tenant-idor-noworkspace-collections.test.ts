@@ -40,6 +40,18 @@ vi.mock('@/lib/storage', () => ({
 }));
 
 vi.mock('@/lib/audit', () => ({ audit: vi.fn() }));
+vi.mock('@/lib/voice', () => ({
+  placeClickToCall: vi.fn(),
+  toE164: vi.fn((n: string) => n),
+  getVoiceConfig: vi.fn(() => null),
+  isVoiceConfigured: vi.fn(() => false),
+}));
+vi.mock('@/lib/vectorize', () => ({ syncContact: vi.fn() }));
+vi.mock('@/lib/permissions', () => ({
+  getBrokerContext: vi.fn(),
+  canManageLeads: vi.fn(() => false),
+}));
+vi.mock('@/lib/broker-assign-lead', () => ({ assignLeadToRealtor: vi.fn() }));
 vi.mock('@/lib/data-export', () => ({ exportSpaceData: vi.fn(async () => ({})) }));
 vi.mock('@/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 vi.mock('@/lib/integrations/connections', () => ({ activeToolkits: vi.fn(async () => []) }));
@@ -151,6 +163,14 @@ import { GET as getDealActivity, POST as postDealActivity } from '@/app/api/deal
 import { GET as getCommissionSplits, POST as postCommissionSplits } from '@/app/api/deals/[id]/commission-splits/route';
 import { POST as shiftChecklist } from '@/app/api/deals/[id]/checklist/shift/route';
 import { GET as listNotes, POST as postNote } from '@/app/api/notes/route';
+import { GET as listMessageTemplates, POST as postMessageTemplate } from '@/app/api/message-templates/route';
+import { GET as listCalls, POST as postCall } from '@/app/api/calls/route';
+import { GET as listSavedViews, POST as postSavedView } from '@/app/api/saved-views/route';
+import { GET as searchWorkspace } from '@/app/api/search/route';
+import { POST as postPushSubscribe, DELETE as deletePushSubscribe } from '@/app/api/push/subscribe/route';
+import { GET as listTours, POST as postTour } from '@/app/api/tours/route';
+import { GET as listDuplicates } from '@/app/api/contacts/duplicates/route';
+import { POST as postContactsBulk } from '@/app/api/contacts/bulk/route';
 import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -836,5 +856,168 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('Note');
+  });
+
+  it('GET /api/message-templates 404s and does not query MessageTemplate', async () => {
+    const res = await listMessageTemplates();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('MessageTemplate');
+  });
+
+  it('POST /api/message-templates 404s and does not insert MessageTemplate', async () => {
+    const res = await postMessageTemplate(
+      new NextRequest('http://localhost/api/message-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Chase VICTIM', channel: 'sms', body: 'Call 555-0100' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('MessageTemplate');
+  });
+
+  it('GET /api/calls 404s and does not query CallLog', async () => {
+    const res = await listCalls(new NextRequest('http://localhost/api/calls?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CallLog');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('POST /api/calls 404s and does not insert CallLog', async () => {
+    const res = await postCall(
+      new NextRequest('http://localhost/api/calls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', toNumber: '+15557654321', contactId: 'c_victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CallLog');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('GET /api/saved-views 404s and does not query SavedView', async () => {
+    const res = await listSavedViews(
+      new NextRequest('http://localhost/api/saved-views?slug=victim&entity=contact'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SavedView');
+  });
+
+  it('POST /api/saved-views 404s and does not insert SavedView', async () => {
+    const res = await postSavedView(
+      new NextRequest('http://localhost/api/saved-views', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'victim',
+          entity: 'contact',
+          name: 'Chase VICTIM',
+          filters: { q: '555-0100' },
+        }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SavedView');
+  });
+
+  it('GET /api/search 404s and does not query Contact, Deal, or Tour', async () => {
+    const res = await searchWorkspace(
+      new NextRequest('http://localhost/api/search?slug=victim&q=VICTIM'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('Tour');
+  });
+
+  it('POST /api/push/subscribe 404s and does not upsert PushSubscription', async () => {
+    const res = await postPushSubscribe(
+      new NextRequest('http://localhost/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'victim',
+          subscription: {
+            endpoint: 'https://push.example/victim',
+            keys: { p256dh: 'pkey', auth: 'akey' },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('PushSubscription');
+  });
+
+  it('DELETE /api/push/subscribe 404s and does not delete PushSubscription', async () => {
+    const res = await deletePushSubscribe(
+      new NextRequest('http://localhost/api/push/subscribe', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', endpoint: 'https://push.example/victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('PushSubscription');
+  });
+
+  it('GET /api/tours 404s and does not query Tour', async () => {
+    const res = await listTours(new NextRequest('http://localhost/api/tours?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Tour');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('POST /api/tours 404s and does not write Tour', async () => {
+    const res = await postTour(
+      new NextRequest('http://localhost/api/tours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: 'victim',
+          guestName: 'Ada',
+          guestEmail: 'ada@example.com',
+          startsAt: '2026-08-22T15:00:00.000Z',
+          endsAt: '2026-08-22T16:00:00.000Z',
+          contactId: 'c_victim',
+        }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Tour');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('GET /api/contacts/duplicates 404s and does not query Contact', async () => {
+    const res = await listDuplicates(
+      new NextRequest('http://localhost/api/contacts/duplicates?slug=victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('POST /api/contacts/bulk 404s and does not write Contact', async () => {
+    const res = await postContactsBulk(
+      new NextRequest('http://localhost/api/contacts/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', ids: ['c_victim'], action: 'archive' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
   });
 });

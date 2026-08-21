@@ -264,8 +264,7 @@ export async function PATCH(req: NextRequest) {
   if (Object.keys(settingsPatch).length > 0) {
     // Upsert keyed on spaceId — when the row doesn't exist yet, the unique
     // constraint on spaceId picks it up and we synthesise the required PK.
-    const { data: upserted, error: settingsError } = await supabase
-      .from('SpaceSetting')
+    const { data: upserted, error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .upsert(
         { id: crypto.randomUUID(), spaceId: space.id, ...settingsPatch },
         { onConflict: 'spaceId' },
@@ -279,10 +278,8 @@ export async function PATCH(req: NextRequest) {
     }
     settingsRow = upserted as unknown as typeof settingsRow;
   } else {
-    const { data: existing } = await supabase
-      .from('SpaceSetting')
+    const { data: existing } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .select(SETTINGS_SELECT)
-      .eq('spaceId', space.id)
       .maybeSingle();
     settingsRow = existing as unknown as typeof settingsRow;
   }

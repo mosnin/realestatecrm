@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export async function GET(req: NextRequest) {
@@ -28,24 +28,18 @@ export async function GET(req: NextRequest) {
       try { return await promise; } catch (err) { console.error(`[search] ${label} threw:`, err); return { data: null, error: err }; }
     };
 
-    const contactsPromise = safeQuery('contacts', supabase
-      .from('Contact')
+    const contactsPromise = safeQuery('contacts', tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name, email, phone, type, leadScore, scoreLabel')
-      .eq('spaceId', space.id)
       .or(`name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
       .limit(8));
 
-    const dealsPromise = safeQuery('deals', supabase
-      .from('Deal')
+    const dealsPromise = safeQuery('deals', tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('id, title, address, value, status, stageId')
-      .eq('spaceId', space.id)
       .or(`title.ilike.${term},address.ilike.${term}`)
       .limit(8));
 
-    const toursPromise = safeQuery('tours', supabase
-      .from('Tour')
+    const toursPromise = safeQuery('tours', tenantTable(supabase, 'Tour', { spaceId: space.id })
       .select('id, guestName, guestEmail, propertyAddress, startsAt, status')
-      .eq('spaceId', space.id)
       .or(`guestName.ilike.${term},guestEmail.ilike.${term},propertyAddress.ilike.${term}`)
       .limit(8));
 
@@ -74,8 +68,7 @@ export async function GET(req: NextRequest) {
     const stageIds = [...new Set(dealRows.map((d: any) => d.stageId).filter(Boolean))];
     let stageMap: Record<string, { name: string; color: string }> = {};
     if (stageIds.length > 0) {
-      const { data: stages } = await unscoped(supabase
-        .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
+      const { data: stages } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
         .select('id, name, color')
         .in('id', stageIds);
       for (const s of stages ?? []) {

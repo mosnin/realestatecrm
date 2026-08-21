@@ -31,12 +31,10 @@ export async function GET(
   if (!tour) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch space timezone for correct date/time display
-  const { data: spaceSettings } = await supabase
-    .from('SpaceSetting')
+  const { data: spaceSettings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('timezone')
-    .eq('spaceId', space.id)
     .maybeSingle();
-  const timezone = spaceSettings?.timezone || 'America/New_York';
+  const timezone = (spaceSettings as { timezone?: string | null } | null)?.timezone || 'America/New_York';
 
   // Build the prep card from CRM data
   const prep: {

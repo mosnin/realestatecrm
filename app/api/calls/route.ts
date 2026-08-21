@@ -38,10 +38,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('CallLog')
+  const { data, error } = await tenantTable(supabase, 'CallLog', { spaceId: space.id })
     .select(CALL_COLUMNS)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(100);
 
@@ -55,20 +53,19 @@ export async function GET(req: NextRequest) {
   // a PostgREST embedded relation depends on the FK being present in the
   // schema cache, and a lookup failure here degrades to null names instead
   // of failing the whole list.
+  const callRows = (data ?? []) as Array<{ contactId?: string | null }>;
   const contactIds = Array.from(
-    new Set((data ?? []).map((call) => call.contactId).filter((id): id is string => Boolean(id))),
+    new Set(callRows.map((call) => call.contactId).filter((id): id is string => Boolean(id))),
   );
   const contactNames = new Map<string, string | null>();
   if (contactIds.length > 0) {
-    const { data: contacts, error: contactsError } = await supabase
-      .from('Contact')
+    const { data: contacts, error: contactsError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name')
-      .eq('spaceId', space.id)
       .in('id', contactIds);
     if (contactsError) {
       logger.warn('[calls] contact name lookup failed', { spaceId: space.id, err: contactsError.message });
     } else {
-      for (const contact of contacts ?? []) {
+      for (const contact of (contacts ?? []) as Array<{ id: string; name?: string | null }>) {
         contactNames.set(contact.id, contact.name ?? null);
       }
     }
@@ -113,16 +110,15 @@ export async function POST(req: NextRequest) {
   // If a contactId is given, it must belong to this space — never trust the body.
   let contactId: string | null = null;
   if (payload.contactId) {
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
       .eq('id', payload.contactId)
-      .eq('spaceId', space.id)
       .maybeSingle();
-    if (!contact) {
+    const owned = contact as { id: string } | null;
+    if (!owned) {
       return NextResponse.json({ error: 'Contact not found.' }, { status: 404 });
     }
-    contactId = contact.id;
+    contactId = owned.id;
   }
 
   // The agent's own number — what Telnyx rings first. It lives on
@@ -130,10 +126,8 @@ export async function POST(req: NextRequest) {
   // Space row — getSpaceFromSlug never selects it, so the old `space.phoneNumber`
   // cast was always undefined and every call silently fell through to the env
   // fallback. TELNYX_AGENT_NUMBER stays as a deploy-wide fallback.
-  const { data: settingRow } = await supabase
-    .from('SpaceSetting')
+  const { data: settingRow } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('phoneNumber')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const agentNumber = toE164(
     (settingRow as { phoneNumber?: string | null } | null)?.phoneNumber ??
@@ -144,8 +138,7 @@ export async function POST(req: NextRequest) {
   // Insert the row first so the webhook has a target, and so the call shows up
   // in the log immediately even if dialing fails.
   const now = new Date().toISOString();
-  const { data: row, error: insertErr } = await supabase
-    .from('CallLog')
+  const { data: row, error: insertErr } = await tenantTable(supabase, 'CallLog', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       contactId,

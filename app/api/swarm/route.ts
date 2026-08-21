@@ -130,10 +130,8 @@ export async function POST(req: NextRequest) {
   // cap could launch unlimited swarms. Gate it the same way. Fails open on a DB
   // error so a transient blip can't block a legitimate run.
   try {
-    const { data: settingsRow } = await supabase
-      .from('AgentSettings')
+    const { data: settingsRow } = await tenantTable(supabase, 'AgentSettings', { spaceId: space.id })
       .select('dailyTokenBudget')
-      .eq('spaceId', space.id)
       .maybeSingle();
     const dailyTokenBudget = (settingsRow?.dailyTokenBudget as number | null | undefined) ?? 50_000;
     const { total: todayTokens } = await getTodayTokenUsage(space.id);

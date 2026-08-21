@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 import type { MessageChannel } from '@/lib/message-templates';
 
 const VALID_CHANNELS: MessageChannel[] = ['sms', 'email', 'note'];
@@ -16,10 +17,8 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('MessageTemplate')
+  const { data, error } = await tenantTable(supabase, 'MessageTemplate', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .order('updatedAt', { ascending: false });
 
   if (error) {
@@ -59,8 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Body must be under 5000 characters' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('MessageTemplate')
+  const { data, error } = await tenantTable(supabase, 'MessageTemplate', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

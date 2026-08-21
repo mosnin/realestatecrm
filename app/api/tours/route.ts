@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export async function GET(req: NextRequest) {
@@ -15,10 +15,8 @@ export async function GET(req: NextRequest) {
   const status = req.nextUrl.searchParams.get('status');
   const upcoming = req.nextUrl.searchParams.get('upcoming');
 
-  let query = supabase
-    .from('Tour')
-    .select('*, Contact(id, name, email, phone)')
-    .eq('spaceId', space.id);
+  let query = tenantTable(supabase, 'Tour', { spaceId: space.id })
+    .select('*, Contact(id, name, email, phone)');
 
   if (status) {
     query = query.eq('status', status);
@@ -56,11 +54,9 @@ export async function POST(req: NextRequest) {
   // Verify linked contact belongs to this space
   let validContactId: string | null = null;
   if (contactId) {
-    const { data: contactRow, error: cErr } = await supabase
-      .from('Contact')
+    const { data: contactRow, error: cErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
       .eq('id', contactId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (cErr) throw cErr;
     validContactId = contactRow?.id ?? null;
@@ -96,8 +92,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot conflicts with an existing tour' }, { status: 409 });
   }
 
-  const { data, error } = await unscoped(supabase
-    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
+  const { data, error } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
     .select('*')
     .eq('id', tourId)
     .single();
