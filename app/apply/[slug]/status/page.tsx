@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { ApplicationStatusClient } from './application-status-client';
 import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { hasCurrentSubscription } from '@/lib/api-auth';
+import type { IntakeFormConfig } from '@/lib/types';
 
 // Disable caching so status updates show immediately
 export const dynamic = 'force-dynamic';
@@ -142,12 +143,19 @@ export default async function ApplicationStatusPage({
     </IntakeChatShell>
   );
 
+  // Ref-only (backwards-compat status page) must NOT load applicationData —
+  // that payload is form PII (income, employment, SSN-class fields) and the
+  // portal APIs already require statusPortalToken to see it. Shipping it in
+  // the RSC props for a ref-only view leaked the full application to anyone
+  // who had the confirmation-email ref.
+  const contactCols = token
+    ? 'id, name, email, applicationStatus, applicationStatusNote, applicationData, formConfigSnapshot, applicationRef, statusPortalToken, scoringStatus, createdAt'
+    : 'id, name, email, applicationStatus, applicationStatusNote, applicationRef, statusPortalToken, scoringStatus, createdAt';
+
   // Build query — if token is provided, validate both ref AND token (portal mode)
   let query = supabase
     .from('Contact')
-    .select(
-      'id, name, email, applicationStatus, applicationStatusNote, applicationData, formConfigSnapshot, applicationRef, statusPortalToken, scoringStatus, createdAt',
-    )
+    .select(contactCols)
     .eq('applicationRef', ref)
     .eq('spaceId', space.id);
 
@@ -238,8 +246,14 @@ export default async function ApplicationStatusPage({
           status: contact.applicationStatus ?? 'received',
           statusNote: contact.applicationStatusNote,
           applicationRef: contact.applicationRef ?? ref,
-          applicationData: contact.applicationData,
-          formConfigSnapshot: contact.formConfigSnapshot,
+          applicationData: portalMode
+            ? ((contact as { applicationData?: Record<string, unknown> | null }).applicationData ??
+              null)
+            : null,
+          formConfigSnapshot: portalMode
+            ? ((contact as { formConfigSnapshot?: IntakeFormConfig | null }).formConfigSnapshot ??
+              null)
+            : null,
           createdAt: contact.createdAt,
         }}
         businessName={businessName}

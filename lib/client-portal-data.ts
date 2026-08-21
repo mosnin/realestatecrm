@@ -6,6 +6,7 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { escapeLike } from '@/lib/escape-like';
 
 export interface PortalApplication {
   contactId: string;
@@ -45,14 +46,6 @@ type SpaceRel = { name?: string | null; slug?: string | null } | null;
  * session email — it is the only authorization check, so never pass an
  * unverified or caller-supplied address here.
  */
-/** Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
- *  case-insensitively) rather than as a pattern. `%` and `_` are legal in email
- *  local parts and were a wildcard-injection hole in the cross-client guard
- *  (e.g. a client registered as `%@gmail.com` would match every gmail contact). */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
 export async function getClientPortalData(email: string): Promise<ClientPortalData> {
   const lower = email.trim().toLowerCase();
 
@@ -67,7 +60,7 @@ export async function getClientPortalData(email: string): Promise<ClientPortalDa
     supabase
       .from('Tour')
       .select('id, propertyAddress, startsAt, status, spaceId, contactId, guestEmail, Space(name, slug)')
-      .ilike('guestEmail', lower)
+      .ilike('guestEmail', escapeLike(lower))
       .order('startsAt', { ascending: false }),
   ]);
 

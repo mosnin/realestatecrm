@@ -33,6 +33,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { escapeLike } from '@/lib/escape-like';
 import { createTrigger, deleteTrigger } from './composio';
 import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
@@ -1111,15 +1112,6 @@ function normalizeSenderEmail(raw: string | null): string {
   if (!raw) return '';
   const angle = raw.match(/<([^>]+)>/);
   return normalizeEmail(angle ? angle[1] : raw);
-}
-
-/**
- * Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
- * case-insensitively). Mirrors the cross-client guard in lib/client-portal-data.ts
- * — `%`/`_` are legal in email local-parts and would otherwise be wildcards.
- */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 /**

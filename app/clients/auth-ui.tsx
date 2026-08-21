@@ -252,6 +252,7 @@ export function VerifyForm({ initialEmail }: { initialEmail: string }) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
@@ -261,7 +262,7 @@ export function VerifyForm({ initialEmail }: { initialEmail: string }) {
     if (pending) return;
     setPending(true);
     setError(null);
-    const { ok, data } = await postJson('/api/clients/auth/verify', { email, code });
+    const { ok, data } = await postJson('/api/clients/auth/verify', { email, code, password });
     if (!ok) {
       setError((data.error as string) ?? 'That code is wrong or expired.');
       setPending(false);
@@ -303,6 +304,17 @@ export function VerifyForm({ initialEmail }: { initialEmail: string }) {
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           placeholder="000000"
           className="tracking-[0.4em]"
+        />
+      </Field>
+      <Field label="Password" htmlFor="verify-password">
+        <TextInput
+          id="verify-password"
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="The password you just chose"
         />
       </Field>
       <FormError error={error} />

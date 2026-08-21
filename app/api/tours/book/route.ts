@@ -7,6 +7,7 @@ import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
+import { escapeLike } from '@/lib/escape-like';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
     .from('Contact')
     .select('id')
     .eq('spaceId', space.id)
-    .ilike('email', guestEmail.trim())
+    .ilike('email', escapeLike(guestEmail.trim()))
     .maybeSingle();
 
   if (contactRow) {
