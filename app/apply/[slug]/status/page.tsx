@@ -143,19 +143,12 @@ export default async function ApplicationStatusPage({
     </IntakeChatShell>
   );
 
-  // Ref-only (backwards-compat status page) must NOT load applicationData —
-  // that payload is form PII (income, employment, SSN-class fields) and the
-  // portal APIs already require statusPortalToken to see it. Shipping it in
-  // the RSC props for a ref-only view leaked the full application to anyone
-  // who had the confirmation-email ref.
-  const contactCols = token
-    ? 'id, name, email, applicationStatus, applicationStatusNote, applicationData, formConfigSnapshot, applicationRef, statusPortalToken, scoringStatus, createdAt'
-    : 'id, name, email, applicationStatus, applicationStatusNote, applicationRef, statusPortalToken, scoringStatus, createdAt';
-
   // Build query — if token is provided, validate both ref AND token (portal mode)
   let query = supabase
     .from('Contact')
-    .select(contactCols)
+    .select(
+      'id, name, email, applicationStatus, applicationStatusNote, applicationData, formConfigSnapshot, applicationRef, statusPortalToken, scoringStatus, createdAt',
+    )
     .eq('applicationRef', ref)
     .eq('spaceId', space.id);
 
