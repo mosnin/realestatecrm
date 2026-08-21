@@ -5,6 +5,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidListingStatus, isValidPropertyType } from '@/lib/properties';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
     ...out,
   };
 
-  const { data, error } = await supabase.from('Property').insert(insert).select().single();
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: space.id }).insert(insert).select().single();
   if (error) {
     // 23505 = unique_violation (e.g. duplicate MLS #).
     if ((error as { code?: string }).code === '23505') {

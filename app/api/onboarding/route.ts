@@ -11,6 +11,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { SAMPLE_LEAD_NAME } from '@/lib/onboarding-draft';
 import type { User, Space, SpaceSetting } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Seed the sample lead the realtor just watched Chippi work in the reveal
@@ -23,15 +24,13 @@ import type { User, Space, SpaceSetting } from '@/lib/types';
  */
 async function seedSampleLead(spaceId: string, draftBody: string | null): Promise<void> {
   try {
-    const { count } = await supabase
-      .from('Contact')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', spaceId);
+    const { count } = await tenantTable(supabase, 'Contact', { spaceId })
+      .select('*', { count: 'exact', head: true });
     if ((count ?? 0) > 0) return;
 
     const contactId = crypto.randomUUID();
     const followUpAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: contactErr } = await supabase.from('Contact').insert({
+    const { error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId }).insert({
       id: contactId,
       spaceId,
       name: SAMPLE_LEAD_NAME,
@@ -54,7 +53,7 @@ async function seedSampleLead(spaceId: string, draftBody: string | null): Promis
     }
 
     if (draftBody) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
         id: crypto.randomUUID(),
         contactId,
         spaceId,

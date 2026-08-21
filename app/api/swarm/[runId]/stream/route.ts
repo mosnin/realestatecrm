@@ -19,7 +19,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 const TERMINAL_RUN_STATUSES = new Set(['completed', 'failed', 'cancelled']);
@@ -41,13 +41,12 @@ export async function GET(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: run } = await unscoped(supabase
-    .from('SwarmRun'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: run } = await tenantTable(supabase, 'SwarmRun', { spaceId: space.id })
     .select('id, spaceId, status')
     .eq('id', runId)
     .maybeSingle();
 
-  if (!run || run.spaceId !== space.id) {
+  if (!run) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

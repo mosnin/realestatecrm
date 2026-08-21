@@ -9,7 +9,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { Deal, DealStage } from '@/lib/types';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export async function GET(req: NextRequest) {
@@ -25,10 +25,8 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') ?? '200') || 200), 500);
   const offset = Math.max(0, parseInt(req.nextUrl.searchParams.get('offset') ?? '0') || 0);
 
-  const { data: dealRows, error: dealError } = await supabase
-    .from('Deal')
+  const { data: dealRows, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('*, DealStage(id, spaceId, name, color, position)')
-    .eq('spaceId', space.id)
     .order('position', { ascending: true })
     .range(offset, offset + limit - 1);
   if (dealError) throw dealError;
@@ -158,11 +156,9 @@ export async function POST(req: NextRequest) {
       : null;
 
   // Verify the target stage belongs to this space (prevents cross-space stage injection)
-  const { data: stageCheck, error: stageCheckErr } = await supabase
-    .from('DealStage')
+  const { data: stageCheck, error: stageCheckErr } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('id, pipelineType')
     .eq('id', stageId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (stageCheckErr) throw stageCheckErr;
   if (!stageCheck) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });
@@ -173,18 +169,14 @@ export async function POST(req: NextRequest) {
   if (contactIds?.length) {
     const currentPipeline = stageCheck.pipelineType as string | null;
     if (currentPipeline !== 'buyer') {
-      const { data: buyerContacts } = await supabase
-        .from('Contact')
+      const { data: buyerContacts } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
         .select('id, leadType')
         .in('id', contactIds)
-        .eq('spaceId', space.id)
         .eq('leadType', 'buyer')
         .limit(1);
       if (buyerContacts && buyerContacts.length > 0) {
-        const { data: buyerStage } = await supabase
-          .from('DealStage')
+        const { data: buyerStage } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
           .select('id')
-          .eq('spaceId', space.id)
           .eq('pipelineType', 'buyer')
           .order('position', { ascending: true })
           .limit(1);
@@ -194,18 +186,14 @@ export async function POST(req: NextRequest) {
       }
     }
     if (finalStageId === stageId && currentPipeline !== 'seller') {
-      const { data: sellerContacts } = await supabase
-        .from('Contact')
+      const { data: sellerContacts } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
         .select('id, leadType')
         .in('id', contactIds)
-        .eq('spaceId', space.id)
         .eq('leadType', 'seller')
         .limit(1);
       if (sellerContacts && sellerContacts.length > 0) {
-        const { data: sellerStage } = await supabase
-          .from('DealStage')
+        const { data: sellerStage } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
           .select('id')
-          .eq('spaceId', space.id)
           .eq('pipelineType', 'seller')
           .order('position', { ascending: true })
           .limit(1);
@@ -216,8 +204,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data: lastDealRows, error: lastDealError } = await unscoped(supabase
-    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: lastDealRows, error: lastDealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('position')
     .eq('stageId', finalStageId)
     .order('position', { ascending: false })
@@ -325,7 +312,7 @@ export async function POST(req: NextRequest) {
     normalizedContactIds,
   );
   const { data: dealRow, error: dealError } = await withIdempotency(idemKey, async () =>
-    supabase.from('Deal').insert({
+    tenantTable(supabase, 'Deal', { spaceId: space.id }).insert({
       id: dealId,
       spaceId: space.id,
       title,
@@ -358,11 +345,9 @@ export async function POST(req: NextRequest) {
 
   // Insert dealContacts — verify all contacts belong to this space
   if (contactIds?.length) {
-    const { data: validContacts, error: vcError } = await supabase
-      .from('Contact')
+    const { data: validContacts, error: vcError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .in('id', contactIds)
-      .eq('spaceId', space.id);
+      .in('id', contactIds);
     if (vcError) throw vcError;
     const validIds = new Set((validContacts ?? []).map((c: { id: string }) => c.id));
     const dcInserts = (contactIds as string[]).filter((cId) => validIds.has(cId)).map((cId) => ({ dealId, contactId: cId }));
@@ -373,8 +358,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Get stage for the include
-  const { data: stageRow, error: stageError } = await unscoped(supabase
-    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: stageRow, error: stageError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('*')
     .eq('id', finalStageId)
     .single();

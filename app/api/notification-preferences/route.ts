@@ -124,7 +124,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const nowIso = new Date().toISOString();
-  const { error } = await supabase.from('NotificationPreference').upsert(
+  const { error } = await tenantTable(supabase, 'NotificationPreference', { spaceId: space.id }).upsert(
     {
       id: crypto.randomUUID(),
       spaceId: space.id,

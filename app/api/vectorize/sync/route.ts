@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { syncContact, syncDeal } from '@/lib/vectorize';
 import type { Contact, Deal, DealStage } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -16,12 +17,12 @@ export async function POST(req: NextRequest) {
   // Verify the authenticated user owns this space
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const [contactsResult, dealsResult] = await Promise.all([
-    supabase.from('Contact').select('*').eq('spaceId', space.id),
-    supabase.from('Deal').select('*, DealStage(name, color, position)').eq('spaceId', space.id),
+    tenantTable(supabase, 'Contact', { spaceId: space.id }).select('*'),
+    tenantTable(supabase, 'Deal', { spaceId: space.id }).select('*, DealStage(name, color, position)'),
   ]);
 
   if (contactsResult.error) throw contactsResult.error;

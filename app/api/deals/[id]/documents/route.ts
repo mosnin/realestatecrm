@@ -8,7 +8,7 @@ import { logger } from '@/lib/logger';
 import { isValidDocumentKind, defaultDocumentKind } from '@/lib/deals/documents';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export const runtime = 'nodejs';
@@ -28,11 +28,9 @@ const ALLOWED_MIME = new Set([
 async function resolveDealAndSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return null;
   return space;
@@ -47,8 +45,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const space = await resolveDealAndSpace(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await unscoped(supabase
-    .from('DealDocument'), 'post-fetch: caller verified parent scope before this id query')
+  const { data, error } = await tenantTable(supabase, 'DealDocument', { spaceId: space.id })
     .select('*')
     .eq('dealId', id)
     .order('createdAt', { ascending: false });
@@ -146,8 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('DealDocument')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'DealDocument', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,
@@ -216,11 +212,9 @@ async function handleAttachFromFiles(
     // Resolve the deal's current pipeline type so the kind picker default
     // matches what the upload path does. Worst case (no stage) it returns
     // 'offer', the canonical buyer default.
-    const { data: stageRow } = await supabase
-      .from('Deal')
+    const { data: stageRow } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('DealStage(pipelineType)')
       .eq('id', dealId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     const pipelineType =
       (stageRow as { DealStage?: { pipelineType?: string | null } } | null)
@@ -235,25 +229,25 @@ async function handleAttachFromFiles(
   // Verify every file belongs to this space — defence-in-depth on top of
   // RLS. One round trip; the IN() result also gives us name/mime/size for
   // the DealDocument row without re-querying per id.
-  const { data: ownedFiles, error: filesError } = await supabase
-    .from('File')
+  const { data: ownedFiles, error: filesError } = await tenantTable(supabase, 'File', { spaceId })
     .select('id, name, mimeType, sizeBytes, storageKey')
-    .in('id', fileIds)
-    .eq('spaceId', spaceId);
+    .in('id', fileIds);
 
   if (filesError) {
     logger.error('[deals/docs] file lookup failed', { dealId, spaceId }, filesError);
     return NextResponse.json({ error: 'Failed to look up files' }, { status: 500 });
   }
 
-  const ownedSet = new Map((ownedFiles ?? []).map((f) => [f.id as string, f]));
+  type OwnedFile = { id: string; name: string | null; mimeType: string | null; sizeBytes: number | null; storageKey: string };
+  const owned = (ownedFiles ?? []) as OwnedFile[];
+  const ownedSet = new Map(owned.map((f) => [f.id, f]));
   const missing = fileIds.filter((id) => !ownedSet.has(id));
   if (missing.length === fileIds.length) {
     return NextResponse.json({ error: 'No accessible files' }, { status: 404 });
   }
 
   const now = new Date().toISOString();
-  const rows = (ownedFiles ?? []).map((f) => ({
+  const rows = owned.map((f) => ({
     id: crypto.randomUUID(),
     dealId,
     spaceId,
@@ -268,8 +262,7 @@ async function handleAttachFromFiles(
     createdAt: now,
   }));
 
-  const { data: inserted, error: insertError } = await supabase
-    .from('DealDocument')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'DealDocument', { spaceId })
     .insert(rows)
     .select();
 

@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/attachments] extraction failed', { spaceId: space.id, mimeType });
   }
 
-  const { error: insertError } = await supabase.from('Attachment').insert({
+  const { error: insertError } = await tenantTable(supabase, 'Attachment', { spaceId: space.id }).insert({
     id,
     spaceId: space.id,
     userId,

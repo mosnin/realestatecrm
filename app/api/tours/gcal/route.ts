@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { encrypt, decrypt, decryptOrPassthrough } from '@/lib/crypto';
+import { tenantTable } from '@/lib/tenant-db';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -187,18 +188,16 @@ export async function POST(req: NextRequest) {
       googleEventId = created.id;
     }
 
-    await supabase
-      .from('Tour')
+    await tenantTable(supabase, 'Tour', { spaceId: space.id })
       .update({ googleEventId })
-      .eq('id', tourId)
-      .eq('spaceId', space.id);
+      .eq('id', tourId);
 
     return NextResponse.json({ synced: true, googleEventId });
   }
 
   // Disconnect
   if (action === 'disconnect') {
-    await supabase.from('GoogleCalendarToken').delete().eq('spaceId', space.id);
+    await tenantTable(supabase, 'GoogleCalendarToken', { spaceId: space.id }).delete();
     return NextResponse.json({ connected: false });
   }
 

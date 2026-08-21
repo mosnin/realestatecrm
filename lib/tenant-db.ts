@@ -210,6 +210,7 @@ interface LooseBuilder {
   update: (values: Record<string, unknown>) => LooseFilter;
   delete: () => LooseFilter;
   insert: (values: Record<string, unknown> | Record<string, unknown>[]) => any;
+  upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: unknown) => any;
 }
 interface LooseFilter {
   // Return `any` so callers can keep chaining `.eq('id', …).maybeSingle()`
@@ -255,6 +256,17 @@ export function tenantTable(client: SupabaseClient, table: string, scope: Scope)
         }
       }
       return base.insert(values);
+    },
+    upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: unknown) => {
+      const rows = Array.isArray(values) ? values : [values];
+      for (const row of rows) {
+        if (row[column] !== value) {
+          throw new Error(
+            `tenantTable: upsert into "${table}" must set ${column}=${value} on every row`,
+          );
+        }
+      }
+      return base.upsert(values, options);
     },
   };
 }

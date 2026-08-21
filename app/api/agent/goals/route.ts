@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_GOAL_TYPES = [
   'follow_up_sequence',
@@ -25,10 +26,8 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(isNaN(limitParam) ? 20 : limitParam, 50);
   const contactId = req.nextUrl.searchParams.get('contactId');
 
-  let query = supabase
-    .from('AgentGoal')
+  let query = tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .select('*, Contact:contactId(id,name)')
-    .eq('spaceId', space.id)
     .eq('status', status)
     .order('priority', { ascending: false })
     .order('createdAt', { ascending: false })
@@ -65,20 +64,23 @@ export async function POST(req: NextRequest) {
 
   // Validate foreign keys belong to this space
   if (contactId) {
-    const { data: c } = await supabase.from('Contact').select('id')
-      .eq('id', contactId).eq('spaceId', space.id).maybeSingle();
-    if (!c) return NextResponse.json({ error: 'Contact not found' }, { status: 400 });
+    const { data: c } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
+      .select('id')
+      .eq('id', contactId)
+      .maybeSingle();
+    if (!c) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   if (dealId) {
-    const { data: d } = await supabase.from('Deal').select('id')
-      .eq('id', dealId).eq('spaceId', space.id).maybeSingle();
-    if (!d) return NextResponse.json({ error: 'Deal not found' }, { status: 400 });
+    const { data: d } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
+      .select('id')
+      .eq('id', dealId)
+      .maybeSingle();
+    if (!d) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('AgentGoal')
+  const { data, error } = await tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

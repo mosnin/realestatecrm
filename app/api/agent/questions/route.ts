@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth();
@@ -15,10 +16,8 @@ export async function GET(req: NextRequest) {
   const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '20', 10);
   const limit = Math.min(isNaN(limitParam) ? 20 : limitParam, 50);
 
-  const { data, error } = await supabase
-    .from('AgentQuestion')
+  const { data, error } = await tenantTable(supabase, 'AgentQuestion', { spaceId: space.id })
     .select('*, Contact:contactId(id,name)')
-    .eq('spaceId', space.id)
     .eq('status', status)
     .order('priority', { ascending: false })
     .order('createdAt', { ascending: true })
@@ -57,13 +56,14 @@ export async function POST(req: NextRequest) {
 
   // Validate contactId belongs to this space if provided
   if (contactId) {
-    const { data: c } = await supabase.from('Contact').select('id')
-      .eq('id', contactId).eq('spaceId', space.id).maybeSingle();
-    if (!c) return NextResponse.json({ error: 'Contact not found' }, { status: 400 });
+    const { data: c } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
+      .select('id')
+      .eq('id', contactId)
+      .maybeSingle();
+    if (!c) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data, error } = await supabase
-    .from('AgentQuestion')
+  const { data, error } = await tenantTable(supabase, 'AgentQuestion', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

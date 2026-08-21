@@ -6,6 +6,7 @@ import { deleteContactVector } from '@/lib/vectorize';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -58,11 +59,9 @@ export async function DELETE(
     // ── Identify the lead exactly the way unassign-lead does ─────────────
     // First in the broker owner's space, then by brokerageId. The lead must
     // match one of these to belong to THIS brokerage.
-    const { data: spaceContact, error: spaceContactError } = await supabase
-      .from('Contact')
+    const { data: spaceContact, error: spaceContactError } = await tenantTable(supabase, 'Contact', { spaceId: brokerSpace.id })
       .select('*')
       .eq('id', id)
-      .eq('spaceId', brokerSpace.id)
       .maybeSingle();
     if (spaceContactError) throw spaceContactError;
 
@@ -135,11 +134,9 @@ export async function DELETE(
           .limit(1);
 
         if (!remainingLinks || remainingLinks.length === 0) {
-          await supabase
-            .from('Deal')
+          await tenantTable(supabase, 'Deal', { spaceId: brokerSpace.id })
             .delete()
-            .eq('id', dealId)
-            .eq('spaceId', brokerSpace.id);
+            .eq('id', dealId);
         }
       }
     }

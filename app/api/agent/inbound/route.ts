@@ -26,6 +26,7 @@ import {
 } from '@/lib/messaging/compliance';
 import { recordInboundMessage } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
             { status: 500 },
           );
         }
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
           id: crypto.randomUUID(),
           contactId,
           spaceId,
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
       }
       if (isStartKeyword(content)) {
         await unsuppressAddress({ spaceId, channel, address });
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
           id: crypto.randomUUID(),
           contactId,
           spaceId,
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Record as ContactActivity
-  const { error: activityError } = await supabase.from('ContactActivity').insert({
+  const { error: activityError } = await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
     id: crypto.randomUUID(),
     contactId,
     spaceId,

@@ -223,8 +223,7 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  const { data, error } = await supabase
-    .from('ProfilePage')
+  const { data, error } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .upsert({ spaceId: space.id, ...patch }, { onConflict: 'spaceId' })
     .select(SELECT)
     .single();

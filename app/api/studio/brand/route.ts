@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
     linkedin: clean(h.linkedin),
   };
 
-  const { error } = await supabase.from('StudioBrand').upsert(
+  const { error } = await tenantTable(supabase, 'StudioBrand', { spaceId: space.id }).upsert(
     {
       spaceId: space.id,
       colors,

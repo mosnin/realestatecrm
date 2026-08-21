@@ -8,6 +8,7 @@ import { fireFirstTouch } from '@/lib/leads/first-touch';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
 import type { Contact } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -25,10 +26,8 @@ export async function GET(req: NextRequest) {
   const includeSnoozed = req.nextUrl.searchParams.get('includeSnoozed') === '1';
   const onlySnoozed = req.nextUrl.searchParams.get('onlySnoozed') === '1';
 
-  let query = supabase
-    .from('Contact')
+  let query = tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
 
   if (!includeSnoozed && !onlySnoozed) {
@@ -172,7 +171,7 @@ export async function POST(req: NextRequest) {
   const sourceVal = normalizeLeadSource(source) ?? 'manual';
   const sourceDetailVal = sourceDetail ? String(sourceDetail).trim().slice(0, 500) : null;
 
-  const { data: contact, error } = await supabase.from('Contact').insert({
+  const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
     id,
     spaceId: space.id,
     name: name.trim().slice(0, 200),
