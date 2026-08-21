@@ -38,7 +38,14 @@ describe('Realtime specialist floor-manager durable contract', () => {
 
   it('links chat specialists to server-held conversation context, never a model-authored id', async () => {
     const tool = buildDelegateTaskTool();
-    expect(Object.keys(tool.parameters.shape)).toEqual(['goal']);
+    // Schema accepts only `goal`. A model-authored conversationId is stripped
+    // (Zod 4 object schemas are strip-unknown) and never reaches the child.
+    const parsed = tool.parameters.safeParse({
+      goal: 'Email Jane',
+      conversationId: 'conv_spoofed',
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data).toEqual({ goal: 'Email Jane' });
     await tool.handler(
       { goal: 'Email Jane', conversationId: 'conv_spoofed' } as { goal: string },
       makeCtx(),
