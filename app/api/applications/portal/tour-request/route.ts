@@ -120,8 +120,7 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .join('\n');
 
-  const messageInsert = supabase
-    .from('ApplicationMessage')
+  const messageInsert = tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,
@@ -135,8 +134,7 @@ export async function POST(req: NextRequest) {
   // card. The question itself is action-oriented; the context carries the
   // structured fields. agentType=applicant_portal flags the source so the
   // UI can render the right action set in a future pass.
-  const questionInsert = supabase
-    .from('AgentQuestion')
+  const questionInsert = tenantTable(supabase, 'AgentQuestion', { spaceId: contact.spaceId })
     .insert({
       spaceId: contact.spaceId,
       runId: 'applicant-portal',

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { Building2, Calendar, FileText, ExternalLink, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 import type { Property, PropertyPacket } from '@/lib/types';
 import { formatCurrency } from '@/lib/formatting';
 import { formatPropertyAddress, formatPropertyFacts } from '@/lib/properties';
@@ -15,8 +17,10 @@ interface Props { params: Promise<{ token: string }> }
 export default async function PacketPage({ params }: Props) {
   const { token } = await params;
 
-  const { data: packetRow } = await supabase
-    .from('PropertyPacket')
+  const { data: packetRow } = await unscoped(
+    supabase.from('PropertyPacket'),
+    'capability token: packet access token',
+  )
     .select('*')
     .eq('token', token)
     .maybeSingle();
@@ -41,8 +45,7 @@ export default async function PacketPage({ params }: Props) {
     );
   }
 
-  const { data: propertyRow } = await supabase
-    .from('Property')
+  const { data: propertyRow } = await tenantTable(supabase, 'Property', { spaceId: packet.spaceId })
     .select('*')
     .eq('id', packet.propertyId)
     .maybeSingle();
@@ -51,18 +54,15 @@ export default async function PacketPage({ params }: Props) {
 
   // Best-effort view tracking. Non-blocking; a failure shouldn't take the
   // page down.
-  void supabase
-    .from('PropertyPacket')
+  void tenantTable(supabase, 'PropertyPacket', { spaceId: packet.spaceId })
     .update({ viewCount: packet.viewCount + 1, lastViewedAt: now.toISOString() })
     .eq('id', packet.id);
 
   const documentIds = packet.includeDocumentIds ?? [];
   const { data: docRows } = documentIds.length > 0
-    ? await supabase
-        .from('DealDocument')
+    ? await tenantTable(supabase, 'DealDocument', { spaceId: packet.spaceId })
         .select('id, label, kind, sizeBytes, contentType, createdAt')
         .in('id', documentIds)
-        .eq('spaceId', packet.spaceId)
     : { data: [] };
   const docs = (docRows ?? []) as Array<{ id: string; label: string; kind: string; sizeBytes: number | null; contentType: string | null; createdAt: string }>;
 

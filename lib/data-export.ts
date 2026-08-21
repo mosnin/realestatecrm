@@ -19,6 +19,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { isTenantTable, tenantTable } from '@/lib/tenant-db';
 
 // Every Space-scoped table that holds a workspace's own data. Each is read with
 // .eq('spaceId', spaceId).
@@ -77,10 +78,9 @@ export async function exportSpaceData(spaceId: string): Promise<Record<string, u
   const data: Record<string, unknown> = {};
 
   for (const table of SPACE_SCOPED_TABLES) {
-    const { data: rows, error } = await supabase
-      .from(table)
-      .select('*')
-      .eq('spaceId', spaceId);
+    const { data: rows, error } = isTenantTable(table)
+      ? await tenantTable(supabase, table, { spaceId }).select('*')
+      : await supabase.from(table).select('*').eq('spaceId', spaceId);
     if (error) {
       console.error(`[data-export] ${table} read failed`, error.message);
       data[table] = { error: 'unavailable' };

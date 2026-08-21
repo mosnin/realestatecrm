@@ -95,8 +95,7 @@ export async function POST(req: NextRequest) {
     .replace(/[^\w\s.,!?;:'"@#$%&*()\-/+=\[\]{}~`^\n\r\t]/g, '');
 
   // Create the message
-  const { data: message, error: insertError } = await supabase
-    .from('ApplicationMessage')
+  const { data: message, error: insertError } = await tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,

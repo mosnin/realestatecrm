@@ -172,8 +172,7 @@ export async function POST(
       ? `✓ Confirmed tour ${tourTime}${propLine}.${safeNotes ? `\n\n${safeNotes}` : ''}`
       : `✗ Can't make tour ${tourTime}${propLine}.${safeNotes ? `\n\n${safeNotes}` : ''}`;
 
-  await supabase
-    .from('ApplicationMessage')
+  await tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,
