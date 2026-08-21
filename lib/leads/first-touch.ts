@@ -51,6 +51,7 @@ import { leadSourceLabel } from '@/lib/lead-source';
 import { checkSendAllowed, type MessageCategory } from '@/lib/messaging/compliance';
 import { describeDelivery, sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { recordOutboundMessageSafe } from '@/lib/inbox';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
 import type { InboxChannel } from '@/lib/types';
 
 /** Reasoning line shown under the draft in the inbox/focus card. */
@@ -483,6 +484,16 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
   const channelWord = channel === 'email' ? 'email' : 'text';
 
   if (sendResult.sent && sendResult.delivery) {
+    try {
+      await advanceDealFromEvent({
+        spaceId,
+        contactId,
+        event: 'first_touch_sent',
+        title: leadName,
+      });
+    } catch (err) {
+      logger.warn('[first-touch] pipeline advance failed', { spaceId, contactId }, err);
+    }
     await notifyRealtor({
       spaceId,
       slug: space.slug,

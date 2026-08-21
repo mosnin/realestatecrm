@@ -6,11 +6,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { mirrorMock, rollbackMock, sendTourConfirmationMock, notifyNewTourMock } = vi.hoisted(() => ({
+const { mirrorMock, rollbackMock, sendTourConfirmationMock, notifyNewTourMock, advanceMock } = vi.hoisted(() => ({
   mirrorMock: vi.fn(),
   rollbackMock: vi.fn(async () => undefined),
   sendTourConfirmationMock: vi.fn(async () => undefined),
   notifyNewTourMock: vi.fn(async () => undefined),
+  advanceMock: vi.fn(async () => ({ ok: true, dealId: 'deal_1', created: true, moved: false })),
 }));
 
 vi.mock('@/lib/space', () => ({
@@ -30,6 +31,9 @@ vi.mock('@/lib/tour-booking', () => ({
 vi.mock('@/lib/calendar/mirror-tour', () => ({
   mirrorTourBookingToCalendar: mirrorMock,
   rollbackTourBooking: rollbackMock,
+}));
+vi.mock('@/lib/deals/advance-from-event', () => ({
+  advanceDealFromEvent: advanceMock,
 }));
 vi.mock('@/lib/tour-emails', () => ({ sendTourConfirmation: sendTourConfirmationMock }));
 vi.mock('@/lib/notify', () => ({ notifyNewTour: notifyNewTourMock }));
@@ -126,6 +130,14 @@ describe('POST /api/tours/book — calendar write', () => {
     );
     expect(rollbackMock).not.toHaveBeenCalled();
     expect(sendTourConfirmationMock).toHaveBeenCalledOnce();
+    expect(advanceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space_1',
+        event: 'tour_booked',
+        title: 'Sam Lee',
+        address: '123 Oak',
+      }),
+    );
   });
 
   it('rolls the tour back and returns 502 when the calendar write fails', async () => {
@@ -139,6 +151,7 @@ describe('POST /api/tours/book — calendar write', () => {
     expect(rollbackMock).toHaveBeenCalledWith('space_1', mirrored.tourId);
     expect(sendTourConfirmationMock).not.toHaveBeenCalled();
     expect(notifyNewTourMock).not.toHaveBeenCalled();
+    expect(advanceMock).not.toHaveBeenCalled();
   });
 
   it('still books when no calendar is connected (CRM-only, honest)', async () => {
@@ -148,5 +161,8 @@ describe('POST /api/tours/book — calendar write', () => {
     expect(res.status).toBe(201);
     expect(rollbackMock).not.toHaveBeenCalled();
     expect(sendTourConfirmationMock).toHaveBeenCalledOnce();
+    expect(advanceMock).toHaveBeenCalledWith(
+      expect.objectContaining({ spaceId: 'space_1', event: 'tour_booked' }),
+    );
   });
 });

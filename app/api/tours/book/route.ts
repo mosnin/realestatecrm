@@ -8,6 +8,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
 import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar/mirror-tour';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
 import { logger } from '@/lib/logger';
 
 /** Public endpoint — guests book a tour without authentication. */
@@ -213,6 +214,19 @@ export async function POST(req: NextRequest) {
       { error: 'Could not add this tour to the calendar. Please try another time.' },
       { status: 502 },
     );
+  }
+
+  try {
+    await advanceDealFromEvent({
+      spaceId: space.id,
+      contactId,
+      event: 'tour_booked',
+      sourceTourId: tourId,
+      title: guestName.trim(),
+      address: propertyAddress?.trim() || null,
+    });
+  } catch (err) {
+    logger.warn('[tours/book] pipeline advance failed', { spaceId: space.id, tourId }, err);
   }
 
   // Fetch the created tour for the response

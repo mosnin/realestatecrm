@@ -25,6 +25,7 @@ const {
   sendDraftMock,
   checkSendAllowedMock,
   recordOutboundMessageSafeMock,
+  advanceDealFromEventMock,
 } = vi.hoisted(() => ({
   checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
   sendPushMock: vi.fn(async () => 1),
@@ -49,6 +50,7 @@ const {
     async (): Promise<{ allowed: boolean; reason?: string; detail?: string }> => ({ allowed: true }),
   ),
   recordOutboundMessageSafeMock: vi.fn(async () => ({ threadId: 't1', messageId: 'm1', deduped: false })),
+  advanceDealFromEventMock: vi.fn(async () => ({ ok: true, dealId: 'deal_1', created: true, moved: false })),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));
@@ -70,6 +72,7 @@ vi.mock('@/lib/delivery', () => ({
 }));
 vi.mock('@/lib/messaging/compliance', () => ({ checkSendAllowed: checkSendAllowedMock }));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMessageSafeMock }));
+vi.mock('@/lib/deals/advance-from-event', () => ({ advanceDealFromEvent: advanceDealFromEventMock }));
 vi.mock('@/lib/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -173,6 +176,7 @@ beforeEach(() => {
   });
   sendDraftMock.mockResolvedValue({ sent: true, method: 'gmail' });
   checkSendAllowedMock.mockResolvedValue({ allowed: true });
+  advanceDealFromEventMock.mockClear();
 });
 
 describe('fireFirstTouch', () => {
@@ -253,6 +257,12 @@ describe('fireFirstTouch', () => {
       href: '/s/acme/chippi/inbox',
       priority: 'high',
     });
+    expect(advanceDealFromEventMock).toHaveBeenCalledWith({
+      spaceId: 'space_1',
+      contactId: 'c_1',
+      event: 'first_touch_sent',
+      title: 'Jane Doe',
+    });
   });
 
   it('treats omitted origin as manual (marketing consent gate)', async () => {
@@ -300,6 +310,7 @@ describe('fireFirstTouch', () => {
     });
     expect(sendDraftMock).not.toHaveBeenCalled();
     expect(recordOutboundMessageSafeMock).not.toHaveBeenCalled();
+    expect(advanceDealFromEventMock).not.toHaveBeenCalled();
     expect(createAppNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'New lead: Jane Doe — first touch ready',
@@ -329,6 +340,7 @@ describe('fireFirstTouch', () => {
       holdReason: 'compliance',
     });
     expect(sendDraftMock).not.toHaveBeenCalled();
+    expect(advanceDealFromEventMock).not.toHaveBeenCalled();
     expect(updates.filter((u) => u.table === 'AgentDraft')).toHaveLength(0);
     expect(createAppNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -355,6 +367,7 @@ describe('fireFirstTouch', () => {
       holdReason: 'send_failed',
     });
     expect(recordOutboundMessageSafeMock).not.toHaveBeenCalled();
+    expect(advanceDealFromEventMock).not.toHaveBeenCalled();
     expect(updates.filter((u) => u.table === 'AgentDraft')).toHaveLength(0);
     expect(createAppNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
