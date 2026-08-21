@@ -108,7 +108,7 @@ export default function DataProcessingAgreementPage() {
                 </tr>
                 <tr>
                   <td className="py-2 pr-4">OpenAI</td>
-                  <td className="py-2 pr-4">AI lead scoring and voice AI assistant features</td>
+                  <td className="py-2 pr-4">AI lead scoring and optional voice assistant features when enabled</td>
                   <td className="py-2">United States</td>
                 </tr>
                 <tr>
@@ -118,7 +118,7 @@ export default function DataProcessingAgreementPage() {
                 </tr>
                 <tr>
                   <td className="py-2 pr-4">Telnyx</td>
-                  <td className="py-2 pr-4">SMS delivery and voice communications</td>
+                  <td className="py-2 pr-4">SMS delivery and voice communications (when Telnyx is configured)</td>
                   <td className="py-2">United States</td>
                 </tr>
               </tbody>

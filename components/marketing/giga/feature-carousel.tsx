@@ -91,7 +91,7 @@ const TABS: FeatureTab[] = [
   {
     icon: Inbox,
     tab: 'Omnichannel inbox',
-    blurb: 'Email, text, and calls in one worked queue, nothing slips.',
+    blurb: 'Email and text in one worked queue; phone calling when Telnyx is configured.',
     heading: (
       <>
         Every channel, one
@@ -99,7 +99,7 @@ const TABS: FeatureTab[] = [
       </>
     ),
     description:
-      'Email, text, and calls land in a single queue Chippi keeps moving around the clock, so follow-up never slips and no lead goes cold while you are out showing.',
+      'Email and text land in a single queue Chippi keeps moving. Phone calling joins that queue when Telnyx is configured, so follow-up never slips while you are out showing.',
     image: '/marketing/product/live-demo.jpg',
     imageAlt: 'Chippi working an omnichannel inbox',
   },

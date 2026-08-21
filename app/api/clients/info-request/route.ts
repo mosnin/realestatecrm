@@ -6,6 +6,7 @@ import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export const runtime = 'nodejs';
@@ -73,8 +74,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Already answered.' }, { status: 409 });
   }
 
-  const { error } = await unscoped(supabase
-    .from('ClientInfoRequest'), 'post-fetch: client portal ownership proof')
+  const { error } = await tenantTable(supabase, 'ClientInfoRequest', { spaceId: row.spaceId })
     .update({ response, status: 'fulfilled', fulfilledAt: new Date().toISOString() })
     .eq('id', id);
   if (error) {

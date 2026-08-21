@@ -35,7 +35,7 @@ async function notifySubscriptionChange(subscriptionId: string, newStatus: strin
     const statusMessages: Record<string, { subject: string; body: string }> = {
       active: {
         subject: `Your Chippi subscription is now active`,
-        body: `Great news! Your subscription for <strong>${space.name}</strong> is active. You have full access to all features.`,
+        body: `Great news! Your subscription for <strong>${space.name}</strong> is active. You have access to the CRM and credit-metered AI tools on your plan.`,
       },
       past_due: {
         subject: `Payment issue with your Chippi subscription`,

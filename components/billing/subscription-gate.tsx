@@ -71,7 +71,7 @@ export function SubscriptionGate({
           <div className="space-y-2">
             <h1 className="text-2xl font-bold tracking-tight">Start your free trial</h1>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-              Get full access to everything in Chippi for 7 days. No credit card required to start.
+              Get full access to Chippi&apos;s CRM and credit-metered AI tools for 7 days. No credit card required to start.
             </p>
           </div>
 

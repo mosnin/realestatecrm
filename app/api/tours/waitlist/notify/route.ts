@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -20,11 +20,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data: entry } = await supabase
-    .from('TourWaitlist')
+  const { data: entry } = await tenantTable(supabase, 'TourWaitlist', { spaceId: space.id })
     .select('*')
     .eq('id', waitlistId)
-    .eq('spaceId', space.id)
     .eq('status', 'waiting')
     .maybeSingle();
 
@@ -34,8 +32,7 @@ export async function POST(req: NextRequest) {
 
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min hold
 
-  const { data: updated, error } = await unscoped(supabase
-    .from('TourWaitlist'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: updated, error } = await tenantTable(supabase, 'TourWaitlist', { spaceId: space.id })
     .update({
       status: 'notified',
       notifiedAt: new Date().toISOString(),
@@ -47,10 +44,8 @@ export async function POST(req: NextRequest) {
   if (error) throw error;
 
   // Send notification email
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('businessName')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   const businessName = settings?.businessName || space.name;

@@ -6,6 +6,7 @@ import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export const runtime = 'nodejs';
@@ -27,15 +28,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data } = await unscoped(supabase
-    .from('ClientMessage'), 'post-fetch: client portal ownership proof')
+  const { data: owned } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
+    .select('spaceId')
+    .eq('id', contactId)
+    .maybeSingle();
+  if (!owned?.spaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const { data } = await tenantTable(supabase, 'ClientMessage', { spaceId: owned.spaceId })
     .select('id, senderType, body, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: true });
 
   // Mark realtor → client messages read now that the client has loaded them.
-  await unscoped(supabase
-    .from('ClientMessage'), 'post-fetch: client portal ownership proof')
+  await tenantTable(supabase, 'ClientMessage', { spaceId: owned.spaceId })
     .update({ readAt: new Date().toISOString() })
     .eq('contactId', contactId)
     .eq('senderType', 'realtor')
@@ -77,8 +83,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: inserted, error } = await supabase
-    .from('ClientMessage')
+  const { data: inserted, error } = await tenantTable(supabase, 'ClientMessage', { spaceId: contact.spaceId })
     .insert({
       contactId,
       spaceId: contact.spaceId,
