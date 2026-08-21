@@ -123,11 +123,9 @@ export const setFollowupTool = defineTool<typeof parameters, SetFollowupResult>(
       };
     }
 
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {
@@ -140,11 +138,9 @@ export const setFollowupTool = defineTool<typeof parameters, SetFollowupResult>(
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Contact')
+    const { error: updateErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .update({ followUpAt: iso, updatedAt: new Date().toISOString() })
-      .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.personId);
     if (updateErr) {
       logger.error(
         '[tools.set_followup] update failed',

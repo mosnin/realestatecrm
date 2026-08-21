@@ -51,11 +51,9 @@ export const markPersonHotTool = defineTool<typeof parameters, MarkHotResult>({
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name, leadScore')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {
@@ -70,16 +68,14 @@ export const markPersonHotTool = defineTool<typeof parameters, MarkHotResult>({
 
     const newScore = Math.max(contact.leadScore ?? 0, HOT_LEAD_THRESHOLD);
 
-    const { error: updateErr } = await supabase
-      .from('Contact')
+    const { error: updateErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .update({
         scoreLabel: 'hot',
         leadScore: newScore,
         scoringStatus: 'scored',
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.personId);
     if (updateErr) {
       logger.error(
         '[tools.mark_person_hot] update failed',

@@ -28,7 +28,7 @@ export async function POST(
   // Get space first, then query contact scoped to that space to prevent
   // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data: contactRows, error: contactError } = await tenantTable(supabase, 'Contact', {
     spaceId: space.id,

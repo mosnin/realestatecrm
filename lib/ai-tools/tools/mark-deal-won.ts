@@ -58,11 +58,9 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, status, value')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -82,11 +80,9 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
     if (args.finalValue !== undefined) updates.value = args.finalValue;
     if (args.note !== undefined) updates.wonLostNote = args.note;
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update(updates)
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error(
         '[tools.mark_deal_won] update failed',

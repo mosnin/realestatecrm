@@ -43,11 +43,9 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, status')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -59,16 +57,14 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({
         status: 'lost',
         wonLostReason: args.reason,
         closedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error(
         '[tools.mark_deal_lost] update failed',

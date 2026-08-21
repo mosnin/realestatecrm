@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 type UndoHandler = (params: {
   spaceId: string;
@@ -30,21 +31,17 @@ type UndoHandler = (params: {
 const UNDO_HANDLERS: Record<string, UndoHandler> = {
   async set_contact_follow_up({ spaceId, relatedContactId }) {
     if (!relatedContactId) return { ok: false, reason: 'No contact tied to this action.' };
-    const { error } = await supabase
-      .from('Contact')
+    const { error } = await tenantTable(supabase, 'Contact', { spaceId })
       .update({ followUpAt: null, updatedAt: new Date().toISOString() })
-      .eq('id', relatedContactId)
-      .eq('spaceId', spaceId);
+      .eq('id', relatedContactId);
     if (error) return { ok: false, reason: error.message };
     return { ok: true };
   },
   async set_deal_follow_up({ spaceId, relatedDealId }) {
     if (!relatedDealId) return { ok: false, reason: 'No deal tied to this action.' };
-    const { error } = await supabase
-      .from('Deal')
+    const { error } = await tenantTable(supabase, 'Deal', { spaceId })
       .update({ followUpAt: null, updatedAt: new Date().toISOString() })
-      .eq('id', relatedDealId)
-      .eq('spaceId', spaceId);
+      .eq('id', relatedDealId);
     if (error) return { ok: false, reason: error.message };
     return { ok: true };
   },
@@ -57,14 +54,12 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch + scope-check in one query
-  const { data: row, error: fetchError } = await supabase
-    .from('AgentActivityLog')
+  const { data: row, error: fetchError } = await tenantTable(supabase, 'AgentActivityLog', { spaceId: space.id })
     .select('id, spaceId, actionType, relatedContactId, relatedDealId, reversible, reversedAt')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -95,11 +90,9 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
 
   // Mark reversed so the UI knows + future GETs filter it out of "undoable"
   const reversedAt = new Date().toISOString();
-  const { error: updateError } = await supabase
-    .from('AgentActivityLog')
+  const { error: updateError } = await tenantTable(supabase, 'AgentActivityLog', { spaceId: space.id })
     .update({ reversedAt })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (updateError) {
     // The side effect was reversed but the log update failed. Surface this
     // honestly — caller can refresh to see the field-level change.

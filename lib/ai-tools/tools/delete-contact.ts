@@ -11,6 +11,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -43,11 +44,9 @@ export const deleteContactTool = defineTool<typeof parameters, DeleteContactResu
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {
@@ -60,11 +59,9 @@ export const deleteContactTool = defineTool<typeof parameters, DeleteContactResu
       };
     }
 
-    const { error: deleteErr } = await supabase
-      .from('Contact')
+    const { error: deleteErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .delete()
-      .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.personId);
     if (deleteErr) {
       logger.error('[tools.delete_contact] delete failed', { contactId: args.personId }, deleteErr);
       return { summary: `Delete failed: ${deleteErr.message}`, display: 'error' };

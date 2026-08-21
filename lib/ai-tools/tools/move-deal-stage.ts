@@ -56,11 +56,9 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
   async handler(args, ctx) {
     // Deal must exist in this space.
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, stageId, status')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -84,11 +82,9 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Stage must belong to the same space. A stale id from another workspace
     // should never satisfy this check.
-    const { data: newStage, error: stageErr } = await supabase
-      .from('DealStage')
+    const { data: newStage, error: stageErr } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.stageId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (stageErr) {
       return { summary: `Stage lookup failed: ${stageErr.message}`, display: 'error' };
@@ -105,11 +101,9 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
       .eq('id', deal.stageId)
       .maybeSingle();
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ stageId: args.stageId, stageChangedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error('[tools.move_deal_stage] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Stage update failed: ${updateErr.message}`, display: 'error' };

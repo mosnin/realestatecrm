@@ -52,11 +52,9 @@ export const updateDealValueTool = defineTool<typeof parameters, UpdateDealValue
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, value')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -74,11 +72,9 @@ export const updateDealValueTool = defineTool<typeof parameters, UpdateDealValue
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ value: args.newValue, updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error('[tools.update_deal_value] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Update failed: ${updateErr.message}`, display: 'error' };

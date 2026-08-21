@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(
   _req: NextRequest,
@@ -17,25 +18,21 @@ export async function GET(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { contactId } = await params;
 
   // Verify contact belongs to this space
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch the two special memory types
-  const { data: memories } = await supabase
-    .from('AgentMemory')
+  const { data: memories } = await tenantTable(supabase, 'AgentMemory', { spaceId: space.id })
     .select('content, createdAt, memoryType')
-    .eq('spaceId', space.id)
     .eq('entityType', 'contact')
     .eq('entityId', contactId)
     .or('content.like.AGENT_BRIEF:%,content.like.SCORE_EXPLANATION:%')

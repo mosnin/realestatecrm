@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -42,11 +43,9 @@ export const deleteDealTool = defineTool<typeof parameters, DeleteDealResult>({
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -58,11 +57,9 @@ export const deleteDealTool = defineTool<typeof parameters, DeleteDealResult>({
       };
     }
 
-    const { error: deleteErr } = await supabase
-      .from('Deal')
+    const { error: deleteErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .delete()
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (deleteErr) {
       logger.error('[tools.delete_deal] delete failed', { dealId: args.dealId }, deleteErr);
       return { summary: `Delete failed: ${deleteErr.message}`, display: 'error' };

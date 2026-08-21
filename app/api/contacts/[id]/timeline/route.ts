@@ -22,7 +22,7 @@ export async function GET(
   // Get space first, then query contact scoped to that space to prevent
   // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).select('spaceId').eq('id', contactId).maybeSingle();
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

@@ -43,11 +43,9 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, propertyId')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -56,11 +54,9 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       return { summary: `No deal with id "${args.dealId}".`, display: 'error' };
     }
 
-    const { data: property, error: propErr } = await supabase
-      .from('Property')
+    const { data: property, error: propErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .select('id, address')
       .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (propErr) {
       return { summary: `Property lookup failed: ${propErr.message}`, display: 'error' };
@@ -77,11 +73,9 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ propertyId: property.id, updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error('[tools.attach_property_to_deal] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Link failed: ${updateErr.message}`, display: 'error' };

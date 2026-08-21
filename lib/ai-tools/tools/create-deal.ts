@@ -22,6 +22,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { notifyNewDeal } from '@/lib/notify';
 import { logger } from '@/lib/logger';
@@ -86,11 +87,9 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     let validContactIds: string[] = [];
     let buyerAmongContacts = false;
     if (args.contactIds && args.contactIds.length > 0) {
-      const { data: validContacts, error: vcErr } = await supabase
-        .from('Contact')
+      const { data: validContacts, error: vcErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, leadType')
         .in('id', args.contactIds)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null);
       if (vcErr) {
         return { summary: `Contact validation failed: ${vcErr.message}`, display: 'error' };
@@ -179,11 +178,9 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
     }
 
     // Position = bottom of the stage's current column.
-    const { data: lastDealRow } = await supabase
-      .from('Deal')
+    const { data: lastDealRow } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('position')
       .eq('stageId', finalStageId)
-      .eq('spaceId', ctx.space.id)
       .order('position', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -198,8 +195,7 @@ export const createDealTool = defineTool<typeof parameters, CreateDealResult>({
       String(args.value ?? ''),
     );
     const { data: dealRow, error: dealErr } = await withIdempotency(idemKey, async () =>
-      supabase
-        .from('Deal')
+      tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
         .insert({
           id: dealId,
           spaceId: ctx.space.id,

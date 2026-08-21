@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function PATCH(
   req: NextRequest,
@@ -12,7 +13,7 @@ export async function PATCH(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
   const body = await req.json();
@@ -26,11 +27,9 @@ export async function PATCH(
   }
 
   // Verify the question belongs to this space
-  const { data: existing } = await supabase
-    .from('AgentQuestion')
+  const { data: existing } = await tenantTable(supabase, 'AgentQuestion', { spaceId: space.id })
     .select('id, status')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!existing) {
@@ -44,15 +43,13 @@ export async function PATCH(
     );
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('AgentQuestion')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentQuestion', { spaceId: space.id })
     .update({
       status: 'answered',
       answer,
       answeredAt: new Date().toISOString(),
     })
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
 

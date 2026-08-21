@@ -41,8 +41,20 @@ vi.mock('@/lib/storage', () => ({
 }));
 
 vi.mock('@/lib/audit', () => ({ audit: vi.fn() }));
-vi.mock('@/lib/delivery', () => ({ sendDraft: vi.fn() }));
+vi.mock('@/lib/delivery', () => ({ sendDraft: vi.fn(), describeDelivery: () => 'via email' }));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: vi.fn() }));
+vi.mock('@/lib/messaging/compliance', () => ({
+  checkSendAllowed: vi.fn(async () => ({ allowed: true })),
+}));
+vi.mock('@/lib/lead-scoring', () => ({
+  scoreLeadApplicationDynamic: vi.fn(),
+}));
+vi.mock('@/lib/billing/meter', () => ({
+  assertCanSpend: vi.fn(async () => undefined),
+  chargeWorkflow: vi.fn(async () => undefined),
+  CreditsExhaustedError: class CreditsExhaustedError extends Error {},
+  SubscriptionDelinquentError: class SubscriptionDelinquentError extends Error {},
+}));
 
 const { runStudioGeneration, proposeActions } = vi.hoisted(() => ({
   runStudioGeneration: vi.fn(),
@@ -108,6 +120,15 @@ import { POST as studioGenerate } from '@/app/api/studio/generate/route';
 import { GET as getEditorDoc } from '@/app/api/files/documents/[id]/route';
 import { GET as getAgentContact } from '@/app/api/agent/contact/[id]/route';
 import { GET as getAgentDeal } from '@/app/api/agent/deal/[id]/route';
+import { GET as getTimeline } from '@/app/api/contacts/[id]/timeline/route';
+import { POST as emailContact } from '@/app/api/contacts/[id]/email/route';
+import { POST as rescoreContact } from '@/app/api/contacts/[id]/rescore/route';
+import { DELETE as deleteOverride } from '@/app/api/tours/overrides/[id]/route';
+import { PATCH as patchGoal } from '@/app/api/agent/goals/[id]/route';
+import { PATCH as patchQuestion } from '@/app/api/agent/questions/[id]/route';
+import { GET as getBrief } from '@/app/api/agent/brief/[contactId]/route';
+import { GET as getContactContext } from '@/app/api/agent/contact-context/[contactId]/route';
+import { POST as reverseActivity } from '@/app/api/agent/activity/[id]/reverse/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -116,6 +137,10 @@ const mockGetSpaceForUser = vi.mocked(getSpaceForUser);
 
 function params(id: string) {
   return { params: Promise.resolve({ id }) };
+}
+
+function contactParams(contactId: string) {
+  return { params: Promise.resolve({ contactId }) };
 }
 
 function noPii(body: string) {
@@ -298,5 +323,112 @@ describe('no workspace — high-risk PII routes 404 without an existence oracle'
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('Deal');
     expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/contacts/[id]/timeline 404s and does not query Contact', async () => {
+    const res = await getTimeline(
+      new NextRequest('http://localhost/api/contacts/c_victim/timeline'),
+      params('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('Tour');
+  });
+
+  it('POST /api/contacts/[id]/email 404s and does not query Contact', async () => {
+    const res = await emailContact(
+      new NextRequest('http://localhost/api/contacts/c_victim/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: 'VICTIM', body: '555-0100 at 123 Victim Lane' }),
+      }),
+      params('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('POST /api/contacts/[id]/rescore 404s and does not query Contact', async () => {
+    const res = await rescoreContact(
+      new NextRequest('http://localhost/api/contacts/c_victim/rescore', { method: 'POST' }),
+      params('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('DELETE /api/tours/overrides/[id] 404s and does not query overrides', async () => {
+    const res = await deleteOverride(
+      new NextRequest('http://localhost/api/tours/overrides/ov_victim', { method: 'DELETE' }),
+      params('ov_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('TourAvailabilityOverride');
+  });
+
+  it('PATCH /api/agent/goals/[id] 404s and does not query AgentGoal', async () => {
+    const res = await patchGoal(
+      new NextRequest('http://localhost/api/agent/goals/goal_victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      }),
+      params('goal_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentGoal');
+  });
+
+  it('PATCH /api/agent/questions/[id] 404s and does not query AgentQuestion', async () => {
+    const res = await patchQuestion(
+      new NextRequest('http://localhost/api/agent/questions/q_victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer: 'VICTIM answer' }),
+      }),
+      params('q_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentQuestion');
+  });
+
+  it('GET /api/agent/brief/[contactId] 404s and does not query Contact', async () => {
+    const res = await getBrief(
+      new NextRequest('http://localhost/api/agent/brief/c_victim'),
+      contactParams('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/agent/contact-context/[contactId] 404s and does not query Contact', async () => {
+    const res = await getContactContext(
+      new NextRequest('http://localhost/api/agent/contact-context/c_victim'),
+      contactParams('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('AgentGoal');
+  });
+
+  it('POST /api/agent/activity/[id]/reverse 404s and does not query activity', async () => {
+    const res = await reverseActivity(
+      new NextRequest('http://localhost/api/agent/activity/act_victim/reverse', { method: 'POST' }),
+      params('act_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentActivityLog');
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('Deal');
   });
 });
