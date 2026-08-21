@@ -8,8 +8,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const { sendDraftMock, checkSendAllowedMock, recordOutboundMock } = vi.hoisted(() => ({
-  sendDraftMock: vi.fn(async () => ({ sent: true, method: 'gmail' as const })),
-  checkSendAllowedMock: vi.fn(async () => ({ allowed: true })),
+  sendDraftMock: vi.fn(),
+  checkSendAllowedMock: vi.fn(),
   recordOutboundMock: vi.fn(async () => ({ threadId: 't1', messageId: 'm1', deduped: false })),
 }));
 

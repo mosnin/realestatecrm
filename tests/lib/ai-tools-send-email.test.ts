@@ -36,8 +36,8 @@ vi.mock('@/lib/supabase', () => {
 
 const { sendEmailFromCRMMock, sendDraftMock, checkSendAllowedMock, recordOutboundMock } = vi.hoisted(() => ({
   sendEmailFromCRMMock: vi.fn(async () => undefined),
-  sendDraftMock: vi.fn(async () => ({ sent: true, method: 'gmail' as const })),
-  checkSendAllowedMock: vi.fn(async () => ({ allowed: true })),
+  sendDraftMock: vi.fn(),
+  checkSendAllowedMock: vi.fn(),
   recordOutboundMock: vi.fn(async () => ({ threadId: 't1', messageId: 'm1', deduped: false })),
 }));
 vi.mock('@/lib/email', () => ({

@@ -391,7 +391,7 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       }
     }
 
-    const sent = delivery ?? { sent: true, method: 'email' as const };
+    const sent: DeliveryResult = delivery ?? { sent: true, method: 'email' };
     if (resolvedContactId) {
       await recordOutboundMessageSafe(
         {

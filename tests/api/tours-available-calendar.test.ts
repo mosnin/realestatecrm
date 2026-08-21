@@ -18,7 +18,7 @@ vi.mock('@/lib/rate-limit', () => ({
   getClientIp: vi.fn(() => '127.0.0.1'),
 }));
 vi.mock('@/lib/calendar/busy-times', () => ({
-  fetchCalendarBusySlots: (...args: unknown[]) => busySlotsMock(...args),
+  fetchCalendarBusySlots: busySlotsMock,
 }));
 
 vi.mock('@/lib/supabase', () => {
