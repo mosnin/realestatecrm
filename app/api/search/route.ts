@@ -23,8 +23,11 @@ export async function GET(req: NextRequest) {
     if (!sanitized.trim()) return NextResponse.json({ contacts: [], deals: [], tours: [] });
     const term = `%${sanitized}%`;
 
-    // Run each query independently so one failure doesn't block the others
-    const safeQuery = async <T>(label: string, promise: PromiseLike<T>): Promise<T | { data: null; error: unknown }> => {
+    // Run each query independently so one failure doesn't block the others.
+    // tenantTable().select() is loosely typed, so pin the PostgREST bag here
+    // instead of letting PromiseLike<T> collapse to unknown.
+    type QueryBag = { data: any; error: unknown };
+    const safeQuery = async (label: string, promise: PromiseLike<QueryBag>): Promise<QueryBag> => {
       try { return await promise; } catch (err) { console.error(`[search] ${label} threw:`, err); return { data: null, error: err }; }
     };
 
