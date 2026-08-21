@@ -4,6 +4,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { tenantTable } from '@/lib/tenant-db';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -176,11 +177,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   // Load the ledger row; must belong to this brokerage.
-  const { data: existing, error: fetchErr } = await supabase
-    .from('CommissionLedger')
+  const { data: existing, error: fetchErr } = await tenantTable(supabase, 'CommissionLedger', {
+    brokerageId: ctx.brokerage.id,
+  })
     .select('*')
     .eq('id', id)
-    .eq('brokerageId', ctx.brokerage.id)
     .maybeSingle();
 
   if (fetchErr) {
@@ -198,12 +199,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   // this brokerage. Validate via membership rather than a global User lookup so
   // this endpoint does not leak or attach users from other brokerages.
   if (referralUserIdVal !== undefined && referralUserIdVal !== null) {
-    const { data: referralMember, error: referralMemberErr } = await supabase
-      .from('BrokerageMembership')
+    const { data: referralMember, error: referralMemberErr } = await tenantTable(supabase, 'BrokerageMembership', {
+      brokerageId: ctx.brokerage.id,
+    })
       .select('id')
-      .eq('brokerageId', ctx.brokerage.id)
       .eq('userId', referralUserIdVal)
-      .maybeSingle<{ id: string }>();
+      .maybeSingle();
     if (referralMemberErr) {
       console.error('[broker/commissions/ledger/PATCH] referral membership lookup failed', referralMemberErr);
       return NextResponse.json({ error: 'Failed to validate referralUserId' }, { status: 500 });
@@ -270,11 +271,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   // Scope the update to brokerageId to guard against TOCTOU races.
-  const { data: updated, error: updateErr } = await supabase
-    .from('CommissionLedger')
+  const { data: updated, error: updateErr } = await tenantTable(supabase, 'CommissionLedger', {
+    brokerageId: ctx.brokerage.id,
+  })
     .update(updates)
     .eq('id', id)
-    .eq('brokerageId', ctx.brokerage.id)
     .select('*')
     .maybeSingle();
 

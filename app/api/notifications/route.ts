@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   notificationForNewLeadsCount,
   notificationForUpcomingTour,
@@ -289,10 +290,8 @@ export async function GET(req: NextRequest) {
   // is unavailable we still return the raw computed list rather than 500.
   let stateByKey = new Map<string, NotificationStateRow>();
   try {
-    const { data: states } = await supabase
-      .from('NotificationState')
+    const { data: states } = await tenantTable(supabase, 'NotificationState', { spaceId: space.id })
       .select('key, readAt, dismissedAt, sourceCreatedAt')
-      .eq('spaceId', space.id)
       .eq('userId', userId);
     stateByKey = new Map((states ?? []).map((s: NotificationStateRow) => [s.key, s]));
   } catch (err) {

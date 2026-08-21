@@ -61,8 +61,10 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
     if (!callerUser) {
       return { summary: 'Broker access required.', display: 'error' };
     }
-    const { data: callerMemberships } = await supabase
-      .from('BrokerageMembership')
+    const { data: callerMemberships } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'membership lookup by userId to discover caller brokerages',
+    )
       .select('brokerageId')
       .eq('userId', (callerUser as { id: string }).id)
       .in('role', ['broker_owner', 'broker_admin']);
@@ -78,6 +80,7 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
       .from('BrokerageMembership')
       .select('brokerageId, userId')
       .eq('userId', args.realtorUserId)
+      .in('brokerageId', Array.from(callerBrokerageIds))
       .maybeSingle();
     if (
       !realtorMembership ||

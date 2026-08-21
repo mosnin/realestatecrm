@@ -93,6 +93,7 @@ vi.mock('@/lib/supabase', () => ({
 
 import { GET as getDocument, DELETE as deleteDocument } from '@/app/api/documents/[id]/route';
 import { GET as getFile, DELETE as deleteFile } from '@/app/api/files/[id]/route';
+import { GET as getDealDoc, DELETE as deleteDealDoc } from '@/app/api/deals/[id]/documents/[docId]/route';
 import { PATCH as patchConversation, DELETE as deleteConversation } from '@/app/api/ai/conversations/[id]/route';
 import { GET as getMessages } from '@/app/api/ai/messages/route';
 import { requireAuth } from '@/lib/api-auth';
@@ -175,6 +176,34 @@ describe('GET/DELETE /api/files/[id] — File scoped, no PII leak', () => {
     expect(res.status).toBe(404);
     expect(deleteCalls.filter((d) => d.table === 'File')).toHaveLength(0);
     expect(eqOn('File', 'spaceId').map((c) => c.value)).toEqual(['space_caller']);
+  });
+});
+
+describe('GET/DELETE /api/deals/[id]/documents/[docId] — DealDocument scoped, no PII leak', () => {
+  it('404s a cross-tenant deal document and does not leak the victim label', async () => {
+    seed('DealDocument', { data: null });
+
+    const res = await getDealDoc(
+      new NextRequest('http://localhost/api/deals/deal_victim/documents/doc_victim'),
+      { params: Promise.resolve({ id: 'deal_victim', docId: 'doc_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    const body = JSON.stringify(await res.json());
+    expect(body).not.toContain('VICTIM');
+    expect(body).not.toContain('offer-letter.pdf');
+    expect(eqOn('DealDocument', 'spaceId').map((c) => c.value)).toEqual(['space_caller']);
+  });
+
+  it('DELETE 404s a foreign deal document and does not delete', async () => {
+    seed('DealDocument', { data: null });
+
+    const res = await deleteDealDoc(
+      new NextRequest('http://localhost/api/deals/deal_victim/documents/doc_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'deal_victim', docId: 'doc_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    expect(deleteCalls.filter((d) => d.table === 'DealDocument')).toHaveLength(0);
+    expect(eqOn('DealDocument', 'spaceId').map((c) => c.value)).toEqual(['space_caller']);
   });
 });
 

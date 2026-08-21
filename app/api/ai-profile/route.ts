@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_BUSINESS_FOCUS = [
   'residential',
@@ -59,10 +60,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from('AIUserProfile')
+  const { data, error } = await tenantTable(supabase, 'AIUserProfile', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (error) {

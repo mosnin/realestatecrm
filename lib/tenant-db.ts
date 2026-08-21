@@ -104,8 +104,9 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   IntegrationEvent: 'spaceId',
   PushSubscription: 'spaceId',
   // Cycle 2: verified spaceId tables that request paths already query.
-  // Omitted on purpose: SupportTicket / TelemetryEvent (nullable spaceId),
-  // ChannelMember / WorkflowRunStep / DealContact (no scope column — parent FK).
+  // Omitted on purpose: SupportTicket / TelemetryEvent / AuditLog / CreditTxn /
+  // AgentEventInbox (nullable spaceId), ChannelMember / WorkflowRunStep /
+  // DealContact (no scope column — parent FK).
   WorkflowRun: 'spaceId',
   WorkspaceRunTask: 'spaceId',
   WorkspaceRunTaskFile: 'spaceId',
@@ -134,6 +135,23 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   FormAnalyticsEvent: 'spaceId',
   CalendarEvent: 'spaceId',
   CalendarEventMirror: 'spaceId',
+  // Cycle 2 completeness: verified NOT NULL spaceId tables the guard was
+  // still blind to. Omitted on purpose (nullable spaceId, same class as
+  // SupportTicket / TelemetryEvent): AuditLog, CreditTxn, AgentEventInbox.
+  AIUserProfile: 'spaceId',
+  NotificationState: 'spaceId',
+  DeadLetterEvent: 'spaceId',
+  DisabledSpace: 'spaceId',
+  BriefTipHistory: 'spaceId',
+  GoalDecomposition: 'spaceId',
+  TaskCheckpoint: 'spaceId',
+  CalendarNote: 'spaceId',
+  WorkspaceRunTaskPlanClaim: 'spaceId',
+  AgentJobRun: 'spaceId',
+  AgentActionProposal: 'spaceId',
+  AgentRunArtifact: 'spaceId',
+  ScheduleOccurrence: 'spaceId',
+  InviteCodeRedemption: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',
@@ -150,6 +168,12 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   ChannelMessage: 'brokerageId',
   BrokerageIntegrationConnection: 'brokerageId',
   BrokerMessage: 'brokerageId',
+  BrokerageMembership: 'brokerageId',
+  Invitation: 'brokerageId',
+  BrokerageRemoval: 'brokerageId',
+  CommissionLedger: 'brokerageId',
+  BrokerageChatConversation: 'brokerageId',
+  BrokerageChatMessage: 'brokerageId',
 };
 
 export function isTenantTable(table: string): boolean {

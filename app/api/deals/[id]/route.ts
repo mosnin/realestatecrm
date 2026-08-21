@@ -14,18 +14,17 @@ import { normalizeCloseReason } from '@/lib/close-reason';
 import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import type { Deal, DealStage } from '@/lib/types';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: rows, error } = await supabase
-    .from('Deal')
+  const { data: rows, error } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('*')
-    .eq('id', dealId)
-    .eq('spaceId', space.id);
+    .eq('id', dealId);
   if (error) throw error;
-  if (!rows.length) return null;
+  if (!rows?.length) return null;
   return { deal: rows[0], space };
 }
 
@@ -45,7 +44,7 @@ export async function GET(
   const [stageResult, dcResult, activityResult] = await Promise.all([
     unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', deal.stageId).maybeSingle(),
     supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
-    supabase.from('DealActivity').select('*').eq('dealId', id).eq('spaceId', ctx.space.id).order('createdAt', { ascending: false }).limit(50),
+    tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).select('*').eq('dealId', id).order('createdAt', { ascending: false }).limit(50),
   ]);
 
   if (stageResult.error && stageResult.error.code !== 'PGRST116') throw stageResult.error;
@@ -92,16 +91,14 @@ export async function PATCH(
     const space = await getSpaceForUser(userId);
     if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from('Deal')
+    const { data: existingRows, error: existingError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('*')
-      .eq('id', id)
-      .eq('spaceId', space.id);
+      .eq('id', id);
     if (existingError) {
       console.error('[deals/PATCH] fetch error:', existingError);
       return NextResponse.json({ error: 'Failed to fetch deal' }, { status: 500 });
     }
-    if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!existingRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const existing = existingRows[0];
 
@@ -423,8 +420,7 @@ export async function PATCH(
       }
     }
 
-    const { data: dealRow, error: updateError } = await unscoped(supabase
-      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
+    const { data: dealRow, error: updateError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .update({
         ...(body.title !== undefined && { title: String(body.title).slice(0, 255) }),
         ...(body.description !== undefined && { description: body.description ? String(body.description).slice(0, 5000) : null }),
@@ -474,11 +470,6 @@ export async function PATCH(
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
-      // CAS on space ownership — TOCTOU-safe, matching the Contact PATCH route.
-      // The existence check above confirmed the deal is in-space; scoping the
-      // write too means it lands atomically on the caller's own row even if the
-      // row were reassigned between the check and the write.
-      .eq('spaceId', space.id)
       .select()
       .single();
     if (updateError) {
@@ -669,13 +660,11 @@ export async function DELETE(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: dealRows, error: dealError } = await supabase
-    .from('Deal')
+  const { data: dealRows, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (dealError) throw dealError;
-  if (!dealRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!dealRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const deal = dealRows[0];
 
@@ -683,20 +672,16 @@ export async function DELETE(
   // cascade removes DealDocument rows the moment the Deal is gone, but
   // Wasabi objects don't cascade. Offer letters, purchase agreements,
   // closing disclosures persist forever in cloud storage otherwise.
-  const { data: docRows } = await supabase
-    .from('DealDocument')
+  const { data: docRows } = await tenantTable(supabase, 'DealDocument', { spaceId: space.id })
     .select('storagePath')
-    .eq('dealId', id)
-    .eq('spaceId', space.id);
-  const docKeys = (docRows ?? [])
-    .map((r) => (r as { storagePath: string }).storagePath)
+    .eq('dealId', id);
+  const docKeys = ((docRows ?? []) as { storagePath: string | null }[])
+    .map((r) => r.storagePath)
     .filter((k): k is string => Boolean(k));
 
-  const { error: deleteError } = await supabase
-    .from('Deal')
+  const { error: deleteError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (deleteError) throw deleteError;
 
   // Fire-and-forget the Wasabi cleanup. The DB delete already committed;

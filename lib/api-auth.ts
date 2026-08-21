@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 import type { Space } from '@/lib/types';
 
 /**
@@ -185,8 +186,10 @@ export async function requireSpaceOwner(
     // .maybeSingle() throw (PostgREST errors on >1 row), 500ing a legitimate
     // multi-brokerage admin. Mirror the context helpers in lib/permissions.ts:
     // fetch all, then deterministically prefer broker_owner over broker_admin.
-    const { data: memberships } = await supabase
-      .from('BrokerageMembership')
+    const { data: memberships } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'membership lookup by userId then verify space owner against those brokerageIds',
+    )
       .select('role, brokerageId, createdAt')
       .eq('userId', dbUser.id)
       .in('role', ['broker_owner', 'broker_admin'])

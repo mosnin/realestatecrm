@@ -78,11 +78,25 @@ describe('TENANT_TABLES registry completeness', () => {
       'CommissionSplit',
       'McpAuthCode',
       'CalendarEvent',
+      'AIUserProfile',
+      'NotificationState',
+      'CalendarNote',
+      'DeadLetterEvent',
     ]) {
       expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
     }
     expect(scopeColumnFor('ChannelMessage')).toBe('brokerageId');
     expect(scopeColumnFor('BrokerageIntegrationConnection')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageMembership')).toBe('brokerageId');
+    expect(scopeColumnFor('Invitation')).toBe('brokerageId');
+    expect(scopeColumnFor('CommissionLedger')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageRemoval')).toBe('brokerageId');
+  });
+
+  it('does not register nullable-spaceId tables (wrong-column / optional-tenant hazard)', () => {
+    for (const t of ['SupportTicket', 'TelemetryEvent', 'AuditLog', 'CreditTxn', 'AgentEventInbox']) {
+      expect(isTenantTable(t), `${t} has nullable spaceId and must stay unregistered`).toBe(false);
+    }
   });
 
   it('does not register DealContact as space-scoped (junction has no spaceId)', () => {

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
 import type { PlatformRole } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -149,8 +150,10 @@ export async function POST(req: Request, { params }: Params) {
     }
 
     // The membership must belong to THIS user (no cross-user edits).
-    const { data: membership } = await supabase
-      .from('BrokerageMembership')
+    const { data: membership } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'admin: platform-admin membership lookup by id',
+    )
       .select('id, role, userId, brokerageId')
       .eq('id', membershipId)
       .maybeSingle();
@@ -165,8 +168,10 @@ export async function POST(req: Request, { params }: Params) {
     }
 
     if (membership.role !== membershipRole) {
-      const { error: memErr } = await supabase
-        .from('BrokerageMembership')
+      const { error: memErr } = await unscoped(
+        supabase.from('BrokerageMembership'),
+        'admin: platform-admin membership update by id',
+      )
         .update({ role: membershipRole })
         .eq('id', membershipId);
       if (memErr) {
