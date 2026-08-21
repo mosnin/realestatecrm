@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** GET — list overrides for the next 90 days */
 export async function GET(req: NextRequest) {
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     const { data: existingRows } = await existingQuery;
     if (existingRows && existingRows.length > 0) {
       const ids = existingRows.map((r: { id: string }) => r.id);
-      await supabase.from('TourAvailabilityOverride').delete().in('id', ids);
+      await unscoped(supabase.from('TourAvailabilityOverride'), 'post-fetch: caller verified parent scope before this id query').delete().in('id', ids);
     }
   }
 

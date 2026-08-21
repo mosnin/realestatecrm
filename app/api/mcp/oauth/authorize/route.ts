@@ -4,6 +4,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
 import crypto from 'crypto';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST /api/mcp/oauth/authorize
@@ -39,8 +41,8 @@ export async function POST(req: NextRequest) {
   // can't even start an OAuth flow — the Claude connector gets a clear
   // "invalid_client" instead of silently exchanging a code it'll never
   // be able to use at the token endpoint.
-  const { data: mcpKey } = await supabase
-    .from('McpApiKey')
+  const { data: mcpKey } = await unscoped(supabase
+    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
     .select('spaceId, expiresAt')
     .eq('clientId', client_id)
     .maybeSingle();

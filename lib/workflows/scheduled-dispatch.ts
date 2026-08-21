@@ -65,6 +65,8 @@ import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { notifyDraftReady, notifyAutoSend } from '@/lib/notify';
 import type { InboxChannel } from '@/lib/types';
 import type { WorkflowAutonomy } from './schema';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Don't let one tick process an unbounded number of rows — the overflow is
  *  picked up on the next tick. */
@@ -110,8 +112,8 @@ async function setStatus(
   status: 'drafted' | 'sent' | 'failed',
   detail: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('ScheduledMessage')
+  const { error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status, detail, updatedAt: new Date().toISOString() })
     .eq('id', id);
   if (error) {
@@ -132,8 +134,8 @@ async function setStatus(
  * safe failure; risking a double-send to a real client is not.
  */
 async function claimForSend(id: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('ScheduledMessage')
+  const { data, error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status: 'sending', updatedAt: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'pending')
@@ -153,8 +155,8 @@ async function claimForSend(id: string): Promise<boolean> {
  * follow-up), which is the safe direction — never a send.
  */
 async function releaseClaim(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('ScheduledMessage')
+  const { error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status: 'pending', updatedAt: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'sending');
@@ -434,8 +436,8 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
   // (surfaced for review) rather than back in 'pending'. 30 minutes is far
   // beyond any legitimate single-row send.
   const staleBefore = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const { data: reclaimed, error: reclaimErr } = await supabase
-    .from('ScheduledMessage')
+  const { data: reclaimed, error: reclaimErr } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'failed',
       detail: { error: 'stale sending claim reclaimed — delivery state unknown; review before rescheduling' },
@@ -451,8 +453,8 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
     });
   }
 
-  const { data: rows, error } = await supabase
-    .from('ScheduledMessage')
+  const { data: rows, error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, channel, recipientContactId, instruction, autonomy')
     .eq('status', 'pending')
     .lte('sendAt', now.toISOString())

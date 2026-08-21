@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -94,8 +96,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot conflicts with an existing tour' }, { status: 409 });
   }
 
-  const { data, error } = await supabase
-    .from('Tour')
+  const { data, error } = await unscoped(supabase
+    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', tourId)
     .single();

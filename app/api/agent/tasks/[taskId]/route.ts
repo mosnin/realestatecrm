@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { transitionTask } from '@/lib/agent/task-state-machine';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // ── GET /api/agent/tasks/[taskId] ─────────────────────────────────────────────
 // Fetch a single task and its execution steps.
@@ -48,8 +50,8 @@ export async function GET(
   }
 
   // Fetch execution steps ordered by step index.
-  const { data: steps, error: stepsError } = await supabase
-    .from('ExecutionStep')
+  const { data: steps, error: stepsError } = await unscoped(supabase
+    .from('ExecutionStep'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('taskId', taskId)
     .order('stepIndex', { ascending: true });

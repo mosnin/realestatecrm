@@ -9,6 +9,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -47,8 +49,8 @@ export async function GET(req: Request) {
 
   // Resolve a signed URL per asset. S3 presigning is local (no network call),
   // so signing the whole page is cheap.
-  const { data: files, error: filesErr } = await supabase
-    .from('File')
+  const { data: files, error: filesErr } = await unscoped(supabase
+    .from('File'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, storageKey')
     .in('id', rows.map((r) => r.fileId));
   if (filesErr) {

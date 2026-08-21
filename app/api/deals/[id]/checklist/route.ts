@@ -5,6 +5,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { TEMPLATES, materializeTemplate, type ChecklistKind, type TemplateId } from '@/lib/deals/checklist';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const VALID_KINDS: ChecklistKind[] = [
   'earnest_money',
@@ -40,8 +42,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const ctx = await resolveDealAndSpace(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('DealChecklistItem')
+  const { data, error } = await unscoped(supabase
+    .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('dealId', id)
     .order('position', { ascending: true });
@@ -80,8 +82,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (typeof body.seed === 'string' && body.seed in TEMPLATES) {
     const templateId = body.seed as TemplateId;
     // Refuse if items already exist — template seed is additive-by-intent.
-    const { count } = await supabase
-      .from('DealChecklistItem')
+    const { count } = await unscoped(supabase
+      .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
       .select('id', { count: 'exact', head: true })
       .eq('dealId', id);
     if ((count ?? 0) > 0) {
@@ -122,8 +124,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     dueAt = d.toISOString();
   }
 
-  const { data: maxRow } = await supabase
-    .from('DealChecklistItem')
+  const { data: maxRow } = await unscoped(supabase
+    .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
     .select('position')
     .eq('dealId', id)
     .order('position', { ascending: false })

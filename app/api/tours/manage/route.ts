@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST — Guest self-service tour management via manage token.
@@ -19,8 +21,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'token and action required' }, { status: 400 });
   }
 
-  const { data: tour } = await supabase
-    .from('Tour')
+  const { data: tour } = await unscoped(supabase
+    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, status, startsAt')
     .eq('manageToken', token)
     .maybeSingle();
@@ -48,8 +50,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error } = await supabase
-      .from('Tour')
+    const { error } = await unscoped(supabase
+      .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status: 'cancelled', updatedAt: new Date().toISOString() })
       .eq('id', tour.id);
 

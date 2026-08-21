@@ -27,6 +27,7 @@
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl, uploadObject, buildKey } from '@/lib/storage';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -544,8 +545,8 @@ export async function refreshEnvelopeStatus(
   // No change → just bump updatedAt and return. (request.status is already
   // narrowed to non-terminal here, so an unchanged status can't be completed.)
   if (status === request.status) {
-    await supabase
-      .from('SignatureRequest')
+    await unscoped(supabase
+      .from('SignatureRequest'), 'post-fetch: caller verified parent scope before this id query')
       .update({ updatedAt: new Date().toISOString() })
       .eq('id', request.id);
     return { ok: true, signatureRequest: { ...request, status } };
@@ -605,8 +606,8 @@ export async function refreshEnvelopeStatus(
     }
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('SignatureRequest')
+  const { data: updated, error: updateError } = await unscoped(supabase
+    .from('SignatureRequest'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status,
       signedDocumentUrl,

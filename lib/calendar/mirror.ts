@@ -28,6 +28,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -333,8 +334,8 @@ export async function updateEventThrough(
 
   // Keep the mirror row's window in sync regardless of the external result —
   // it's our forensic record of where the event should be.
-  const { error: updErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: updErr } = await unscoped(supabase
+    .from('CalendarEventMirror'), 'post-fetch: caller verified parent scope before this id query')
     .update({ start: input.startsAt, end: input.endsAt })
     .eq('id', mirror.id);
   if (updErr) {
@@ -388,8 +389,8 @@ export async function deleteEventThrough(input: {
 
   // Drop the mirror row — the event is gone (or we tried). Leaving a stale
   // row would resurface a deleted slot in the on-demand calendar surface.
-  const { error: delErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: delErr } = await unscoped(supabase
+    .from('CalendarEventMirror'), 'post-fetch: caller verified parent scope before this id query')
     .delete()
     .eq('id', mirror.id);
   if (delErr) {

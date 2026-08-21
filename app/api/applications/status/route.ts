@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * PATCH — Update application status (agent-facing, authenticated).
@@ -23,8 +25,8 @@ export async function PATCH(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   // Get current status for audit trail
-  const { data: currentContact } = await supabase
-    .from('Contact')
+  const { data: currentContact } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
     .select('applicationStatus, spaceId')
     .eq('id', contactId)
     .maybeSingle();
@@ -37,8 +39,8 @@ export async function PATCH(req: NextRequest) {
     update.applicationStatusNote = statusNote?.trim() || null;
   }
 
-  const { error } = await supabase
-    .from('Contact')
+  const { error } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
     .update(update)
     .eq('id', contactId);
 

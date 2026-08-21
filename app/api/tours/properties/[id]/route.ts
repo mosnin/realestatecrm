@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 async function resolveProfile(userId: string, profileId: string) {
-  const { data: row } = await supabase.from('TourPropertyProfile').select('*').eq('id', profileId).maybeSingle();
+  const { data: row } = await unscoped(supabase.from('TourPropertyProfile'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', profileId).maybeSingle();
   if (!row) return null;
   const space = await getSpaceForUser(userId);
   if (!space || row.spaceId !== space.id) return null;

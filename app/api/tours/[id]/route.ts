@@ -6,9 +6,11 @@ import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 async function resolveTour(userId: string, tourId: string) {
-  const { data: tour, error } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
+  const { data: tour, error } = await unscoped(supabase.from('Tour'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', tourId).maybeSingle();
   if (error) throw error;
   if (!tour) return null;
   const space = await getSpaceForUser(userId);
@@ -136,8 +138,8 @@ export async function PATCH(
   // Auto-create follow-up reminder when tour is completed (24h later)
   if (body.status === 'completed' && ctx.tour.status !== 'completed' && data.contactId) {
     const followUpAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('Contact')
+    unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .update({ followUpAt, type: 'TOUR' })
       .eq('id', data.contactId)
       .is('followUpAt', null)
@@ -156,8 +158,8 @@ export async function PATCH(
   // Auto-set follow-up for no-shows (48h later)
   if (body.status === 'no_show' && ctx.tour.status !== 'no_show' && data.contactId) {
     const followUpAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('Contact')
+    unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .update({ followUpAt })
       .eq('id', data.contactId)
       .is('followUpAt', null)

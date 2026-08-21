@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Pipeline } from '@/lib/types';
 
 export const DEFAULT_PIPELINES = [
@@ -47,10 +48,8 @@ export const DEFAULT_PIPELINES = [
  * space that already has pipelines is a no-op read.
  */
 export async function ensureDefaultPipelines(spaceId: string): Promise<Pipeline[]> {
-  const { data: existing, error: fetchError } = await supabase
-    .from('Pipeline')
+  const { data: existing, error: fetchError } = await tenantTable(supabase, 'Pipeline', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('position', { ascending: true });
   if (fetchError) throw fetchError;
 
@@ -64,8 +63,7 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<Pipeline[
     const def = DEFAULT_PIPELINES[i];
     const pipelineId = crypto.randomUUID();
 
-    const { data: pipeline, error: insertError } = await supabase
-      .from('Pipeline')
+    const { data: pipeline, error: insertError } = await tenantTable(supabase, 'Pipeline', { spaceId })
       .insert({
         id: pipelineId,
         spaceId,
@@ -79,23 +77,21 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<Pipeline[
     if (insertError) throw insertError;
     pipelines.push(pipeline as Pipeline);
 
-    const { data: matchingStages, error: stagesError } = await supabase
-      .from('DealStage')
+    const { data: matchingStages, error: stagesError } = await tenantTable(supabase, 'DealStage', {
+      spaceId,
+    })
       .select('id')
-      .eq('spaceId', spaceId)
       .eq('pipelineType', def.pipelineType)
       .is('pipelineId', null);
     if (stagesError) throw stagesError;
 
     if (matchingStages && matchingStages.length > 0) {
-      const { error: updateError } = await supabase
-        .from('DealStage')
+      const { error: updateError } = await tenantTable(supabase, 'DealStage', { spaceId })
         .update({ pipelineId })
         .in(
           'id',
           matchingStages.map((s: { id: string }) => s.id),
-        )
-        .eq('spaceId', spaceId);
+        );
       if (updateError) throw updateError;
     } else {
       const inserts = def.defaultStages.map((s) => ({
@@ -107,7 +103,7 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<Pipeline[
         pipelineType: def.pipelineType,
         pipelineId,
       }));
-      const { error: seedError } = await supabase.from('DealStage').insert(inserts);
+      const { error: seedError } = await tenantTable(supabase, 'DealStage', { spaceId }).insert(inserts);
       if (seedError) throw seedError;
     }
   }

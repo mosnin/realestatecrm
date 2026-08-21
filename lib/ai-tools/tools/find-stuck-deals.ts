@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -70,8 +72,8 @@ export const findStuckDealsTool = defineTool<typeof parameters, FindStuckDealsRe
 
     // Resolve stage names in one shot.
     const stageIds = Array.from(new Set(rows.map((r) => r.stageId)));
-    const { data: stages } = await supabase
-      .from('DealStage')
+    const { data: stages } = await unscoped(supabase
+      .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, name')
       .in('id', stageIds);
     const stageMap = new Map(((stages ?? []) as Array<{ id: string; name: string }>).map((s) => [s.id, s.name]));

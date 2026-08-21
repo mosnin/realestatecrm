@@ -19,6 +19,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { activeToolkits } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { inngest } from '@/lib/inngest/client';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -234,15 +236,15 @@ export async function POST(req: NextRequest) {
     });
     const eventId = sent.ids?.[0];
     if (eventId) {
-      await supabase
-        .from('StudioPost')
+      await unscoped(supabase
+        .from('StudioPost'), 'post-fetch: caller verified parent scope before this id query')
         .update({ inngestEventId: eventId })
         .eq('id', post.id);
     }
   } catch (err) {
     logger.error('[studio.schedule] inngest send failed', { spaceId: space.id }, err as Error);
-    await supabase
-      .from('StudioPost')
+    await unscoped(supabase
+      .from('StudioPost'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status: 'failed', updatedAt: new Date().toISOString() })
       .eq('id', post.id);
     return NextResponse.json(

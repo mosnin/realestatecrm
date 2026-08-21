@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST — Submit tour feedback (from guest, token-based).
@@ -28,8 +30,8 @@ export async function POST(req: NextRequest) {
 
   // Verify tour access via manage token only
   let tour: any = null;
-  const { data } = await supabase
-    .from('Tour')
+  const { data } = await unscoped(supabase
+    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, status')
     .eq('manageToken', token)
     .maybeSingle();
@@ -44,8 +46,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Check for existing feedback
-  const { data: existing } = await supabase
-    .from('TourFeedback')
+  const { data: existing } = await unscoped(supabase
+    .from('TourFeedback'), 'post-fetch: caller verified parent scope before this id query')
     .select('id')
     .eq('tourId', tour.id)
     .maybeSingle();

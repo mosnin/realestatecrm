@@ -3,6 +3,8 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type ContactNoteRow = {
   id: string;
@@ -54,8 +56,8 @@ async function resolveBrokerContactAccess(params: {
     }
   }
 
-  const { data: brokerageContact, error: brokerageContactError } = await supabase
-    .from('Contact')
+  const { data: brokerageContact, error: brokerageContactError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .select(select)
     .eq('id', contactId)
     .eq('brokerageId', brokerage.id)
@@ -69,8 +71,8 @@ async function resolveBrokerContactAccess(params: {
     };
   }
 
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .select(select)
     .eq('id', contactId)
     .maybeSingle();
@@ -171,8 +173,8 @@ export async function POST(req: NextRequest) {
       ? `${newNote}\n\n${existingNotes}`
       : newNote;
 
-    const { error: updateError } = await supabase
-      .from('Contact')
+    const { error: updateError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .update({
         notes: updatedNotes,
         updatedAt: now.toISOString(),

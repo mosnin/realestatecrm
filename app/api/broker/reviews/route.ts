@@ -3,6 +3,8 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type StatusFilter = 'open' | 'approved' | 'closed' | 'all';
 
@@ -77,7 +79,7 @@ export async function GET(req: NextRequest) {
         loadBrokerageScopedReviewDeal({ dealId, brokerageId: ctx.brokerage.id }),
       ),
     ),
-    supabase.from('DealReviewComment').select('id, reviewRequestId').in('reviewRequestId', reviewIds),
+    unscoped(supabase.from('DealReviewComment'), 'broker: membership-proved cross-space access').select('id, reviewRequestId').in('reviewRequestId', reviewIds),
   ]);
 
   if (usersRes.error) {

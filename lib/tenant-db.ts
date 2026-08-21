@@ -103,6 +103,37 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   SavedView: 'spaceId',
   IntegrationEvent: 'spaceId',
   PushSubscription: 'spaceId',
+  // Cycle 2: verified spaceId tables that request paths already query.
+  // Omitted on purpose: SupportTicket / TelemetryEvent (nullable spaceId),
+  // ChannelMember / WorkflowRunStep / DealContact (no scope column — parent FK).
+  WorkflowRun: 'spaceId',
+  WorkspaceRunTask: 'spaceId',
+  WorkspaceRunTaskFile: 'spaceId',
+  WorkspaceRunLaunchReceipt: 'spaceId',
+  WorkspaceWorkbookSource: 'spaceId',
+  ConversationTurn: 'spaceId',
+  MessageTemplate: 'spaceId',
+  NotificationPreference: 'spaceId',
+  TourWaitlist: 'spaceId',
+  TourFeedback: 'spaceId',
+  StudioGeneration: 'spaceId',
+  StudioBrand: 'spaceId',
+  UserSkill: 'spaceId',
+  CustomPlugin: 'spaceId',
+  AgentSettings: 'spaceId',
+  AgentQuestion: 'spaceId',
+  AgentGoal: 'spaceId',
+  ExecutionStep: 'spaceId',
+  DripEnrollment: 'spaceId',
+  DripSequence: 'spaceId',
+  ClientDocument: 'spaceId',
+  ClientInfoRequest: 'spaceId',
+  CommissionSplit: 'spaceId',
+  McpAuthCode: 'spaceId',
+  FormDraft: 'spaceId',
+  FormAnalyticsEvent: 'spaceId',
+  CalendarEvent: 'spaceId',
+  CalendarEventMirror: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',
@@ -113,7 +144,11 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   DealRoutingRule: 'brokerageId',
   BrokerageTemplate: 'brokerageId',
   Channel: 'brokerageId',
-  ChannelMember: 'brokerageId',
+  // ChannelMember is a junction (channelId + userId) with no brokerageId —
+  // registering brokerageId here would be a WRONG column. Scope through
+  // Channel, same as DealContact is scoped through Deal/Contact.
+  ChannelMessage: 'brokerageId',
+  BrokerageIntegrationConnection: 'brokerageId',
   BrokerMessage: 'brokerageId',
 };
 

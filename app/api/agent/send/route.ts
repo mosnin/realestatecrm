@@ -22,7 +22,9 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sendEmailFromCRM } from '@/lib/email';
+import { tenantTable } from '@/lib/tenant-db';
+import { sendDraft, describeDelivery } from '@/lib/delivery';
+import { checkSendAllowed } from '@/lib/messaging/compliance';
 import { sendSMS } from '@/lib/sms';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
@@ -92,11 +94,9 @@ export async function POST(req: NextRequest) {
 
   // Validate contact belongs to this space — the spaceId check is the
   // tenant isolation boundary. Never trust the LLM's contactId without it.
-  const { data: contact, error: contactErr } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email, phone')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (contactErr) {
@@ -108,10 +108,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Resolve sender display name from SpaceSetting, same as the on-demand agent
-  const { data: spaceSetting } = await supabase
-    .from('SpaceSetting')
+  const { data: spaceSetting } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('businessName')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   const fromName = (spaceSetting?.businessName as string | undefined) ?? spaceId;
 
@@ -122,23 +120,64 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${contact.name} has no email on file` }, { status: 422 });
     }
 
-    try {
-      await sendEmailFromCRM({
-        // Agent outreach to a lead — consumer; the gate decides if it goes.
-        audience: 'consumer',
-        category: 'marketing',
-        spaceId,
-        contactId,
-        toEmail: contact.email,
-        fromName,
-        subject: subject!,
-        body: content,
-      });
-      deliveredTo = contact.email;
-    } catch (err) {
-      console.error('[agent/send] email delivery failed', err);
-      return NextResponse.json({ error: 'Email delivery failed' }, { status: 502 });
+    const decision = await checkSendAllowed({
+      spaceId,
+      channel: 'email',
+      address: contact.email,
+      audience: 'consumer',
+      category: 'marketing',
+      contactId,
+    });
+    if (!decision.allowed) {
+      return NextResponse.json(
+        {
+          error: `Blocked because ${decision.reason ?? 'messaging rules'}: ${decision.detail ?? 'this message was not sent.'}`,
+          reason: decision.reason,
+        },
+        { status: 403 },
+      );
     }
+
+    const { data: spaceRow } = await supabase
+      .from('Space')
+      .select('ownerId')
+      .eq('id', spaceId)
+      .maybeSingle();
+    let clerkId: string | undefined;
+    const ownerId = (spaceRow as { ownerId?: string } | null)?.ownerId;
+    if (ownerId) {
+      const { data: owner } = await supabase
+        .from('User')
+        .select('clerkId')
+        .eq('id', ownerId)
+        .maybeSingle();
+      clerkId = (owner as { clerkId?: string } | null)?.clerkId ?? undefined;
+    }
+
+    const delivery = await sendDraft(
+      { channel: 'email', subject: subject!, content },
+      { name: contact.name ?? 'there', email: contact.email, phone: contact.phone },
+      fromName,
+      { spaceId, userId: clerkId },
+    );
+    if (!delivery.sent) {
+      logger.error('[agent/send] email delivery failed', {
+        spaceId,
+        error: delivery.error,
+        method: delivery.method,
+      });
+      return NextResponse.json(
+        { error: `Send failed: ${delivery.error ?? 'delivery failed'}` },
+        { status: 502 },
+      );
+    }
+    deliveredTo = contact.email;
+    logger.info('[agent/send] email sent', {
+      spaceId,
+      method: delivery.method,
+      fallback: delivery.fallback ?? false,
+      via: describeDelivery(delivery),
+    });
   }
 
   if (channel === 'sms') {
@@ -165,7 +204,7 @@ export async function POST(req: NextRequest) {
 
   // Audit the send to the contact's activity feed — non-fatal
   try {
-    await supabase.from('ContactActivity').insert({
+    await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
       id: crypto.randomUUID(),
       spaceId,
       contactId,

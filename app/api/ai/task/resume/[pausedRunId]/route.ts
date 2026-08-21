@@ -61,6 +61,8 @@ import {
   type ChildStoredApproval,
 } from '@/lib/ai-tools/delegate-child-pause';
 import { continueDelegatedChildAfterDecision } from '@/lib/ai-tools/delegate-run';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const resumeBodySchema = z.object({
   approved: z.boolean(),
@@ -166,8 +168,8 @@ export async function POST(
   const pausedColumns = isWorkbenchEnabled()
     ? 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt, updatedAt'
     : 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, status, expiresAt, updatedAt';
-  const { data: row, error } = await supabase
-    .from('AgentPausedRun')
+  const { data: row, error } = await unscoped(supabase
+    .from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query')
     .select(pausedColumns)
     .eq('id', pausedRunId)
     .eq('userId', auth.userId)
@@ -183,7 +185,7 @@ export async function POST(
   }
   if (paused.expiresAt && new Date(paused.expiresAt).getTime() < Date.now()) {
     // Best-effort flip; ignore failures — the request is over either way.
-    await supabase.from('AgentPausedRun').update({ status: 'expired' }).eq('id', paused.id);
+    await unscoped(supabase.from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query').update({ status: 'expired' }).eq('id', paused.id);
     return NextResponse.json({ error: 'Run expired' }, { status: 410 });
   }
 
@@ -354,8 +356,8 @@ export async function POST(
   } else {
     // Rolling-deploy compatibility for approval rows created before the turn
     // ledger migration. These cannot hold a ConversationTurn queue.
-    const { data: marked, error: markErr } = await supabase
-      .from('AgentPausedRun')
+    const { data: marked, error: markErr } = await unscoped(supabase
+      .from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status: 'resumed', updatedAt: new Date().toISOString() })
       .eq('id', paused.id)
       .eq('status', 'pending')

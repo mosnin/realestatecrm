@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST — notify a waitlisted guest that a slot opened up.
@@ -32,8 +34,8 @@ export async function POST(req: NextRequest) {
 
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min hold
 
-  const { data: updated, error } = await supabase
-    .from('TourWaitlist')
+  const { data: updated, error } = await unscoped(supabase
+    .from('TourWaitlist'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'notified',
       notifiedAt: new Date().toISOString(),

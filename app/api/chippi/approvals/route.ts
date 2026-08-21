@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 export interface ApprovalTask {
   id: string;
@@ -33,10 +34,8 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ count: 0, tasks: [] });
 
-  const { data, error } = await supabase
-    .from('AgentTask')
+  const { data, error } = await tenantTable(supabase, 'AgentTask', { spaceId: space.id })
     .select('id, spaceId, title, goalDescription, status, metadata, createdAt, updatedAt')
-    .eq('spaceId', space.id)
     .eq('status', 'paused')
     .not('metadata->approvalRequired', 'is', null)
     .order('createdAt', { ascending: false })

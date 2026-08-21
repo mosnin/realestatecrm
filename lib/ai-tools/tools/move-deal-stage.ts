@@ -23,6 +23,8 @@ import { supabase } from '@/lib/supabase';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -96,8 +98,8 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Fetch the old stage's name for the activity log. Non-fatal if we can't
     // find it — the move still works; we just log "Unknown" as the origin.
-    const { data: oldStage } = await supabase
-      .from('DealStage')
+    const { data: oldStage } = await unscoped(supabase
+      .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
       .select('name')
       .eq('id', deal.stageId)
       .maybeSingle();
@@ -131,8 +133,8 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
     }
 
     // Search reindex — best effort. We load the minimum the indexer needs.
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

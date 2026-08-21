@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -85,8 +87,8 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
     }
 
     // ── Contact must exist (in this space OR linked to the brokerage) ──────
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, name, spaceId, brokerageId')
       .eq('id', args.personId)
       .maybeSingle();

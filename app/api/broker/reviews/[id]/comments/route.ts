@@ -8,6 +8,8 @@ import { sendPushToSpace } from '@/lib/push';
 import { notifyBroker } from '@/lib/broker-notify';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -52,8 +54,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Load the review first — we need its brokerageId and requestingUserId
   // to authorize. Use maybeSingle so missing rows yield a controlled 404.
-  const { data: review, error: loadErr } = await supabase
-    .from('DealReviewRequest')
+  const { data: review, error: loadErr } = await unscoped(supabase
+    .from('DealReviewRequest'), 'broker: membership-proved cross-space access')
     .select('id, dealId, brokerageId, requestingUserId, status')
     .eq('id', reviewId)
     .maybeSingle<ReviewRow>();

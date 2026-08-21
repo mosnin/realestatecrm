@@ -11,6 +11,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Space } from '@/lib/types';
 
 /**
@@ -246,11 +247,9 @@ export async function requireContactAccess(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: rows, error } = await supabase
-    .from('Contact')
+  const { data: rows, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('spaceId')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .limit(1)
     .maybeSingle();
 

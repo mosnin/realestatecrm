@@ -21,6 +21,8 @@ import { supabase } from '@/lib/supabase';
 import { sendTourReminder, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, tourReminderSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface ReminderRow {
   tourId: string;
@@ -39,8 +41,8 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
   const in1h = new Date(now.getTime() + 60 * 60 * 1000);
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-  const { data: tours, error } = await supabase
-    .from('Tour')
+  const { data: tours, error } = await unscoped(supabase
+    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
     .select(
       'id, guestName, guestEmail, guestPhone, propertyAddress, startsAt, endsAt, status, spaceId, manageToken, contactId, reminder24SentAt, reminder1hSentAt',
     )
@@ -80,8 +82,8 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
     // CLAIM the send: stamp the column only if still null. If another cron
     // tick already claimed it, this updates zero rows and we skip — no
     // double-send.
-    const { data: claimed, error: claimErr } = await supabase
-      .from('Tour')
+    const { data: claimed, error: claimErr } = await unscoped(supabase
+      .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
       .update({ [column]: new Date().toISOString() })
       .eq('id', tour.id)
       .is(column, null)

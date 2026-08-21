@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
 import { normalizeLeadSource } from '@/lib/lead-source';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export type AssignLeadResult =
   | { ok: true; newContactId: string; assignedToSpaceId: string }
@@ -46,8 +48,8 @@ export async function assignLeadToRealtor(params: {
     value: brokerSpace.id,
   };
   if (!contact) {
-    const { data: contactByBrokerageId, error: brokerageContactError } = await supabase
-      .from('Contact')
+    const { data: contactByBrokerageId, error: brokerageContactError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .select('*')
       .eq('id', contactId)
       .eq('brokerageId', brokerage.id)
@@ -144,8 +146,8 @@ export async function assignLeadToRealtor(params: {
     assignedAt: now,
   });
 
-  const { error: updateError } = await supabase
-    .from('Contact')
+  const { error: updateError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .update({
       tags: [...existingTags.filter((t: string) => t !== 'new-lead'), 'assigned'],
       notes: assignmentNote,

@@ -15,6 +15,8 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { deleteConnection as composioDelete } from './composio';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export type BrokerageIntegrationStatus = 'active' | 'expired' | 'revoked' | 'failed';
 
@@ -78,8 +80,8 @@ export async function listBrokerageConnectionsForUser(args: {
 
 /** Look up by composio connection id — used by the OAuth callback. */
 export async function findBrokerageByComposioId(composioConnectionId: string) {
-  const { data } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('BrokerageIntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('composioConnectionId', composioConnectionId)
     .maybeSingle();
@@ -88,8 +90,8 @@ export async function findBrokerageByComposioId(composioConnectionId: string) {
 
 /** Look up by our own row id. */
 export async function getBrokerageConnectionById(id: string) {
-  const { data } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('BrokerageIntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -170,8 +172,8 @@ export async function upsertBrokerageByComposioId(args: {
 }): Promise<BrokerageIntegrationConnectionRow | null> {
   const existing = await findBrokerageByComposioId(args.composioConnectionId);
   if (existing) {
-    const { error } = await supabase
-      .from('BrokerageIntegrationConnection')
+    const { error } = await unscoped(supabase
+      .from('BrokerageIntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         label: args.label ?? existing.label ?? null,
         status: 'active',
@@ -203,8 +205,8 @@ export async function setBrokerageConnectionStatus(args: {
   status: BrokerageIntegrationStatus;
   lastError?: string;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('BrokerageIntegrationConnection')
+  const { error } = await unscoped(supabase
+    .from('BrokerageIntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: args.status,
       lastError: args.lastError ?? null,

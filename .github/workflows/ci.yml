@@ -54,6 +54,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Tenant-scope audit (app/api + lib)
+        run: node scripts/audit-tenant-scope.mjs
+
       - name: Unit tests (Vitest)
         run: pnpm test
 

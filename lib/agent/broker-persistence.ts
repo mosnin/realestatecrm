@@ -17,11 +17,13 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { coalesceTextBlocks, type MessageBlock } from '@/lib/ai-tools/blocks';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Bump the parent conversation's updatedAt so the sidebar orders by recency. */
 async function touchConversation(conversationId: string): Promise<void> {
-  const { error } = await supabase
-    .from('BrokerConversation')
+  const { error } = await unscoped(supabase
+    .from('BrokerConversation'), 'post-fetch: caller verified parent scope before this id query')
     .update({ updatedAt: new Date().toISOString() })
     .eq('id', conversationId);
   if (error) {

@@ -114,4 +114,21 @@ describe('wrapGuard', () => {
       expect.objectContaining({ table: 'Deal' }),
     );
   });
+
+  it('throws in production when TENANT_GUARD_ENFORCE=1 (enforce-ready, not flipped in prod)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TENANT_GUARD', '1');
+    vi.stubEnv('TENANT_GUARD_ENFORCE', '1');
+    const client = wrapGuard(makeFakeClient()) as unknown as LooseClient;
+    await expect(client.from('Deal').select('id')).rejects.toThrow(/Unscoped tenant query/i);
+  });
+
+  it('stays observe-only in production when TENANT_GUARD_ENFORCE is unset', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('TENANT_GUARD', '1');
+    vi.stubEnv('TENANT_GUARD_ENFORCE', '');
+    const client = wrapGuard(makeFakeClient()) as unknown as LooseClient;
+    await expect(client.from('Contact').select('id')).resolves.toEqual({ data: [], error: null });
+    expect(captureMessageMock).toHaveBeenCalled();
+  });
 });

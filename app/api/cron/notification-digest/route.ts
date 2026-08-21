@@ -10,6 +10,8 @@ import {
   type EffectiveEventTypes,
 } from '@/lib/notify-prefs';
 import { buildDigestSections, contiguousWindow } from '@/lib/notify-digest';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * GET /api/cron/notification-digest
@@ -153,13 +155,13 @@ async function handler(req: NextRequest) {
   // A member override SHADOWS the space default for the same (space, user):
   // we send at most one digest per recipient, driven by their effective prefs.
   const [spaceRes, memberRes] = await Promise.all([
-    supabase
-      .from('SpaceSetting')
+    unscoped(supabase
+      .from('SpaceSetting'), 'cron: cross-tenant discovery then per-row work')
       .select('spaceId, digestCadence, lastDigestAt')
       .in('digestCadence', ['daily', 'weekly'])
       .limit(MAX_TARGETS_PER_RUN),
-    supabase
-      .from('NotificationPreference')
+    unscoped(supabase
+      .from('NotificationPreference'), 'cron: cross-tenant discovery then per-row work')
       .select('spaceId, userId, digestCadence, lastDigestAt')
       .in('digestCadence', ['daily', 'weekly'])
       .limit(MAX_TARGETS_PER_RUN),

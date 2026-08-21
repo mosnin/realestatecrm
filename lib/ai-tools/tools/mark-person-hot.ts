@@ -18,6 +18,8 @@ import { logger } from '@/lib/logger';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import { defineTool } from '../types';
 import type { Contact } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -102,8 +104,8 @@ export const markPersonHotTool = defineTool<typeof parameters, MarkHotResult>({
       );
     }
 
-    const { data: refreshed } = await supabase
-      .from('Contact')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.personId)
       .maybeSingle();

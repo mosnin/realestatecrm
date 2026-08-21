@@ -42,6 +42,8 @@ import { selectWorkspaceTarget, type WorkspaceProperty } from '@/lib/workspace-r
 import type { PlanStep, WorkSessionRow } from './types';
 export type { PlanStep, WorkSessionRow } from './types';
 import { proposeActions } from './actions';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const MAX_STEPS = 6;
 const STEP_MAX_TURNS = 12;
@@ -57,7 +59,7 @@ type WorkSessionPhase = 'plan' | 'step' | 'artifact';
 // ── Row helpers ──────────────────────────────────────────────────────────────
 
 export async function getSession(id: string): Promise<WorkSessionRow | null> {
-  const { data, error } = await supabase.from('WorkSession').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await unscoped(supabase.from('WorkSession'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', id).maybeSingle();
   // A queue handler must distinguish "missing" from "the database could not
   // answer". Treating both as null acknowledges the Cloudflare message and
   // can strand a live session with no later delivery.
@@ -66,8 +68,8 @@ export async function getSession(id: string): Promise<WorkSessionRow | null> {
 }
 
 async function patchSession(id: string, patch: Record<string, unknown>): Promise<void> {
-  const { error } = await supabase
-    .from('WorkSession')
+  const { error } = await unscoped(supabase
+    .from('WorkSession'), 'post-fetch: caller verified parent scope before this id query')
     .update({ ...patch, updatedAt: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;

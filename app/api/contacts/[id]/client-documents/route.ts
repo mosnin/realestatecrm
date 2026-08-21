@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -17,8 +19,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const docId = req.nextUrl.searchParams.get('id');
   if (docId) {
-    const { data: doc } = await supabase
-      .from('ClientDocument')
+    const { data: doc } = await unscoped(supabase
+      .from('ClientDocument'), 'post-fetch: caller verified parent scope before this id query')
       .select('fileKey')
       .eq('id', docId)
       .eq('contactId', contactId)
@@ -28,8 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ url });
   }
 
-  const { data } = await supabase
-    .from('ClientDocument')
+  const { data } = await unscoped(supabase
+    .from('ClientDocument'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, fileName, contentType, sizeBytes, uploadedBy, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: false });

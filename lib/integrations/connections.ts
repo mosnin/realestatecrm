@@ -10,6 +10,8 @@ import { logger } from '@/lib/logger';
 import { after } from 'next/server';
 import { deleteConnection as composioDelete, listConnectedAccountsForEntity } from './composio';
 import { findIntegration } from './catalog';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export type IntegrationStatus = 'active' | 'pending' | 'expired' | 'revoked' | 'failed';
 
@@ -193,8 +195,8 @@ export async function activeToolkits(args: {
 
 /** Look up by composio connection id — used by the OAuth callback. */
 export async function findByComposioId(composioConnectionId: string) {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('composioConnectionId', composioConnectionId)
     .maybeSingle();
@@ -203,8 +205,8 @@ export async function findByComposioId(composioConnectionId: string) {
 
 /** Look up by our own row id. */
 export async function getById(id: string) {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -234,8 +236,8 @@ export async function upsertByComposioId(args: {
   const targetStatus = args.status ?? 'active';
   const existing = await findByComposioId(args.composioConnectionId);
   if (existing) {
-    const { error } = await supabase
-      .from('IntegrationConnection')
+    const { error } = await unscoped(supabase
+      .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         label: args.label ?? existing.label ?? null,
         status: targetStatus,
@@ -318,8 +320,8 @@ export async function setStatus(args: {
   status: IntegrationStatus;
   lastError?: string;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('IntegrationConnection')
+  const { error } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: args.status,
       lastError: args.lastError ?? null,

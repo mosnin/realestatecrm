@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import type { DealStage } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,8 +65,8 @@ export async function GET(req: NextRequest) {
   // label) so the payload doesn't balloon with long custom labels.
   let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
   if (dealIds.length > 0) {
-    const { data, error: clError } = await supabase
-      .from('DealChecklistItem')
+    const { data, error: clError } = await unscoped(supabase
+      .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
       .select('dealId, completedAt, dueAt, label')
       .in('dealId', dealIds);
     if (clError) throw clError;

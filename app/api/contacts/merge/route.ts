@@ -28,6 +28,8 @@ import { audit } from '@/lib/audit';
 import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
 import { MAX_CONTACT_MERGE_GROUP as MAX_MERGE_GROUP } from '@/lib/api-limits';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Reference tables re-pointed by merge_contacts(), for the preview count. */
 const REFERENCE_TABLES: ReadonlyArray<{ table: string; column: string }> = [
@@ -206,8 +208,8 @@ export async function POST(req: NextRequest) {
   const presentDupIds = duplicateIds.filter((id) => byId.has(id));
   const missingDupIds = duplicateIds.filter((id) => !byId.has(id));
   if (missingDupIds.length > 0) {
-    const { data: foreign } = await supabase
-      .from('Contact')
+    const { data: foreign } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('id')
       .in('id', missingDupIds);
     if (foreign && foreign.length > 0) {

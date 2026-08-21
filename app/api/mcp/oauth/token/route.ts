@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { SignJWT } from 'jose';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 function getJwtSecret(): Uint8Array {
   // Dedicated secret only — no CLERK_SECRET_KEY fallback (keep MCP token
@@ -79,8 +81,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Look up auth code
-    const { data: authCode, error: codeErr } = await supabase
-      .from('McpAuthCode')
+    const { data: authCode, error: codeErr } = await unscoped(supabase
+      .from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify')
       .select('*')
       .eq('code', code)
       .maybeSingle();
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
     // Check expiry
     if (new Date(authCode.expiresAt) < new Date()) {
       console.error('[mcp/token] code expired');
-      await supabase.from('McpAuthCode').delete().eq('code', code);
+      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code expired' }, { status: 400 });
     }
 
@@ -118,14 +120,14 @@ export async function POST(req: NextRequest) {
 
     if (expectedChallenge !== authCode.codeChallenge) {
       console.error('[mcp/token] PKCE mismatch');
-      await supabase.from('McpAuthCode').delete().eq('code', code);
+      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, { status: 400 });
     }
 
     // Verify redirect_uri if provided
     if (redirect_uri && redirect_uri !== authCode.redirectUri) {
       console.error('[mcp/token] redirect_uri mismatch:', { expected: authCode.redirectUri, got: redirect_uri });
-      await supabase.from('McpAuthCode').delete().eq('code', code);
+      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
       return NextResponse.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, { status: 400 });
     }
 
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
       const state = params.state;
       if (!state) {
         console.error('[mcp/token] state required but missing');
-        await supabase.from('McpAuthCode').delete().eq('code', code);
+        await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
         return NextResponse.json({ error: 'invalid_grant', error_description: 'state parameter required' }, { status: 400 });
       }
       const expectedStateHash = crypto
@@ -144,17 +146,17 @@ export async function POST(req: NextRequest) {
         .digest('hex');
       if (expectedStateHash !== authCode.stateHash) {
         console.error('[mcp/token] state nonce verification failed');
-        await supabase.from('McpAuthCode').delete().eq('code', code);
+        await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
         return NextResponse.json({ error: 'invalid_grant', error_description: 'state verification failed' }, { status: 400 });
       }
     }
 
     // Delete code (single-use)
-    await supabase.from('McpAuthCode').delete().eq('code', code);
+    await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
 
     // Update last used
     if (authCode.clientId) {
-      supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', authCode.clientId).then(() => {});
+      unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', authCode.clientId).then(() => {});
     }
 
     // Issue JWT
@@ -190,8 +192,8 @@ export async function POST(req: NextRequest) {
     }
 
     const secretHash = crypto.createHash('sha256').update(client_secret).digest('hex');
-    const { data: key } = await supabase
-      .from('McpApiKey')
+    const { data: key } = await unscoped(supabase
+      .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
       .select('spaceId, clientSecretHash, expiresAt')
       .eq('clientId', client_id)
       .maybeSingle();
@@ -214,7 +216,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_client', error_description: 'key expired' }, { status: 401 });
     }
 
-    supabase.from('McpApiKey').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', client_id).then(() => {});
+    unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', client_id).then(() => {});
 
     let jwtSecret: Uint8Array;
     try {

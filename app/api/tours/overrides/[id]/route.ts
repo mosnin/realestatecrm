@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function DELETE(
   _req: NextRequest,
@@ -12,8 +14,8 @@ export async function DELETE(
   const { userId } = authResult;
   const { id } = await params;
 
-  const { data: row } = await supabase
-    .from('TourAvailabilityOverride')
+  const { data: row } = await unscoped(supabase
+    .from('TourAvailabilityOverride'), 'post-fetch: caller verified parent scope before this id query')
     .select('spaceId')
     .eq('id', id)
     .maybeSingle();

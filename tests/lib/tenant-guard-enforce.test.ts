@@ -60,8 +60,37 @@ describe('TENANT_TABLES registry completeness', () => {
     expect(scopeColumnFor('BrokerMessage')).toBe('brokerageId');
   });
 
+  it('covers cycle-2 request-path tables with a verified scope column', () => {
+    for (const t of [
+      'WorkflowRun',
+      'ConversationTurn',
+      'ChannelMessage',
+      'MessageTemplate',
+      'NotificationPreference',
+      'TourWaitlist',
+      'TourFeedback',
+      'StudioGeneration',
+      'StudioBrand',
+      'DripEnrollment',
+      'DripSequence',
+      'ClientDocument',
+      'ClientInfoRequest',
+      'CommissionSplit',
+      'McpAuthCode',
+      'CalendarEvent',
+    ]) {
+      expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
+    }
+    expect(scopeColumnFor('ChannelMessage')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageIntegrationConnection')).toBe('brokerageId');
+  });
+
   it('does not register DealContact as space-scoped (junction has no spaceId)', () => {
     expect(isTenantTable('DealContact')).toBe(false);
+  });
+
+  it('does not register ChannelMember as brokerage-scoped (junction has no brokerageId)', () => {
+    expect(isTenantTable('ChannelMember')).toBe(false);
   });
 
   it('every registered table scopes by a real tenant column', () => {

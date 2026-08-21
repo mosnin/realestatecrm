@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { sendDraftResumeEmail } from '@/lib/email';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -108,8 +110,8 @@ export async function POST(req: NextRequest) {
         updatePayload.completedAt = new Date().toISOString();
       }
 
-      const { error: updateError } = await supabase
-        .from('FormDraft')
+      const { error: updateError } = await unscoped(supabase
+        .from('FormDraft'), 'post-fetch: caller verified parent scope before this id query')
         .update(updatePayload)
         .eq('id', existingDraft.id);
 
@@ -199,8 +201,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data: draft, error } = await supabase
-      .from('FormDraft')
+    const { data: draft, error } = await unscoped(supabase
+      .from('FormDraft'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, answers, currentStep, formConfigVersion, spaceId, completedAt, expiresAt')
       .eq('resumeToken', token)
       .maybeSingle();

@@ -6,6 +6,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { normalizeArea, parseAreaQuery, type NormalizedArea } from '@/lib/areas';
 import { missingResearchKeys } from '@/lib/area-analysis';
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST /api/areas/analyze — Property IQ area research.
@@ -38,8 +40,8 @@ async function areaFromProperty(
   spaceId: string,
   propertyId: string,
 ): Promise<NormalizedArea | null> {
-  const { data } = await supabase
-    .from('Property')
+  const { data } = await unscoped(supabase
+    .from('Property'), 'post-fetch: caller verified parent scope before this id query')
     .select('city, "stateRegion", "postalCode"')
     .eq('id', propertyId)
     .or(`spaceId.eq.${spaceId},assignedSpaceId.eq.${spaceId}`)

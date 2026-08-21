@@ -13,6 +13,8 @@ import { dealHasOpenSignatureRequests } from '@/lib/esign';
 import { normalizeCloseReason } from '@/lib/close-reason';
 import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import type { Deal, DealStage } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 async function resolveDealAndSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
@@ -41,7 +43,7 @@ export async function GET(
   const { deal } = ctx;
 
   const [stageResult, dcResult, activityResult] = await Promise.all([
-    supabase.from('DealStage').select('*').eq('id', deal.stageId).maybeSingle(),
+    unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', deal.stageId).maybeSingle(),
     supabase.from('DealContact').select('dealId, contactId, role, Contact(id, name, type)').eq('dealId', id),
     supabase.from('DealActivity').select('*').eq('dealId', id).eq('spaceId', ctx.space.id).order('createdAt', { ascending: false }).limit(50),
   ]);
@@ -421,8 +423,8 @@ export async function PATCH(
       }
     }
 
-    const { data: dealRow, error: updateError } = await supabase
-      .from('Deal')
+    const { data: dealRow, error: updateError } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         ...(body.title !== undefined && { title: String(body.title).slice(0, 255) }),
         ...(body.description !== undefined && { description: body.description ? String(body.description).slice(0, 5000) : null }),
@@ -487,8 +489,8 @@ export async function PATCH(
     // Auto-log stage_change and status_change activities
     const activityInserts: Array<{ id: string; dealId: string; spaceId: string; type: string; content: string; metadata: Record<string, unknown> }> = [];
     if (stageChanged) {
-      const { data: newStageRow } = await supabase.from('DealStage').select('name').eq('id', body.stageId).maybeSingle();
-      const { data: oldStageRow } = await supabase.from('DealStage').select('name').eq('id', existing.stageId).maybeSingle();
+      const { data: newStageRow } = await unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('name').eq('id', body.stageId).maybeSingle();
+      const { data: oldStageRow } = await unscoped(supabase.from('DealStage'), 'post-fetch: caller verified parent scope before this id query').select('name').eq('id', existing.stageId).maybeSingle();
       activityInserts.push({
         id: crypto.randomUUID(),
         dealId: id,
@@ -571,8 +573,8 @@ export async function PATCH(
 
     // Get stage for the include
     const stageIdToFetch = body.stageId ?? existing.stageId;
-    const { data: stageRow, error: stageError } = await supabase
-      .from('DealStage')
+    const { data: stageRow, error: stageError } = await unscoped(supabase
+      .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', stageIdToFetch)
       .single();

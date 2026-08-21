@@ -9,6 +9,8 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { Deal, DealStage } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -214,8 +216,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { data: lastDealRows, error: lastDealError } = await supabase
-    .from('Deal')
+  const { data: lastDealRows, error: lastDealError } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
     .select('position')
     .eq('stageId', finalStageId)
     .order('position', { ascending: false })
@@ -371,8 +373,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Get stage for the include
-  const { data: stageRow, error: stageError } = await supabase
-    .from('DealStage')
+  const { data: stageRow, error: stageError } = await unscoped(supabase
+    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', finalStageId)
     .single();

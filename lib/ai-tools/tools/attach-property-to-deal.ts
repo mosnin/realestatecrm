@@ -13,6 +13,8 @@ import { supabase } from '@/lib/supabase';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -96,8 +98,8 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       logger.warn('[tools.attach_property_to_deal] activity insert failed', { dealId: args.dealId }, activityErr);
     }
 
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

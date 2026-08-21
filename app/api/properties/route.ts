@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidListingStatus, isValidPropertyType } from '@/lib/properties';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * Shared input sanitiser. Accepts a loose body and returns an object safe to
@@ -91,8 +93,8 @@ export async function GET(req: NextRequest) {
 
   const search = (req.nextUrl.searchParams.get('search') ?? '').trim().slice(0, 200);
 
-  let query = supabase
-    .from('Property')
+  let query = unscoped(supabase
+    .from('Property'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     // The realtor's own properties PLUS any brokerage-pool property assigned
     // to their space. space.id is a controlled UUID, safe in the or-filter.

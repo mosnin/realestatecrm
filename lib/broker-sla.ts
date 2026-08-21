@@ -33,6 +33,8 @@ import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { notifyBroker } from '@/lib/broker-notify';
 import { sendPushToSpace } from '@/lib/push';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface BrokerageSlaPolicy {
   id: string;
@@ -232,8 +234,8 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
           body: `Assigned to ${realtor} ${waited} minutes ago and still no first response. Reassign or step in.`,
           metadata: { kind: 'lead_sla_breach', contactId: c.id, spaceId: c.spaceId, realtor, waitedMinutes: waited },
         });
-        await supabase
-          .from('Contact')
+        await unscoped(supabase
+          .from('Contact'), 'broker: membership-proved cross-space access')
           .update({ tags: [...tags, ESCALATED_TAG] })
           .eq('id', c.id);
         result.escalated += 1;
@@ -246,8 +248,8 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
         title: 'A lead is waiting on you',
         body: `${c.name} has been waiting ${waited} minutes. Reach out now.`,
       }).catch(() => 0);
-      await supabase
-        .from('Contact')
+      await unscoped(supabase
+        .from('Contact'), 'broker: membership-proved cross-space access')
         .update({ tags: [...tags, NUDGED_TAG] })
         .eq('id', c.id);
       result.nudged += 1;

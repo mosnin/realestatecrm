@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger';
 import { isValidDocumentKind, defaultDocumentKind } from '@/lib/deals/documents';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -45,8 +47,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const space = await resolveDealAndSpace(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('DealDocument')
+  const { data, error } = await unscoped(supabase
+    .from('DealDocument'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('dealId', id)
     .order('createdAt', { ascending: false });

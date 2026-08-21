@@ -5,6 +5,8 @@ import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { logger } from '@/lib/logger';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { _sanitisePropertyBody as sanitiseBody } from '@/app/api/properties/route';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * GET /api/broker/properties — the brokerage's property pool.
@@ -62,8 +64,8 @@ export async function GET() {
 
   const members = await loadMemberSpaces(ctx.brokerage.id, ctx.brokerage.ownerId);
 
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await unscoped(supabase
+    .from('Property'), 'broker: membership-proved cross-space access')
     .select('*')
     .eq('brokerageId', ctx.brokerage.id)
     .order('updatedAt', { ascending: false })

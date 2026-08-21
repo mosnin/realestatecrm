@@ -16,6 +16,8 @@ import {
 } from '@/lib/storage';
 import { generateImage, generateVideo, type GeneratedAsset } from '@/lib/studio/fal';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const MAX_PROMPT = 2000;
 
@@ -100,8 +102,8 @@ export async function runStudioGeneration(args: {
   }
 
   const markFailed = async (message: string): Promise<void> => {
-    await supabase
-      .from('StudioGeneration')
+    await unscoped(supabase
+      .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         status: 'failed',
         errorMessage: message,
@@ -180,8 +182,8 @@ export async function runStudioGeneration(args: {
     throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
-  await supabase
-    .from('StudioGeneration')
+  await unscoped(supabase
+    .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'completed',
       fileId,

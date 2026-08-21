@@ -20,6 +20,8 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { normalizeTriggerEvent } from './triggers';
 import type { IntegrationEvent, IntegrationEventStatus } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface CaptureEventArgs {
   spaceId: string;
@@ -171,8 +173,8 @@ export async function setEventStatus(
   status: IntegrationEventStatus,
 ): Promise<void> {
   try {
-    const { error } = await supabase
-      .from('IntegrationEvent')
+    const { error } = await unscoped(supabase
+      .from('IntegrationEvent'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status, updatedAt: new Date().toISOString() })
       .eq('deliveryId', deliveryId);
     if (error) {

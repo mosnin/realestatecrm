@@ -5,6 +5,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { enqueueTask } from '@/lib/agent/task-state-machine';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // ── GET /api/agent/tasks?spaceId=... ─────────────────────────────────────────
 // List tasks for a space, ordered newest-first, capped at 50.
@@ -100,8 +102,8 @@ export async function POST(req: NextRequest) {
     });
 
     // Fetch the newly-created row so we can return canonical fields.
-    const { data: task, error: fetchError } = await supabase
-      .from('AgentTask')
+    const { data: task, error: fetchError } = await unscoped(supabase
+      .from('AgentTask'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, status, title, goalDescription, createdAt')
       .eq('id', taskId)
       .single();

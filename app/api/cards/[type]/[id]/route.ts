@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // ── GET /api/cards/[type]/[id]?spaceId=... ───────────────────────────────────
 // Returns rich data for expandable chat cards. Auth required — user must own
@@ -155,16 +157,16 @@ async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
   // parallel to keep latency low.
   const [stageResult, propertyResult, contactsResult, activityResult] = await Promise.all([
     row.stageId
-      ? supabase
-          .from('DealStage')
+      ? unscoped(supabase
+          .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
           .select('id, name')
           .eq('id', row.stageId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
 
     row.propertyId
-      ? supabase
-          .from('Property')
+      ? unscoped(supabase
+          .from('Property'), 'post-fetch: caller verified parent scope before this id query')
           .select('id, address')
           .eq('id', row.propertyId)
           .maybeSingle()

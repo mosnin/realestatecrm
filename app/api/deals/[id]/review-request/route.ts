@@ -5,6 +5,8 @@ import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForReviewRequested } from '@/lib/notification-voice';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -58,8 +60,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Resolve the deal (and its Space) by id. We use the service-role client,
   // so we need an independent access check after the fetch. The access check
   // is then routed through requireSpaceOwner(slug) to mirror the spec.
-  const { data: dealRow, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: dealRow, error: dealErr } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, title, spaceId, Space(id, slug, brokerageId)')
     .eq('id', dealId)
     .maybeSingle<DealLookupRow>();

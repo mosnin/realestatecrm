@@ -18,6 +18,8 @@ import { deleteContactVector, syncContact } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import type { Contact } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -221,8 +223,8 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
     deleteContactVector(ctx.space.id, args.mergeId).catch((err) =>
       logger.warn('[tools.merge_persons] vector delete failed', { merge: args.mergeId }, err),
     );
-    const { data: survivor } = await supabase
-      .from('Contact')
+    const { data: survivor } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.keepId)
       .maybeSingle();

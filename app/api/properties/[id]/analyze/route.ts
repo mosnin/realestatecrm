@@ -11,6 +11,8 @@ import {
 } from '@/lib/property-analysis';
 import { normalizeArea } from '@/lib/areas';
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST /api/properties/[id]/analyze
@@ -44,8 +46,8 @@ interface PropertyRow extends PropertyRecord {
 async function resolve(userId: string, id: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data } = await supabase
-    .from('Property')
+  const { data } = await unscoped(supabase
+    .from('Property'), 'post-fetch: caller verified parent scope before this id query')
     .select(SELECT)
     .eq('id', id)
     .or(`spaceId.eq.${space.id},assignedSpaceId.eq.${space.id}`)

@@ -29,6 +29,7 @@ import { createAppNotification } from '@/lib/notifications';
 import { evaluateConditions } from './conditions';
 import { executeAction, type WorkflowContext, type ActionStepResult } from './actions';
 import { walkGraph } from './graph-walk';
+import { unscoped } from '@/lib/supabase-guard';
 import type {
   ConditionGroup,
   TriggerType,
@@ -105,8 +106,8 @@ async function finishRun(input: {
   summary?: string;
   error?: string | null;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('WorkflowRun')
+  const { error } = await unscoped(supabase
+    .from('WorkflowRun'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: input.status,
       summary: input.summary ?? null,
@@ -124,8 +125,8 @@ async function updateWorkflowLastRun(input: {
   workflowId: string;
   lastRunStatus: 'ok' | 'error' | 'skipped';
 }): Promise<void> {
-  const { error } = await supabase
-    .from('Workflow')
+  const { error } = await unscoped(supabase
+    .from('Workflow'), 'post-fetch: caller verified parent scope before this id query')
     .update({ lastRunAt: new Date().toISOString(), lastRunStatus: input.lastRunStatus })
     .eq('id', input.workflowId);
   if (error) {

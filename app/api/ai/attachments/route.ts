@@ -24,6 +24,8 @@ import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import { uploadObject, deleteObject, getSignedDownloadUrl, buildKey } from '@/lib/storage';
 import { extractAttachmentText } from '@/lib/extraction/extract';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** TTL for the URL returned on POST. The chat UI uses it for the inline
  *  preview the moment the upload completes; 20 minutes is long enough for
@@ -258,8 +260,8 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  const { data, error } = await supabase
-    .from('Attachment')
+  const { data, error } = await unscoped(supabase
+    .from('Attachment'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, storagePath')
     .eq('id', id)
     .maybeSingle();
@@ -278,7 +280,7 @@ export async function DELETE(req: NextRequest) {
     logger.warn('[ai/attachments] storage remove failed', { spaceId: space.id }, err);
   });
 
-  const { error: delError } = await supabase.from('Attachment').delete().eq('id', id);
+  const { error: delError } = await unscoped(supabase.from('Attachment'), 'post-fetch: caller verified parent scope before this id query').delete().eq('id', id);
   if (delError) {
     logger.error('[ai/attachments] delete failed', { spaceId: space.id }, delError);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

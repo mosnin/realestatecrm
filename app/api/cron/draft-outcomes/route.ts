@@ -36,6 +36,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // Window edges. Adjust here, not at the call site.
 const CHECK_DELAY_MS = 24 * 60 * 60 * 1000;        // wait 1 day before judging
@@ -89,8 +91,8 @@ async function handler(req: NextRequest) {
   const upperBound = new Date(now - CHECK_DELAY_MS).toISOString();
 
   // ── 1. Pull candidate drafts ─────────────────────────────────────────────
-  const { data: drafts, error: draftsErr } = await supabase
-    .from('AgentDraft')
+  const { data: drafts, error: draftsErr } = await unscoped(supabase
+    .from('AgentDraft'), 'cron: cross-tenant discovery then per-row work')
     .select('id, spaceId, dealId, updatedAt')
     .eq('status', 'sent')
     .is('outcome_signal', null)
@@ -123,8 +125,8 @@ async function handler(req: NextRequest) {
   const stageKindsById = new Map<string, string | null>();
 
   if (dealIds.length > 0) {
-    const { data: deals, error: dealsErr } = await supabase
-      .from('Deal')
+    const { data: deals, error: dealsErr } = await unscoped(supabase
+      .from('Deal'), 'cron: cross-tenant discovery then per-row work')
       .select('id, status, stageId, stageChangedAt, updatedAt')
       .in('id', dealIds);
     if (dealsErr) {
@@ -141,8 +143,8 @@ async function handler(req: NextRequest) {
       ),
     );
     if (stageIds.length > 0) {
-      const { data: stages, error: stagesErr } = await supabase
-        .from('DealStage')
+      const { data: stages, error: stagesErr } = await unscoped(supabase
+        .from('DealStage'), 'cron: cross-tenant discovery then per-row work')
         .select('id, kind')
         .in('id', stageIds);
       if (stagesErr) {
@@ -164,8 +166,8 @@ async function handler(req: NextRequest) {
   for (const draft of draftRows) {
     const signal = classifyDraft(draft, dealsById, stageKindsById);
 
-    const { error: updErr } = await supabase
-      .from('AgentDraft')
+    const { error: updErr } = await unscoped(supabase
+      .from('AgentDraft'), 'cron: cross-tenant discovery then per-row work')
       .update({
         outcome_signal: signal,
         outcome_checked_at: checkedAt,

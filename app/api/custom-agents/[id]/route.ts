@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,8 +20,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const { data: agent, error } = await supabase
-    .from('CustomAgent')
+  const { data: agent, error } = await unscoped(supabase
+    .from('CustomAgent'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -53,8 +55,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   // Fetch the agent and verify ownership before mutating.
-  const { data: existing, error: fetchError } = await supabase
-    .from('CustomAgent')
+  const { data: existing, error: fetchError } = await unscoped(supabase
+    .from('CustomAgent'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId')
     .eq('id', id)
     .maybeSingle();
@@ -121,8 +123,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (capabilities !== undefined) updates.capabilities = capabilities;
   updates.updatedAt = new Date().toISOString();
 
-  const { data: agent, error: updateError } = await supabase
-    .from('CustomAgent')
+  const { data: agent, error: updateError } = await unscoped(supabase
+    .from('CustomAgent'), 'post-fetch: caller verified parent scope before this id query')
     .update(updates)
     .eq('id', id)
     .select('*')
@@ -150,8 +152,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   // Fetch the agent and verify ownership before mutating.
-  const { data: existing, error: fetchError } = await supabase
-    .from('CustomAgent')
+  const { data: existing, error: fetchError } = await unscoped(supabase
+    .from('CustomAgent'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId')
     .eq('id', id)
     .maybeSingle();
@@ -167,8 +169,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { error: updateError } = await supabase
-    .from('CustomAgent')
+  const { error: updateError } = await unscoped(supabase
+    .from('CustomAgent'), 'post-fetch: caller verified parent scope before this id query')
     .update({ isActive: false, updatedAt: new Date().toISOString() })
     .eq('id', id);
 

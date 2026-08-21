@@ -4,6 +4,8 @@ import { requireContactAccess } from '@/lib/api-auth';
 import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -46,8 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Notify the client by their contact email (best-effort).
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
     .select('email')
     .eq('id', contactId)
     .maybeSingle();

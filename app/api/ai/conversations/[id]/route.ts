@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getAuthorizedRealtorConversation } from '@/lib/chat/realtor-conversation-auth';
 import { parseWorkExecutionMode } from '@/lib/chat/work-execution-mode';
@@ -51,11 +52,9 @@ export async function PATCH(
           updatedAt: new Date().toISOString(),
         };
 
-    const { data, error } = await supabase
-      .from('Conversation')
+    const { data, error } = await tenantTable(supabase, 'Conversation', { spaceId: conv.spaceId })
       .update(patch)
       .eq('id', id)
-      .eq('spaceId', conv.spaceId)
       .select()
       .single();
     if (error) return NextResponse.json({ error: 'Failed to update conversation' }, { status: 500 });
@@ -82,7 +81,9 @@ export async function DELETE(
     const conv = await getConversationAndVerifyOwner(id, userId);
     if (!conv) return NextResponse.json({ error: 'Not found or Forbidden' }, { status: 404 });
 
-    const { error } = await supabase.from('Conversation').delete().eq('id', id).eq('spaceId', conv.spaceId);
+    const { error } = await tenantTable(supabase, 'Conversation', { spaceId: conv.spaceId })
+      .delete()
+      .eq('id', id);
     if (error) return NextResponse.json({ error: 'Failed to delete conversation' }, { status: 500 });
 
     return NextResponse.json({ success: true });

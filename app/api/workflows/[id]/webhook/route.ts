@@ -30,6 +30,8 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { logger } from '@/lib/logger';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -80,8 +82,8 @@ export async function POST(
   // Load the workflow by id alone. We don't have a session here, so we query
   // without spaceId gating — the UUID itself is the credential. We gate on
   // enabled + trigger.type below.
-  const { data: row, error: dbErr } = await supabase
-    .from('Workflow')
+  const { data: row, error: dbErr } = await unscoped(supabase
+    .from('Workflow'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, "spaceId", trigger, conditions, actions, autonomy, graph, enabled')
     .eq('id', id)
     .maybeSingle();

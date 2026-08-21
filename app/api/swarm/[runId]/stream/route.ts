@@ -19,6 +19,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const TERMINAL_RUN_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 const TERMINAL_EVENT_TYPES = new Set(['swarm_completed', 'swarm_failed', 'swarm_cancelled']);
@@ -39,8 +41,8 @@ export async function GET(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: run } = await supabase
-    .from('SwarmRun')
+  const { data: run } = await unscoped(supabase
+    .from('SwarmRun'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, status')
     .eq('id', runId)
     .maybeSingle();

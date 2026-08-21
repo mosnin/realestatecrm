@@ -31,6 +31,8 @@ import { dispatchWorkspaceRunTask } from '@/lib/workspace-runs/server';
 import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Resolve the space owned by a user (Space.ownerId is unique). Best-effort —
  *  returns 'unknown' so the DLQ write never fails on the NOT NULL spaceId. */
@@ -73,8 +75,8 @@ export const publishScheduledPost = inngest.createFunction(
       const postId = String(data.postId ?? '');
       let spaceId = 'unknown';
       if (postId) {
-        const { data: post } = await supabase
-          .from('StudioPost')
+        const { data: post } = await unscoped(supabase
+          .from('StudioPost'), 'background job: spaceId from event payload')
           .select('userId')
           .eq('id', postId)
           .maybeSingle();
@@ -94,8 +96,8 @@ export const publishScheduledPost = inngest.createFunction(
 
     // Load the post and the storage key of its image.
     const post = await step.run('load-post', async (): Promise<LoadedPost | null> => {
-      const { data } = await supabase
-        .from('StudioPost')
+      const { data } = await unscoped(supabase
+        .from('StudioPost'), 'background job: spaceId from event payload')
         .select('status, userId, caption, platforms, fileId')
         .eq('id', postId)
         .maybeSingle();
@@ -107,8 +109,8 @@ export const publishScheduledPost = inngest.createFunction(
         platforms: string[] | null;
         fileId: string;
       };
-      const { data: file } = await supabase
-        .from('File')
+      const { data: file } = await unscoped(supabase
+        .from('File'), 'background job: spaceId from event payload')
         .select('storageKey')
         .eq('id', row.fileId)
         .maybeSingle();
@@ -128,8 +130,8 @@ export const publishScheduledPost = inngest.createFunction(
 
     if (!post.storageKey) {
       await step.run('mark-missing', async () => {
-        await supabase
-          .from('StudioPost')
+        await unscoped(supabase
+          .from('StudioPost'), 'background job: spaceId from event payload')
           .update({
             status: 'failed',
             platformResults: { error: 'The post image is missing.' },
@@ -147,8 +149,8 @@ export const publishScheduledPost = inngest.createFunction(
     // both would update to 'publishing' and post twice. If the CAS returns
     // no row, another worker already claimed it; bail.
     const claim = await step.run('claim', async () => {
-      const { data: claimedRow, error: claimErr } = await supabase
-        .from('StudioPost')
+      const { data: claimedRow, error: claimErr } = await unscoped(supabase
+        .from('StudioPost'), 'background job: spaceId from event payload')
         .update({ status: 'publishing', updatedAt: new Date().toISOString() })
         .eq('id', postId)
         .eq('status', 'scheduled')
@@ -184,8 +186,8 @@ export const publishScheduledPost = inngest.createFunction(
     }
 
     await step.run('finalize', async () => {
-      await supabase
-        .from('StudioPost')
+      await unscoped(supabase
+        .from('StudioPost'), 'background job: spaceId from event payload')
         .update({
           status: anyOk ? 'posted' : 'failed',
           platformResults: results,

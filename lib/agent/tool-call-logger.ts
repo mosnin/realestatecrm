@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
 import { after } from 'next/server';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 interface ToolCallRecord {
   stepId: string;
@@ -64,7 +66,7 @@ async function persistToolCallComplete(stepId: string, outputSummary: string): P
   inFlight.delete(stepId);
 
   try {
-    await supabase.from('ExecutionStep').update({
+    await unscoped(supabase.from('ExecutionStep'), 'post-fetch: caller verified parent scope before this id query').update({
       outputSummary: outputSummary.slice(0, 500),
       toolResult: { output: outputSummary.slice(0, 500) },
       status: 'completed',
@@ -91,7 +93,7 @@ async function persistToolCallError(stepId: string, error: string): Promise<void
   inFlight.delete(stepId);
 
   try {
-    await supabase.from('ExecutionStep').update({
+    await unscoped(supabase.from('ExecutionStep'), 'post-fetch: caller verified parent scope before this id query').update({
       errorMessage: error.slice(0, 1000),
       outputSummary: error.slice(0, 500),
       status: 'failed',

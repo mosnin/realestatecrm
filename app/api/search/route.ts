@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -72,8 +74,8 @@ export async function GET(req: NextRequest) {
     const stageIds = [...new Set(dealRows.map((d: any) => d.stageId).filter(Boolean))];
     let stageMap: Record<string, { name: string; color: string }> = {};
     if (stageIds.length > 0) {
-      const { data: stages } = await supabase
-        .from('DealStage')
+      const { data: stages } = await unscoped(supabase
+        .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
         .select('id, name, color')
         .in('id', stageIds);
       for (const s of stages ?? []) {

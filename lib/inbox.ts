@@ -26,6 +26,8 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { InboxChannel, InboxDirection } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Postgres unique_violation — raised when the partial unique index on
  *  (spaceId, channel, externalId) rejects a concurrent duplicate insert. */
@@ -188,8 +190,8 @@ export async function recordInboundMessage(
   const messageId = (data as { id: string }).id;
 
   // Bump the rollup now that the inbound message is durably written.
-  const { error: bumpError } = await supabase
-    .from('InboxThread')
+  const { error: bumpError } = await unscoped(supabase
+    .from('InboxThread'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       lastMessageAt: now,
       lastDirection: 'inbound' satisfies InboxDirection,
@@ -257,8 +259,8 @@ export async function recordOutboundMessage(
   const messageId = (data as { id: string }).id;
 
   // Flip the rollup to outbound. unreadCount is intentionally left untouched.
-  const { error: bumpError } = await supabase
-    .from('InboxThread')
+  const { error: bumpError } = await unscoped(supabase
+    .from('InboxThread'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       lastMessageAt: now,
       lastDirection: 'outbound' satisfies InboxDirection,

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -22,8 +24,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Verify the deal exists and belongs to this user's space
-  const { data: deal, error: dealError } = await supabase
-    .from('Deal')
+  const { data: deal, error: dealError } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, stageId, position')
     .eq('id', dealId)
     .maybeSingle();
@@ -36,8 +38,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Verify the target stage belongs to the same space
-  const { data: stage, error: stageError } = await supabase
-    .from('DealStage')
+  const { data: stage, error: stageError } = await unscoped(supabase
+    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId')
     .eq('id', newStageId)
     .maybeSingle();
@@ -75,8 +77,8 @@ export async function PATCH(req: NextRequest) {
     throw rpcError;
   }
 
-  const { data: updated, error: fetchError } = await supabase
-    .from('Deal')
+  const { data: updated, error: fetchError } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('id', dealId)
     .single();

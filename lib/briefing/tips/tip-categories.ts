@@ -34,6 +34,8 @@
 import { supabase } from '@/lib/supabase';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -104,8 +106,8 @@ export async function tipDealClosingSoonNoTouch(spaceId: string): Promise<Signal
   const signals: Signal[] = [];
   for (const deal of data as Array<{ id: string; title: string; closeDate: string; contactId: string | null }>) {
     if (!deal.contactId) continue;
-    const { count } = await supabase
-      .from('ContactActivity')
+    const { count } = await unscoped(supabase
+      .from('ContactActivity'), 'post-fetch: caller verified parent scope before this id query')
       .select('id', { count: 'exact', head: true })
       .eq('contactId', deal.contactId)
       .gte('createdAt', fiveDaysAgo);
@@ -149,8 +151,8 @@ export async function tipWonDealReviewAsk(spaceId: string): Promise<Signal[]> {
   for (const deal of data as Array<{ id: string; title: string; closeDate: string; contactId: string | null }>) {
     if (!deal.contactId) continue;
     // Has any ContactActivity note mentioned "review" or "testimonial"?
-    const { data: notes } = await supabase
-      .from('ContactActivity')
+    const { data: notes } = await unscoped(supabase
+      .from('ContactActivity'), 'post-fetch: caller verified parent scope before this id query')
       .select('content')
       .eq('contactId', deal.contactId)
       .eq('type', 'note')
@@ -200,8 +202,8 @@ export async function tipPastClientReferral(spaceId: string): Promise<Signal[]> 
   const signals: Signal[] = [];
   for (const deal of deals as Array<{ id: string; contactId: string | null; closeDate: string; title: string }>) {
     if (!deal.contactId) continue;
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, name, lastContactedAt')
       .eq('id', deal.contactId)
       .maybeSingle();
@@ -519,8 +521,8 @@ export async function tipStageStagnation(spaceId: string): Promise<Signal[]> {
   if (stagnantStageIds.length === 0) return [];
 
   // Resolve stage names in one shot.
-  const { data: stages } = await supabase
-    .from('DealStage')
+  const { data: stages } = await unscoped(supabase
+    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, name')
     .in('id', stagnantStageIds);
   const stageNameById = new Map(

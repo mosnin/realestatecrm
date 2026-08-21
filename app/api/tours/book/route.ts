@@ -7,6 +7,10 @@ import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
+import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar/mirror-tour';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { tenantTable } from '@/lib/tenant-db';
+import { logger } from '@/lib/logger';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -185,19 +189,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
 
-  // Fetch the created tour for the response
-  const { data: tour, error: fetchError } = await supabase
-    .from('Tour')
+  const calendar = await mirrorTourBookingToCalendar({
+    spaceId: space.id,
+    tourId,
+    guestName: guestName.trim(),
+    guestEmail: guestEmail.trim().toLowerCase(),
+    guestPhone: guestPhone?.trim() || null,
+    propertyAddress: propertyAddress?.trim() || null,
+    notes: notes?.trim() || null,
+    startsAt: start.toISOString(),
+    endsAt: end.toISOString(),
+    createdBy: 'realtor',
+  });
+  if (calendar.attempted && !calendar.externalOk) {
+    await rollbackTourBooking(space.id, tourId);
+    logger.warn('[tours/book] calendar write failed — tour rolled back', {
+      spaceId: space.id,
+      tourId,
+      via: calendar.via,
+    });
+    return NextResponse.json(
+      { error: 'Could not add this tour to the calendar. Please try another time.' },
+      { status: 502 },
+    );
+  }
+
+  try {
+    await advanceDealFromEvent({
+      spaceId: space.id,
+      contactId,
+      event: 'tour_booked',
+      sourceTourId: tourId,
+      title: guestName.trim(),
+      address: propertyAddress?.trim() || null,
+    });
+  } catch (err) {
+    logger.warn('[tours/book] pipeline advance failed', { spaceId: space.id, tourId }, err);
+  }
+
+  const { data: tour, error: fetchError } = await tenantTable(supabase, 'Tour', {
+    spaceId: space.id,
+  })
     .select('*')
     .eq('id', tourId)
     .single();
   if (fetchError) throw fetchError;
 
   // Send confirmation email (non-blocking)
-  const { data: settingsFull } = await supabase
-    .from('SpaceSetting')
+  const { data: settingsFull } = await tenantTable(supabase, 'SpaceSetting', {
+    spaceId: space.id,
+  })
     .select('businessName')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const emailData: TourEmailData = {
     guestName: tour.guestName,

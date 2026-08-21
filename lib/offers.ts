@@ -22,6 +22,8 @@
 import 'server-only';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { logger } from '@/lib/logger';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -313,6 +315,20 @@ export async function transition(
     note: note ?? null,
   });
   if (eventError) throw eventError;
+
+  if (to === 'accepted' && existing.dealId) {
+    try {
+      await advanceDealFromEvent({
+        spaceId,
+        dealId: existing.dealId,
+        event: 'offer_accepted',
+        title: existing.buyerName,
+        address: existing.propertyAddress,
+      });
+    } catch (err) {
+      logger.warn('[offers] pipeline advance failed', { spaceId, offerId, dealId: existing.dealId }, err);
+    }
+  }
 
   return data as unknown as Offer;
 }

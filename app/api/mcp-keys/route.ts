@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // GET /api/mcp-keys?slug=xxx — list all MCP API keys for the user's space
 export async function GET(req: NextRequest) {
@@ -119,7 +121,7 @@ export async function DELETE(req: NextRequest) {
 
     if (!existing) return NextResponse.json({ error: 'API key not found' }, { status: 404 });
 
-    const { error } = await supabase.from('McpApiKey').delete().eq('id', id);
+    const { error } = await unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('id', id);
     if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
 
     return NextResponse.json({ success: true });

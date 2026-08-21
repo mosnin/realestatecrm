@@ -210,8 +210,8 @@ export async function verifyExtToken(
   if (link.revokedAt) return null;
 
   // Best-effort — an update failure here must never fail the auth check.
-  void supabase
-    .from('BrowserLink')
+  void unscoped(supabase
+    .from('BrowserLink'), 'pairing code / extension token lookup')
     .update({ lastUsedAt: new Date().toISOString() })
     .eq('id', link.id)
     .then(() => undefined, () => undefined);

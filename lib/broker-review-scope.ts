@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export type BrokerageReviewDeal = {
   deal: {
@@ -25,8 +27,8 @@ export async function loadBrokerageScopedReviewDeal(params: {
 }): Promise<BrokerageReviewDeal | null> {
   const { dealId, brokerageId } = params;
 
-  const { data: deal, error: dealError } = await supabase
-    .from('Deal')
+  const { data: deal, error: dealError } = await unscoped(supabase
+    .from('Deal'), 'broker: membership-proved cross-space access')
     .select('id, title, value, spaceId')
     .eq('id', dealId)
     .maybeSingle<BrokerageReviewDeal['deal']>();

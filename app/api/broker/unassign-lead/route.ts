@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const unassignLeadSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
@@ -87,8 +89,8 @@ export async function POST(req: NextRequest) {
       value: brokerSpace.id,
     };
     if (!brokerContact) {
-      const { data: brokerageContact, error: brokerageContactError } = await supabase
-        .from('Contact')
+      const { data: brokerageContact, error: brokerageContactError } = await unscoped(supabase
+        .from('Contact'), 'broker: membership-proved cross-space access')
         .select('*')
         .eq('id', contactId)
         .eq('brokerageId', brokerage.id)
@@ -300,8 +302,8 @@ export async function POST(req: NextRequest) {
       'unassigned',
     ];
 
-    const { error: updateError } = await supabase
-      .from('Contact')
+    const { error: updateError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .update({
         tags: updatedTags,
         notes: unassignmentNote,

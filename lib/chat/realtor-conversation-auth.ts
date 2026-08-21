@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { isRealtorConversation } from '@/lib/chat/conversation-access';
 
 export interface AuthorizedRealtorConversation {
@@ -55,12 +56,14 @@ export async function getAuthorizedRealtorConversation({
   const ownedSpaces = (spaces ?? []) as Array<{ id: string; ownerId: string }>;
   if (ownedSpaces.length === 0) return null;
 
-  const { data: conversation, error: convErr } = await supabase
-    .from('Conversation')
-    .select('id, spaceId, title, mode, executionMode')
-    .eq('id', conversationId)
-    .in('spaceId', ownedSpaces.map((space) => space.id))
-    .maybeSingle();
+  const { data: conversation, error: convErr } = await unscoped(
+    supabase
+      .from('Conversation')
+      .select('id, spaceId, title, mode, executionMode')
+      .eq('id', conversationId)
+      .in('spaceId', ownedSpaces.map((space) => space.id)),
+    'post-fetch: .in(spaceId, ownedSpaces) after Space.ownerId proof',
+  ).maybeSingle();
   if (convErr) throw convErr;
   if (!conversation) return null;
 

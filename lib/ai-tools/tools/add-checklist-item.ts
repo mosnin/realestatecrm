@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const CHECKLIST_KINDS = [
   'earnest_money',
@@ -86,8 +88,8 @@ export const addChecklistItemTool = defineTool<typeof parameters, AddChecklistIt
 
     // Position = current max + 1 so the item appears at the bottom of the
     // checklist. Matches POST /api/deals/[id]/checklist.
-    const { data: maxRow } = await supabase
-      .from('DealChecklistItem')
+    const { data: maxRow } = await unscoped(supabase
+      .from('DealChecklistItem'), 'post-fetch: caller verified parent scope before this id query')
       .select('position')
       .eq('dealId', args.dealId)
       .order('position', { ascending: false })

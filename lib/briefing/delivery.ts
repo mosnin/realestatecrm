@@ -25,6 +25,8 @@ import { sendSMS } from '@/lib/sms';
 import { briefEmailHtml, briefEmailSubject } from './email-template';
 import { buildBriefSms, BRIEF_SMS_FIRST_DISCLOSURE } from './sms-template';
 import type { Brief } from './types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 interface DeliverySpaceContext {
   spaceId: string;
@@ -81,8 +83,8 @@ async function deliverEmail(ctx: DeliverContext, isEmpty: boolean): Promise<Deli
 
   // Atomic claim. Whichever concurrent tick gets RETURNING wins.
   const nowIso = new Date().toISOString();
-  const { data: claimed, error: claimErr } = await supabase
-    .from('Brief')
+  const { data: claimed, error: claimErr } = await unscoped(supabase
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .update({ emailSentAt: nowIso })
     .eq('id', ctx.briefId)
     .is('emailSentAt', null)
@@ -126,8 +128,8 @@ async function deliverEmail(ctx: DeliverContext, isEmpty: boolean): Promise<Deli
     }
 
     const messageId = result.data?.id ?? null;
-    await supabase
-      .from('Brief')
+    await unscoped(supabase
+      .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
       .update({ emailMessageId: messageId, briefDeliveryErrorCode: null })
       .eq('id', ctx.briefId);
 
@@ -142,8 +144,8 @@ async function deliverEmail(ctx: DeliverContext, isEmpty: boolean): Promise<Deli
 async function handleEmailFailure(briefId: string, code: 'transient' | 'permanent'): Promise<DeliveryResult['email']> {
   if (code === 'transient') {
     // Release the lock so the next tick retries within today.
-    await supabase
-      .from('Brief')
+    await unscoped(supabase
+      .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
       .update({ emailSentAt: null })
       .eq('id', briefId)
       .is('emailMessageId', null);
@@ -153,8 +155,8 @@ async function handleEmailFailure(briefId: string, code: 'transient' | 'permanen
   // brief. Auto-disable after 3 consecutive permanent failures (counted
   // by a separate per-space scan in the cron — not done here to keep this
   // function pure-per-brief).
-  await supabase
-    .from('Brief')
+  await unscoped(supabase
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .update({ briefDeliveryErrorCode: `email_${code}` })
     .eq('id', briefId);
   return 'failed-permanent';
@@ -185,8 +187,8 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
   if (!ctx.space.phoneNumber) return 'skipped-no-phone';
 
   const nowIso = new Date().toISOString();
-  const { data: claimed, error: claimErr } = await supabase
-    .from('Brief')
+  const { data: claimed, error: claimErr } = await unscoped(supabase
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .update({ smsSentAt: nowIso })
     .eq('id', ctx.briefId)
     .is('smsSentAt', null)
@@ -221,16 +223,16 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
     if (!sent) {
       // sendSMS already classifies/logs internally — treat as transient
       // and release the lock so we retry within today.
-      await supabase
-        .from('Brief')
+      await unscoped(supabase
+        .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
         .update({ smsSentAt: null })
         .eq('id', ctx.briefId)
         .is('smsMessageId', null);
       return 'failed-transient';
     }
 
-    await supabase
-      .from('Brief')
+    await unscoped(supabase
+      .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
       .update({ briefDeliveryErrorCode: null })
       .eq('id', ctx.briefId);
 
@@ -238,8 +240,8 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
     return 'sent';
   } catch (err) {
     logger.error('[brief-delivery] sms send threw', { briefId: ctx.briefId }, err as Error);
-    await supabase
-      .from('Brief')
+    await unscoped(supabase
+      .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
       .update({ smsSentAt: null })
       .eq('id', ctx.briefId)
       .is('smsMessageId', null);

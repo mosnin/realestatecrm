@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * POST /api/applications/portal/tour-request
@@ -81,8 +83,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify token + application
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'capability token: application portal')
     .select('id, spaceId, name, email')
     .eq('applicationRef', applicationRef)
     .eq('statusPortalToken', token)

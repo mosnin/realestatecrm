@@ -21,6 +21,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { composeBrief } from '@/lib/briefing/compose';
 import { localDateIn } from '@/lib/briefing/timing';
 import type { Brief, BriefCardTap, SignalKind, SignalSource } from '@/lib/briefing/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const DEFAULT_TIMEZONE = 'America/New_York';
 
@@ -246,7 +248,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (Object.keys(update).length > 0) {
-    await supabase.from('Brief').update(update).eq('id', existing.id);
+    await unscoped(supabase.from('Brief'), 'post-fetch: caller verified parent scope before this id query').update(update).eq('id', existing.id);
   }
 
   // The first ever 'seen' PATCH stamps briefIntroSeenAt so the one-line

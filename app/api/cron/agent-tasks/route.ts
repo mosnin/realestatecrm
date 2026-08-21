@@ -34,6 +34,8 @@ import { transitionTask } from '@/lib/agent/task-state-machine';
 import { isSpaceDisabled } from '@/lib/agent/kill-switch';
 import { monitorCron } from '@/lib/cron-monitor';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 // The Modal-free in-process fallback blocks until the headless run finishes
@@ -77,8 +79,8 @@ async function handler(req: NextRequest) {
   // ── 1. Queued executable tasks, oldest first ────────────────────────────
   // 'sla' rows are durable follow-up reminders, not executable goals — see
   // the header. Everything else ('manual', approval-requeued, retries) runs.
-  const { data: rows, error: queryErr } = await supabase
-    .from('AgentTask')
+  const { data: rows, error: queryErr } = await unscoped(supabase
+    .from('AgentTask'), 'cron: cross-tenant discovery then per-row work')
     .select('id, spaceId, title, description, goalDescription')
     .eq('status', 'queued')
     // updatedAt (not createdAt): gated tasks get their updatedAt touched
@@ -175,8 +177,8 @@ async function handler(req: NextRequest) {
     // (they stay 'queued' and run when the space unblocks) — without this,
     // one blocked space with >MAX_SCAN_PER_TICK queued tasks permanently
     // fills the window and starves every other tenant's tasks.
-    const { error: touchErr } = await supabase
-      .from('AgentTask')
+    const { error: touchErr } = await unscoped(supabase
+      .from('AgentTask'), 'cron: cross-tenant discovery then per-row work')
       .update({ updatedAt: new Date().toISOString() })
       .in('id', gatedTasks.map((t) => t.id));
     if (touchErr) {

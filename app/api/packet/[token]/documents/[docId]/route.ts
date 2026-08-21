@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * Public signed-URL endpoint for documents inside a packet. No auth — gated
@@ -14,8 +16,8 @@ export async function GET(
 ) {
   const { token, docId } = await params;
 
-  const { data: packet } = await supabase
-    .from('PropertyPacket')
+  const { data: packet } = await unscoped(supabase
+    .from('PropertyPacket'), 'capability token: packet access token')
     .select('includeDocumentIds, spaceId, expiresAt, revokedAt')
     .eq('token', token)
     .maybeSingle();

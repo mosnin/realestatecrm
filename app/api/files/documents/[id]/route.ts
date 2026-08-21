@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { uploadObject, deleteObject, getObjectText } from '@/lib/storage';
 import { DOC_MIME } from '../route';
@@ -22,11 +23,9 @@ const MAX_DOC_BYTES = 1_000_000;
 const MAX_TITLE_LEN = 200;
 
 function loadDoc(id: string, spaceId: string) {
-  return supabase
-    .from('File')
+  return tenantTable(supabase, 'File', { spaceId })
     .select('id, spaceId, storageKey, name, createdAt')
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .eq('mimeType', DOC_MIME)
     .maybeSingle();
 }
@@ -112,11 +111,9 @@ export async function PUT(
     return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
   }
 
-  const { error: updateError } = await supabase
-    .from('File')
+  const { error: updateError } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .update({ name: title, sizeBytes: bytes })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (updateError) {
     logger.error('[files/documents/id] row update failed', { id }, updateError);
@@ -143,11 +140,9 @@ export async function DELETE(
   }
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error: delError } = await supabase
-    .from('File')
+  const { error: delError } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (delError) {
     logger.error('[files/documents/id] delete failed', { id }, delError);

@@ -19,6 +19,8 @@ import { localDateIn } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import type { Brief } from '@/lib/briefing/types';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const DAILY_LIMIT = 3;
 const DEFAULT_TIMEZONE = 'America/New_York';
@@ -88,7 +90,7 @@ export async function POST() {
 
   // Clean up the synthetic row — we never want it in the analytics
   // aggregations or in tomorrow's "yesterday" link.
-  await supabase.from('Brief').delete().eq('id', row.id);
+  await unscoped(supabase.from('Brief'), 'post-fetch: caller verified parent scope before this id query').delete().eq('id', row.id);
 
   return NextResponse.json({ ok: true, result });
 }
