@@ -162,12 +162,15 @@ function hourOptions(): { value: number; label: string }[] {
 
 // ── Manager ──────────────────────────────────────────────────────────────────
 
-export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: string } = {}) {
+export function RoutinesManager({
+  apiBase = '/api/routines',
+  startOpen = false,
+}: { apiBase?: string; startOpen?: boolean } = {}) {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(startOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -195,6 +198,13 @@ export function RoutinesManager({ apiBase = '/api/routines' }: { apiBase?: strin
     void loadRoutines();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase]);
+
+  useEffect(() => {
+    if (startOpen) {
+      setComposerOpen(true);
+      setEditingId(null);
+    }
+  }, [startOpen]);
 
   async function createRoutine(payload: ComposerValue) {
     setBusyId('new');
