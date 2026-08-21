@@ -79,10 +79,10 @@ async function deleteSpaceStorageObjects(spaceId: string): Promise<void> {
   // Attachment + File are space-scoped directly. DealDocument + ContactDocument
   // also carry spaceId, so a single spaceId filter reaches every blob.
   const [att, file, deal, contact] = await Promise.all([
-    supabase.from('Attachment').select('storagePath').eq('spaceId', spaceId),
-    supabase.from('File').select('storageKey').eq('spaceId', spaceId),
-    supabase.from('DealDocument').select('storagePath').eq('spaceId', spaceId),
-    supabase.from('ContactDocument').select('storageKey').eq('spaceId', spaceId),
+    tenantTable(supabase, 'Attachment', { spaceId }).select('storagePath'),
+    tenantTable(supabase, 'File', { spaceId }).select('storageKey'),
+    tenantTable(supabase, 'DealDocument', { spaceId }).select('storagePath'),
+    tenantTable(supabase, 'ContactDocument', { spaceId }).select('storageKey'),
   ]);
 
   collect(att.data as Array<Record<string, unknown>> | null, 'storagePath');

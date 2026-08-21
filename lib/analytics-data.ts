@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { ApplicationData, LeadScoreDetails } from '@/lib/types';
 import type { SpeedToLeadResult } from '@/lib/analytics/speed-to-lead';
 
@@ -171,22 +172,14 @@ interface RawData {
 
 export async function fetchRawAnalyticsData(spaceId: string): Promise<RawData> {
   const [contactsRes, dealsRes, stagesRes, toursRes] = await Promise.all([
-    supabase
-      .from('Contact')
-      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails, leadType')
-      .eq('spaceId', spaceId),
-    supabase
-      .from('Deal')
-      .select('id, value, stageId, priority, createdAt, status, sourceTourId')
-      .eq('spaceId', spaceId),
-    supabase
-      .from('DealStage')
-      .select('id, name, color')
-      .eq('spaceId', spaceId),
-    supabase
-      .from('Tour')
-      .select('id, status, createdAt')
-      .eq('spaceId', spaceId),
+    tenantTable(supabase, 'Contact', { spaceId })
+      .select('id, type, tags, leadScore, scoreLabel, scoringStatus, createdAt, applicationData, scoreDetails, leadType'),
+    tenantTable(supabase, 'Deal', { spaceId })
+      .select('id, value, stageId, priority, createdAt, status, sourceTourId'),
+    tenantTable(supabase, 'DealStage', { spaceId })
+      .select('id, name, color'),
+    tenantTable(supabase, 'Tour', { spaceId })
+      .select('id, status, createdAt'),
   ]);
 
   return {

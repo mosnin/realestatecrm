@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import {
   sendTourRescheduled,
@@ -42,7 +43,7 @@ export interface TourNoticeInput {
 async function resolveBusiness(spaceId: string): Promise<{ businessName: string; slug: string }> {
   try {
     const [{ data: settings }, { data: space }] = await Promise.all([
-      supabase.from('SpaceSetting').select('businessName').eq('spaceId', spaceId).maybeSingle(),
+      tenantTable(supabase, 'SpaceSetting', { spaceId }).select('businessName').maybeSingle(),
       supabase.from('Space').select('name, slug').eq('id', spaceId).maybeSingle(),
     ]);
     return {

@@ -26,6 +26,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal, SignalGatherer, SignalKind } from '../types';
 
@@ -71,12 +72,10 @@ export const draftsSource: SignalGatherer = {
   // case the surface wants to attribute (Phase C breadcrumbs).
   source: 'drafts',
   async gather(spaceId: string): Promise<Signal[]> {
-    const { data, error } = await supabase
-      .from('AgentDraft')
+    const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId })
       .select(
         'id, contactId, channel, subject, priority, Contact:contactId(id, name, leadScore)',
       )
-      .eq('spaceId', spaceId)
       .eq('status', 'pending')
       .order('priority', { ascending: false })
       .order('createdAt', { ascending: false })

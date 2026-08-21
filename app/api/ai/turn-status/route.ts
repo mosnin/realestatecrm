@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getTurnPresence } from '@/lib/chat/turn-presence';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
@@ -39,11 +40,9 @@ export async function GET(req: NextRequest) {
   // ── Realtor surface ─────────────────────────────────────────────────────
   const space = await getSpaceForUser(userId);
   if (space) {
-    const { data: convo } = await supabase
-      .from('Conversation')
+    const { data: convo } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
       .select('id, title')
       .eq('id', conversationId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (convo && !isReservedConversationTitle((convo as { title?: string | null }).title)) {
       return NextResponse.json(presencePayload(await getTurnPresence(conversationId)));
@@ -53,11 +52,11 @@ export async function GET(req: NextRequest) {
   // ── Broker surface ──────────────────────────────────────────────────────
   const brokerCtx = await resolveBrokerContext();
   if (brokerCtx) {
-    const { data: brokerConvo } = await supabase
-      .from('BrokerConversation')
+    const { data: brokerConvo } = await tenantTable(supabase, 'BrokerConversation', {
+      brokerageId: brokerCtx.brokerage.id,
+    })
       .select('id')
       .eq('id', conversationId)
-      .eq('brokerageId', brokerCtx.brokerage.id)
       .maybeSingle();
     if (brokerConvo) {
       return NextResponse.json(presencePayload(await getTurnPresence(conversationId)));

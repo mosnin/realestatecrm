@@ -20,6 +20,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { sendSMS } from '@/lib/sms';
 import { briefEmailHtml, briefEmailSubject } from './email-template';
@@ -200,10 +201,8 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
   try {
     // Check if this is the realtor's FIRST-EVER brief SMS. If so, send
     // the one-time opt-in disclosure first as its own message.
-    const { count: priorSends } = await supabase
-      .from('Brief')
+    const { count: priorSends } = await tenantTable(supabase, 'Brief', { spaceId: ctx.space.spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', ctx.space.spaceId)
       .not('smsSentAt', 'is', null)
       .neq('id', ctx.briefId);
 
@@ -252,12 +251,10 @@ async function deliverSms(ctx: DeliverContext, isEmpty: boolean): Promise<Delive
 // ── Context loader — pulled out so the cron and the /test endpoint share it ─
 
 export async function loadDeliveryContext(spaceId: string): Promise<DeliverySpaceContext | null> {
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select(
       'briefEmail, briefSms, notifications, smsNotifications, phoneNumber, businessName, unsubscribeToken',
     )
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (!settings) return null;

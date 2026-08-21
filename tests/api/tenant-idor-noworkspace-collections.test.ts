@@ -106,6 +106,9 @@ vi.mock('@/lib/usage/today-token-usage', () => ({
   getTodayTokenUsage: vi.fn(async () => ({ total: 0 })),
 }));
 vi.mock('@/lib/agent/quick-draft', () => ({ composeQuickDraft: vi.fn() }));
+vi.mock('@/lib/agent/broker-context', () => ({
+  resolveBrokerContext: vi.fn(async () => null),
+}));
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn(async () => ({ userId: 'u_caller' })),
 }));
@@ -222,6 +225,13 @@ import { POST as analyzeProperty } from '@/app/api/properties/[id]/analyze/route
 import { POST as analyzeArea } from '@/app/api/areas/analyze/route';
 import { GET as listOffers, POST as postOffer } from '@/app/api/offers/route';
 import { GET as listCalendarEvents, POST as postCalendarEvent } from '@/app/api/calendar/events/route';
+import { GET as getTurns, POST as postTurns } from '@/app/api/ai/turns/route';
+import { DELETE as deleteTurn } from '@/app/api/ai/turns/[turnId]/route';
+import { GET as getTurnStatus } from '@/app/api/ai/turn-status/route';
+import { POST as postStop } from '@/app/api/ai/stop/route';
+import { GET as getTourFeedback } from '@/app/api/tours/feedback/route';
+import { GET as getNotifications, PATCH as patchNotifications } from '@/app/api/notifications/route';
+import { POST as openWorkbench } from '@/app/api/workspace-runs/[id]/files/[fileId]/workbench/route';
 import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -1351,5 +1361,120 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('CalendarEvent');
     expect(fromMockTables).not.toContain('CalendarEventMirror');
+  });
+
+  it('GET /api/ai/turns 404s and does not query Conversation', async () => {
+    const res = await getTurns(
+      new NextRequest('http://localhost/api/ai/turns?conversationId=conv_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Conversation');
+    expect(fromMockTables).not.toContain('ConversationTurn');
+  });
+
+  it('POST /api/ai/turns 404s and does not write ConversationTurn', async () => {
+    const res = await postTurns(
+      new NextRequest('http://localhost/api/ai/turns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: 'conv_victim',
+          clientRequestId: 'req_victim',
+          mode: 'chat',
+          source: 'typed',
+          message: 'Chase VICTIM at 123 Victim Lane',
+        }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Conversation');
+    expect(fromMockTables).not.toContain('ConversationTurn');
+    expect(fromMockTables).not.toContain('Attachment');
+  });
+
+  it('DELETE /api/ai/turns/[turnId] 404s and does not query ConversationTurn', async () => {
+    const res = await deleteTurn(
+      new NextRequest('http://localhost/api/ai/turns/turn_victim', { method: 'DELETE' }),
+      { params: Promise.resolve({ turnId: 'turn_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Conversation');
+    expect(fromMockTables).not.toContain('ConversationTurn');
+  });
+
+  it('GET /api/ai/turn-status 404s and does not query Conversation', async () => {
+    const res = await getTurnStatus(
+      new NextRequest('http://localhost/api/ai/turn-status?conversationId=conv_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Conversation');
+    expect(fromMockTables).not.toContain('BrokerConversation');
+  });
+
+  it('POST /api/ai/stop 404s and does not query Conversation', async () => {
+    const res = await postStop(
+      new NextRequest('http://localhost/api/ai/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv_victim', turnId: 'turn_victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Conversation');
+    expect(fromMockTables).not.toContain('ConversationTurn');
+    expect(fromMockTables).not.toContain('BrokerConversation');
+  });
+
+  it('GET /api/tours/feedback 404s and does not query TourFeedback', async () => {
+    const res = await getTourFeedback(
+      new NextRequest('http://localhost/api/tours/feedback?slug=victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('TourFeedback');
+  });
+
+  it('GET /api/notifications 404s and does not query AppNotification', async () => {
+    const res = await getNotifications(
+      new NextRequest('http://localhost/api/notifications?slug=victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AppNotification');
+    expect(fromMockTables).not.toContain('NotificationState');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('PATCH /api/notifications 404s and does not write NotificationState', async () => {
+    const res = await patchNotifications(
+      new NextRequest('http://localhost/api/notifications?slug=victim', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('NotificationState');
+    expect(fromMockTables).not.toContain('AppNotification');
+  });
+
+  it('POST /api/workspace-runs/[id]/files/[fileId]/workbench 404s and does not query File', async () => {
+    const res = await openWorkbench(
+      new NextRequest('http://localhost/api/workspace-runs/run_victim/files/file_victim/workbench?slug=victim', {
+        method: 'POST',
+      }),
+      { params: Promise.resolve({ id: 'run_victim', fileId: 'file_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('WorkspaceRun');
+    expect(fromMockTables).not.toContain('File');
+    expect(fromMockTables).not.toContain('Artifact');
   });
 });

@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 
 import { run, Agent } from '@openai/agents';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { getLLMClient, resolveChatModel } from '@/lib/llm';
 import { getAgentModel } from '@/lib/ai-tools/agent-model';
@@ -239,7 +240,7 @@ export async function planSession(
   // Workspace Runs use an honest fixed packet plan; unlike research, the VM
   // will execute exactly these four visible deliverable steps.
   if (session.kind === 'workspace') {
-    const { data: properties, error: propertiesError } = await supabase.from('Property').select('*').eq('spaceId', session.spaceId).order('updatedAt', { ascending: false }).limit(50);
+    const { data: properties, error: propertiesError } = await tenantTable(supabase, 'Property', { spaceId: session.spaceId }).select('*').order('updatedAt', { ascending: false }).limit(50);
     if (propertiesError) throw propertiesError;
     const target = selectWorkspaceTarget(`${session.goal}\n${session.answer ?? ''}`, (properties ?? []) as WorkspaceProperty[]);
     if (!target && session.allowQuestions && !session.answer) {

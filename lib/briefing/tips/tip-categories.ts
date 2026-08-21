@@ -32,9 +32,9 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal } from '../types';
-import { unscoped } from '@/lib/supabase-guard';
 
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -55,10 +55,8 @@ export async function tipHotLeadDormant(spaceId: string): Promise<Signal[]> {
   today.setHours(0, 0, 0, 0);
   const sevenDaysAgo = new Date(today.getTime() - 7 * MS_PER_DAY);
 
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, leadScore, lastContactedAt')
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .gte('leadScore', HOT_LEAD_THRESHOLD)
     .lt('lastContactedAt', sevenDaysAgo.toISOString())
@@ -92,10 +90,8 @@ export async function tipDealClosingSoonNoTouch(spaceId: string): Promise<Signal
   const todayStr = today.toISOString().slice(0, 10);
   const fiveDaysAgo = new Date(today.getTime() - 5 * MS_PER_DAY).toISOString();
 
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, title, closeDate, contactId')
-    .eq('spaceId', spaceId)
     .eq('status', 'active')
     .gte('closeDate', todayStr)
     .lte('closeDate', sevenDaysOut);
@@ -106,8 +102,7 @@ export async function tipDealClosingSoonNoTouch(spaceId: string): Promise<Signal
   const signals: Signal[] = [];
   for (const deal of data as Array<{ id: string; title: string; closeDate: string; contactId: string | null }>) {
     if (!deal.contactId) continue;
-    const { count } = await unscoped(supabase
-      .from('ContactActivity'), 'post-fetch: caller verified parent scope before this id query')
+    const { count } = await tenantTable(supabase, 'ContactActivity', { spaceId })
       .select('id', { count: 'exact', head: true })
       .eq('contactId', deal.contactId)
       .gte('createdAt', fiveDaysAgo);
@@ -137,10 +132,8 @@ export async function tipWonDealReviewAsk(spaceId: string): Promise<Signal[]> {
   const fourteenAgo = new Date(today.getTime() - 14 * MS_PER_DAY);
   const thirtyAgo = new Date(today.getTime() - 30 * MS_PER_DAY);
 
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, title, closeDate, contactId, status')
-    .eq('spaceId', spaceId)
     .eq('status', 'won')
     .gte('closeDate', thirtyAgo.toISOString().slice(0, 10))
     .lte('closeDate', fourteenAgo.toISOString().slice(0, 10));
@@ -151,8 +144,7 @@ export async function tipWonDealReviewAsk(spaceId: string): Promise<Signal[]> {
   for (const deal of data as Array<{ id: string; title: string; closeDate: string; contactId: string | null }>) {
     if (!deal.contactId) continue;
     // Has any ContactActivity note mentioned "review" or "testimonial"?
-    const { data: notes } = await unscoped(supabase
-      .from('ContactActivity'), 'post-fetch: caller verified parent scope before this id query')
+    const { data: notes } = await tenantTable(supabase, 'ContactActivity', { spaceId })
       .select('content')
       .eq('contactId', deal.contactId)
       .eq('type', 'note')
@@ -189,10 +181,8 @@ export async function tipPastClientReferral(spaceId: string): Promise<Signal[]> 
 
   // Past clients = contacts with a won Deal closed 6-18 months ago, no
   // contact in 180+ days.
-  const { data: deals } = await supabase
-    .from('Deal')
+  const { data: deals } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, contactId, closeDate, title')
-    .eq('spaceId', spaceId)
     .eq('status', 'won')
     .gte('closeDate', eighteenMonthsAgo.toISOString().slice(0, 10))
     .lte('closeDate', sixMonthsAgo.toISOString().slice(0, 10));
@@ -202,8 +192,7 @@ export async function tipPastClientReferral(spaceId: string): Promise<Signal[]> 
   const signals: Signal[] = [];
   for (const deal of deals as Array<{ id: string; contactId: string | null; closeDate: string; title: string }>) {
     if (!deal.contactId) continue;
-    const { data: contact } = await unscoped(supabase
-      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
+    const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, lastContactedAt')
       .eq('id', deal.contactId)
       .maybeSingle();
@@ -238,10 +227,8 @@ export async function tipUnworkedTag(spaceId: string): Promise<Signal[]> {
   const twentyOneAgo = new Date(today.getTime() - 21 * MS_PER_DAY);
 
   // Pull all non-brokerage contacts and bucket by tag.
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, tags, lastContactedAt, leadScore')
-    .eq('spaceId', spaceId)
     .is('brokerageId', null);
 
   if (error || !data) return [];
@@ -290,10 +277,8 @@ export async function tipOverduePileup(spaceId: string): Promise<Signal[]> {
   today.setHours(0, 0, 0, 0);
   const threeAgo = new Date(today.getTime() - 3 * MS_PER_DAY).toISOString();
 
-  const { count, error } = await supabase
-    .from('Contact')
+  const { count, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .lt('followUpAt', threeAgo);
 
@@ -335,17 +320,13 @@ export async function spaceHasStabilityHistory(spaceId: string): Promise<boolean
   today.setHours(0, 0, 0, 0);
   const cutoff = new Date(today.getTime() - MIN_STABILITY_DAYS * MS_PER_DAY).toISOString();
 
-  const { count: draftCount } = await supabase
-    .from('AgentDraft')
+  const { count: draftCount } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .lt('createdAt', cutoff);
   if ((draftCount ?? 0) > 0) return true;
 
-  const { count: contactCount } = await supabase
-    .from('Contact')
+  const { count: contactCount } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .lt('createdAt', cutoff);
   return (contactCount ?? 0) > 0;
@@ -408,10 +389,8 @@ export async function tipReplyRateDecline(spaceId: string): Promise<Signal[]> {
   const sevenAgo = new Date(today.getTime() - 7 * MS_PER_DAY);
   const fourteenAgo = new Date(today.getTime() - 14 * MS_PER_DAY);
 
-  const { data: drafts, error } = await supabase
-    .from('AgentDraft')
+  const { data: drafts, error } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('contactId, createdAt')
-    .eq('spaceId', spaceId)
     .eq('status', 'sent')
     .gte('createdAt', fourteenAgo.toISOString())
     .lt('createdAt', today.toISOString());
@@ -429,10 +408,8 @@ export async function tipReplyRateDecline(spaceId: string): Promise<Signal[]> {
   const contactIds = Array.from(new Set(rows.map((d) => d.contactId as string)));
   if (contactIds.length === 0) return [];
 
-  const { data: activities } = await supabase
-    .from('ContactActivity')
+  const { data: activities } = await tenantTable(supabase, 'ContactActivity', { spaceId })
     .select('contactId, type, createdAt')
-    .eq('spaceId', spaceId)
     .in('contactId', contactIds)
     .in('type', ['note', 'email', 'call'])
     .gte('createdAt', fourteenAgo.toISOString());
@@ -489,10 +466,8 @@ export async function tipStageStagnation(spaceId: string): Promise<Signal[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const { data: deals, error } = await supabase
-    .from('Deal')
+  const { data: deals, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, stageId, stageChangedAt')
-    .eq('spaceId', spaceId)
     .eq('status', 'active');
 
   if (error || !deals) return [];
@@ -521,8 +496,7 @@ export async function tipStageStagnation(spaceId: string): Promise<Signal[]> {
   if (stagnantStageIds.length === 0) return [];
 
   // Resolve stage names in one shot.
-  const { data: stages } = await unscoped(supabase
-    .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: stages } = await tenantTable(supabase, 'DealStage', { spaceId })
     .select('id, name')
     .in('id', stagnantStageIds);
   const stageNameById = new Map(
@@ -570,10 +544,8 @@ export async function tipTourConversionDrop(spaceId: string): Promise<Signal[]> 
 
   type TourRow = { id: string; contactId: string | null; endsAt: string };
   const fetchTours = async (from: Date, to: Date) => {
-    const { data } = await supabase
-      .from('Tour')
+    const { data } = await tenantTable(supabase, 'Tour', { spaceId })
       .select('id, contactId, endsAt')
-      .eq('spaceId', spaceId)
       .eq('status', 'completed')
       .gte('endsAt', from.toISOString())
       .lt('endsAt', to.toISOString());
@@ -592,10 +564,8 @@ export async function tipTourConversionDrop(spaceId: string): Promise<Signal[]> 
   // Conversion = an AgentDraft tagged application/offer within 7 days,
   // OR a Deal stage move within 7 days. Both because some realtors stage
   // applications as deal moves; others draft them as messages.
-  const { data: drafts } = await supabase
-    .from('AgentDraft')
+  const { data: drafts } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('contactId, channel, subject, createdAt')
-    .eq('spaceId', spaceId)
     .in('contactId', allContactIds)
     .gte('createdAt', baselineStart.toISOString());
 
@@ -604,10 +574,8 @@ export async function tipTourConversionDrop(spaceId: string): Promise<Signal[]> 
     /application|offer/i.test(`${d.channel} ${d.subject ?? ''}`),
   );
 
-  const { data: deals } = await supabase
-    .from('Deal')
+  const { data: deals } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, contactId, stageChangedAt')
-    .eq('spaceId', spaceId)
     .in('contactId', allContactIds);
   type DealRow = { id: string; contactId: string; stageChangedAt: string | null };
   const dealRows = (deals ?? []) as DealRow[];
@@ -664,10 +632,8 @@ export async function tipSourceDrySpell(spaceId: string): Promise<Signal[]> {
   today.setHours(0, 0, 0, 0);
   const ninetyAgo = new Date(today.getTime() - 90 * MS_PER_DAY);
 
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('sourceLabel, createdAt')
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .not('sourceLabel', 'is', null)
     .gte('createdAt', ninetyAgo.toISOString());

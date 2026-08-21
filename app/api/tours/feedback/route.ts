@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -46,8 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Check for existing feedback
-  const { data: existing } = await unscoped(supabase
-    .from('TourFeedback'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: existing } = await tenantTable(supabase, 'TourFeedback', { spaceId: tour.spaceId })
     .select('id')
     .eq('tourId', tour.id)
     .maybeSingle();
@@ -56,8 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Feedback already submitted' }, { status: 409 });
   }
 
-  const { data: feedback, error } = await supabase
-    .from('TourFeedback')
+  const { data: feedback, error } = await tenantTable(supabase, 'TourFeedback', { spaceId: tour.spaceId })
     .insert({
       tourId: tour.id,
       spaceId: tour.spaceId,
@@ -82,21 +81,17 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   if (tourId) {
-    const { data } = await supabase
-      .from('TourFeedback')
+    const { data } = await tenantTable(supabase, 'TourFeedback', { spaceId: auth.space.id })
       .select('*')
       .eq('tourId', tourId)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (!data) return NextResponse.json(null);
     return NextResponse.json(data);
   }
 
   // Return all feedback for this space
-  const { data } = await supabase
-    .from('TourFeedback')
+  const { data } = await tenantTable(supabase, 'TourFeedback', { spaceId: auth.space.id })
     .select('*')
-    .eq('spaceId', auth.space.id)
     .order('createdAt', { ascending: false })
     .limit(100);
 

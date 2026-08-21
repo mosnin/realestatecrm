@@ -11,6 +11,7 @@
 
 import type { IntakeFormConfig, FormSection, FormQuestion } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,10 +95,8 @@ export async function analyzeFormPerformance(
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
   // Fetch contacts with formConfigSnapshot from last 30 days
-  const { data: contacts, error } = await supabase
-    .from('Contact')
+  const { data: contacts, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, applicationData, formConfigSnapshot, leadScore, scoreLabel, createdAt')
-    .eq('spaceId', spaceId)
     .not('formConfigSnapshot', 'is', null)
     .gte('createdAt', thirtyDaysAgo)
     .order('createdAt', { ascending: false })

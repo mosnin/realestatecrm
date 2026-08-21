@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -33,11 +34,9 @@ export async function GET(
     return NextResponse.json({ error: 'Document not in packet' }, { status: 403 });
   }
 
-  const { data: doc } = await supabase
-    .from('DealDocument')
+  const { data: doc } = await tenantTable(supabase, 'DealDocument', { spaceId: packet.spaceId })
     .select('storagePath, spaceId')
     .eq('id', docId)
-    .eq('spaceId', packet.spaceId)
     .maybeSingle();
 
   if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });

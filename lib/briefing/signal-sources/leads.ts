@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal, SignalGatherer, SignalKind } from '../types';
 
@@ -48,10 +49,8 @@ export const leadsSource: SignalGatherer = {
     today.setHours(0, 0, 0, 0);
     const fiveDaysAgo = new Date(today.getTime() - STALE_HOT_LEAD_DAYS * MS_PER_DAY);
 
-    const { data, error } = await supabase
-      .from('Contact')
+    const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, leadScore, followUpAt, lastContactedAt, phone, email, type, tags')
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .in('type', ['QUALIFICATION', 'TOUR', 'APPLICATION', 'LEASE_REVIEW']);
 

@@ -25,6 +25,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { DigestSection } from '@/lib/email';
 import type { EffectiveEventTypes } from '@/lib/notify-prefs';
 
@@ -101,10 +102,8 @@ export async function buildDigestSections(
 
   // ── New leads ──────────────────────────────────────────────────────────
   if (eventTypes.newLeads) {
-    const { data: leads, error } = await supabase
-      .from('Contact')
+    const { data: leads, error } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, createdAt')
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .contains('tags', ['new-lead'])
       .gte('createdAt', since)
@@ -125,10 +124,8 @@ export async function buildDigestSections(
 
   // ── Tour bookings ──────────────────────────────────────────────────────
   if (eventTypes.tourBookings) {
-    const { data: tours, error } = await supabase
-      .from('Tour')
+    const { data: tours, error } = await tenantTable(supabase, 'Tour', { spaceId })
       .select('id, guestName, startsAt, propertyAddress, createdAt')
-      .eq('spaceId', spaceId)
       .gte('createdAt', since)
       .lte('createdAt', until)
       .order('createdAt', { ascending: false })
@@ -157,10 +154,8 @@ export async function buildDigestSections(
 
   // ── New deals ──────────────────────────────────────────────────────────
   if (eventTypes.newDeals) {
-    const { data: deals, error } = await supabase
-      .from('Deal')
+    const { data: deals, error } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('id, title, value, createdAt')
-      .eq('spaceId', spaceId)
       .gte('createdAt', since)
       .lte('createdAt', until)
       .order('createdAt', { ascending: false })

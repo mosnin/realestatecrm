@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Signal, SignalGatherer } from '../types';
 
 const MS_PER_HOUR = 1000 * 60 * 60;
@@ -43,10 +44,8 @@ export const calendarSource: SignalGatherer = {
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
 
-    const { data, error } = await supabase
-      .from('Tour')
+    const { data, error } = await tenantTable(supabase, 'Tour', { spaceId })
       .select('id, startsAt, contactId, guestName, propertyAddress, status')
-      .eq('spaceId', spaceId)
       .gte('startsAt', now.toISOString())
       .lt('startsAt', tomorrow.toISOString())
       .neq('status', 'cancelled');

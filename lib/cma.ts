@@ -24,6 +24,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import {
   rentcastConfigured,
@@ -329,10 +330,8 @@ async function selectCrmComps(
   subject: CmaSubject,
   limit: number,
 ): Promise<CmaComp[]> {
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId })
     .select(COMP_SELECT)
-    .eq('spaceId', spaceId)
     .order('updatedAt', { ascending: false })
     .limit(50);
   if (error) throw new Error(`Comp lookup failed: ${error.message}`);
@@ -376,11 +375,9 @@ export async function buildCma(args: BuildCmaArgs): Promise<CmaPayload> {
   // ── Resolve the subject ───────────────────────────────────────────────────
   let subject: CmaSubject;
   if (subjectPropertyId) {
-    const { data, error } = await supabase
-      .from('Property')
+    const { data, error } = await tenantTable(supabase, 'Property', { spaceId })
       .select(COMP_SELECT)
       .eq('id', subjectPropertyId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     if (error) throw new Error(`Subject lookup failed: ${error.message}`);
     if (!data) throw new Error('Subject property not found.');

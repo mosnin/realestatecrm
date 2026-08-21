@@ -12,6 +12,7 @@ import {
 } from '@/lib/chippi/workbench-store';
 import { validateStoredWorkbookContent } from '@/lib/chippi/workbench-format';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { checkRateLimit } from '@/lib/rate-limit';
 
@@ -63,11 +64,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (sourceKind !== 'root' && sourceKind !== 'task') {
     return NextResponse.json({ error: 'A valid workspace source kind is required.' }, { status: 400 });
   }
-  const { data: run, error: runError } = await supabase
-    .from('WorkspaceRun')
+  const { data: run, error: runError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId: auth.space.id })
     .select('id,status')
     .eq('id', runId)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   if (runError) return databaseFailure();
   if (run?.status !== 'completed') {
@@ -76,12 +75,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let source: WorkspaceSource | null = null;
   if (sourceKind === 'root') {
-    const { data: rootMembership, error: rootError } = await supabase
-      .from('WorkspaceRunFile')
+    const { data: rootMembership, error: rootError } = await tenantTable(supabase, 'WorkspaceRunFile', { spaceId: auth.space.id })
       .select('id,fileId,name,mimeType,sizeBytes')
       .eq('id', membershipId)
       .eq('runId', runId)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (rootError) return databaseFailure();
     if (rootMembership?.fileId) {
@@ -95,20 +92,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       };
     }
   } else {
-    const { data: taskMembership, error: taskMembershipError } = await supabase
-      .from('WorkspaceRunTaskFile')
+    const { data: taskMembership, error: taskMembershipError } = await tenantTable(supabase, 'WorkspaceRunTaskFile', { spaceId: auth.space.id })
       .select('id,fileId,name,mimeType,sizeBytes,taskId')
       .eq('id', membershipId)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (taskMembershipError) return databaseFailure();
     const { data: task, error: taskError } = taskMembership?.fileId
-      ? await supabase
-          .from('WorkspaceRunTask')
+      ? await tenantTable(supabase, 'WorkspaceRunTask', { spaceId: auth.space.id })
           .select('id')
           .eq('id', taskMembership.taskId)
           .eq('runId', runId)
-          .eq('spaceId', auth.space.id)
           .eq('status', 'completed')
           .maybeSingle()
       : { data: null, error: null };
@@ -137,11 +130,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Only completed CSV workspace files within Workbench limits can be opened.' }, { status: 400 });
   }
 
-  const { data: file, error: fileError } = await supabase
-    .from('File')
+  const { data: file, error: fileError } = await tenantTable(supabase, 'File', { spaceId: auth.space.id })
     .select('id,name,mimeType,sizeBytes,storageKey')
     .eq('id', source.fileId)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   if (fileError) return databaseFailure();
   if (
@@ -154,10 +145,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Workspace file is unavailable.' }, { status: 404 });
   }
 
-  let mappingQuery = supabase
-    .from('WorkspaceWorkbookSource')
+  let mappingQuery = tenantTable(supabase, 'WorkspaceWorkbookSource', { spaceId: auth.space.id })
     .select('artifactId,sourceFileId')
-    .eq('spaceId', auth.space.id)
     .eq('runId', runId);
   mappingQuery = source.sourceKind === 'root'
     ? mappingQuery.eq('workspaceRunFileId', source.membershipId)
@@ -166,21 +155,17 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (mappingError) return databaseFailure();
   if (existingMapping?.artifactId) {
     if (existingMapping.sourceFileId !== source.fileId) return databaseFailure();
-    const { data: existingArtifact, error: artifactError } = await supabase
-      .from('Artifact')
+    const { data: existingArtifact, error: artifactError } = await tenantTable(supabase, 'Artifact', { spaceId: auth.space.id })
       .select('id,currentVersionId')
       .eq('id', existingMapping.artifactId)
-      .eq('spaceId', auth.space.id)
       .eq('artifactType', 'workbook')
       .maybeSingle();
     if (artifactError) return databaseFailure();
     if (!existingArtifact?.currentVersionId) return databaseFailure();
-    const { data: existingVersion, error: versionError } = await supabase
-      .from('ArtifactVersion')
+    const { data: existingVersion, error: versionError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: auth.space.id })
       .select('versionNumber')
       .eq('id', existingArtifact.currentVersionId)
       .eq('artifactId', existingArtifact.id)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (versionError || !existingVersion) return databaseFailure();
     return NextResponse.json({

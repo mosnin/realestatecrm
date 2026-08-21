@@ -27,6 +27,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal, SignalGatherer } from '../types';
@@ -154,10 +155,8 @@ export function evidenceForSkippedInbound(args: { contactName: string }): string
 /** Look up the active Gmail connection for the space. Returns null when
  *  no Gmail is connected — caller short-circuits to []. */
 async function activeGmailConnection(spaceId: string): Promise<ConnectionRow | null> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('id, userId')
-    .eq('spaceId', spaceId)
     .eq('toolkit', 'gmail')
     .eq('status', 'active')
     .maybeSingle();
@@ -221,10 +220,8 @@ async function fetchRecentMessages(args: {
 
 /** Look up the realtor's contacts so we can cross-walk participant emails. */
 async function contactsByEmail(spaceId: string): Promise<Map<string, ContactRow>> {
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email, leadScore')
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .not('email', 'is', null);
   if (error || !data) return new Map();
@@ -241,10 +238,8 @@ async function contactsByEmail(spaceId: string): Promise<Map<string, ContactRow>
  *  for the contact, the drafts source covers it. */
 async function recentlyDraftedContactIds(spaceId: string): Promise<Set<string>> {
   const since = new Date(Date.now() - DRAFT_LOOKBACK_HOURS * MS_PER_HOUR).toISOString();
-  const { data, error } = await supabase
-    .from('AgentDraft')
+  const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('contactId')
-    .eq('spaceId', spaceId)
     .gte('createdAt', since)
     .not('contactId', 'is', null);
   if (error || !data) return new Set();

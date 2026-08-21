@@ -22,6 +22,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { composeBrief } from './compose';
 import {
   composePipelineSummary,
@@ -126,17 +127,13 @@ async function countFollowUpsDue(spaceId: string): Promise<number> {
   const cutoff = endOfToday.toISOString();
 
   const [contactsRes, dealsRes] = await Promise.all([
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .not('followUpAt', 'is', null)
       .lte('followUpAt', cutoff),
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .eq('status', 'active')
       .not('followUpAt', 'is', null)
       .lte('followUpAt', cutoff),
@@ -148,10 +145,8 @@ async function countFollowUpsDue(spaceId: string): Promise<number> {
 /** Untouched new leads — tagged `new-lead`, not brokerage-routed. Same
  *  predicate the /leads page uses to surface "N new since you last checked". */
 async function countNewLeads(spaceId: string): Promise<number> {
-  const { count } = await supabase
-    .from('Contact')
+  const { count } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .contains('tags', ['new-lead']);
   return count ?? 0;
@@ -159,10 +154,8 @@ async function countNewLeads(spaceId: string): Promise<number> {
 
 /** Pending AgentDraft rows — the same count the Inbox surface shows. */
 async function countPendingDrafts(spaceId: string): Promise<number> {
-  const { count } = await supabase
-    .from('AgentDraft')
+  const { count } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .eq('status', 'pending');
   return count ?? 0;
 }
@@ -175,10 +168,8 @@ async function countPendingDrafts(spaceId: string): Promise<number> {
  * isolation without standing up the whole dashboard compose.
  */
 export async function countClientsWaiting(spaceId: string): Promise<number> {
-  const { count } = await supabase
-    .from('InboxThread')
+  const { count } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .gt('unreadCount', 0);
   return count ?? 0;
 }
@@ -192,10 +183,8 @@ export async function countClientsWaiting(spaceId: string): Promise<number> {
 async function composePipelineStat(spaceId: string): Promise<PipelineStat | null> {
   const [summary, valueRes] = await Promise.all([
     composePipelineSummary(spaceId),
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId })
       .select('value')
-      .eq('spaceId', spaceId)
       .eq('status', 'active'),
   ]);
 
@@ -220,10 +209,8 @@ async function composePipelineStat(spaceId: string): Promise<PipelineStat | null
  * top; capped to a short list for the bento cell.
  */
 async function fetchHotLeads(spaceId: string): Promise<HotLead[]> {
-  const { data } = await supabase
-    .from('Contact')
+  const { data } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, leadScore, lastContactedAt, scoreLabel, scoringStatus')
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .eq('scoringStatus', 'scored')
     .eq('scoreLabel', 'hot')
@@ -248,10 +235,8 @@ async function fetchToursToday(spaceId: string): Promise<TourToday[]> {
   const endOfDay = new Date(now);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const { data } = await supabase
-    .from('Tour')
+  const { data } = await tenantTable(supabase, 'Tour', { spaceId })
     .select('id, startsAt, guestName, propertyAddress, contactId, status')
-    .eq('spaceId', spaceId)
     .gte('startsAt', now.toISOString())
     .lte('startsAt', endOfDay.toISOString())
     .neq('status', 'cancelled')
@@ -286,16 +271,12 @@ const REPUTATION_WINDOW_DAYS = 90;
 async function composeReputationStat(spaceId: string): Promise<ReputationStat | null> {
   const since = new Date(Date.now() - REPUTATION_WINDOW_DAYS * 86_400_000).toISOString();
   const [requestedRes, clickedRes] = await Promise.all([
-    supabase
-      .from('ReviewCampaign')
+    tenantTable(supabase, 'ReviewCampaign', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .in('status', ['sent', 'clicked', 'completed'])
       .gte('createdAt', since),
-    supabase
-      .from('ReviewCampaign')
+    tenantTable(supabase, 'ReviewCampaign', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .not('clickedAt', 'is', null)
       .gte('createdAt', since),
   ]);
