@@ -21,6 +21,7 @@ import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { findCalendarConnection, updateEventThrough } from '@/lib/calendar/mirror';
 import { notifyTourRescheduled } from '@/lib/tour-notify';
+import { tourWindowConflicts } from '@/lib/tours/conflicts';
 
 const parameters = z
   .object({
@@ -94,6 +95,19 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
       const oldEnd = new Date(tour.endsAt as string).getTime();
       const duration = Math.max(15 * 60 * 1000, oldEnd - oldStart);
       newEnds = new Date(newStarts.getTime() + duration);
+    }
+
+    const overlaps = await tourWindowConflicts({
+      spaceId: ctx.space.id,
+      startsAt: newStarts.toISOString(),
+      endsAt: newEnds.toISOString(),
+      excludeTourId: args.tourId,
+    });
+    if (overlaps) {
+      return {
+        summary: `That time overlaps an existing tour — pick a different slot.`,
+        display: 'error',
+      };
     }
 
     const { error: updateErr } = await supabase

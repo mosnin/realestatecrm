@@ -93,6 +93,17 @@ vi.mock('@/lib/gcal-helpers', () => ({
   deleteGoogleEvent: (...a: unknown[]) => deleteGoogleEvent(...a),
 }));
 
+const tourWindowConflicts = vi.fn(async () => false);
+vi.mock('@/lib/tours/conflicts', () => ({
+  tourWindowConflicts: (...a: unknown[]) => tourWindowConflicts(...a),
+}));
+
+const dropTourCalendarArtifacts = vi.fn(async () => undefined);
+vi.mock('@/lib/tours/calendar-propagate', () => ({
+  dropTourCalendarArtifacts: (...a: unknown[]) => dropTourCalendarArtifacts(...a),
+  moveTourCalendarArtifacts: vi.fn(async () => undefined),
+}));
+
 // ── billing meter (assert charge is gated on success) ───────────────────────
 const assertCanSpend = vi.fn((..._a: unknown[]) => Promise.resolve());
 const chargeWorkflow = vi.fn((..._a: unknown[]) => Promise.resolve());
@@ -106,6 +117,7 @@ vi.mock('@/lib/billing/meter', () => ({
 import { scheduleTourTool } from '@/lib/ai-tools/tools/schedule-tour';
 import { rescheduleTourTool } from '@/lib/ai-tools/tools/reschedule-tour';
 import { cancelTourTool } from '@/lib/ai-tools/tools/cancel-tour';
+import { deleteTourTool } from '@/lib/ai-tools/tools/delete-tour';
 import type { ToolContext } from '@/lib/ai-tools/types';
 
 function makeCtx(): ToolContext {
@@ -127,6 +139,10 @@ beforeEach(() => {
   deleteEventThrough.mockReset();
   notifyTourRescheduled.mockReset();
   notifyTourCancelled.mockReset();
+  tourWindowConflicts.mockReset();
+  tourWindowConflicts.mockResolvedValue(false);
+  dropTourCalendarArtifacts.mockReset();
+  dropTourCalendarArtifacts.mockResolvedValue(undefined);
   deleteGoogleEvent.mockReset();
   deleteGoogleEvent.mockResolvedValue(true);
   assertCanSpend.mockResolvedValue(undefined);
@@ -246,6 +262,18 @@ describe('reschedule_tour — propagates to calendar + guest', () => {
     const res = await rescheduleTourTool.handler(rescheduleArgs, makeCtx());
     expect(res.display).toBe('success');
   });
+
+  it('refuses a move that overlaps another tour and does not notify', async () => {
+    seatTour();
+    tourWindowConflicts.mockResolvedValue(true);
+
+    const res = await rescheduleTourTool.handler(rescheduleArgs, makeCtx());
+
+    expect(res.display).toBe('error');
+    expect(res.summary.toLowerCase()).toMatch(/overlap|slot/);
+    expect(notifyTourRescheduled).not.toHaveBeenCalled();
+    expect(updateEventThrough).not.toHaveBeenCalled();
+  });
 });
 
 // ── 3. cancel_tour: calendar + notify propagation ────────────────────────────
@@ -306,5 +334,29 @@ describe('cancel_tour — propagates to calendar + guest', () => {
 
     const res = await cancelTourTool.handler(cancelArgs, makeCtx());
     expect(res.display).toBe('success');
+  });
+});
+
+describe('delete_tour — drops both calendar systems', () => {
+  it('calls dropTourCalendarArtifacts with the tour id and legacy event id', async () => {
+    lookupRow = {
+      id: 't_1',
+      contactId: 'c_1',
+      guestName: 'Sam Lee',
+      googleEventId: 'gcal_123',
+    };
+
+    const res = await deleteTourTool.handler(
+      { tourId: 't_1', reason: 'duplicate booking' },
+      makeCtx(),
+    );
+
+    expect(res.display).toBe('success');
+    expect(dropTourCalendarArtifacts).toHaveBeenCalledTimes(1);
+    expect(dropTourCalendarArtifacts.mock.calls[0][0]).toMatchObject({
+      spaceId: 's_1',
+      tourId: 't_1',
+      googleEventId: 'gcal_123',
+    });
   });
 });

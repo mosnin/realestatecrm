@@ -25,8 +25,9 @@
 import { supabase } from '@/lib/supabase';
 import { sendNewLeadNotification } from '@/lib/email';
 import { sendNewDealNotification } from '@/lib/email';
-import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
-import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
+import { sendAgentNotification, sendAgentTourCancelled, type TourEmailData } from '@/lib/tour-emails';
+import { sendSMS, newLeadSMS, newTourSMS, newDealSMS, tourCancelledOwnerSMS } from '@/lib/sms';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
 import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
 import { formatCompact } from '@/lib/formatting';
@@ -230,14 +231,14 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
 
   // SMS notification to agent
   if (info.smsEnabled && info.ownerPhone) {
-    const d = new Date(params.tourData.startsAt);
+    const tz = params.tourData.timezone;
     promises.push(
       sendSMS(
         newTourSMS({
           spaceName: info.spaceName,
           guestName: params.tourData.guestName,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          date: formatTourShortDate(params.tourData.startsAt, tz),
+          time: formatTourTime(params.tourData.startsAt, tz),
           property: params.tourData.propertyAddress,
           phone: info.ownerPhone,
         })
@@ -247,8 +248,8 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
 
   // Push notification
   if (info.pushEnabled) {
-    const d = new Date(params.tourData.startsAt);
-    const when = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    const tz = params.tourData.timezone;
+    const when = `${formatTourShortDate(params.tourData.startsAt, tz)} at ${formatTourTime(params.tourData.startsAt, tz)}`;
     const prop = params.tourData.propertyAddress ? ` at ${params.tourData.propertyAddress}` : '';
     promises.push(
       sendPushToSpace(params.spaceId, {
@@ -256,6 +257,61 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
         body: `${when}${prop}.`,
         url: `/s/${info.spaceSlug}/calendar`,
       }).catch((err) => logger.error('[notify] tour push failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  await Promise.allSettled(promises);
+}
+
+export interface NotifyTourCancelledOwnerParams {
+  spaceId: string;
+  tourData: TourEmailData;
+}
+
+/**
+ * Tell the realtor a guest cancelled. Immediate — never digest-suppressed.
+ * A cancellation in an hour-later digest leaves the realtor showing up to
+ * an empty appointment. Still respects the tour-booking event toggle and
+ * channel prefs so an opted-out owner stays opted out.
+ */
+export async function notifyTourCancelledOwner(params: NotifyTourCancelledOwnerParams): Promise<void> {
+  const info = await getSpaceOwnerInfo(params.spaceId);
+  if (!info || !info.notifyTourBookings) return;
+
+  const tz = params.tourData.timezone;
+  const promises: Promise<unknown>[] = [];
+
+  if (info.emailEnabled) {
+    promises.push(
+      sendAgentTourCancelled(info.ownerEmail, params.tourData)
+        .catch((err) => logger.error('[notify] tour-cancel email failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  if (info.smsEnabled && info.ownerPhone) {
+    promises.push(
+      sendSMS(
+        tourCancelledOwnerSMS({
+          spaceName: info.spaceName,
+          guestName: params.tourData.guestName,
+          date: formatTourShortDate(params.tourData.startsAt, tz),
+          time: formatTourTime(params.tourData.startsAt, tz),
+          property: params.tourData.propertyAddress,
+          phone: info.ownerPhone,
+        })
+      ).catch((err) => logger.error('[notify] tour-cancel SMS failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  if (info.pushEnabled) {
+    const when = `${formatTourShortDate(params.tourData.startsAt, tz)} at ${formatTourTime(params.tourData.startsAt, tz)}`;
+    const prop = params.tourData.propertyAddress ? ` at ${params.tourData.propertyAddress}` : '';
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: `Tour cancelled: ${params.tourData.guestName}`,
+        body: `${when}${prop}.`,
+        url: `/s/${info.spaceSlug}/calendar`,
+      }).catch((err) => logger.error('[notify] tour-cancel push failed', { spaceId: params.spaceId }, err))
     );
   }
 

@@ -7,6 +7,7 @@ import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -196,9 +197,10 @@ export async function POST(req: NextRequest) {
   // Send confirmation email (non-blocking)
   const { data: settingsFull } = await supabase
     .from('SpaceSetting')
-    .select('businessName')
+    .select('businessName, timezone')
     .eq('spaceId', space.id)
     .maybeSingle();
+  const timezone = settingsFull?.timezone ?? null;
   const emailData: TourEmailData = {
     guestName: tour.guestName,
     guestEmail: tour.guestEmail,
@@ -213,12 +215,12 @@ export async function POST(req: NextRequest) {
     // can self-serve cancel/reschedule/feedback (the page existed but was
     // never linked from any guest email).
     manageToken: tour.manageToken,
+    timezone,
   };
   try { await sendTourConfirmation(emailData); } catch (e) { console.error('[tours] confirmation email failed:', e); }
 
   // Send SMS confirmation to guest
   if (tour.guestPhone) {
-    const d = new Date(tour.startsAt);
     try {
       await sendSMS(
         tourConfirmationSMS({
@@ -226,8 +228,8 @@ export async function POST(req: NextRequest) {
           guestPhone: tour.guestPhone,
           spaceId: space.id,
           businessName: settingsFull?.businessName || space.name,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          date: formatTourShortDate(tour.startsAt, timezone),
+          time: formatTourTime(tour.startsAt, timezone),
           property: tour.propertyAddress,
         })
       );
