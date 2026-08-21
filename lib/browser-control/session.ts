@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
 import { assertPublicHttpUrl } from '@/lib/browser-proxy';
 import { ACTION_TTL_SECONDS, type BrowserActionInput, type BrowserActionResult, type LiveFrame } from './protocol';
@@ -93,10 +94,8 @@ export async function getActiveSession(
   spaceId: string,
   userId: string,
 ): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('status', 'active')
     .order('startedAt', { ascending: false })
@@ -119,10 +118,8 @@ export async function getActiveExtensionSession(
   spaceId: string,
   userId: string,
 ): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('source', 'extension')
     .eq('status', 'active')
@@ -149,16 +146,14 @@ export async function startSession(opts: {
   userId: string;
   linkId: string;
 }): Promise<BrowserSessionRow> {
-  await supabase
-    .from('BrowserSession')
+  await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .update({ status: 'ended', endedAt: new Date().toISOString() })
-    .eq('spaceId', opts.spaceId)
     .eq('linkId', opts.linkId)
     .eq('status', 'active');
 
   const id = crypto.randomUUID();
   const startedAt = new Date().toISOString();
-  const { error } = await supabase.from('BrowserSession').insert({
+  const { error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId }).insert({
     id,
     spaceId: opts.spaceId,
     userId: opts.userId,
@@ -182,21 +177,17 @@ export async function startSession(opts: {
 }
 
 export async function endSession(sessionId: string, opts: { spaceId: string }): Promise<void> {
-  const { error } = await supabase
-    .from('BrowserSession')
+  const { error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .update({ status: 'ended', endedAt: new Date().toISOString() })
-    .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId);
+    .eq('id', sessionId);
   if (error) throw error;
 }
 
 /** End every active session belonging to a link — called when a link is revoked. */
 export async function endSessionsForLink(linkId: string, opts: { spaceId: string }): Promise<void> {
-  const { error } = await supabase
-    .from('BrowserSession')
+  const { error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .update({ status: 'ended', endedAt: new Date().toISOString() })
     .eq('linkId', linkId)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'active');
   if (error) throw error;
 }
@@ -212,10 +203,8 @@ export async function getOrStartSessionForLink(link: {
   spaceId: string;
   userId: string;
 }): Promise<BrowserSessionRow> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId: link.spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', link.spaceId)
     .eq('linkId', link.id)
     .eq('status', 'active')
     .order('startedAt', { ascending: false })
@@ -237,11 +226,9 @@ export async function findLinkSession(
   sessionId: string,
   opts: { spaceId: string; linkId: string },
 ): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .select(SESSION_COLUMNS)
     .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('linkId', opts.linkId)
     .maybeSingle();
   if (error) throw error;
@@ -266,10 +253,8 @@ export async function startHeadlessSession(opts: {
   spaceId: string;
   userId: string;
 }): Promise<BrowserSessionRow> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', opts.spaceId)
     .eq('userId', opts.userId)
     .eq('status', 'active')
     .eq('source', 'headless')
@@ -300,11 +285,9 @@ export async function startHeadlessSession(opts: {
     throw new Error('Unable to start the cloud research session.');
   }
 
-  const { data: created, error: lookupError } = await supabase
-    .from('BrowserSession')
+  const { data: created, error: lookupError } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .select(SESSION_COLUMNS)
     .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('userId', opts.userId)
     .eq('source', 'headless')
     .eq('status', 'active')
@@ -333,10 +316,8 @@ export async function getActiveHeadlessSession(
   spaceId: string,
   userId: string,
 ): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('source', 'headless')
     .eq('status', 'active')
@@ -353,10 +334,8 @@ export async function getLatestHeadlessSession(
   spaceId: string,
   userId: string,
 ): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select(SESSION_COLUMNS)
-    .eq('spaceId', spaceId)
     .eq('userId', userId)
     .eq('source', 'headless')
     .order('startedAt', { ascending: false })
@@ -369,11 +348,9 @@ export async function getLatestHeadlessSession(
 export async function getLatestHeadlessFrame(spaceId: string, userId: string): Promise<{ sessionId: string; frame: LatestFrame } | null> {
   const session = await getActiveHeadlessSession(spaceId, userId);
   if (!session) return null;
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select('lastFrame, lastFrameAt')
     .eq('id', session.id)
-    .eq('spaceId', spaceId)
     .eq('source', 'headless')
     .maybeSingle();
   if (error) throw error;
@@ -383,11 +360,9 @@ export async function getLatestHeadlessFrame(spaceId: string, userId: string): P
 }
 
 export async function getHeadlessSessionForUser(sessionId: string, opts: { spaceId: string; userId: string }): Promise<BrowserSessionRow | null> {
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .select(SESSION_COLUMNS)
     .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('userId', opts.userId)
     .eq('source', 'headless')
     .eq('status', 'active')
@@ -507,11 +482,9 @@ export async function recordHeadlessActionResult(
   opts: { spaceId: string; sessionId: string },
   result: BrowserActionResult,
 ): Promise<void> {
-  const { data: action, error } = await supabase
-    .from('BrowserAction')
+  const { data: action, error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .select('id, sessionId')
     .eq('id', actionId)
-    .eq('spaceId', opts.spaceId)
     .maybeSingle();
   if (error) throw error;
   if (!action) return;
@@ -519,15 +492,13 @@ export async function recordHeadlessActionResult(
   const row = action as { id: string; sessionId: string };
   if (row.sessionId !== opts.sessionId) return; // belongs to a different session — ignore
 
-  const { data: updated, error: updateErr } = await supabase
-    .from('BrowserAction')
+  const { data: updated, error: updateErr } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .update({
       status: result.ok ? 'done' : 'error',
       result,
       completedAt: new Date().toISOString(),
     })
     .eq('id', row.id)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'running')
     .select('id')
     .maybeSingle();
@@ -554,11 +525,9 @@ export async function recordPollHeartbeat(
     update.lastFrame = frame;
     update.lastFrameAt = new Date().toISOString();
   }
-  const { error } = await supabase
-    .from('BrowserSession')
+  const { error } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .update(update)
     .eq('id', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'active');
   if (error) throw error;
 }
@@ -574,11 +543,9 @@ export async function getLatestFrame(spaceId: string, userId: string): Promise<L
   const session = await getActiveSession(spaceId, userId);
   if (!session) return null;
 
-  const { data, error } = await supabase
-    .from('BrowserSession')
+  const { data, error } = await tenantTable(supabase, 'BrowserSession', { spaceId })
     .select('lastFrame, lastFrameAt')
     .eq('id', session.id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (error) throw error;
 
@@ -623,11 +590,9 @@ export async function enqueueActionForSession(opts: {
   sessionId: string;
   input: BrowserActionInput;
 }): Promise<{ actionId: string } | { error: string }> {
-  const { data: session, error: sessionError } = await supabase
-    .from('BrowserSession')
+  const { data: session, error: sessionError } = await tenantTable(supabase, 'BrowserSession', { spaceId: opts.spaceId })
     .select('id, source')
     .eq('id', opts.sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('userId', opts.userId)
     .eq('status', 'active')
     .maybeSingle();
@@ -652,7 +617,7 @@ export async function enqueueActionForSession(opts: {
   }
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrowserAction').insert({
+  const { error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId }).insert({
     id,
     spaceId: opts.spaceId,
     sessionId: opts.sessionId,
@@ -681,11 +646,9 @@ export async function awaitActionResult(
   const deadline = Date.now() + timeoutMs;
 
   for (;;) {
-    const { data, error } = await supabase
-      .from('BrowserAction')
+    const { data, error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
       .select('status, result')
       .eq('id', actionId)
-      .eq('spaceId', opts.spaceId)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
@@ -713,11 +676,9 @@ export async function awaitActionResult(
  */
 export async function expireStaleQueuedActions(sessionId: string, opts: { spaceId: string }): Promise<void> {
   const cutoff = new Date(Date.now() - ACTION_TTL_SECONDS * 1000).toISOString();
-  const { error } = await supabase
-    .from('BrowserAction')
+  const { error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .update({ status: 'expired', completedAt: new Date().toISOString() })
     .eq('sessionId', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'queued')
     .lt('createdAt', cutoff);
   if (error) throw error;
@@ -728,11 +689,9 @@ export async function dispatchNextAction(
   sessionId: string,
   opts: { spaceId: string },
 ): Promise<{ id: string; sessionId: string; input: BrowserActionInput } | null> {
-  const { data, error } = await supabase
-    .from('BrowserAction')
+  const { data, error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .select('id, sessionId, type, params')
     .eq('sessionId', sessionId)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'queued')
     .order('createdAt', { ascending: true })
     .limit(1)
@@ -741,11 +700,9 @@ export async function dispatchNextAction(
   if (!data) return null;
 
   const row = data as { id: string; sessionId: string; type: string; params: BrowserActionInput };
-  const { data: claimed, error: updateErr } = await supabase
-    .from('BrowserAction')
+  const { data: claimed, error: updateErr } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .update({ status: 'running', dispatchedAt: new Date().toISOString() })
     .eq('id', row.id)
-    .eq('spaceId', opts.spaceId)
     .eq('status', 'queued') // only claim it if still queued (guards a racing second poll)
     .select('id')
     .maybeSingle();
@@ -767,11 +724,9 @@ export async function recordActionResult(
   opts: { spaceId: string; linkId: string },
   result: BrowserActionResult,
 ): Promise<void> {
-  const { data: action, error } = await supabase
-    .from('BrowserAction')
+  const { data: action, error } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .select('id, sessionId')
     .eq('id', actionId)
-    .eq('spaceId', opts.spaceId)
     .maybeSingle();
   if (error) throw error;
   if (!action) return;
@@ -780,14 +735,12 @@ export async function recordActionResult(
   const session = await findLinkSession(row.sessionId, { spaceId: opts.spaceId, linkId: opts.linkId });
   if (!session) return; // action's session doesn't belong to this link — ignore
 
-  const { error: updateErr } = await supabase
-    .from('BrowserAction')
+  const { error: updateErr } = await tenantTable(supabase, 'BrowserAction', { spaceId: opts.spaceId })
     .update({
       status: result.ok ? 'done' : 'error',
       result,
       completedAt: new Date().toISOString(),
     })
-    .eq('id', row.id)
-    .eq('spaceId', opts.spaceId);
+    .eq('id', row.id);
   if (updateErr) throw updateErr;
 }

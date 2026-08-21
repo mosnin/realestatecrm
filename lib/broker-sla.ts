@@ -29,6 +29,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { notifyBroker } from '@/lib/broker-notify';
 import { sendPushToSpace } from '@/lib/push';
@@ -94,10 +95,8 @@ async function ensureSlaFollowUpTask(args: {
 
   try {
     // Dedup: is there already an open SLA follow-up for this contact?
-    const { data: existing, error: lookupError } = await supabase
-      .from('AgentTask')
+    const { data: existing, error: lookupError } = await tenantTable(supabase, 'AgentTask', { spaceId })
       .select('id')
-      .eq('spaceId', spaceId)
       .eq('triggerSource', SLA_TASK_TRIGGER)
       .eq('metadata->>contactId', contactId)
       .in('status', OPEN_TASK_STATUSES)
@@ -124,7 +123,7 @@ async function ensureSlaFollowUpTask(args: {
     // (contactId/kind) that the lookup above keys on — enqueueTask doesn't
     // expose a metadata field, so the row is written directly here.
     const now = new Date().toISOString();
-    const { error: insertError } = await supabase.from('AgentTask').insert({
+    const { error: insertError } = await tenantTable(supabase, 'AgentTask', { spaceId }).insert({
       spaceId,
       title: title.slice(0, 255),
       description,

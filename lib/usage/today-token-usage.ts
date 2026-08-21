@@ -20,6 +20,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 export interface TodayTokenUsage {
   chat: number;
@@ -30,10 +31,8 @@ export interface TodayTokenUsage {
 export async function getTodayTokenUsage(spaceId: string): Promise<TodayTokenUsage> {
   const todayUtc = new Date().toISOString().slice(0, 10);
 
-  const { data: chatRows } = await supabase
-    .from('ChatUsage')
+  const { data: chatRows } = await tenantTable(supabase, 'ChatUsage', { spaceId })
     .select('promptTokens, completionTokens')
-    .eq('spaceId', spaceId)
     .gte('createdAt', `${todayUtc}T00:00:00.000Z`);
 
   const chat = (chatRows ?? []).reduce(

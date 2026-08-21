@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
 
 
@@ -121,8 +122,7 @@ export async function enqueueTask(
 ): Promise<string> {
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('AgentTask')
+  const { data, error } = await tenantTable(supabase, 'AgentTask', { spaceId })
     .insert({
       spaceId,
       title:           input.title,

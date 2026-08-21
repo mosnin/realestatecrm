@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data, error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .select('*')
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = await req.json();
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -62,7 +62,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .delete()
