@@ -61,7 +61,7 @@ const { ensureMock } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/deals/default-pipelines', () => ({
   ensureDefaultPipelines: ensureMock,
-  CONTRACT_SPINE: 'esign',
+  CONTRACT_SPINE: 'realtor',
 }));
 
 import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';

@@ -1,6 +1,6 @@
 /**
- * A completed DocuSign envelope on a deal is the e-sign spine: it advances
- * the deal as offer-accepted (Under Contract + contractAcceptedAt).
+ * A completed DocuSign envelope updates signature status only.
+ * Chippi is not the e-sign of record: it must not advance the deal.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,12 +17,6 @@ const { advanceMock, executeMock, listAccountsMock, composioConfiguredMock } = v
 vi.mock('@/lib/deals/advance-from-event', () => ({
   advanceDealFromEvent: advanceMock,
 }));
-vi.mock('@/lib/deals/default-pipelines', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/deals/default-pipelines')>(
-    '@/lib/deals/default-pipelines',
-  );
-  return { ...actual, CONTRACT_SPINE: 'esign' };
-});
 vi.mock('@/lib/integrations/composio', () => ({
   composioConfigured: composioConfiguredMock,
   listConnectedAccountsForEntity: listAccountsMock,
@@ -63,6 +57,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 import { refreshEnvelopeStatus } from '@/lib/esign';
+import { CONTRACT_SPINE } from '@/lib/deals/default-pipelines';
 
 const row = {
   id: 'sig_1',
@@ -91,8 +86,10 @@ beforeEach(() => {
   executeMock.mockReset();
 });
 
-describe('refreshEnvelopeStatus — e-sign spine', () => {
-  it('advances the deal when the envelope completes', async () => {
+describe('refreshEnvelopeStatus — realtor owns the contract', () => {
+  it('does not treat a completed envelope as offer accepted', async () => {
+    expect(CONTRACT_SPINE).toBe('realtor');
+
     queue('SignatureRequest', { data: { ...row }, error: null });
     executeMock
       .mockResolvedValueOnce({ successful: true, data: { status: 'completed' } })
@@ -106,12 +103,10 @@ describe('refreshEnvelopeStatus — e-sign spine', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(advanceMock).toHaveBeenCalledWith({
-      spaceId: 'space_1',
-      dealId: 'deal_1',
-      event: 'offer_accepted',
-      title: 'Jane Doe',
-    });
+    if (result.ok) {
+      expect(result.signatureRequest.status).toBe('completed');
+    }
+    expect(advanceMock).not.toHaveBeenCalled();
   });
 
   it('does not move the pipeline when the envelope is still in flight', async () => {

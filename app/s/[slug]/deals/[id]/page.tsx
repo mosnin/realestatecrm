@@ -594,6 +594,10 @@ export default async function DealDetailPage({
                   placeholder="Not set"
                 />
               </FieldCell>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                You set these. Accepting an offer stamps the contract date. Chippi
+                does not certify signatures or pull MLS.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <FieldCell label="Stage">

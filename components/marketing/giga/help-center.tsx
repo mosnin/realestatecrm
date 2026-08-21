@@ -109,7 +109,7 @@ const GUIDES: Guide[] = [
     desc: 'Connect the tools you already pay for — Chippi works across them.',
     steps: [
       'Add Gmail, Google Calendar, HubSpot, DocuSign, WhatsApp and more.',
-      'Connections are managed through Composio — Gmail, calendar, CRM, e-sign, and more.',
+      'Connections are managed through Composio — Gmail, calendar, CRM, and more.',
       'Chippi reads and writes in both directions so your systems stay in sync.',
     ],
   },

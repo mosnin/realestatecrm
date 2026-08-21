@@ -19,7 +19,7 @@ const TABS = [
   },
   {
     title: 'Listings',
-    files: ['Front exterior, 220 Marina.jpg', 'MLS sheet, 14 Oak St.pdf', 'Floor plan, 31 Harbor Way.png', 'Just-listed flyer, 5 Birch.pdf'],
+    files: ['Front exterior, 220 Marina.jpg', 'Listing sheet, 14 Oak St.pdf', 'Floor plan, 31 Harbor Way.png', 'Just-listed flyer, 5 Birch.pdf'],
   },
   {
     title: 'Clients',

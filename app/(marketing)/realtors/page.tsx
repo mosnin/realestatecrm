@@ -20,7 +20,6 @@ import {
   Inbox,
   Link2,
   MessageSquare,
-  PenLine,
   ShieldCheck,
 } from 'lucide-react';
 import { PageHero } from '@/components/marketing/site/page-hero';
@@ -87,7 +86,7 @@ const BENTO_CELLS = [
 const BAND_STATS: { value: string; label: string }[] = [
   { value: '24/7', label: 'Working your book around the clock' },
   { value: 'Logged', label: 'Every send on the record' },
-  { value: 'OAuth', label: 'Inbox, calendar, CRM, e-sign' },
+  { value: 'OAuth', label: 'Inbox, calendar, CRM' },
 ];
 
 /* The first day, in three steps, white shadow steps, tinted-circle icons. */
@@ -229,7 +228,6 @@ const STACK_ROWS: { icon: typeof Inbox; label: string; note: string }[] = [
   { icon: Inbox, label: 'Inbox', note: 'Gmail · Outlook' },
   { icon: CalendarCheck, label: 'Calendar', note: 'Google · Calendly' },
   { icon: MessageSquare, label: 'CRM', note: 'HubSpot · Salesforce' },
-  { icon: PenLine, label: 'E-sign', note: 'DocuSign' },
 ];
 
 function StackIllustration() {
@@ -488,14 +486,15 @@ export default function RealtorsPage() {
                   It works inside the tools you already pay for.
                 </h2>
                 <p className="mt-4 max-w-md text-base leading-relaxed text-neutral-600 sm:text-lg">
-                  Your inbox, your calendar, your CRM, your e-sign, Chippi
-                  connects to each over OAuth and reaches for the right one as it
-                  works. No migration, no rip-and-replace.
+                  Your inbox, your calendar, your CRM. Chippi connects to each
+                  over OAuth and reaches for the right one as it works. No
+                  migration, no rip-and-replace. We do not list on MLS or
+                  certify e-signatures.
                 </p>
                 <div className="mt-8 grid max-w-md grid-cols-2 gap-6 border-t border-black/10 pt-6">
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">Gmail</span>
-                    <p className="mt-1 text-xs text-neutral-600">Inbox, calendar, CRM, e-sign</p>
+                    <p className="mt-1 text-xs text-neutral-600">Inbox, calendar, CRM</p>
                   </div>
                   <div>
                     <span className="text-2xl font-semibold tracking-tight text-zinc-950">OAuth</span>

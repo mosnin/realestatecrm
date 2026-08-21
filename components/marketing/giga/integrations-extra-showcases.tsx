@@ -2,8 +2,8 @@
 
 /**
  * Two extra integrations feature sections that complement integrations-showcase.tsx.
- * Where that one walks the connected surfaces (inbox / calendar / CRM / messaging /
- * e-sign), these two cover the bookends of the integration story:
+ * Where that one walks the connected surfaces (inbox / calendar / CRM / messaging),
+ * these two cover the bookends of the integration story:
  *
  *   1. IntegrationsSetupShowcase   - the OAuth / connect flow (app tiles flip from
  *      a "Connect" button to a green "Connected" chip after a one-click consent).
@@ -110,7 +110,7 @@ const SETUP_STEPS: ShowcaseStep[] = [
   {
     key: 'pick',
     title: 'Pick your tools',
-    desc: 'Choose from the catalog connected through Composio — inbox, calendar, CRM, e-sign, and more. Pick the ones you already use.',
+    desc: 'Choose from the catalog connected through Composio — inbox, calendar, CRM, and more. Pick the ones you already use.',
     mockup: (
       <Frost title="Connect">
         <motion.div variants={rowV} className="px-1 pb-1 text-[11px] text-white/45">

@@ -52,7 +52,7 @@ export default function IntegrationHero() {
           Works with your favorite tools
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-          Inbox, calendar, CRM, e-sign, and dozens of other apps connect in about
+          Inbox, calendar, CRM, and dozens of other apps connect in about
           two minutes. Chippi calls each one as a tool while it works, no
           migration, no double entry.
         </p>

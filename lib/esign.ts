@@ -12,6 +12,11 @@
  * Composio isn't configured, it returns a structured result — it never
  * throws a 500.
  *
+ * Chippi is not the e-sign vendor and does not certify signatures. A
+ * completed envelope updates SignatureRequest status only. It must not
+ * advance the deal or stamp contractAcceptedAt. The realtor accepts the
+ * offer when they are ready.
+ *
  * ─────────────────────────────────────────────────────────────────────────
  *  ⚠️  ACTION SLUGS NEED LIVE VERIFICATION  ⚠️
  * ─────────────────────────────────────────────────────────────────────────
@@ -27,8 +32,6 @@
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl, uploadObject, buildKey } from '@/lib/storage';
-import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
-import { CONTRACT_SPINE } from '@/lib/deals/default-pipelines';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -627,24 +630,8 @@ export async function refreshEnvelopeStatus(
     };
   }
 
-  // E-sign is the one external contract spine. A completed envelope on a
-  // deal is "offer accepted" in the real world — stamp the contract date
-  // and move to Under Contract. Never invent MLS or lender sync.
-  if (status === 'completed' && request.dealId && CONTRACT_SPINE === 'esign') {
-    try {
-      await advanceDealFromEvent({
-        spaceId: request.spaceId,
-        dealId: request.dealId,
-        event: 'offer_accepted',
-        title: request.signerName,
-      });
-    } catch (err) {
-      logger.warn('[esign] pipeline advance after complete failed', {
-        spaceId: request.spaceId,
-        dealId: request.dealId,
-      }, err);
-    }
-  }
+  // Status only. A completed envelope is not offer-accepted — we do not
+  // certify signatures or move the deal. The realtor accepts the offer.
 
   return { ok: true, signatureRequest: updated as SignatureRequestRow };
 }

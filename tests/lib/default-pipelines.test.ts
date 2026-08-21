@@ -56,8 +56,8 @@ beforeEach(() => {
 });
 
 describe('ensureDefaultPipelines', () => {
-  it('picks e-sign as the only external contract spine', () => {
-    expect(CONTRACT_SPINE).toBe('esign');
+  it('picks the realtor as the contract spine — not MLS, not e-sign', () => {
+    expect(CONTRACT_SPINE).toBe('realtor');
     expect(DEFAULT_PIPELINE_DEFS.map((d) => d.pipelineType)).toEqual(['rental', 'buyer', 'seller']);
     expect(DEFAULT_PIPELINE_DEFS.find((d) => d.pipelineType === 'seller')?.defaultStages).toEqual(
       expect.arrayContaining([

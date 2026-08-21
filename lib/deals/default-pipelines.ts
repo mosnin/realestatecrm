@@ -6,9 +6,10 @@
  * This helper is idempotent: missing types are created; existing boards
  * are left alone. Drag / custom stages stay the realtor's.
  *
- * The one external contract spine this campaign picked is e-sign (the
- * realtor's connected DocuSign via lib/esign.ts). We do not pretend to
- * sync MLS or a lender LOS.
+ * Contract spine is the realtor. We are not an MLS member and do not
+ * ingest listing data. We are not an e-sign vendor and do not treat a
+ * DocuSign envelope as offer-accepted. Under Contract moves when the
+ * realtor accepts an offer (or drags the card). Lender LOS is not faked.
  */
 
 import crypto from 'crypto';
@@ -16,8 +17,11 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { DealStageKind } from '@/lib/types';
 
-/** The only external paperwork spine we run. MLS and lender are not faked. */
-export const CONTRACT_SPINE = 'esign' as const;
+/**
+ * Who may declare a contract. `'realtor'` = offer accept / drag / dates
+ * they typed. Not MLS. Not e-sign. Not a lender LOS.
+ */
+export const CONTRACT_SPINE = 'realtor' as const;
 
 export type DefaultPipelineType = 'rental' | 'buyer' | 'seller';
 
@@ -68,6 +72,7 @@ export const DEFAULT_PIPELINE_DEFS: DefaultPipelineDef[] = [
     defaultStages: [
       { name: 'New Seller', color: '#6b7280', position: 0, kind: 'lead' },
       { name: 'Listing Prep', color: '#3b82f6', position: 1, kind: 'qualified' },
+      // CRM marketing status — not an MLS listing feed.
       { name: 'On Market', color: '#8b5cf6', position: 2, kind: 'active' },
       { name: 'Under Contract', color: '#f97316', position: 3, kind: 'under_contract' },
       { name: 'Closing', color: '#10b981', position: 4, kind: 'closing' },
