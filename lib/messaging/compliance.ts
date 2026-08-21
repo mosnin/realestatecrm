@@ -237,8 +237,8 @@ async function resolveTimeZone(spaceId: string): Promise<string> {
   try {
     const { data } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('timezone')
-      .maybeSingle<{ timezone: string | null }>();
-    const tz = data?.timezone;
+      .maybeSingle();
+    const tz = (data as { timezone: string | null } | null)?.timezone;
     if (tz && typeof tz === 'string') return tz;
   } catch {
     /* fall through to the default */
