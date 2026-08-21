@@ -37,7 +37,7 @@ export async function GET(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
   const { data: doc, error } = await loadDoc(id, space.id);
@@ -70,7 +70,7 @@ export async function PUT(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
 
@@ -130,7 +130,7 @@ export async function DELETE(
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
   const { data: doc, error } = await loadDoc(id, space.id);

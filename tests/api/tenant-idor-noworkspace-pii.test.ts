@@ -36,6 +36,8 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/storage', () => ({
   getSignedDownloadUrl: vi.fn(async () => 'https://signed.example/file'),
   deleteObject: vi.fn(async () => undefined),
+  getObjectText: vi.fn(async () => '# doc'),
+  uploadObject: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/audit', () => ({ audit: vi.fn() }));
@@ -103,6 +105,9 @@ import { DELETE as deleteMemory } from '@/app/api/agent/memory/[id]/route';
 import { PATCH as patchDraft } from '@/app/api/agent/drafts/[id]/route';
 import { POST as postTour } from '@/app/api/chippi/post-tour/route';
 import { POST as studioGenerate } from '@/app/api/studio/generate/route';
+import { GET as getEditorDoc } from '@/app/api/files/documents/[id]/route';
+import { GET as getAgentContact } from '@/app/api/agent/contact/[id]/route';
+import { GET as getAgentDeal } from '@/app/api/agent/deal/[id]/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -261,5 +266,37 @@ describe('no workspace — high-risk PII routes 404 without an existence oracle'
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(runStudioGeneration).not.toHaveBeenCalled();
+  });
+
+  it('GET /api/files/documents/[id] 404s and does not query File', async () => {
+    const res = await getEditorDoc(
+      new NextRequest('http://localhost/api/files/documents/doc_victim'),
+      params('doc_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('File');
+  });
+
+  it('GET /api/agent/contact/[id] 404s and does not query Contact', async () => {
+    const res = await getAgentContact(
+      new NextRequest('http://localhost/api/agent/contact/c_victim'),
+      params('c_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/agent/deal/[id] 404s and does not query Deal', async () => {
+    const res = await getAgentDeal(
+      new NextRequest('http://localhost/api/agent/deal/d_victim'),
+      params('d_victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Deal');
+    expect(fromMockTables).not.toContain('AgentMemory');
   });
 });
