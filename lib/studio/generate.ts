@@ -68,10 +68,8 @@ export async function runStudioGeneration(args: {
   // Brand kit — fold the realtor's palette into the prompt so output comes
   // out on-brand. The original prompt is what gets logged; fal sees the augment.
   let effectivePrompt = prompt;
-  const { data: brand } = await supabase
-    .from('StudioBrand')
+  const { data: brand } = await tenantTable(supabase, 'StudioBrand', { spaceId: args.spaceId })
     .select('colors')
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   const brandColors = (brand?.colors as string[] | null) ?? [];
   if (brandColors.length > 0) {
@@ -79,7 +77,7 @@ export async function runStudioGeneration(args: {
   }
 
   const generationId = crypto.randomUUID();
-  const { error: genErr } = await supabase.from('StudioGeneration').insert({
+  const { error: genErr } = await tenantTable(supabase, 'StudioGeneration', { spaceId: args.spaceId }).insert({
     id: generationId,
     spaceId: args.spaceId,
     userId: args.userId,

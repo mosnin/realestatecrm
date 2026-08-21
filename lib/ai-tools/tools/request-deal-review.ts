@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 const parameters = z
@@ -105,7 +106,7 @@ export const requestDealReviewTool = defineTool<typeof parameters, RequestDealRe
 
     const reviewId = crypto.randomUUID();
     const ownerId = (space as { ownerId: string }).ownerId;
-    const { error: insertErr } = await supabase.from('DealReviewRequest').insert({
+    const { error: insertErr } = await tenantTable(supabase, 'DealReviewRequest', { brokerageId }).insert({
       id: reviewId,
       dealId: args.dealId,
       requestingUserId: ownerId,

@@ -35,6 +35,7 @@
 
 import { createClerkClient } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 
@@ -147,7 +148,7 @@ export async function hardDeleteSpaceAndUser(params: {
   await deleteSpaceStorageObjects(spaceId);
 
   // 1. Non-cascading tables — must go first, while the spaceId still resolves.
-  const { error: attErr } = await supabase.from('Attachment').delete().eq('spaceId', spaceId);
+  const { error: attErr } = await tenantTable(supabase, 'Attachment', { spaceId }).delete();
   if (attErr) throw new Error(`Attachment delete failed: ${attErr.message}`);
 
   const { error: telErr } = await supabase.from('TelemetryEvent').delete().eq('spaceId', spaceId);

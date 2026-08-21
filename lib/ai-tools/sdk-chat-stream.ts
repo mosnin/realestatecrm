@@ -19,6 +19,7 @@
 import crypto from 'crypto';
 import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import type { AgentEvent, PushableEvent } from '@/lib/ai-tools/events';
 import { createSeqCounter, encodeEvent } from '@/lib/ai-tools/events';
@@ -1316,7 +1317,9 @@ async function persistPausedRun(input: PersistPausedInput): Promise<string | nul
     // Do not mention the additive column for ordinary/feature-off pauses: old
     // schemas and non-Workbench approvals retain their existing insert shape.
     Object.assign(pausedRun, pausedRunActiveWorkbookFields(input.ctx));
-    const { error } = await supabase.from('AgentPausedRun').insert(pausedRun);
+    const { error } = await tenantTable(supabase, 'AgentPausedRun', {
+      spaceId: input.ctx.space.id,
+    }).insert(pausedRun);
     if (error) {
       logger.error('[ai/task ts] persistPausedRun failed', { conversationId: input.conversationId }, error);
       return null;

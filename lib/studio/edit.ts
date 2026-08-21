@@ -69,7 +69,7 @@ export async function runStudioEdit(args: {
   const sourceUrl = await getSignedDownloadUrl(source.storageKey as string, 3600);
 
   const generationId = crypto.randomUUID();
-  const { error: genErr } = await supabase.from('StudioGeneration').insert({
+  const { error: genErr } = await tenantTable(supabase, 'StudioGeneration', { spaceId: args.spaceId }).insert({
     id: generationId,
     spaceId: args.spaceId,
     userId: args.userId,

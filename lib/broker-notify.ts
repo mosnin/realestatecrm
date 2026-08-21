@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { after } from 'next/server';
 
@@ -27,7 +28,7 @@ async function persistBrokerNotification(params: NotifyBrokerParams): Promise<vo
   const { brokerageId, type, title, body, metadata } = params;
 
   try {
-    await supabase.from('BrokerNotification').insert({
+    await tenantTable(supabase, 'BrokerNotification', { brokerageId }).insert({
       id: crypto.randomUUID(),
       brokerageId,
       type,

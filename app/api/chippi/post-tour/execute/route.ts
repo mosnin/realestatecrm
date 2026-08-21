@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { allowed } = await checkRateLimit(`chippi:post-tour-exec:${userId}`, 30, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });

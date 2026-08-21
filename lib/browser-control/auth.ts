@@ -16,6 +16,7 @@
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 import { EXT_TOKEN_PREFIX, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_SECONDS } from './protocol';
 
 export interface BrowserLinkRow {
@@ -70,7 +71,7 @@ export async function issuePairingCode(opts: {
   const codeHash = sha256(normalizeCode(code));
   const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_SECONDS * 1000).toISOString();
 
-  const { error } = await supabase.from('BrowserPairingCode').insert({
+  const { error } = await tenantTable(supabase, 'BrowserPairingCode', { spaceId: opts.spaceId }).insert({
     id: crypto.randomUUID(),
     spaceId: opts.spaceId,
     userId: opts.userId,
@@ -127,7 +128,7 @@ export async function redeemPairingCode(
   const deviceLabel = opts.deviceLabel?.trim().slice(0, 120) || null;
   const linkId = crypto.randomUUID();
 
-  const { error: linkErr } = await supabase.from('BrowserLink').insert({
+  const { error: linkErr } = await tenantTable(supabase, 'BrowserLink', { spaceId: pairingRow.spaceId }).insert({
     id: linkId,
     spaceId: pairingRow.spaceId,
     userId: pairingRow.userId,

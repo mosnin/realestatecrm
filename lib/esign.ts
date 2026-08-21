@@ -26,6 +26,7 @@
 
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSignedDownloadUrl, uploadObject, buildKey } from '@/lib/storage';
 import { unscoped } from '@/lib/supabase-guard';
 import {
@@ -584,7 +585,7 @@ export async function refreshEnvelopeStatus(
 
         // Attach back as a DealDocument when tied to a deal.
         if (request.dealId) {
-          await supabase.from('DealDocument').insert({
+          await tenantTable(supabase, 'DealDocument', { spaceId: request.spaceId }).insert({
             dealId: request.dealId,
             spaceId: request.spaceId,
             kind: 'other',

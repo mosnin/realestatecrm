@@ -37,6 +37,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
 import { logger } from '@/lib/logger';
 import { parseDripSteps, type DripStep } from './schema';
@@ -358,7 +359,9 @@ async function processEnrollment(
   // (lib/workflows/scheduled-dispatch.ts) processes it with zero new code.
   const nowIso = now.toISOString();
   const scheduledMessageId = crypto.randomUUID();
-  const { error: schedErr } = await supabase.from('ScheduledMessage').insert({
+  const { error: schedErr } = await tenantTable(supabase, 'ScheduledMessage', {
+    spaceId: enrollment.spaceId,
+  }).insert({
     id: scheduledMessageId,
     spaceId: enrollment.spaceId,
     workflowId: null,

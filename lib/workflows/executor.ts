@@ -23,6 +23,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
@@ -153,7 +154,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
 
   // 1. Open the run ledger. If even this fails we have nowhere to record the
   //    outcome — log and report failed with the (unwritten) id.
-  const { error: insertErr } = await supabase.from('WorkflowRun').insert({
+  const { error: insertErr } = await tenantTable(supabase, 'WorkflowRun', { spaceId: workflow.spaceId }).insert({
     id: runId,
     workflowId: workflow.id,
     spaceId: workflow.spaceId,

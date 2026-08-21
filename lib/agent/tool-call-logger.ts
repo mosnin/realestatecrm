@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { randomUUID } from 'crypto';
 import { after } from 'next/server';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 interface ToolCallRecord {
@@ -25,7 +26,7 @@ async function persistToolCallStart(
   const inputSummary = JSON.stringify(args).slice(0, 500);
 
   try {
-    await supabase.from('ExecutionStep').insert({
+    await tenantTable(supabase, 'ExecutionStep', { spaceId }).insert({
       id: stepId,
       spaceId,
       taskId: taskId ?? null,

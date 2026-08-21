@@ -13,6 +13,7 @@
 
 import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { encodeEvent, createSeqCounter, type AgentEvent, type PushableEvent } from './events';
 import { saveAssistantMessage } from './persistence';
@@ -160,7 +161,7 @@ export async function persistChildPausedRun(input: {
       input.goal,
     );
     if (approvals.length === 0) return null;
-    const { error } = await supabase.from('AgentPausedRun').insert({
+    const { error } = await tenantTable(supabase, 'AgentPausedRun', { spaceId: input.ctx.space.id }).insert({
       id,
       spaceId: input.ctx.space.id,
       userId: input.ctx.userId,

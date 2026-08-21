@@ -80,6 +80,7 @@ vi.mock('@/lib/supabase', () => ({
 import { POST as convertTour } from '@/app/api/tours/convert/route';
 import { POST as authorizeMcp } from '@/app/api/mcp/oauth/authorize/route';
 import { POST as studioEdit } from '@/app/api/studio/edit/route';
+import { POST as postTourExecute } from '@/app/api/chippi/post-tour/execute/route';
 import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -179,5 +180,24 @@ describe('POST /api/studio/edit — no workspace is not Forbidden', () => {
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(insertCalls.filter((c) => c.table === 'File')).toHaveLength(0);
+  });
+});
+
+describe('POST /api/chippi/post-tour/execute — no workspace is not Forbidden', () => {
+  it('404s when the caller has no workspace and does not mirror calendar events', async () => {
+    mockGetSpaceForUser.mockResolvedValue(null);
+
+    const res = await postTourExecute(
+      new NextRequest('http://localhost/api/chippi/post-tour/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposals: [{ tool: 'create_event', args: { summary: 'VICTIM $500,000 at 123 Victim Lane' } }],
+        }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(insertCalls.filter((c) => c.table === 'CalendarEventMirror')).toHaveLength(0);
   });
 });

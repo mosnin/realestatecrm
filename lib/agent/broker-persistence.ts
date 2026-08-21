@@ -15,6 +15,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { coalesceTextBlocks, type MessageBlock } from '@/lib/ai-tools/blocks';
 import { unscoped } from '@/lib/supabase-guard';
@@ -42,7 +43,7 @@ export async function saveBrokerUserMessage(
   input: SaveBrokerUserMessageInput,
 ): Promise<{ messageId: string }> {
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrokerMessage').insert({
+  const { error } = await tenantTable(supabase, 'BrokerMessage', { brokerageId: input.brokerageId }).insert({
     id,
     brokerageId: input.brokerageId,
     conversationId: input.conversationId,
@@ -75,7 +76,7 @@ export async function saveBrokerAssistantMessage(
     .trim();
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrokerMessage').insert({
+  const { error } = await tenantTable(supabase, 'BrokerMessage', { brokerageId: input.brokerageId }).insert({
     id,
     brokerageId: input.brokerageId,
     conversationId: input.conversationId,

@@ -344,7 +344,7 @@ async function runScheduleMessage(
   const scheduledMessageId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
 
-  const { error } = await supabase.from('ScheduledMessage').insert({
+  const { error } = await tenantTable(supabase, 'ScheduledMessage', { spaceId: opts.spaceId }).insert({
     id: scheduledMessageId,
     spaceId: opts.spaceId,
     workflowId: null,
