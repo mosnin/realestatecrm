@@ -129,6 +129,10 @@ import { PATCH as patchQuestion } from '@/app/api/agent/questions/[id]/route';
 import { GET as getBrief } from '@/app/api/agent/brief/[contactId]/route';
 import { GET as getContactContext } from '@/app/api/agent/contact-context/[contactId]/route';
 import { POST as reverseActivity } from '@/app/api/agent/activity/[id]/reverse/route';
+import { GET as getProfilePage, PATCH as patchProfilePage } from '@/app/api/profile-page/route';
+import { GET as listMemory } from '@/app/api/agent/memory/route';
+import { GET as getInsights } from '@/app/api/agent/insights/route';
+import { GET as getStudioBrand, PUT as putStudioBrand } from '@/app/api/studio/brand/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -430,5 +434,61 @@ describe('no workspace — high-risk PII routes 404 without an existence oracle'
     expect(fromMockTables).not.toContain('AgentActivityLog');
     expect(fromMockTables).not.toContain('Contact');
     expect(fromMockTables).not.toContain('Deal');
+  });
+
+  it('GET /api/profile-page 404s and does not query ProfilePage', async () => {
+    const res = await getProfilePage();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('ProfilePage');
+    expect(fromMockTables).not.toContain('SpaceSetting');
+    expect(fromMockTables).not.toContain('Property');
+  });
+
+  it('PATCH /api/profile-page 404s and does not query ProfilePage', async () => {
+    const res = await patchProfilePage(
+      new NextRequest('http://localhost/api/profile-page', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ headline: 'VICTIM' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('ProfilePage');
+  });
+
+  it('GET /api/agent/memory 404s and does not query AgentMemory', async () => {
+    const res = await listMemory(new NextRequest('http://localhost/api/agent/memory'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/agent/insights 404s and does not query AgentMemory', async () => {
+    const res = await getInsights();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('AgentMemory');
+  });
+
+  it('GET /api/studio/brand 404s and does not query StudioBrand', async () => {
+    const res = await getStudioBrand();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioBrand');
+  });
+
+  it('PUT /api/studio/brand 404s and does not query StudioBrand', async () => {
+    const res = await putStudioBrand(
+      new NextRequest('http://localhost/api/studio/brand', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colors: ['#000'], voice: 'VICTIM', handles: {} }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioBrand');
   });
 });

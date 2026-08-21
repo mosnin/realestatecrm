@@ -41,11 +41,9 @@ export const noteOnPersonTool = defineTool<typeof parameters, NoteOnPersonResult
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {

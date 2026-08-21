@@ -55,18 +55,14 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
   async handler(args, ctx) {
     // Both contacts must exist in this space and not be brokerage rows.
     const [keepRes, mergeRes] = await Promise.all([
-      supabase
-        .from('Contact')
+      tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, name')
         .eq('id', args.keepId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle(),
-      supabase
-        .from('Contact')
+      tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, name')
         .eq('id', args.mergeId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle(),
     ]);
@@ -88,16 +84,12 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
 
     // Count rows for the summary BEFORE moving.
     const [actCountRes, tourCountRes, dcCountRes] = await Promise.all([
-      supabase
-        .from('ContactActivity')
+      tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id })
         .select('id', { count: 'exact', head: true })
-        .eq('contactId', args.mergeId)
-        .eq('spaceId', ctx.space.id),
-      supabase
-        .from('Tour')
+        .eq('contactId', args.mergeId),
+      tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
         .select('id', { count: 'exact', head: true })
-        .eq('contactId', args.mergeId)
-        .eq('spaceId', ctx.space.id),
+        .eq('contactId', args.mergeId),
       supabase
         .from('DealContact')
         .select('dealId', { count: 'exact', head: true })
@@ -108,11 +100,9 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
     const dealLinksCount = (dcCountRes as unknown as { count: number | null }).count ?? 0;
 
     // Step 1: ContactActivity → keepId
-    const { error: actErr } = await supabase
-      .from('ContactActivity')
+    const { error: actErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id })
       .update({ contactId: args.keepId })
-      .eq('contactId', args.mergeId)
-      .eq('spaceId', ctx.space.id);
+      .eq('contactId', args.mergeId);
     if (actErr) {
       logger.error('[tools.merge_persons] activity move failed', { keep: args.keepId, merge: args.mergeId }, actErr);
       return {
@@ -122,11 +112,9 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
     }
 
     // Step 2: Tour → keepId
-    const { error: tourErr } = await supabase
-      .from('Tour')
+    const { error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .update({ contactId: args.keepId })
-      .eq('contactId', args.mergeId)
-      .eq('spaceId', ctx.space.id);
+      .eq('contactId', args.mergeId);
     if (tourErr) {
       logger.error('[tools.merge_persons] tour move failed (PARTIAL MERGE)', { keep: args.keepId, merge: args.mergeId }, tourErr);
       return {
@@ -207,11 +195,9 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
     }
 
     // Step 5: Delete the merged Contact row.
-    const { error: deleteErr } = await supabase
-      .from('Contact')
+    const { error: deleteErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .delete()
-      .eq('id', args.mergeId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.mergeId);
     if (deleteErr) {
       logger.error('[tools.merge_persons] delete failed (PARTIAL MERGE)', { merge: args.mergeId }, deleteErr);
       return {

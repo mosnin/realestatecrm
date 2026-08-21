@@ -27,7 +27,7 @@ export async function GET() {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data, error } = await tenantTable(supabase, 'StudioBrand', { spaceId: space.id })
     .select('colors, voice, handles')
@@ -49,7 +49,7 @@ export async function PUT(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let body: { colors?: unknown; voice?: unknown; handles?: unknown };
   try {

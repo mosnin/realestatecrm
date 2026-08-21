@@ -51,11 +51,9 @@ export const logMeetingTool = defineTool<typeof parameters, LogMeetingResult>({
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {
@@ -89,11 +87,9 @@ export const logMeetingTool = defineTool<typeof parameters, LogMeetingResult>({
       return { summary: `Couldn't log the meeting: ${activityErr.message}`, display: 'error' };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Contact')
+    const { error: updateErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .update({ lastContactedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-      .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.personId);
     if (updateErr) {
       logger.warn(
         '[tools.log_meeting] lastContactedAt update failed',

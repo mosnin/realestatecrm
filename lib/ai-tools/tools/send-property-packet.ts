@@ -61,11 +61,9 @@ export const sendPropertyPacketTool = defineTool<typeof parameters, SendProperty
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: contactErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.contactId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (contactErr) {
       return { summary: `Contact lookup failed: ${contactErr.message}`, display: 'error' };
@@ -74,11 +72,9 @@ export const sendPropertyPacketTool = defineTool<typeof parameters, SendProperty
       return { summary: `No contact with id "${args.contactId}".`, display: 'error' };
     }
 
-    const { data: property, error: propertyErr } = await supabase
-      .from('Property')
+    const { data: property, error: propertyErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .select('id, address')
       .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (propertyErr) {
       return { summary: `Property lookup failed: ${propertyErr.message}`, display: 'error' };

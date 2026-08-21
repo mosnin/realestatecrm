@@ -126,11 +126,9 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     let guestPhone: string | null = args.guestPhone?.trim() || null;
 
     if (args.contactId) {
-      const { data: contact, error } = await supabase
-        .from('Contact')
+      const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, name, email, phone')
         .eq('id', args.contactId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle();
       if (error) {

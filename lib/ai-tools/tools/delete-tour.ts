@@ -45,11 +45,9 @@ export const deleteTourTool = defineTool<typeof parameters, DeleteTourResult>({
   },
 
   async handler(args, ctx) {
-    const { data: tour, error: tourErr } = await supabase
-      .from('Tour')
+    const { data: tour, error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .select('id, contactId, guestName, googleEventId')
       .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (tourErr) {
       return { summary: `Tour lookup failed: ${tourErr.message}`, display: 'error' };
@@ -75,11 +73,9 @@ export const deleteTourTool = defineTool<typeof parameters, DeleteTourResult>({
       }
     }
 
-    const { error: deleteErr } = await supabase
-      .from('Tour')
+    const { error: deleteErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .delete()
-      .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.tourId);
     if (deleteErr) {
       logger.error('[tools.delete_tour] delete failed', { tourId: args.tourId }, deleteErr);
       return { summary: `Delete failed: ${deleteErr.message}`, display: 'error' };

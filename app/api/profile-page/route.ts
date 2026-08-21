@@ -78,7 +78,7 @@ export async function GET() {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const [{ data }, { data: settingsRow }, { data: propertyRows }] = await Promise.all([
     tenantTable(supabase, 'ProfilePage', { spaceId: space.id }).select(SELECT).maybeSingle(),
@@ -156,7 +156,7 @@ export async function PATCH(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };

@@ -42,11 +42,9 @@ export const logSmsSentTool = defineTool<typeof parameters, LogSmsResult>({
   },
 
   async handler(args, ctx) {
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (!contact) {
       return { summary: 'Contact not found in this workspace.', display: 'error' };
