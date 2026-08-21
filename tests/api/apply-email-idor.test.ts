@@ -120,14 +120,13 @@ vi.mock('@/lib/supabase', () => {
     chain.insert = vi.fn(() => chain);
     chain.update = vi.fn(() => chain);
     const resolve = (): Terminal => {
-      if (table === 'Contact' && emailPattern !== null && q.length === 0) {
+      if (table === 'Contact' && emailPattern !== null) {
         const hit = sqlIlike(VICTIM.email, emailPattern);
         emailPattern = null;
         return hit
           ? { data: [{ id: VICTIM.id, name: VICTIM.name, applicationRef: VICTIM.applicationRef }] }
           : { data: [], error: null };
       }
-      emailPattern = null;
       return q.shift() ?? { data: null, error: null };
     };
     chain.maybeSingle = vi.fn(() => Promise.resolve(resolve()));
