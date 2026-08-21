@@ -239,7 +239,7 @@ describe('no workspace — leftover PII collections 404 without an existence ora
   });
 
   it('GET /api/leads/first-touch 404s and does not query AgentDraft', async () => {
-    const res = await firstTouch(new NextRequest('http://localhost/api/leads/first-touch'));
+    const res = await firstTouch();
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('AgentDraft');
@@ -279,9 +279,7 @@ describe('no workspace — leftover PII collections 404 without an existence ora
   });
 
   it('DELETE /api/profile-page/cover-photo 404s and does not query ProfilePage', async () => {
-    const res = await deleteCoverPhoto(
-      new NextRequest('http://localhost/api/profile-page/cover-photo', { method: 'DELETE' }),
-    );
+    const res = await deleteCoverPhoto();
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('ProfilePage');
@@ -297,9 +295,7 @@ describe('no workspace — leftover PII collections 404 without an existence ora
   });
 
   it('DELETE /api/profile-page/profile-photo 404s and does not query ProfilePage', async () => {
-    const res = await deleteProfilePhoto(
-      new NextRequest('http://localhost/api/profile-page/profile-photo', { method: 'DELETE' }),
-    );
+    const res = await deleteProfilePhoto();
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('ProfilePage');
