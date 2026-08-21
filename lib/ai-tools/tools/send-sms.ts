@@ -18,6 +18,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { sendSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -200,7 +201,7 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // ContactActivity.type enum doesn't include an 'sms' value, so we log
     // under 'note' with a metadata flag the UI can special-case later.
     if (resolvedContactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: resolvedContactId,

@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -54,7 +55,7 @@ export const logEmailSentTool = defineTool<typeof parameters, LogEmailResult>({
 
     const sentAt = args.sentAt ?? new Date().toISOString();
     const activityId = crypto.randomUUID();
-    const { error } = await supabase.from('ContactActivity').insert({
+    const { error } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       contactId: c.id,
       spaceId: ctx.space.id,

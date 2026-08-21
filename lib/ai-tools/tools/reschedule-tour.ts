@@ -17,6 +17,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { findCalendarConnection, updateEventThrough } from '@/lib/calendar/mirror';
@@ -111,7 +112,7 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
     }
 
     if (tour.contactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: tour.contactId,

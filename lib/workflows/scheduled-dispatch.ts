@@ -66,6 +66,7 @@ import { notifyDraftReady, notifyAutoSend } from '@/lib/notify';
 import type { InboxChannel } from '@/lib/types';
 import type { WorkflowAutonomy } from './schema';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /** Don't let one tick process an unbounded number of rows — the overflow is
@@ -362,7 +363,7 @@ async function processAuto(
   // failure must not flip a real send into a 'failed' (which could re-send).
   const sentAt = new Date().toISOString();
   try {
-    await supabase.from('ContactActivity').insert({
+    await tenantTable(supabase, 'ContactActivity', { spaceId: row.spaceId }).insert({
       id: crypto.randomUUID(),
       spaceId: row.spaceId,
       contactId: contact.id,

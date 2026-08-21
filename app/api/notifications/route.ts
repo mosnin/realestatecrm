@@ -350,9 +350,9 @@ async function stampState(
   if (patch.readAt) row.readAt = patch.readAt;
   if (patch.dismissedAt) row.dismissedAt = patch.dismissedAt;
 
-  await supabase
-    .from('NotificationState')
-    .upsert(row, { onConflict: 'spaceId,userId,key' });
+  await tenantTable(supabase, 'NotificationState', { spaceId }).upsert(row, {
+    onConflict: 'spaceId,userId,key',
+  });
 }
 
 /**
@@ -390,7 +390,7 @@ export async function PATCH(req: NextRequest) {
       // detectable).
       const current = await listNotifications(space.id, slug);
       if (current.length === 0) return NextResponse.json({ success: true });
-      await supabase.from('NotificationState').upsert(
+      await tenantTable(supabase, 'NotificationState', { spaceId: space.id }).upsert(
         current.map((n) => ({
           spaceId: space.id,
           userId,

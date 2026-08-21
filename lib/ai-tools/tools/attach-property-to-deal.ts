@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -86,7 +87,7 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       return { summary: `Link failed: ${updateErr.message}`, display: 'error' };
     }
 
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,

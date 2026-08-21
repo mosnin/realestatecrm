@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -72,7 +73,7 @@ export const clearFollowupTool = defineTool<typeof parameters, ClearFollowupResu
       return { summary: `Update failed: ${updateErr.message}`, display: 'error' };
     }
 
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       contactId: args.personId,
       spaceId: ctx.space.id,

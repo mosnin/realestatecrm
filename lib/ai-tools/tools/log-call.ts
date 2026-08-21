@@ -13,6 +13,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncContact } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -79,7 +80,7 @@ export const logCallTool = defineTool<typeof parameters, LogCallResult>({
     }
 
     const activityId = crypto.randomUUID();
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       contactId: args.personId,
       spaceId: ctx.space.id,

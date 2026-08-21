@@ -16,6 +16,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -88,7 +89,7 @@ export const sendPropertyPacketTool = defineTool<typeof parameters, SendProperty
 
     const intent = args.intent?.trim() || 'standard';
     const activityId = crypto.randomUUID();
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       contactId: args.contactId,
       spaceId: ctx.space.id,

@@ -7,6 +7,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -56,7 +57,7 @@ export const noteOnDealTool = defineTool<typeof parameters, NoteOnDealResult>({
     }
 
     const activityId = crypto.randomUUID();
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       dealId: args.dealId,
       spaceId: ctx.space.id,

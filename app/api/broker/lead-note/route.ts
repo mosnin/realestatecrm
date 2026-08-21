@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 type ContactNoteRow = {
@@ -40,11 +41,11 @@ async function resolveBrokerContactAccess(params: {
   const brokerSpaceId = ownerSpace?.id ?? null;
 
   if (brokerSpaceId) {
-    const { data: brokerSpaceContact, error: brokerSpaceError } = await supabase
-      .from('Contact')
+    const { data: brokerSpaceContact, error: brokerSpaceError } = await tenantTable(supabase, 'Contact', {
+      spaceId: brokerSpaceId,
+    })
       .select(select)
       .eq('id', contactId)
-      .eq('spaceId', brokerSpaceId)
       .maybeSingle();
     if (brokerSpaceError) throw brokerSpaceError;
     if (brokerSpaceContact) {
@@ -194,11 +195,11 @@ export async function POST(req: NextRequest) {
           assignedSpaceId?: string;
         };
         if (meta.assignedContactId && meta.assignedSpaceId) {
-          const { data: realtorContact } = await supabase
-            .from('Contact')
+          const { data: realtorContact } = await tenantTable(supabase, 'Contact', {
+            spaceId: meta.assignedSpaceId,
+          })
             .select('id, notes')
             .eq('id', meta.assignedContactId)
-            .eq('spaceId', meta.assignedSpaceId)
             .maybeSingle();
 
           if (realtorContact) {
@@ -207,14 +208,12 @@ export async function POST(req: NextRequest) {
               ? `${newNote}\n\n${realtorExisting}`
               : newNote;
 
-            await supabase
-              .from('Contact')
+            await tenantTable(supabase, 'Contact', { spaceId: meta.assignedSpaceId })
               .update({
                 notes: realtorUpdated,
                 updatedAt: now.toISOString(),
               })
-              .eq('id', meta.assignedContactId)
-              .eq('spaceId', meta.assignedSpaceId);
+              .eq('id', meta.assignedContactId);
           }
         }
       } catch {

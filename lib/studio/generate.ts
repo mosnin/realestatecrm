@@ -17,6 +17,7 @@ import {
 import { generateImage, generateVideo, type GeneratedAsset } from '@/lib/studio/fal';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 const MAX_PROMPT = 2000;
@@ -164,7 +165,7 @@ export async function runStudioGeneration(args: {
     throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
-  const { error: fileErr } = await supabase.from('File').insert({
+  const { error: fileErr } = await tenantTable(supabase, 'File', { spaceId: args.spaceId }).insert({
     id: fileId,
     spaceId: args.spaceId,
     userId: args.userId,

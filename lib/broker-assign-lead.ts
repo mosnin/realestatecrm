@@ -3,6 +3,7 @@ import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
 import { normalizeLeadSource } from '@/lib/lead-source';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export type AssignLeadResult =
@@ -99,7 +100,7 @@ export async function assignLeadToRealtor(params: {
   const newContactId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  const { error: cloneError } = await supabase.from('Contact').insert({
+  const { error: cloneError } = await tenantTable(supabase, 'Contact', { spaceId: realtorSpace.id }).insert({
     id: newContactId,
     spaceId: realtorSpace.id,
     name: contact.name,

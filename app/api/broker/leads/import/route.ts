@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_MULTIPART_SIZE = MAX_FILE_SIZE + 256 * 1024; // multipart overhead headroom
@@ -275,21 +276,32 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Batch insert ──────────────────────────────────────────────────────
+  // Group by spaceId so tenantTable can assert the scope column on every row.
+  // Assign-to can land contacts in different member workspaces in one CSV.
   if (contactsToInsert.length > 0) {
-    // Insert in batches of 100 to stay within Supabase limits
+    const bySpace = new Map<string, Array<Record<string, unknown>>>();
+    for (const row of contactsToInsert) {
+      const spaceId = String(row.spaceId);
+      const list = bySpace.get(spaceId) ?? [];
+      list.push(row);
+      bySpace.set(spaceId, list);
+    }
+
     const BATCH_SIZE = 100;
-    for (let i = 0; i < contactsToInsert.length; i += BATCH_SIZE) {
-      const batch = contactsToInsert.slice(i, i + BATCH_SIZE);
-      const { error: insertError } = await supabase.from('Contact').insert(batch);
-      if (insertError) {
-        console.error('[broker/leads/import] insert error', insertError);
-        const batchStart = i + 2;
-        const batchEnd = Math.min(i + BATCH_SIZE, contactsToInsert.length) + 1;
-        errors.push(`Failed to insert rows ${batchStart}-${batchEnd}: ${insertError.message}`);
-        skipped += batch.length;
-        continue;
+    for (const [spaceId, rows] of bySpace) {
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        const { error: insertError } = await tenantTable(supabase, 'Contact', { spaceId }).insert(batch);
+        if (insertError) {
+          console.error('[broker/leads/import] insert error', insertError);
+          const batchStart = i + 2;
+          const batchEnd = Math.min(i + BATCH_SIZE, rows.length) + 1;
+          errors.push(`Failed to insert rows ${batchStart}-${batchEnd}: ${insertError.message}`);
+          skipped += batch.length;
+          continue;
+        }
+        imported += batch.length;
       }
-      imported += batch.length;
     }
   }
 

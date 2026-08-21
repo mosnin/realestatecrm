@@ -15,6 +15,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { fireReviewAsk } from '@/lib/reputation/review-engine';
@@ -98,7 +99,7 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
     const recordedValue = args.finalValue ?? deal.value;
     const valueLabel = recordedValue != null ? `$${Number(recordedValue).toLocaleString()}` : 'unspecified';
 
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,

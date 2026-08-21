@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_TYPES = new Set(['QUALIFICATION', 'TOUR', 'APPLICATION']);
 
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
   if (inserts.length === 0)
     return NextResponse.json({ error: 'No valid rows (name is required)' }, { status: 400 });
 
-  const { error } = await supabase.from('Contact').insert(inserts);
+  const { error } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert(inserts);
   if (error) {
     console.error('[import] insert error:', error);
     return NextResponse.json({ error: 'Failed to import contacts' }, { status: 500 });

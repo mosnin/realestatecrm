@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { _sanitisePropertyBody as sanitiseBody } from '@/app/api/properties/route';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -125,7 +126,10 @@ export async function POST(req: NextRequest) {
     ...out,
   };
 
-  const { data, error } = await supabase.from('Property').insert(insert).select().single();
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: ownerSpace.id as string })
+    .insert(insert)
+    .select()
+    .single();
   if (error) {
     if ((error as { code?: string }).code === '23505') {
       return NextResponse.json({ error: 'A property with that MLS number already exists' }, { status: 409 });

@@ -18,6 +18,7 @@ import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
 import { resolveVoiceWorkExecutionMode } from '@/lib/realtime/voice-delegation';
 import { userOwnsSpace } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -90,11 +91,9 @@ async function ensureConversation(args: {
   executionMode: WorkExecutionMode;
 }> {
   if (args.requestedId) {
-    const { data, error } = await supabase
-      .from('Conversation')
+    const { data, error } = await tenantTable(supabase, 'Conversation', { spaceId: args.spaceId })
       .select('id, spaceId, title, mode, executionMode')
       .eq('id', args.requestedId)
-      .eq('spaceId', args.spaceId)
       .maybeSingle();
     if (error) throw error;
     if (!isRealtorConversation(data, args.spaceId)) {
@@ -115,7 +114,7 @@ async function ensureConversation(args: {
   // in the same newly-created thread.
   const id = stableVoiceId(args.spaceId, 'new-conversation', args.callId, 'session');
   const now = new Date().toISOString();
-  const insert = await supabase.from('Conversation').insert({
+  const insert = await tenantTable(supabase, 'Conversation', { spaceId: args.spaceId }).insert({
     id,
     spaceId: args.spaceId,
     title: fallbackHeuristic(args.goal),
@@ -130,11 +129,11 @@ async function ensureConversation(args: {
     return { id, created: true, mode: 'work', executionMode: 'review' };
   }
 
-  const { data: existing, error: existingError } = await supabase
-    .from('Conversation')
+  const { data: existing, error: existingError } = await tenantTable(supabase, 'Conversation', {
+    spaceId: args.spaceId,
+  })
     .select('id, mode, executionMode')
     .eq('id', id)
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   if (existingError) throw existingError;
   if (!existing) throw insert.error;
@@ -180,7 +179,7 @@ async function persistVoiceTurn(args: {
   ];
   const now = new Date().toISOString();
 
-  const { error: userError } = await supabase.from('Message').upsert(
+  const { error: userError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert(
     {
       id: userMessageId,
       spaceId: args.spaceId,
@@ -194,7 +193,7 @@ async function persistVoiceTurn(args: {
   );
   if (userError) throw userError;
 
-  const { error: assistantError } = await supabase.from('Message').upsert(
+  const { error: assistantError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert(
     {
       id: assistantMessageId,
       spaceId: args.spaceId,
@@ -208,11 +207,9 @@ async function persistVoiceTurn(args: {
   );
   if (assistantError) throw assistantError;
 
-  const { error: touchError } = await supabase
-    .from('Conversation')
+  const { error: touchError } = await tenantTable(supabase, 'Conversation', { spaceId: args.spaceId })
     .update({ updatedAt: new Date().toISOString() })
-    .eq('id', args.conversationId)
-    .eq('spaceId', args.spaceId);
+    .eq('id', args.conversationId);
   if (touchError) throw touchError;
 }
 
@@ -261,7 +258,7 @@ async function persistSpecialistTurn(args: {
   ];
   const now = new Date().toISOString();
 
-  const { error: userError } = await supabase.from('Message').upsert(
+  const { error: userError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert(
     {
       id: userMessageId,
       spaceId: args.spaceId,
@@ -275,7 +272,7 @@ async function persistSpecialistTurn(args: {
   );
   if (userError) throw userError;
 
-  const { error: assistantError } = await supabase.from('Message').upsert(
+  const { error: assistantError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert(
     {
       id: assistantMessageId,
       spaceId: args.spaceId,
@@ -289,11 +286,9 @@ async function persistSpecialistTurn(args: {
   );
   if (assistantError) throw assistantError;
 
-  const { error: touchError } = await supabase
-    .from('Conversation')
+  const { error: touchError } = await tenantTable(supabase, 'Conversation', { spaceId: args.spaceId })
     .update({ updatedAt: new Date().toISOString() })
-    .eq('id', args.conversationId)
-    .eq('spaceId', args.spaceId);
+    .eq('id', args.conversationId);
   if (touchError) throw touchError;
 }
 
@@ -328,7 +323,7 @@ async function persistWorkspaceContinuationTurn(args: {
     },
   ];
   const now = new Date().toISOString();
-  const { error: userError } = await supabase.from('Message').upsert({
+  const { error: userError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert({
     id: userMessageId,
     spaceId: args.spaceId,
     conversationId: args.conversationId,
@@ -338,7 +333,7 @@ async function persistWorkspaceContinuationTurn(args: {
     createdAt: now,
   }, { onConflict: 'id', ignoreDuplicates: true });
   if (userError) throw userError;
-  const { error: assistantError } = await supabase.from('Message').upsert({
+  const { error: assistantError } = await tenantTable(supabase, 'Message', { spaceId: args.spaceId }).upsert({
     id: assistantMessageId,
     spaceId: args.spaceId,
     conversationId: args.conversationId,
@@ -348,11 +343,9 @@ async function persistWorkspaceContinuationTurn(args: {
     createdAt: new Date(Date.now() + 1).toISOString(),
   }, { onConflict: 'id', ignoreDuplicates: true });
   if (assistantError) throw assistantError;
-  const { error: touchError } = await supabase
-    .from('Conversation')
+  const { error: touchError } = await tenantTable(supabase, 'Conversation', { spaceId: args.spaceId })
     .update({ updatedAt: new Date().toISOString() })
-    .eq('id', args.conversationId)
-    .eq('spaceId', args.spaceId);
+    .eq('id', args.conversationId);
   if (touchError) throw touchError;
 }
 
@@ -426,11 +419,11 @@ export async function POST(req: Request) {
       body.callId,
       'specialist-launch',
     );
-    const { data: existingRun, error: existingRunError } = await supabase
-      .from('SwarmRun')
+    const { data: existingRun, error: existingRunError } = await tenantTable(supabase, 'SwarmRun', {
+      spaceId: auth.space.id,
+    })
       .select('id,spaceId,conversationId,goal,customAgentIds,launchToken,status,modalAcceptedAt')
       .eq('id', runId)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (existingRunError) {
       return NextResponse.json({ error: 'Could not verify the specialist request.' }, { status: 500 });
@@ -600,10 +593,10 @@ export async function POST(req: Request) {
     }
 
     if (body.action === 'get_specialist_status') {
-      const { data: run, error: runError } = await supabase
-        .from('SwarmRun')
+      const { data: run, error: runError } = await tenantTable(supabase, 'SwarmRun', {
+        spaceId: auth.space.id,
+      })
         .select('id,status')
-        .eq('spaceId', auth.space.id)
         .eq('conversationId', body.conversationId)
         .order('createdAt', { ascending: false })
         .limit(1)
@@ -630,11 +623,11 @@ export async function POST(req: Request) {
       if (membersError) return NextResponse.json({ error: 'Could not read specialist status.' }, { status: 500 });
       let resultAvailable = false;
       if (run.status === 'completed') {
-        const { count, error: resultError } = await supabase
-          .from('SwarmRun')
+        const { count, error: resultError } = await tenantTable(supabase, 'SwarmRun', {
+          spaceId: auth.space.id,
+        })
           .select('id', { count: 'exact', head: true })
           .eq('id', run.id)
-          .eq('spaceId', auth.space.id)
           .not('result', 'is', null);
         if (resultError) return NextResponse.json({ error: 'Could not read specialist status.' }, { status: 500 });
         resultAvailable = (count ?? 0) > 0;
@@ -741,11 +734,11 @@ export async function POST(req: Request) {
 
   // Idempotency is checked before quota: a provider retry receives the first
   // accepted result instead of being rejected or consuming another slot.
-  const { data: existing, error: existingError } = await supabase
-    .from('WorkSession')
+  const { data: existing, error: existingError } = await tenantTable(supabase, 'WorkSession', {
+    spaceId: auth.space.id,
+  })
     .select('*')
     .eq('id', sessionId)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   if (existingError) {
     return NextResponse.json({ error: 'Could not verify the voice work session.' }, { status: 500 });
@@ -763,10 +756,10 @@ export async function POST(req: Request) {
     if (!rl.allowed) {
       return NextResponse.json({ error: 'Too many voice work sessions this hour.' }, { status: 429 });
     }
-    const { count: active, error: activeError } = await supabase
-      .from('WorkSession')
+    const { count: active, error: activeError } = await tenantTable(supabase, 'WorkSession', {
+      spaceId: auth.space.id,
+    })
       .select('*', { count: 'exact', head: true })
-      .eq('spaceId', auth.space.id)
       .in('status', ['planning', 'awaiting_approval', 'awaiting_input', 'running']);
     if (activeError) {
       return NextResponse.json({ error: 'Could not verify active work sessions.' }, { status: 500 });

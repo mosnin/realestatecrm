@@ -19,6 +19,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction, buildHeadlessToolContext } from '@/lib/agent/run-instruction';
 import { executeToolForEntity } from '@/lib/integrations/composio';
@@ -305,7 +306,7 @@ async function runCreateTask(
 
   // The activity line mirrors set_followup's write so the task shows up in the
   // contact's timeline. Best-effort: the followUpAt above is the real task.
-  const { error: activityErr } = await supabase.from('ContactActivity').insert({
+  const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
     id: crypto.randomUUID(),
     contactId,
     spaceId,

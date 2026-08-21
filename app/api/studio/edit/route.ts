@@ -21,6 +21,7 @@ import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
 import { checkStudioSpendBudget } from '@/lib/studio/spend';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const subCheck = await requireActiveSubscription(space, userId);
   if (subCheck) return subCheck;
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Couldn't start the edit — usually temporary." }, { status: 500 });
   }
 
-  const { error: srcErr } = await supabase.from('File').insert({
+  const { error: srcErr } = await tenantTable(supabase, 'File', { spaceId: space.id }).insert({
     id: sourceId,
     spaceId: space.id,
     userId,

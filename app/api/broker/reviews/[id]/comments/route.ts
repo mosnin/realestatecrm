@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const isBrokerMember = Boolean(brokerCtx && brokerCtx.brokerage.id === review.brokerageId);
   const isRequester = review.requestingUserId === dbUser.id;
   if (!isBrokerMember && !isRequester) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const commentId = crypto.randomUUID();

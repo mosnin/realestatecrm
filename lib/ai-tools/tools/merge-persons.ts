@@ -14,6 +14,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { deleteContactVector, syncContact } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -187,7 +188,7 @@ export const mergePersonsTool = defineTool<typeof parameters, MergePersonsResult
     }
 
     // Step 4: Audit log on the surviving contact.
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       spaceId: ctx.space.id,
       contactId: args.keepId,

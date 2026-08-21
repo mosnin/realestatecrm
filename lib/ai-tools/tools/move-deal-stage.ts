@@ -20,6 +20,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -116,7 +117,7 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Activity log — non-fatal. PostgREST returns { error } rather than
     // throwing on RLS/constraint failures, so we check the error field.
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,
