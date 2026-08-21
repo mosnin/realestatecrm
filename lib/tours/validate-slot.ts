@@ -60,11 +60,9 @@ export async function validateTourSlot(
 
   // ── Per-property overrides (same precedence available/route.ts uses) ────────
   if (propertyProfileId) {
-    const { data: profile } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profile } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId })
       .select('*')
       .eq('id', propertyProfileId)
-      .eq('spaceId', spaceId)
       .eq('isActive', true)
       .maybeSingle();
     if (profile) {
@@ -98,10 +96,8 @@ export async function validateTourSlot(
   const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`;
 
   // ── Build the effective override for this single date (single + recurring) ──
-  const { data: overridesRaw } = await supabase
-    .from('TourAvailabilityOverride')
-    .select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId')
-    .eq('spaceId', spaceId);
+  const { data: overridesRaw } = await tenantTable(supabase, 'TourAvailabilityOverride', { spaceId })
+    .select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId');
 
   let effectiveOverride: { isBlocked: boolean; startHour: number | null; endHour: number | null } | undefined;
 

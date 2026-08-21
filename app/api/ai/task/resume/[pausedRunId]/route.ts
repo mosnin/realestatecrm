@@ -116,18 +116,14 @@ async function restoreApprovedWorkbookContext(
   const args = approvedArguments as Record<string, unknown>;
   if (args.artifactId !== persisted.artifactId || args.sourceVersionNumber !== persisted.versionNumber || args.workbookTitle !== persisted.title) return null;
   try {
-    const { data: artifact } = await supabase
-      .from('Artifact')
+    const { data: artifact } = await tenantTable(supabase, 'Artifact', { spaceId })
       .select('id, title, artifactType, currentVersionId')
       .eq('id', persisted.artifactId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     if (!artifact || artifact.artifactType !== 'workbook' || artifact.title !== persisted.title) return null;
-    const { data: version } = await supabase
-      .from('ArtifactVersion')
+    const { data: version } = await tenantTable(supabase, 'ArtifactVersion', { spaceId })
       .select('id, versionNumber')
       .eq('artifactId', persisted.artifactId)
-      .eq('spaceId', spaceId)
       .eq('versionNumber', persisted.versionNumber)
       .maybeSingle();
     if (!version || version.versionNumber !== persisted.versionNumber) return null;
