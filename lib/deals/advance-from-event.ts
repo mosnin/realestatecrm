@@ -16,6 +16,10 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { DealStageKind } from '@/lib/types';
+import {
+  ensureDefaultPipelines,
+  type DefaultPipelineType,
+} from '@/lib/deals/default-pipelines';
 
 export type PipelineEvent = 'first_touch_sent' | 'tour_booked' | 'offer_accepted';
 
@@ -27,6 +31,8 @@ export interface AdvanceFromEventInput {
   sourceTourId?: string | null;
   title?: string | null;
   address?: string | null;
+  /** When set, new deals land on this board. Otherwise inferred from the contact. */
+  pipelineType?: DefaultPipelineType | null;
 }
 
 export type AdvanceFromEventResult =
@@ -51,7 +57,7 @@ const KIND_RANK: Record<DealStageKind, number> = {
 const NAME_HINTS: Record<DealStageKind, RegExp> = {
   lead: /\b(lead|new|prospect|inquiry|intake)\b/i,
   qualified: /\b(qualif|pre-?approv)\b/i,
-  active: /\b(showing|tour|active|screening)\b/i,
+  active: /\b(showing|tour|active|screening|market|listing)\b/i,
   under_contract: /\b(under.?contract|pending|accepted)\b/i,
   closing: /\b(closing|escrow)\b/i,
   closed: /\b(closed|won|complete|done|funded)\b/i,
@@ -78,6 +84,7 @@ interface DealRow {
   title: string;
   status: string;
   sourceTourId: string | null;
+  contractAcceptedAt?: string | null;
 }
 
 function inferKind(name: string): DealStageKind | null {
@@ -131,7 +138,7 @@ async function loadStages(spaceId: string): Promise<StageRow[] | null> {
 }
 
 function stagesForDeal(all: StageRow[], current: StageRow | undefined): StageRow[] {
-  if (!current) return preferBuyer(all);
+  if (!current) return preferPipeline(all, 'buyer');
   if (current.pipelineId) {
     const same = all.filter((s) => s.pipelineId === current.pipelineId);
     if (same.length) return same;
@@ -143,16 +150,55 @@ function stagesForDeal(all: StageRow[], current: StageRow | undefined): StageRow
   return all;
 }
 
-function preferBuyer(all: StageRow[]): StageRow[] {
-  const buyer = all.filter((s) => s.pipelineType === 'buyer');
-  return buyer.length ? buyer : all;
+function preferPipeline(all: StageRow[], type: DefaultPipelineType | null): StageRow[] {
+  if (!type) return preferPipeline(all, 'buyer');
+  const match = all.filter((s) => s.pipelineType === type);
+  return match.length ? match : all;
+}
+
+async function loadContactLeadType(
+  spaceId: string,
+  contactId: string | null | undefined,
+): Promise<DefaultPipelineType | null> {
+  if (!contactId) return null;
+  const { data, error } = await supabase
+    .from('Contact')
+    .select('leadType')
+    .eq('id', contactId)
+    .eq('spaceId', spaceId)
+    .maybeSingle();
+  if (error) {
+    logger.warn('[deals.advance] contact leadType lookup failed', { spaceId, err: error.message });
+    return null;
+  }
+  const t = (data as { leadType?: string } | null)?.leadType;
+  if (t === 'seller' || t === 'buyer' || t === 'rental') return t;
+  return null;
+}
+
+async function stampContractAcceptedAt(spaceId: string, deal: DealRow): Promise<void> {
+  if (deal.contractAcceptedAt) return;
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('Deal')
+    .update({ contractAcceptedAt: now, updatedAt: now })
+    .eq('id', deal.id)
+    .eq('spaceId', spaceId)
+    .is('contractAcceptedAt', null);
+  if (error) {
+    logger.warn('[deals.advance] contractAcceptedAt stamp failed', {
+      spaceId,
+      dealId: deal.id,
+      err: error.message,
+    });
+  }
 }
 
 async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
   if (input.dealId) {
     const { data, error } = await supabase
       .from('Deal')
-      .select('id, stageId, title, status, sourceTourId')
+      .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
       .eq('id', input.dealId)
       .eq('spaceId', input.spaceId)
       .maybeSingle();
@@ -166,7 +212,7 @@ async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
   if (input.sourceTourId) {
     const { data, error } = await supabase
       .from('Deal')
-      .select('id, stageId, title, status, sourceTourId')
+      .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
       .eq('spaceId', input.spaceId)
       .eq('sourceTourId', input.sourceTourId)
       .maybeSingle();
@@ -196,7 +242,7 @@ async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
 
   const { data: deals, error: dealErr } = await supabase
     .from('Deal')
-    .select('id, stageId, title, status, sourceTourId')
+    .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
     .in('id', ids)
     .eq('spaceId', input.spaceId);
   if (dealErr) {
@@ -291,6 +337,9 @@ async function moveDeal(
       stageChangedAt: now,
       updatedAt: now,
       ...(input.sourceTourId && !deal.sourceTourId ? { sourceTourId: input.sourceTourId } : {}),
+      ...(input.event === 'offer_accepted' && !deal.contractAcceptedAt
+        ? { contractAcceptedAt: now }
+        : {}),
     })
     .eq('id', deal.id)
     .eq('spaceId', input.spaceId);
@@ -329,8 +378,18 @@ async function moveDeal(
 export async function advanceDealFromEvent(
   input: AdvanceFromEventInput,
 ): Promise<AdvanceFromEventResult> {
-  const stages = await loadStages(input.spaceId);
+  const preferred =
+    input.pipelineType ??
+    (await loadContactLeadType(input.spaceId, input.contactId)) ??
+    (input.event === 'tour_booked' ? 'buyer' : 'buyer');
+
+  let stages = await loadStages(input.spaceId);
   if (stages === null) return { ok: false, reason: 'lookup_failed' };
+  if (stages.length === 0 || !stages.some((s) => s.pipelineType === preferred)) {
+    await ensureDefaultPipelines(input.spaceId);
+    stages = await loadStages(input.spaceId);
+    if (stages === null) return { ok: false, reason: 'lookup_failed' };
+  }
   if (stages.length === 0) return { ok: false, reason: 'no_stage' };
 
   const existing = await findDeal(input);
@@ -344,9 +403,15 @@ export async function advanceDealFromEvent(
     const target = pickTarget(pool, input.event);
     if (!target) return { ok: false, reason: 'no_stage' };
     if (existing.stageId === target.id) {
+      if (input.event === 'offer_accepted') {
+        await stampContractAcceptedAt(input.spaceId, existing);
+      }
       return { ok: true, dealId: existing.id, created: false, moved: false, reason: 'same_stage' };
     }
     if (current && isAheadOrEqual(current, target)) {
+      if (input.event === 'offer_accepted') {
+        await stampContractAcceptedAt(input.spaceId, existing);
+      }
       return { ok: true, dealId: existing.id, created: false, moved: false, reason: 'already_ahead' };
     }
     const from = current ?? { ...target, name: 'Unknown' };
@@ -361,7 +426,7 @@ export async function advanceDealFromEvent(
     return { ok: false, reason: 'no_deal' };
   }
 
-  const target = pickTarget(preferBuyer(stages), input.event);
+  const target = pickTarget(preferPipeline(stages, preferred), input.event);
   if (!target) return { ok: false, reason: 'no_stage' };
   const createdId = await createDeal(input, target);
   if (!createdId) return { ok: false, reason: 'lookup_failed' };

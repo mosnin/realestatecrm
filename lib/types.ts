@@ -424,6 +424,14 @@ export type Deal = {
   address: string | null;
   priority: Priority;
   closeDate: Date | null;
+  /**
+   * First-class contract dates. `contractAcceptedAt` is stamped when an
+   * offer is accepted or a DocuSign envelope on the deal completes.
+   * Inspection / earnest are realtor-editable; they are not inferred.
+   */
+  contractAcceptedAt?: Date | string | null;
+  inspectionDeadline?: Date | string | null;
+  earnestDueAt?: Date | string | null;
   stageId: string;
   position: number;
   status: 'active' | 'won' | 'lost' | 'on_hold';

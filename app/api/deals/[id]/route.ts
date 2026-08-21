@@ -195,6 +195,26 @@ export async function PATCH(
       closeDateVal = d.toISOString();
     }
 
+    const parseDay = (raw: unknown, field: string): string | null | undefined => {
+      if (raw === undefined) return undefined;
+      if (raw === null || raw === '') return null;
+      const d = new Date(String(raw));
+      if (isNaN(d.getTime())) return `__invalid__:${field}`;
+      return String(raw).slice(0, 10);
+    };
+    const contractAcceptedAtVal = parseDay(body.contractAcceptedAt, 'contractAcceptedAt');
+    const inspectionDeadlineVal = parseDay(body.inspectionDeadline, 'inspectionDeadline');
+    const earnestDueAtVal = parseDay(body.earnestDueAt, 'earnestDueAt');
+    if (typeof contractAcceptedAtVal === 'string' && contractAcceptedAtVal.startsWith('__invalid__')) {
+      return NextResponse.json({ error: 'Invalid contractAcceptedAt' }, { status: 400 });
+    }
+    if (typeof inspectionDeadlineVal === 'string' && inspectionDeadlineVal.startsWith('__invalid__')) {
+      return NextResponse.json({ error: 'Invalid inspectionDeadline' }, { status: 400 });
+    }
+    if (typeof earnestDueAtVal === 'string' && earnestDueAtVal.startsWith('__invalid__')) {
+      return NextResponse.json({ error: 'Invalid earnestDueAt' }, { status: 400 });
+    }
+
     let followUpAtVal: string | null | undefined = undefined;
     if (body.followUpAt !== undefined) {
       if (!body.followUpAt) {
@@ -432,6 +452,13 @@ export async function PATCH(
         ...(body.address !== undefined && { address: body.address ?? null }),
         ...(body.priority !== undefined && { priority: body.priority }),
         ...(body.closeDate !== undefined && { closeDate: closeDateVal }),
+        ...(body.contractAcceptedAt !== undefined && {
+          contractAcceptedAt: contractAcceptedAtVal
+            ? new Date(String(contractAcceptedAtVal) + 'T12:00:00.000Z').toISOString()
+            : null,
+        }),
+        ...(body.inspectionDeadline !== undefined && { inspectionDeadline: inspectionDeadlineVal }),
+        ...(body.earnestDueAt !== undefined && { earnestDueAt: earnestDueAtVal }),
         ...(body.stageId !== undefined && { stageId: body.stageId }),
         // position is NOT written here. It's the kanban ordering key and the
         // only safe write path is the reorder RPC (/api/deals/reorder), which
@@ -538,6 +565,9 @@ export async function PATCH(
       { key: 'probability', label: 'Probability', oldVal: existing.probability, newVal: dealRow.probability, format: (v) => (v == null ? 'none' : `${v}%`) },
       { key: 'commissionRate', label: 'Commission rate', oldVal: existing.commissionRate, newVal: dealRow.commissionRate, format: (v) => (v == null ? 'none' : `${v}%`) },
       { key: 'closeDate', label: 'Close date', oldVal: dateOnly(existing.closeDate), newVal: dateOnly(dealRow.closeDate), format: (v) => (v ? String(v) : 'none') },
+      { key: 'contractAcceptedAt', label: 'Contract accepted', oldVal: dateOnly(existing.contractAcceptedAt), newVal: dateOnly(dealRow.contractAcceptedAt), format: (v) => (v ? String(v) : 'none') },
+      { key: 'inspectionDeadline', label: 'Inspection deadline', oldVal: dateOnly(existing.inspectionDeadline), newVal: dateOnly(dealRow.inspectionDeadline), format: (v) => (v ? String(v) : 'none') },
+      { key: 'earnestDueAt', label: 'Earnest due', oldVal: dateOnly(existing.earnestDueAt), newVal: dateOnly(dealRow.earnestDueAt), format: (v) => (v ? String(v) : 'none') },
       { key: 'followUpAt', label: 'Follow-up', oldVal: existing.followUpAt ?? null, newVal: dealRow.followUpAt ?? null, format: (v) => (v ? String(v) : 'none') },
       { key: 'nextAction', label: 'Next action', oldVal: existing.nextAction ?? null, newVal: dealRow.nextAction ?? null, format: (v) => (v ? String(v) : 'none') },
       { key: 'priority', label: 'Priority', oldVal: existing.priority, newVal: dealRow.priority, format: (v) => (v == null ? 'none' : String(v)) },

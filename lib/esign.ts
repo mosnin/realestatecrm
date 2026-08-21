@@ -27,6 +27,8 @@
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl, uploadObject, buildKey } from '@/lib/storage';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { CONTRACT_SPINE } from '@/lib/deals/default-pipelines';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -623,6 +625,25 @@ export async function refreshEnvelopeStatus(
       ok: true,
       signatureRequest: { ...request, status, signedDocumentUrl, completedAt },
     };
+  }
+
+  // E-sign is the one external contract spine. A completed envelope on a
+  // deal is "offer accepted" in the real world — stamp the contract date
+  // and move to Under Contract. Never invent MLS or lender sync.
+  if (status === 'completed' && request.dealId && CONTRACT_SPINE === 'esign') {
+    try {
+      await advanceDealFromEvent({
+        spaceId: request.spaceId,
+        dealId: request.dealId,
+        event: 'offer_accepted',
+        title: request.signerName,
+      });
+    } catch (err) {
+      logger.warn('[esign] pipeline advance after complete failed', {
+        spaceId: request.spaceId,
+        dealId: request.dealId,
+      }, err);
+    }
   }
 
   return { ok: true, signatureRequest: updated as SignatureRequestRow };
