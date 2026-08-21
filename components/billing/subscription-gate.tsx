@@ -59,8 +59,8 @@ export function SubscriptionGate({
     'Tour scheduling & booking',
     'Follow-up reminders',
     'Notes, calendar & analytics',
-    'Voice AI assistant (Chip)',
-    'MCP integration for Claude',
+    'Voice calling when Telnyx is configured',
+    'MCP integration for Claude after you create a key',
   ];
 
   return (

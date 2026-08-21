@@ -24,7 +24,7 @@ import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import { uploadObject, deleteObject, getSignedDownloadUrl, buildKey } from '@/lib/storage';
 import { extractAttachmentText } from '@/lib/extraction/extract';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /** TTL for the URL returned on POST. The chat UI uses it for the inline
@@ -260,9 +260,8 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  const { data, error } = await unscoped(supabase
-    .from('Attachment'), 'post-fetch: caller verified parent scope before this id query')
-    .select('id, spaceId, storagePath')
+  const { data, error } = await tenantTable(supabase, 'Attachment', { spaceId: space.id })
+    .select('id, storagePath')
     .eq('id', id)
     .maybeSingle();
   if (error) {
@@ -270,9 +269,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (data.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Delete the storage object first; if the row delete fails afterwards the
   // worst case is an orphaned DB row pointing at a missing object — survivable.
@@ -280,7 +276,9 @@ export async function DELETE(req: NextRequest) {
     logger.warn('[ai/attachments] storage remove failed', { spaceId: space.id }, err);
   });
 
-  const { error: delError } = await unscoped(supabase.from('Attachment'), 'post-fetch: caller verified parent scope before this id query').delete().eq('id', id);
+  const { error: delError } = await tenantTable(supabase, 'Attachment', { spaceId: space.id })
+    .delete()
+    .eq('id', id);
   if (delError) {
     logger.error('[ai/attachments] delete failed', { spaceId: space.id }, delError);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

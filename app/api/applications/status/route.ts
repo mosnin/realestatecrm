@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /**
@@ -25,8 +25,7 @@ export async function PATCH(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   // Get current status for audit trail
-  const { data: currentContact } = await unscoped(supabase
-    .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: currentContact } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .select('applicationStatus, spaceId')
     .eq('id', contactId)
     .maybeSingle();
@@ -39,8 +38,7 @@ export async function PATCH(req: NextRequest) {
     update.applicationStatusNote = statusNote?.trim() || null;
   }
 
-  const { error } = await unscoped(supabase
-    .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
+  const { error } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .update(update)
     .eq('id', contactId);
 
@@ -48,13 +46,13 @@ export async function PATCH(req: NextRequest) {
 
   // Create audit trail record
   if (currentContact) {
-    await supabase.from('ApplicationStatusUpdate').insert({
+    await tenantTable(supabase, 'ApplicationStatusUpdate', { spaceId: auth.space.id }).insert({
       contactId,
-      spaceId: currentContact.spaceId,
+      spaceId: auth.space.id,
       fromStatus: currentContact.applicationStatus ?? null,
       toStatus: status,
       note: statusNote?.trim() || null,
-    }).then(({ error: auditErr }) => {
+    }).then(({ error: auditErr }: { error: unknown }) => {
       if (auditErr) console.warn('[status] Audit insert failed (non-fatal):', auditErr);
     });
   }

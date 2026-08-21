@@ -235,4 +235,26 @@ describe('DashboardLayout login gate', () => {
     });
     await expect(renderLayout()).rejects.toThrow('redirect:/billing-required?slug=acme&reason=canceled');
   });
+
+  it('does not paywall a Free workspace when the subscription lookup errors', async () => {
+    isAccountCompedMock.mockResolvedValue(false);
+    subscriptionState.data = null as never;
+    subscriptionState.error = { message: 'connection reset' };
+    loadDashboardUserMock.mockResolvedValue({
+      id: 'user-1',
+      name: 'Ada',
+      onboard: true,
+      isPlatformAdmin: false,
+      space: { id: 'space-1' },
+    });
+    getSpaceFromSlugMock.mockResolvedValue({
+      id: 'space-1',
+      slug: 'acme',
+      name: 'Acme',
+      ownerId: 'user-1',
+    });
+    const ui = (await renderLayout()) as ReactElement;
+    expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
 });

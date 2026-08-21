@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 type Params = { params: Promise<{ id: string }> };
@@ -19,17 +19,17 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   // Ensure the key belongs to the user's space before deleting
-  const { data: existing } = await supabase
-    .from('McpApiKey')
+  const { data: existing } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!existing)
     return NextResponse.json({ error: 'API key not found' }, { status: 404 });
 
-  const { error } = await unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('id', id);
+  const { error } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
+    .delete()
+    .eq('id', id);
 
   if (error)
     return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 });

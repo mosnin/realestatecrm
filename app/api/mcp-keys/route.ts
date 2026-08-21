@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 // GET /api/mcp-keys?slug=xxx — list all MCP API keys for the user's space
@@ -16,10 +16,8 @@ export async function GET(req: NextRequest) {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('McpApiKey')
+  const { data, error } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
     .select('id, name, keyPrefix, lastUsedAt, createdAt, expiresAt')
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
 
   if (error)
@@ -112,16 +110,16 @@ export async function DELETE(req: NextRequest) {
     if (!id || typeof id !== 'string') return NextResponse.json({ error: 'id required' }, { status: 400 });
 
     // Verify key belongs to this space
-    const { data: existing } = await supabase
-      .from('McpApiKey')
+    const { data: existing } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
       .select('id')
       .eq('id', id)
-      .eq('spaceId', space.id)
       .maybeSingle();
 
     if (!existing) return NextResponse.json({ error: 'API key not found' }, { status: 404 });
 
-    const { error } = await unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('id', id);
+    const { error } = await tenantTable(supabase, 'McpApiKey', { spaceId: space.id })
+      .delete()
+      .eq('id', id);
     if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
 
     return NextResponse.json({ success: true });

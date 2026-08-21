@@ -28,13 +28,13 @@ import { readSignupPlan } from '@/lib/signup-plan';
 
 const FEATURES = [
   'I send the follow-ups you ask for and log every result.',
-  'AI lead scoring on every applicant.',
-  'Intake links that qualify leads for you.',
+  'AI lead scoring when you have credits.',
+  'Intake links that collect leads into your book.',
   'Tours scheduled and booked.',
-  'Unlimited contacts and deals.',
+  'Contacts and deals (also on Free).',
   'Notes, calendar, and analytics.',
-  'Connect Gmail, Slack, and more.',
-  'MCP access for Claude and Cursor.',
+  'Connect Gmail, Slack, and more when those apps are connected.',
+  'MCP access for Claude and Cursor after you create a key.',
 ];
 
 function SubscribeContent() {

@@ -20,7 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { placeClickToCall, toE164, getVoiceConfig } from '@/lib/voice';
-import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 export const runtime = 'nodejs';
@@ -166,8 +166,7 @@ export async function POST(req: NextRequest) {
 
   // Gate: no voice config or no agent number → mark failed, return cleanly.
   if (!getVoiceConfig() || !agentNumber) {
-    await unscoped(supabase
-      .from('CallLog'), 'post-fetch: caller verified parent scope before this id query')
+    await tenantTable(supabase, 'CallLog', { spaceId: space.id })
       .update({ status: 'failed', updatedAt: new Date().toISOString() })
       .eq('id', row.id);
     return NextResponse.json(
@@ -190,8 +189,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    await unscoped(supabase
-      .from('CallLog'), 'post-fetch: caller verified parent scope before this id query')
+    await tenantTable(supabase, 'CallLog', { spaceId: space.id })
       .update({ status: 'failed', updatedAt: new Date().toISOString() })
       .eq('id', row.id);
     return NextResponse.json(
@@ -201,8 +199,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Stamp the Telnyx leg id so webhooks correlate back to this row.
-  const { data: updated } = await unscoped(supabase
-    .from('CallLog'), 'post-fetch: caller verified parent scope before this id query')
+  const { data: updated } = await tenantTable(supabase, 'CallLog', { spaceId: space.id })
     .update({ telnyxCallId: result.telnyxCallId, updatedAt: new Date().toISOString() })
     .eq('id', row.id)
     .select(CALL_COLUMNS)

@@ -142,12 +142,13 @@ export default async function DashboardLayout({
 
       if (subError) {
         console.error('[layout] Subscription check query failed:', subError);
-        // Fail secure — redirect to subscribe rather than granting access
-        redirect(`/subscribe?slug=${slug}`);
+        // Do not send never-subscribed Free users to a paywall on a
+        // transient DB error. Treat as inactive / no history so
+        // canAccessWorkspace still lets CRM through (AI stays credit-gated).
       }
 
-      const status = subData?.stripeSubscriptionStatus ?? 'inactive';
-      const hasSubscriptionHistory = !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
+      const status = subError ? 'inactive' : (subData?.stripeSubscriptionStatus ?? 'inactive');
+      const hasSubscriptionHistory = !subError && !!(subData?.stripeSubscriptionId || subData?.trialUsedAt);
 
       if (!canAccessWorkspace({ status, periodEnd: subData?.stripePeriodEnd, hasSubscriptionHistory })) {
         // Lapsed paid/trial relationship: billing/settings stay reachable so
@@ -162,9 +163,9 @@ export default async function DashboardLayout({
     } catch (err: any) {
       // Next.js redirect() throws a special error — re-throw it
       if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err;
-      // Fail secure: if anything goes wrong checking subscription, block access
+      // Don't invent a paywall on an unexpected gate error. Free CRM
+      // remains reachable; AI spend is still credit-gated per request.
       console.error('[layout] Subscription gate error:', err);
-      redirect(`/subscribe?slug=${slug}`);
     }
   }
 
