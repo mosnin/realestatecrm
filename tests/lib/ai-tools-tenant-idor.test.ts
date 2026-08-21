@@ -109,9 +109,12 @@ vi.mock('@/lib/tour-notify', () => ({
   notifyTourCancelled: vi.fn(async () => undefined),
 }));
 
-const bookTourAtomic = vi.fn();
+const { bookTourAtomic, copyObject } = vi.hoisted(() => ({
+  bookTourAtomic: vi.fn(),
+  copyObject: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/tour-booking', () => ({
-  bookTourAtomic: (...args: unknown[]) => bookTourAtomic(...args),
+  bookTourAtomic,
   generateManageToken: () => 'tok_test',
 }));
 
@@ -122,9 +125,8 @@ vi.mock('@/lib/billing/meter', () => ({
   SubscriptionDelinquentError: class SubscriptionDelinquentError extends Error {},
 }));
 
-const copyObject = vi.fn(async () => undefined);
 vi.mock('@/lib/storage', () => ({
-  copyObject: (...args: unknown[]) => copyObject(...args),
+  copyObject,
   getPublicUrl: () => 'https://cdn.example/photo.jpg',
   buildKey: () => 'property-photos/space/prop/file.jpg',
 }));
