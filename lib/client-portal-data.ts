@@ -48,7 +48,9 @@ type SpaceRel = { name?: string | null; slug?: string | null } | null;
 /** Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
  *  case-insensitively) rather than as a pattern. `%` and `_` are legal in email
  *  local parts and were a wildcard-injection hole in the cross-client guard
- *  (e.g. a client registered as `%@gmail.com` would match every gmail contact). */
+ *  (e.g. a client registered as `%@gmail.com` would match every gmail contact,
+ *  and `john_doe@…` would match `johnXdoe@…`). Must wrap EVERY portal email
+ *  ILIKE — Contact and Tour guestEmail alike. */
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, '\\$&');
 }
@@ -67,7 +69,7 @@ export async function getClientPortalData(email: string): Promise<ClientPortalDa
     supabase
       .from('Tour')
       .select('id, propertyAddress, startsAt, status, spaceId, contactId, guestEmail, Space(name, slug)')
-      .ilike('guestEmail', lower)
+      .ilike('guestEmail', escapeLike(lower))
       .order('startsAt', { ascending: false }),
   ]);
 
