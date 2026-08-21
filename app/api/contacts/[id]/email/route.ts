@@ -59,8 +59,12 @@ export async function POST(
   try {
     await sendEmailFromCRM({
       // Realtor-composed email to a contact — still consumer outreach.
+      // spaceId is required: without it the compliance gate fail-closes and
+      // every Send from the contact page 502s ("That didn't go through").
       audience: 'consumer',
       category: 'marketing',
+      spaceId: space.id,
+      contactId: id,
       toEmail: contact.email,
       fromName: user?.name ?? space.name,
       replyTo: user?.email,

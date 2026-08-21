@@ -33,6 +33,7 @@ import 'server-only';
 
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { toE164 } from '@/lib/phone';
 
 export type Channel = 'sms' | 'email';
 /** Who the message is for. Required at every send site — never defaulted. */
@@ -83,10 +84,7 @@ export function normalizeAddress(channel: Channel, raw: string): string | null {
     const lower = v.toLowerCase();
     return lower.includes('@') ? lower : null;
   }
-  const cleaned = v.replace(/[^\d+]/g, '');
-  if (cleaned.length < 10) return null;
-  const e164 = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
-  return /^\+\d{10,15}$/.test(e164) ? e164 : null;
+  return toE164(v);
 }
 
 /** STOP-family keywords per carrier/CTIA convention. */

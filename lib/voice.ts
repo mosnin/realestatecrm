@@ -54,14 +54,8 @@ if (!isVoiceConfigured()) {
   );
 }
 
-/** Normalize a loose phone string to E.164, or null if it can't be one. */
-export function toE164(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const cleaned = raw.replace(/[^\d+]/g, '');
-  if (cleaned.length < 10) return null;
-  const e164 = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
-  return /^\+\d{10,15}$/.test(e164) ? e164 : null;
-}
+/** Re-export so existing call sites keep importing from this module. */
+export { toE164 } from '@/lib/phone';
 
 // Premium-rate prefixes blocked to prevent toll fraud (mirrors lib/sms.ts).
 const PREMIUM_PREFIXES = ['+1900', '+1976', '+44870', '+44871', '+44872', '+44090', '+44091'];
