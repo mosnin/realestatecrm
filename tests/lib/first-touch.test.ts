@@ -80,6 +80,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 import { fireFirstTouch, FIRST_TOUCH_REASONING } from '@/lib/leads/first-touch';
+import { supabase } from '@/lib/supabase';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -337,5 +338,6 @@ describe('fireFirstTouch', () => {
     expect(outcome).toEqual({ created: false, reason: 'contact_not_found' });
     expect(inserts).toHaveLength(0);
     expect(sendPushMock).not.toHaveBeenCalled();
+    expect(vi.mocked(supabase.from).mock.calls.filter((c) => c[0] === 'AgentDraft')).toHaveLength(0);
   });
 });

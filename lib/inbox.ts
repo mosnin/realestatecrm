@@ -24,9 +24,10 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
+
 import { logger } from '@/lib/logger';
 import type { InboxChannel, InboxDirection } from '@/lib/types';
-import { unscoped } from '@/lib/supabase-guard';
 
 
 /** Postgres unique_violation — raised when the partial unique index on
@@ -89,10 +90,8 @@ async function findByExternalId(
   channel: InboxChannel,
   externalId: string,
 ): Promise<ExistingMessage | null> {
-  const { data, error } = await supabase
-    .from('InboxMessage')
+  const { data, error } = await tenantTable(supabase, 'InboxMessage', { spaceId })
     .select('id, threadId')
-    .eq('spaceId', spaceId)
     .eq('channel', channel)
     .eq('externalId', externalId)
     .maybeSingle();
@@ -117,8 +116,7 @@ async function upsertThread(
   contactId: string,
 ): Promise<{ id: string; unreadCount: number }> {
   const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('InboxThread')
+  const { data, error } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .upsert(
       { spaceId, contactId, updatedAt: now },
       { onConflict: 'spaceId,contactId' },
@@ -158,8 +156,7 @@ export async function recordInboundMessage(
   const thread = await upsertThread(spaceId, contactId);
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('InboxMessage')
+  const { data, error } = await tenantTable(supabase, 'InboxMessage', { spaceId })
     .insert({
       spaceId,
       threadId: thread.id,
@@ -190,8 +187,7 @@ export async function recordInboundMessage(
   const messageId = (data as { id: string }).id;
 
   // Bump the rollup now that the inbound message is durably written.
-  const { error: bumpError } = await unscoped(supabase
-    .from('InboxThread'), 'post-fetch: caller verified parent scope before this id query')
+  const { error: bumpError } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .update({
       lastMessageAt: now,
       lastDirection: 'inbound' satisfies InboxDirection,
@@ -229,8 +225,7 @@ export async function recordOutboundMessage(
   const thread = await upsertThread(spaceId, contactId);
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('InboxMessage')
+  const { data, error } = await tenantTable(supabase, 'InboxMessage', { spaceId })
     .insert({
       spaceId,
       threadId: thread.id,
@@ -259,8 +254,7 @@ export async function recordOutboundMessage(
   const messageId = (data as { id: string }).id;
 
   // Flip the rollup to outbound. unreadCount is intentionally left untouched.
-  const { error: bumpError } = await unscoped(supabase
-    .from('InboxThread'), 'post-fetch: caller verified parent scope before this id query')
+  const { error: bumpError } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .update({
       lastMessageAt: now,
       lastDirection: 'outbound' satisfies InboxDirection,
@@ -326,19 +320,15 @@ export async function markThreadRead(
 
   // Stamp only the still-unread inbound messages (readAt IS NULL) so we don't
   // rewrite already-read history.
-  const { error: msgError } = await supabase
-    .from('InboxMessage')
+  const { error: msgError } = await tenantTable(supabase, 'InboxMessage', { spaceId })
     .update({ readAt: now })
     .eq('threadId', threadId)
-    .eq('spaceId', spaceId)
     .eq('direction', 'inbound')
     .is('readAt', null);
   if (msgError) throw msgError;
 
-  const { error: threadError } = await supabase
-    .from('InboxThread')
+  const { error: threadError } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .update({ unreadCount: 0, updatedAt: now })
-    .eq('id', threadId)
-    .eq('spaceId', spaceId);
+    .eq('id', threadId);
   if (threadError) throw threadError;
 }

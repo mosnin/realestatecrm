@@ -43,6 +43,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { notifyTourCancelled, notifyTourRescheduled } from '@/lib/tour-notify';
 import type { CalendarProvider } from './mirror';
@@ -227,10 +228,8 @@ async function mapEventToTour(
   provider: CalendarProvider,
   externalEventId: string,
 ): Promise<{ tour: MappedTour; mirrorId: string } | null> {
-  const { data: mirror, error: mirrorErr } = await supabase
-    .from('CalendarEventMirror')
+  const { data: mirror, error: mirrorErr } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId })
     .select('id, sourceTourId')
-    .eq('spaceId', spaceId)
     .eq('externalProvider', provider)
     .eq('externalEventId', externalEventId)
     .not('sourceTourId', 'is', null)
@@ -246,11 +245,9 @@ async function mapEventToTour(
   const mirrorId = (mirror as { id?: string } | null)?.id ?? null;
   if (!sourceTourId || !mirrorId) return null;
 
-  const { data: tour, error: tourErr } = await supabase
-    .from('Tour')
+  const { data: tour, error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId })
     .select('id, status, startsAt, endsAt, guestName, guestEmail, guestPhone, propertyAddress, externalResponseStatus')
     .eq('id', sourceTourId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (tourErr) {
@@ -264,11 +261,9 @@ async function mapEventToTour(
 
 /** Stamp lastExternalSyncAt (forensics). Best-effort, never blocks. */
 async function stampSynced(spaceId: string, tourId: string, extra: Record<string, unknown> = {}): Promise<void> {
-  const { error } = await supabase
-    .from('Tour')
+  const { error } = await tenantTable(supabase, 'Tour', { spaceId })
     .update({ lastExternalSyncAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...extra })
-    .eq('id', tourId)
-    .eq('spaceId', spaceId);
+    .eq('id', tourId);
   if (error) {
     logger.warn('[calendar.tour-sync] stamp failed', { spaceId, tourId, err: error.message });
   }
@@ -349,15 +344,13 @@ async function cancelFromExternal(
   // matches no row (status already 'cancelled'), so it gets `claimed === null`
   // and skips the mirror-drop + notify. Net: cancel + notify happen exactly
   // once even under at-least-once redelivery.
-  const { data: claimed, error: updErr } = await supabase
-    .from('Tour')
+  const { data: claimed, error: updErr } = await tenantTable(supabase, 'Tour', { spaceId: input.spaceId })
     .update({
       status: 'cancelled',
       lastExternalSyncAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
     .eq('id', tour.id)
-    .eq('spaceId', input.spaceId)
     .neq('status', 'cancelled')
     .select('id')
     .maybeSingle();
@@ -372,11 +365,9 @@ async function cancelFromExternal(
   }
 
   // Drop the now-stale mirror row so a later read/sync can't resurface it.
-  const { error: delErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: delErr } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId: input.spaceId })
     .delete()
-    .eq('id', mirrorId)
-    .eq('spaceId', input.spaceId);
+    .eq('id', mirrorId);
   if (delErr) {
     logger.warn('[calendar.tour-sync] mirror delete failed', { spaceId: input.spaceId, mirrorId, err: delErr.message });
   }
@@ -423,16 +414,14 @@ async function rescheduleFromExternal(
     endsAt = new Date(new Date(startsAt).getTime() + dur).toISOString();
   }
 
-  const { error: updErr } = await supabase
-    .from('Tour')
+  const { error: updErr } = await tenantTable(supabase, 'Tour', { spaceId: input.spaceId })
     .update({
       startsAt,
       endsAt,
       lastExternalSyncAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
-    .eq('id', tour.id)
-    .eq('spaceId', input.spaceId);
+    .eq('id', tour.id);
   if (updErr) {
     logger.warn('[calendar.tour-sync] reschedule update failed', { spaceId: input.spaceId, tourId: tour.id, err: updErr.message });
     return { action: 'noop', tourId: tour.id, reason: 'reschedule_update_failed' };
@@ -440,10 +429,8 @@ async function rescheduleFromExternal(
 
   // Keep the mirror row's window in step (it's our forensic record). Best-
   // effort; scoped to this space's mirror rows for this tour.
-  const { error: mErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: mErr } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId: input.spaceId })
     .update({ start: startsAt, end: endsAt })
-    .eq('spaceId', input.spaceId)
     .eq('sourceTourId', tour.id);
   if (mErr) {
     logger.warn('[calendar.tour-sync] mirror window update failed', { spaceId: input.spaceId, tourId: tour.id, err: mErr.message });

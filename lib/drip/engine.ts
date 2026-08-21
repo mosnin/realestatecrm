@@ -27,12 +27,10 @@
  * enrollment to status='stopped', stopReason='replied' and skips scheduling.
  * A live conversation must never get talked over by a canned drip step.
  *
- * TENANT SCOPING: every query here carries an explicit `.eq('spaceId', …)` —
- * the service-role client bypasses RLS, so that filter IS the boundary
- * (CLAUDE.md). "DripSequence"/"DripEnrollment" are not yet registered in
- * lib/tenant-db.ts's TENANT_TABLES (that file is owned by another track this
- * wave — flagged as a follow-up), so tenantTable() isn't used here; the scope
- * is applied by hand on every read/write instead.
+ * TENANT SCOPING: request-path reads/writes go through tenantTable()
+ * (DripSequence, DripEnrollment, Contact, ContactActivity, InboxMessage,
+ * AgentSettings, ScheduledMessage). The cron discovery query is a
+ * deliberate cross-tenant scan annotated with .unscoped().
  */
 
 import crypto from 'crypto';
@@ -77,11 +75,9 @@ export async function enrollContact(params: {
 }): Promise<EnrollResult> {
   const { spaceId, sequenceId, contactId } = params;
 
-  const { data: sequence, error: seqErr } = await supabase
-    .from('DripSequence')
+  const { data: sequence, error: seqErr } = await tenantTable(supabase, 'DripSequence', { spaceId })
     .select('id, active')
     .eq('id', sequenceId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (seqErr) {
     logger.error('[drip.engine] sequence lookup failed', { spaceId, sequenceId }, seqErr);
@@ -91,11 +87,9 @@ export async function enrollContact(params: {
     return { outcome: 'sequence_not_found' };
   }
 
-  const { data: contact, error: contactErr } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (contactErr) {
     logger.error('[drip.engine] contact lookup failed', { spaceId, contactId }, contactErr);
@@ -106,8 +100,7 @@ export async function enrollContact(params: {
   }
 
   const nowIso = new Date().toISOString();
-  const { data: inserted, error: insertErr } = await supabase
-    .from('DripEnrollment')
+  const { data: inserted, error: insertErr } = await tenantTable(supabase, 'DripEnrollment', { spaceId })
     .insert({
       id: crypto.randomUUID(),
       spaceId,
@@ -185,18 +178,14 @@ async function hasRepliedSince(
   sinceIso: string,
 ): Promise<{ replied: boolean; indeterminate: boolean }> {
   const [activityRes, inboxRes] = await Promise.all([
-    supabase
-      .from('ContactActivity')
+    tenantTable(supabase, 'ContactActivity', { spaceId })
       .select('id')
-      .eq('spaceId', spaceId)
       .eq('contactId', contactId)
       .eq('metadata->>source', 'inbound')
       .gte('createdAt', sinceIso)
       .limit(1),
-    supabase
-      .from('InboxMessage')
+    tenantTable(supabase, 'InboxMessage', { spaceId })
       .select('id')
-      .eq('spaceId', spaceId)
       .eq('contactId', contactId)
       .eq('direction', 'inbound')
       .gte('createdAt', sinceIso)
@@ -228,10 +217,8 @@ async function hasRepliedSince(
  * the general agent dial — flagged, not built, to stay in scope this pass.
  */
 async function resolveAutonomy(spaceId: string): Promise<WorkflowAutonomy> {
-  const { data, error } = await supabase
-    .from('AgentSettings')
+  const { data, error } = await tenantTable(supabase, 'AgentSettings', { spaceId })
     .select('autonomyLevel')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (error) {
     logger.warn('[drip.engine] autonomy lookup failed — defaulting to draft', { spaceId }, error);
@@ -251,10 +238,8 @@ async function resolveAutonomy(spaceId: string): Promise<WorkflowAutonomy> {
 export async function advanceEnrollments(spaceId: string, now: Date = new Date()): Promise<AdvanceSummary> {
   const summary = emptySummary(spaceId);
 
-  const { data: sequenceRows, error: seqErr } = await supabase
-    .from('DripSequence')
-    .select('id, active, steps')
-    .eq('spaceId', spaceId);
+  const { data: sequenceRows, error: seqErr } = await tenantTable(supabase, 'DripSequence', { spaceId })
+    .select('id, active, steps');
   if (seqErr) {
     logger.error('[drip.engine] sequence load failed', { spaceId }, seqErr);
     return summary;
@@ -264,10 +249,8 @@ export async function advanceEnrollments(spaceId: string, now: Date = new Date()
     sequences.set(row.id, row);
   }
 
-  const { data: enrollmentRows, error: enrErr } = await supabase
-    .from('DripEnrollment')
+  const { data: enrollmentRows, error: enrErr } = await tenantTable(supabase, 'DripEnrollment', { spaceId })
     .select('id, spaceId, sequenceId, contactId, enrolledAt, currentStep, status')
-    .eq('spaceId', spaceId)
     .eq('status', 'enrolled')
     .order('enrolledAt', { ascending: true })
     .limit(MAX_ENROLLMENTS_PER_TICK);
@@ -404,11 +387,9 @@ async function setEnrollmentStatus(
   status: 'completed' | 'stopped',
   stopReason: string | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('DripEnrollment')
+  const { error } = await tenantTable(supabase, 'DripEnrollment', { spaceId: enrollment.spaceId })
     .update({ status, stopReason, updatedAt: new Date().toISOString() })
-    .eq('id', enrollment.id)
-    .eq('spaceId', enrollment.spaceId);
+    .eq('id', enrollment.id);
   if (error) {
     logger.warn('[drip.engine] enrollment status update failed', { id: enrollment.id, status }, error);
   }
@@ -420,11 +401,9 @@ async function advanceEnrollmentRow(
   status: 'enrolled' | 'completed',
   stopReason: string | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('DripEnrollment')
+  const { error } = await tenantTable(supabase, 'DripEnrollment', { spaceId: enrollment.spaceId })
     .update({ currentStep, status, stopReason, updatedAt: new Date().toISOString() })
-    .eq('id', enrollment.id)
-    .eq('spaceId', enrollment.spaceId);
+    .eq('id', enrollment.id);
   if (error) {
     logger.warn('[drip.engine] enrollment advance failed', { id: enrollment.id }, error);
   }

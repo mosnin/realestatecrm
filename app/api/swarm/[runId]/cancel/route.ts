@@ -18,7 +18,7 @@ export async function POST(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const { data, error } = await supabase.rpc('cancel_swarm_run', {

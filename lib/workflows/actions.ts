@@ -295,11 +295,9 @@ async function runCreateTask(
   const followUpAt = due.toISOString();
 
   const nowIso = new Date().toISOString();
-  const { error: updateErr } = await supabase
-    .from('Contact')
+  const { error: updateErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .update({ followUpAt, updatedAt: nowIso })
-    .eq('id', contactId)
-    .eq('spaceId', spaceId);
+    .eq('id', contactId);
   if (updateErr) {
     return { status: 'failed', detail: { error: updateErr.message, contactId } };
   }
@@ -693,11 +691,9 @@ async function runUpdateLead(
     if (!allowed.includes(resolvedValue)) {
       return { status: 'failed', detail: { error: `score_label must be hot/warm/cold, got: ${resolvedValue}`, field } };
     }
-    const { error } = await supabase
-      .from('Contact')
+    const { error } = await tenantTable(supabase, 'Contact', { spaceId })
       .update({ scoreLabel: resolvedValue, scoringStatus: 'scored', updatedAt: now })
-      .eq('id', contactId)
-      .eq('spaceId', spaceId);
+      .eq('id', contactId);
     if (error) return { status: 'failed', detail: { error: error.message, field } };
     return { status: 'ok', detail: { field, value: resolvedValue, contactId } };
   }
@@ -708,11 +704,9 @@ async function runUpdateLead(
       return { status: 'failed', detail: { error: `follow_up_in_days must be a non-negative integer, got: ${resolvedValue}` } };
     }
     const followUpAt = new Date(Date.now() + days * 86_400_000).toISOString();
-    const { error } = await supabase
-      .from('Contact')
+    const { error } = await tenantTable(supabase, 'Contact', { spaceId })
       .update({ followUpAt, updatedAt: now })
-      .eq('id', contactId)
-      .eq('spaceId', spaceId);
+      .eq('id', contactId);
     if (error) return { status: 'failed', detail: { error: error.message, field } };
     return { status: 'ok', detail: { field, days, followUpAt, contactId } };
   }
@@ -721,11 +715,9 @@ async function runUpdateLead(
     const tag = resolvedValue.trim();
     if (!tag) return { status: 'failed', detail: { error: 'Tag value must not be empty', field } };
 
-    const { data: row, error: fetchErr } = await supabase
-      .from('Contact')
+    const { data: row, error: fetchErr } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('tags')
       .eq('id', contactId)
-      .eq('spaceId', spaceId)
       .single();
     if (fetchErr) return { status: 'failed', detail: { error: fetchErr.message, field } };
 
@@ -738,11 +730,9 @@ async function runUpdateLead(
         ? currentTags.includes(tag) ? currentTags : [...currentTags, tag]
         : currentTags.filter((t) => t !== tag);
 
-    const { error: updateErr } = await supabase
-      .from('Contact')
+    const { error: updateErr } = await tenantTable(supabase, 'Contact', { spaceId })
       .update({ tags: nextTags, updatedAt: now })
-      .eq('id', contactId)
-      .eq('spaceId', spaceId);
+      .eq('id', contactId);
     if (updateErr) return { status: 'failed', detail: { error: updateErr.message, field } };
     return { status: 'ok', detail: { field, tag, contactId, tags: nextTags } };
   }

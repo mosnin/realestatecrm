@@ -19,7 +19,7 @@ export async function GET(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Fetch the run and verify it belongs to the calling user's space.

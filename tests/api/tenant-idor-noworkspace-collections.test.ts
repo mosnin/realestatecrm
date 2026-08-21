@@ -41,7 +41,16 @@ vi.mock('@/lib/storage', () => ({
 
 vi.mock('@/lib/audit', () => ({ audit: vi.fn() }));
 vi.mock('@/lib/data-export', () => ({ exportSpaceData: vi.fn(async () => ({})) }));
+vi.mock('@/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
+vi.mock('@/lib/integrations/connections', () => ({ activeToolkits: vi.fn(async () => []) }));
+vi.mock('@/lib/integrations/catalog', () => ({ findIntegration: vi.fn() }));
+vi.mock('@/lib/storage/limits', () => ({ validateUpload: vi.fn(() => ({ ok: true })) }));
 vi.mock('@/lib/briefing/compose', () => ({ composeBrief: vi.fn() }));
+vi.mock('@/lib/briefing/delivery', () => ({
+  deliverBrief: vi.fn(),
+  loadDeliveryContext: vi.fn(),
+  getAppOrigin: vi.fn(() => 'https://app.example'),
+}));
 vi.mock('@/lib/activity/query', () => ({ getUnifiedActivity: vi.fn() }));
 
 const { fromMock, fromMockTables } = vi.hoisted(() => {
@@ -80,6 +89,13 @@ import { POST as postAttachment, DELETE as deleteAttachment } from '@/app/api/ai
 import { GET as getAttachment } from '@/app/api/ai/attachments/[id]/route';
 import { POST as coverPhoto, DELETE as deleteCoverPhoto } from '@/app/api/profile-page/cover-photo/route';
 import { POST as profilePhoto, DELETE as deleteProfilePhoto } from '@/app/api/profile-page/profile-photo/route';
+import { GET as getStudioLibrary } from '@/app/api/studio/library/route';
+import { GET as getRecentJob } from '@/app/api/studio/recent-job/route';
+import { GET as getStudioSchedule, DELETE as deleteStudioSchedule } from '@/app/api/studio/schedule/route';
+import { POST as postBriefingTest } from '@/app/api/agent/briefing/test/route';
+import { GET as getSwarm } from '@/app/api/swarm/[runId]/route';
+import { GET as getSwarmStream } from '@/app/api/swarm/[runId]/stream/route';
+import { POST as cancelSwarm } from '@/app/api/swarm/[runId]/cancel/route';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -299,5 +315,77 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('ProfilePage');
+  });
+
+  it('GET /api/studio/library 404s and does not query StudioGeneration', async () => {
+    const res = await getStudioLibrary(new NextRequest('http://localhost/api/studio/library'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioGeneration');
+    expect(fromMockTables).not.toContain('File');
+  });
+
+  it('GET /api/studio/recent-job 404s and does not query StudioGeneration', async () => {
+    const res = await getRecentJob(new NextRequest('http://localhost/api/studio/recent-job'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioGeneration');
+    expect(fromMockTables).not.toContain('File');
+  });
+
+  it('GET /api/studio/schedule 404s and does not query StudioPost', async () => {
+    const res = await getStudioSchedule();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioPost');
+  });
+
+  it('DELETE /api/studio/schedule 404s and does not query StudioPost', async () => {
+    const res = await deleteStudioSchedule(
+      new NextRequest('http://localhost/api/studio/schedule?id=post_victim', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('StudioPost');
+  });
+
+  it('POST /api/agent/briefing/test 404s and does not query Brief', async () => {
+    const res = await postBriefingTest();
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Brief');
+    expect(fromMockTables).not.toContain('SpaceSetting');
+  });
+
+  it('GET /api/swarm/[runId] 404s and does not query SwarmRun', async () => {
+    const res = await getSwarm(
+      new NextRequest('http://localhost/api/swarm/swarm_victim'),
+      { params: Promise.resolve({ runId: 'swarm_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SwarmRun');
+    expect(fromMockTables).not.toContain('SwarmMember');
+  });
+
+  it('GET /api/swarm/[runId]/stream 404s and does not query SwarmRun', async () => {
+    const res = await getSwarmStream(
+      new NextRequest('http://localhost/api/swarm/swarm_victim/stream'),
+      { params: Promise.resolve({ runId: 'swarm_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SwarmRun');
+    expect(fromMockTables).not.toContain('SwarmEvent');
+  });
+
+  it('POST /api/swarm/[runId]/cancel 404s and does not cancel a run', async () => {
+    const res = await cancelSwarm(
+      new NextRequest('http://localhost/api/swarm/swarm_victim/cancel', { method: 'POST' }),
+      { params: Promise.resolve({ runId: 'swarm_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SwarmRun');
   });
 });

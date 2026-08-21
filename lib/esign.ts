@@ -169,11 +169,9 @@ export async function dealHasOpenSignatureRequests(
   dealId: string,
   spaceId: string,
 ): Promise<OpenSignaturesResult> {
-  const { data, error } = await supabase
-    .from('SignatureRequest')
+  const { data, error } = await tenantTable(supabase, 'SignatureRequest', { spaceId })
     .select('id, status')
     .eq('dealId', dealId)
-    .eq('spaceId', spaceId)
     .in('status', OPEN_SIGNATURE_STATUSES as unknown as string[]);
 
   if (error) {
@@ -306,11 +304,9 @@ export async function sendForSignature(
 
   // 2. Load the document — scoped to the space so a caller can't sign
   //    someone else's file.
-  const { data: doc, error: docError } = await supabase
-    .from('DealDocument')
+  const { data: doc, error: docError } = await tenantTable(supabase, 'DealDocument', { spaceId: input.spaceId })
     .select('id, dealId, label, storagePath, contentType')
     .eq('id', input.documentId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
 
   if (docError) {
@@ -378,8 +374,7 @@ export async function sendForSignature(
 
   // 5. Record the request.
   const now = new Date().toISOString();
-  const { data: inserted, error: insertError } = await supabase
-    .from('SignatureRequest')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'SignatureRequest', { spaceId: input.spaceId })
     .insert({
       spaceId: input.spaceId,
       dealId: input.dealId?.trim() || (doc.dealId as string | null) || null,
@@ -495,11 +490,9 @@ export interface RefreshEnvelopeStatusInput {
 export async function refreshEnvelopeStatus(
   input: RefreshEnvelopeStatusInput,
 ): Promise<RefreshEnvelopeStatusResult> {
-  const { data: row, error: rowError } = await supabase
-    .from('SignatureRequest')
+  const { data: row, error: rowError } = await tenantTable(supabase, 'SignatureRequest', { spaceId: input.spaceId })
     .select(REQUEST_COLUMNS)
     .eq('id', input.signatureRequestId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
 
   if (rowError || !row) return { ok: false, reason: 'not_found' };

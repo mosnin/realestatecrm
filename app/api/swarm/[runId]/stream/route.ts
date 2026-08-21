@@ -39,7 +39,7 @@ export async function GET(
 
   // Verify the run belongs to the caller's space.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { data: run } = await tenantTable(supabase, 'SwarmRun', { spaceId: space.id })
     .select('id, spaceId, status')

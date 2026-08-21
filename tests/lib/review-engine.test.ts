@@ -292,5 +292,6 @@ describe('fireReviewAsk', () => {
 
     expect(outcome).toEqual({ created: false, reason: 'contact_not_found' });
     expect(inserts).toHaveLength(0);
+    expect(inserts.filter((i) => i.table === 'ReviewCampaign' || i.table === 'AgentDraft')).toHaveLength(0);
   });
 });

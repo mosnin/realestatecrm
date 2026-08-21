@@ -35,7 +35,7 @@ export async function POST() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { allowed } = await checkRateLimit(
     `brief:test:${space.id}:${dayKey()}`,

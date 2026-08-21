@@ -206,7 +206,9 @@ type Scope = { spaceId: string } | { brokerageId: string };
 // table union into supabase-js's heavily-overloaded `.from()` signatures makes
 // tsc instantiate the generic per-literal and OOM. This keeps inference O(1).
 interface LooseBuilder {
-  select: (columns?: string, options?: unknown) => LooseFilter;
+  // `any` so `.select().order().limit()` / `.select().maybeSingle()` chain
+  // without a follow-up `.eq` — the real PostgREST builder is thenable.
+  select: (columns?: string, options?: unknown) => any;
   update: (values: Record<string, unknown>) => LooseFilter;
   delete: () => LooseFilter;
   insert: (values: Record<string, unknown> | Record<string, unknown>[]) => any;
