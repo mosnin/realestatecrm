@@ -369,7 +369,10 @@ export async function PATCH(
     // other side's edits). A failed INSERT after a successful DELETE left the
     // deal with NO contacts. Computing the add/remove diff keeps the list in a
     // valid intermediate state at every step.
-    if (body.contactIds) {
+    if (body.contactIds !== undefined) {
+      if (!Array.isArray(body.contactIds)) {
+        return NextResponse.json({ error: 'contactIds must be an array' }, { status: 400 });
+      }
       const { data: existingRows, error: exErr } = await supabase
         .from('DealContact')
         .select('contactId')
