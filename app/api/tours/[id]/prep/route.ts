@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * GET — Generate AI tour prep notes for a specific tour.
@@ -19,11 +20,15 @@ export async function GET(
   const { userId } = authResult;
   const { id } = await params;
 
-  const { data: tour } = await supabase.from('Tour').select('*').eq('id', id).maybeSingle();
-  if (!tour) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
   const space = await getSpaceForUser(userId);
-  if (!space || tour.spaceId !== space.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Scope the Tour read in SQL. A foreign tourId 404s — no existence oracle.
+  const { data: tour } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (!tour) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch space timezone for correct date/time display
   const { data: spaceSettings } = await supabase
@@ -66,7 +71,10 @@ export async function GET(
 
   // If linked to a contact, pull their data
   if (tour.contactId) {
-    const { data: contact } = await supabase.from('Contact').select('*').eq('id', tour.contactId).maybeSingle();
+    const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
+      .select('*')
+      .eq('id', tour.contactId)
+      .maybeSingle();
 
     if (contact) {
       // Highlights
@@ -107,8 +115,7 @@ export async function GET(
     }
 
     // Count previous tours
-    const { count } = await supabase
-      .from('Tour')
+    const { count } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
       .select('*', { count: 'exact', head: true })
       .eq('contactId', tour.contactId)
       .in('status', ['completed', 'confirmed', 'scheduled'])

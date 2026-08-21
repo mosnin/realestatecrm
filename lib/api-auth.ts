@@ -128,6 +128,25 @@ export function isPremiumAccessBlocked(
 }
 
 /**
+ * Workspace CRM access (Today, contacts, deals). The product has a Free
+ * plan with a one-time 100-credit grant — never-subscribed spaces must
+ * reach the CRM. AI spend is still gated by assertCanSpend.
+ *
+ * A lapsed *paid* relationship (Stripe subscription id or a used trial,
+ * but no current period) is sent to billing-required. Comp / admin
+ * bypasses live at the call site, not here.
+ */
+export function canAccessWorkspace(args: {
+  status: string | null | undefined;
+  periodEnd: string | Date | null | undefined;
+  hasSubscriptionHistory: boolean;
+  now?: Date;
+}): boolean {
+  if (hasCurrentSubscription(args.status, args.periodEnd, args.now)) return true;
+  return !args.hasSubscriptionHistory;
+}
+
+/**
  * Verifies the calling user owns the given workspace slug, OR is a
  * broker_owner/broker_admin of the brokerage that manages this space.
  * Returns { userId, space } or a 4xx NextResponse.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Convert a completed tour into a deal.
@@ -8,7 +9,12 @@ import { requireSpaceOwner } from '@/lib/api-auth';
  * links the contact, and records the sourceTourId.
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: { slug?: string; tourId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, tourId } = body;
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -29,8 +35,7 @@ export async function POST(req: NextRequest) {
   if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
   // Check if already converted
-  const { data: existingDeal } = await supabase
-    .from('Deal')
+  const { data: existingDeal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('sourceTourId', tourId)
     .maybeSingle();
@@ -127,7 +132,9 @@ export async function POST(req: NextRequest) {
     if (dcError) console.error('[convert] DealContact link failed:', dcError);
     // Update tour with contact link if it wasn't set
     if (!tour.contactId) {
-      await supabase.from('Tour').update({ contactId }).eq('id', tourId);
+      await tenantTable(supabase, 'Tour', { spaceId: space.id })
+        .update({ contactId })
+        .eq('id', tourId);
     }
   }
 

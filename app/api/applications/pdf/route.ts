@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * GET — Generate a plain-text formatted rental application for download.
@@ -15,8 +16,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireContactAccess(contactId);
   if (auth instanceof NextResponse) return auth;
 
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .select('*')
     .eq('id', contactId)
     .single();

@@ -75,7 +75,6 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   // documents, portal messages).
   CmaReport: 'spaceId',
   PropertyPacket: 'spaceId',
-  DealContact: 'spaceId',
   ClientMessage: 'spaceId',
   ApplicationMessage: 'spaceId',
   ApplicationStatusUpdate: 'spaceId',
@@ -83,6 +82,27 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   MessagingSuppression: 'spaceId',
   MessagingConsent: 'spaceId',
   WorkSessionAction: 'spaceId',
+  // Chat + agent deliverables (highest PII / secret surface after Contact).
+  // DealContact is intentionally omitted: it is a junction with no spaceId
+  // column (scoped through Deal/Contact), so registering spaceId here would
+  // be a WRONG column — the only real hazard this registry can introduce.
+  Message: 'spaceId',
+  Artifact: 'spaceId',
+  ArtifactVersion: 'spaceId',
+  ContactDocument: 'spaceId',
+  GoogleCalendarToken: 'spaceId',
+  McpApiKey: 'spaceId',
+  ChatUsage: 'spaceId',
+  Offer: 'spaceId',
+  OfferEvent: 'spaceId',
+  TourPropertyProfile: 'spaceId',
+  TourAvailabilityOverride: 'spaceId',
+  WorkspaceRun: 'spaceId',
+  WorkspaceRunFile: 'spaceId',
+  AgentPausedRun: 'spaceId',
+  SavedView: 'spaceId',
+  IntegrationEvent: 'spaceId',
+  PushSubscription: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',
@@ -94,6 +114,7 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   BrokerageTemplate: 'brokerageId',
   Channel: 'brokerageId',
   ChannelMember: 'brokerageId',
+  BrokerMessage: 'brokerageId',
 };
 
 export function isTenantTable(table: string): boolean {
@@ -129,10 +150,15 @@ interface LooseBuilder {
   select: (columns?: string, options?: unknown) => LooseFilter;
   update: (values: Record<string, unknown>) => LooseFilter;
   delete: () => LooseFilter;
-  insert: (values: Record<string, unknown> | Record<string, unknown>[]) => unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  insert: (values: Record<string, unknown> | Record<string, unknown>[]) => any;
 }
 interface LooseFilter {
-  eq: (column: string, value: string) => unknown;
+  // Return `any` so callers can keep chaining `.eq('id', …).maybeSingle()`
+  // after the pre-applied tenant scope — the real PostgREST builder supports
+  // that; a tighter type here blocked tenantTable() adoption.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  eq: (column: string, value: string) => any;
 }
 interface LooseClient {
   from: (table: string) => LooseBuilder;

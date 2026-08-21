@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  canAccessWorkspace,
   hasCurrentSubscription,
   isPremiumAccessBlocked,
   isSubscriptionDelinquent,
@@ -45,5 +46,58 @@ describe('period-aware subscription entitlement', () => {
     expect(hasCurrentSubscription('active', null, now)).toBe(false);
     expect(isPremiumAccessBlocked('trialing', '2026-04-24T21:29:40.000Z', now)).toBe(true);
     expect(isPremiumAccessBlocked('inactive', null, now)).toBe(false);
+  });
+});
+
+describe('canAccessWorkspace — Free CRM vs lapsed paid', () => {
+  const now = new Date('2026-07-13T12:00:00.000Z');
+
+  it('lets never-subscribed Free spaces into the CRM', () => {
+    expect(
+      canAccessWorkspace({
+        status: 'inactive',
+        periodEnd: null,
+        hasSubscriptionHistory: false,
+        now,
+      }),
+    ).toBe(true);
+  });
+
+  it('lets current trial and paid periods in', () => {
+    expect(
+      canAccessWorkspace({
+        status: 'trialing',
+        periodEnd: '2026-07-14T12:00:00.000Z',
+        hasSubscriptionHistory: true,
+        now,
+      }),
+    ).toBe(true);
+    expect(
+      canAccessWorkspace({
+        status: 'active',
+        periodEnd: '2026-08-13T12:00:00.000Z',
+        hasSubscriptionHistory: true,
+        now,
+      }),
+    ).toBe(true);
+  });
+
+  it('sends a used-trial / canceled paid relationship to billing', () => {
+    expect(
+      canAccessWorkspace({
+        status: 'canceled',
+        periodEnd: '2026-07-01T12:00:00.000Z',
+        hasSubscriptionHistory: true,
+        now,
+      }),
+    ).toBe(false);
+    expect(
+      canAccessWorkspace({
+        status: 'inactive',
+        periodEnd: null,
+        hasSubscriptionHistory: true,
+        now,
+      }),
+    ).toBe(false);
   });
 });

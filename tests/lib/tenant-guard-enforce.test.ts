@@ -18,7 +18,6 @@ describe('TENANT_TABLES registry completeness', () => {
     for (const t of [
       'CmaReport',
       'PropertyPacket',
-      'DealContact',
       'ClientMessage',
       'ApplicationMessage',
       'ApplicationStatusUpdate',
@@ -33,6 +32,36 @@ describe('TENANT_TABLES registry completeness', () => {
     for (const t of ['MessagingSuppression', 'MessagingConsent', 'WorkSessionAction']) {
       expect(isTenantTable(t), `${t} must be registered`).toBe(true);
     }
+  });
+
+  it('covers chat, artifacts, tokens, and billing tables the guard was blind to', () => {
+    for (const t of [
+      'Message',
+      'Artifact',
+      'ArtifactVersion',
+      'ContactDocument',
+      'GoogleCalendarToken',
+      'McpApiKey',
+      'ChatUsage',
+      'Offer',
+      'OfferEvent',
+      'TourPropertyProfile',
+      'TourAvailabilityOverride',
+      'WorkspaceRun',
+      'WorkspaceRunFile',
+      'AgentPausedRun',
+      'SavedView',
+      'IntegrationEvent',
+      'PushSubscription',
+    ]) {
+      expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
+      expect(scopeColumnFor(t)).toBe('spaceId');
+    }
+    expect(scopeColumnFor('BrokerMessage')).toBe('brokerageId');
+  });
+
+  it('does not register DealContact as space-scoped (junction has no spaceId)', () => {
+    expect(isTenantTable('DealContact')).toBe(false);
   });
 
   it('every registered table scopes by a real tenant column', () => {

@@ -94,8 +94,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, title, description, value, commissionRate, probability, milestones, address, priority, closeDate, stageId, contactIds, propertyId, status, closeReason, closeReasonDetail } = body;
+
+  if (typeof slug !== 'string' || !slug) {
+    return NextResponse.json({ error: 'slug required' }, { status: 400 });
+  }
 
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { grantFreeSignup } from '@/lib/billing/grants';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import { ensureDefaultPipelines } from '@/lib/pipelines';
 import { resolveSelfServePlan } from '@/lib/plans';
 import { sendWelcomeEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -466,15 +467,6 @@ export async function POST(req: NextRequest) {
       if (ownerError) throw ownerError;
       if (existingOwnerSpace) return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
 
-      const DEFAULT_STAGES = [
-        { name: 'New', color: '#94a3b8', position: 0 },
-        { name: 'Reviewing', color: '#60a5fa', position: 1 },
-        { name: 'Showing', color: '#a78bfa', position: 2 },
-        { name: 'Applied', color: '#f59e0b', position: 3 },
-        { name: 'Approved', color: '#22c55e', position: 4 },
-        { name: 'Declined', color: '#ef4444', position: 5 }
-      ];
-
       // Direct inserts instead of RPC — avoids UUID/TEXT type mismatch issues
       // and works without requiring the migration to be deployed first.
       const spaceId = crypto.randomUUID();
@@ -529,18 +521,13 @@ export async function POST(req: NextRequest) {
         // Space was created — don't fail the whole flow for settings
       }
 
-      // 3. Create default deal stages
-      const stageRows = DEFAULT_STAGES.map((stage) => ({
-        id: crypto.randomUUID(),
-        spaceId,
-        name: stage.name,
-        color: stage.color,
-        position: stage.position,
-      }));
-      const { error: stagesErr } = await supabase.from('DealStage').insert(stageRows);
-      if (stagesErr) {
-        console.error('[onboarding] DealStage insert failed:', stagesErr);
-        // Non-fatal — stages can be created later
+      // 3. Bootstrap Rental + Buyer pipelines (and their stages) so the
+      // deals board is usable on first paint — same helper GET /api/pipelines
+      // uses. Non-fatal: space creation must not fail if this insert races.
+      try {
+        await ensureDefaultPipelines(spaceId);
+      } catch (e) {
+        console.error('[onboarding] pipeline bootstrap failed:', e);
       }
 
       const newSpace = createdSpace as Space;
@@ -594,18 +581,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'skip') {
-      // Mark user as onboarded without requiring a workspace
-      // They'll be redirected to /setup to complete later
-      const { error } = await supabase
-        .from('User')
-        .update({
-          onboard: true,
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-      if (error) throw error;
-      return NextResponse.json({ success: true, redirect: '/setup' });
+      // Do not mark onboard=true without a workspace — that stranded users
+      // between "completed" and /setup with no recovery path. Leave the
+      // flag false so /setup and the onboarding flow stay reachable.
+      return NextResponse.json({ success: true, onboard: false, redirect: '/setup' });
     }
 
     if (action === 'complete') {
