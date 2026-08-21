@@ -21,6 +21,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import type { TriggerType } from '@/lib/workflows/schema';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -48,10 +49,8 @@ async function loadSample(
   type: TriggerType,
 ): Promise<Record<string, string | number>> {
   if (type === 'lead_created' || type === 'lead_score_threshold' || type === 'inbound_message' || type === 'contact_updated') {
-    const { data: contacts } = await supabase
-      .from('Contact')
+    const { data: contacts } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, email, phone, leadScore, scoreLabel, sourceLabel, preferences, createdAt')
-      .eq('spaceId', spaceId)
       .not('name', 'is', null)
       .order('createdAt', { ascending: false })
       .limit(1);
@@ -75,10 +74,8 @@ async function loadSample(
   }
 
   if (type === 'deal_stage_changed' || type === 'tour_completed' || type === 'deal_created') {
-    const { data: deals } = await supabase
-      .from('Deal')
+    const { data: deals } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('id, stage, amount, contactId, updatedAt, Contact(name, email, phone)')
-      .eq('spaceId', spaceId)
       .order('updatedAt', { ascending: false })
       .limit(1);
 

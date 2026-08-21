@@ -137,10 +137,8 @@ async function sendMessageNotification(
 
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('slug, name').eq('id', contact.spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
       .select('businessName')
-      .eq('spaceId', contact.spaceId)
       .maybeSingle(),
   ]);
 

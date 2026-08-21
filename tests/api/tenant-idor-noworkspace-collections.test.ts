@@ -52,6 +52,16 @@ vi.mock('@/lib/permissions', () => ({
   canManageLeads: vi.fn(() => false),
 }));
 vi.mock('@/lib/broker-assign-lead', () => ({ assignLeadToRealtor: vi.fn() }));
+vi.mock('@/lib/cma', () => ({
+  buildCma: vi.fn(),
+  generateShareToken: vi.fn(() => 'tok'),
+}));
+vi.mock('@/lib/intake', () => ({
+  normalizeSlug: vi.fn((s: string) => s),
+}));
+vi.mock('@/lib/net/ssrf-guard', () => ({
+  assertPublicHttpTarget: vi.fn(async () => ({ ok: true })),
+}));
 vi.mock('@/lib/data-export', () => ({ exportSpaceData: vi.fn(async () => ({})) }));
 vi.mock('@/lib/inngest/client', () => ({ inngest: { send: vi.fn() } }));
 vi.mock('@/lib/integrations/connections', () => ({ activeToolkits: vi.fn(async () => []) }));
@@ -171,6 +181,16 @@ import { POST as postPushSubscribe, DELETE as deletePushSubscribe } from '@/app/
 import { GET as listTours, POST as postTour } from '@/app/api/tours/route';
 import { GET as listDuplicates } from '@/app/api/contacts/duplicates/route';
 import { POST as postContactsBulk } from '@/app/api/contacts/bulk/route';
+import { GET as listSkills, POST as postSkill } from '@/app/api/skills/route';
+import { GET as listCmas, POST as postCma } from '@/app/api/cma/route';
+import { GET as getFormConfig, PUT as putFormConfig, DELETE as deleteFormConfig } from '@/app/api/form-config/route';
+import { POST as postContactsMerge } from '@/app/api/contacts/merge/route';
+import { GET as getContactCard } from '@/app/api/cards/contact/[id]/route';
+import { GET as listPlugins, POST as postPlugin } from '@/app/api/plugins/route';
+import { GET as compareApplicants } from '@/app/api/applications/compare/route';
+import { GET as listPackets, POST as postPacket } from '@/app/api/properties/[id]/packets/route';
+import { GET as getFormAnalytics } from '@/app/api/form-analytics/route';
+import { POST as postFormOptimize } from '@/app/api/form-config/optimize/route';
 import { requireAuth, requireSpaceOwner } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 
@@ -1019,5 +1039,180 @@ describe('no workspace — leftover PII collections 404 without an existence ora
     expect(res.status).toBe(404);
     noPii(JSON.stringify(await res.json()));
     expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('GET /api/skills 404s and does not query UserSkill', async () => {
+    const res = await listSkills(new NextRequest('http://localhost/api/skills?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('UserSkill');
+  });
+
+  it('POST /api/skills 404s and does not insert UserSkill', async () => {
+    const res = await postSkill(
+      new NextRequest('http://localhost/api/skills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', title: 'Chase VICTIM', prompt: 'Call 555-0100 now' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('UserSkill');
+  });
+
+  it('GET /api/cma 404s and does not query CmaReport', async () => {
+    const res = await listCmas(new NextRequest('http://localhost/api/cma?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CmaReport');
+  });
+
+  it('POST /api/cma 404s and does not insert CmaReport', async () => {
+    const res = await postCma(
+      new NextRequest('http://localhost/api/cma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', subject: { address: '123 Victim Lane' } }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CmaReport');
+  });
+
+  it('GET /api/form-config 404s and does not query SpaceSetting', async () => {
+    const res = await getFormConfig(new NextRequest('http://localhost/api/form-config?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SpaceSetting');
+  });
+
+  it('PUT /api/form-config 404s and does not write SpaceSetting', async () => {
+    const res = await putFormConfig(
+      new NextRequest('http://localhost/api/form-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', leadType: 'rental', formConfig: {} }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SpaceSetting');
+  });
+
+  it('DELETE /api/form-config 404s and does not write SpaceSetting', async () => {
+    const res = await deleteFormConfig(
+      new NextRequest('http://localhost/api/form-config', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SpaceSetting');
+  });
+
+  it('POST /api/contacts/merge 404s and does not query Contact', async () => {
+    const res = await postContactsMerge(
+      new NextRequest('http://localhost/api/contacts/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', survivorId: 'c_keep', duplicateIds: ['c_victim'] }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('GET /api/cards/contact/[id] 404s and does not query Contact', async () => {
+    const res = await getContactCard(
+      new NextRequest('http://localhost/api/cards/contact/c_victim'),
+      { params: Promise.resolve({ id: 'c_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+    expect(fromMockTables).not.toContain('ContactActivity');
+  });
+
+  it('GET /api/plugins 404s and does not query CustomPlugin', async () => {
+    const res = await listPlugins(new NextRequest('http://localhost/api/plugins?slug=victim'));
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CustomPlugin');
+  });
+
+  it('POST /api/plugins 404s and does not insert CustomPlugin', async () => {
+    const res = await postPlugin(
+      new NextRequest('http://localhost/api/plugins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim', name: 'mls-lookup', description: 'Lookup VICTIM comps', url: 'https://example.com' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('CustomPlugin');
+  });
+
+  it('GET /api/applications/compare 404s and does not query Contact', async () => {
+    const res = await compareApplicants(
+      new NextRequest('http://localhost/api/applications/compare?slug=victim&ids=c1,c2'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('GET /api/properties/[id]/packets 404s and does not query PropertyPacket', async () => {
+    const res = await listPackets(
+      new NextRequest('http://localhost/api/properties/prop_victim/packets'),
+      { params: Promise.resolve({ id: 'prop_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Property');
+    expect(fromMockTables).not.toContain('PropertyPacket');
+  });
+
+  it('POST /api/properties/[id]/packets 404s and does not insert PropertyPacket', async () => {
+    const res = await postPacket(
+      new NextRequest('http://localhost/api/properties/prop_victim/packets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'VICTIM packet' }),
+      }),
+      { params: Promise.resolve({ id: 'prop_victim' }) },
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('Property');
+    expect(fromMockTables).not.toContain('PropertyPacket');
+  });
+
+  it('GET /api/form-analytics 404s and does not query FormAnalyticsEvent', async () => {
+    const res = await getFormAnalytics(
+      new NextRequest('http://localhost/api/form-analytics?slug=victim'),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('FormAnalyticsEvent');
+    expect(fromMockTables).not.toContain('Contact');
+  });
+
+  it('POST /api/form-config/optimize 404s and does not query SpaceSetting', async () => {
+    const res = await postFormOptimize(
+      new NextRequest('http://localhost/api/form-config/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: 'victim' }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    noPii(JSON.stringify(await res.json()));
+    expect(fromMockTables).not.toContain('SpaceSetting');
   });
 });

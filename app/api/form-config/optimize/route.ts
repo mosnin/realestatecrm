@@ -10,6 +10,7 @@ import {
 } from '@/lib/form-optimization';
 import type { IntakeFormConfig } from '@/lib/types';
 import { hasLLMKey } from '@/lib/llm';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MIN_SUBMISSIONS = 10;
 
@@ -70,10 +71,8 @@ export async function POST(req: NextRequest) {
 
   try {
     // Fetch current form config
-    const { data: settings } = await supabase
-      .from('SpaceSetting')
+    const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .select('formConfig')
-      .eq('spaceId', space.id)
       .maybeSingle();
 
     const formConfig = settings?.formConfig as IntakeFormConfig | null;

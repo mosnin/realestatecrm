@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { buildCma, generateShareToken, type SubjectFields } from '@/lib/cma';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -39,10 +40,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .select(LIST_COLUMNS)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(100);
 
@@ -143,8 +142,7 @@ export async function POST(req: NextRequest) {
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, TITLE_MAX) || null : null;
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

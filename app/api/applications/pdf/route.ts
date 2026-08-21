@@ -26,10 +26,8 @@ export async function GET(req: NextRequest) {
   const app = contact.applicationData as Record<string, any> | null;
   if (!app) return NextResponse.json({ error: 'No application data' }, { status: 400 });
 
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
     .select('businessName')
-    .eq('spaceId', contact.spaceId)
     .maybeSingle();
 
   const { data: space } = await supabase

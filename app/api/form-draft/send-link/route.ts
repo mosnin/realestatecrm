@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { sendDraftResumeEmail } from '@/lib/email';
+import { tenantTable } from '@/lib/tenant-db';
 
 const sendLinkSchema = z.object({
   spaceId: z.string().min(1),
@@ -43,10 +44,8 @@ export async function POST(req: NextRequest) {
 
   try {
     // Find active draft for this email + space
-    const { data: draft, error: draftError } = await supabase
-      .from('FormDraft')
+    const { data: draft, error: draftError } = await tenantTable(supabase, 'FormDraft', { spaceId })
       .select('id, resumeToken')
-      .eq('spaceId', spaceId)
       .eq('email', normalizedEmail)
       .is('completedAt', null)
       .gt('expiresAt', new Date().toISOString())
@@ -72,10 +71,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sent: true });
     }
 
-    const { data: settings } = await supabase
-      .from('SpaceSetting')
+    const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('businessName')
-      .eq('spaceId', spaceId)
       .maybeSingle();
 
     const businessName = settings?.businessName || space.name;

@@ -15,6 +15,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { parseDripSteps, DripSequenceValidationError } from '@/lib/drip/schema';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -29,10 +30,8 @@ export async function GET() {
   const space = await getSpaceForUser(authResult.userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data, error } = await supabase
-    .from('DripSequence')
+  const { data, error } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .select(SELECT)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
 
   if (error) {
@@ -70,10 +69,8 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
-  const { count, error: countErr } = await supabase
-    .from('DripSequence')
-    .select('id', { count: 'exact', head: true })
-    .eq('spaceId', space.id);
+  const { count, error: countErr } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
+    .select('id', { count: 'exact', head: true });
   if (countErr) {
     logger.error('[drip/sequences] count failed', { spaceId: space.id }, countErr);
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -87,8 +84,7 @@ export async function POST(req: NextRequest) {
 
   const nowIso = new Date().toISOString();
   const active = typeof body.active === 'boolean' ? body.active : true;
-  const { data, error } = await supabase
-    .from('DripSequence')
+  const { data, error } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

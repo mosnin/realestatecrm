@@ -34,6 +34,7 @@ import { logger } from '@/lib/logger';
 import { formatCurrency } from '@/lib/formatting';
 import type { CmaPayload, CmaComp } from '@/lib/cma-types';
 import { DATA_SOURCE_LABEL } from '@/lib/cma-types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -309,13 +310,11 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   // Tenant scoping: the .eq('spaceId', space.id) IS the security boundary —
   // a report id from another workspace resolves to no row, never a leak.
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .select(
       'id, spaceId, subjectAddress, title, status, payload, narrative, narrativeUpdatedAt, createdAt',
     )
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {

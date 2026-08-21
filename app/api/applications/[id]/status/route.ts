@@ -121,18 +121,14 @@ async function sendStatusNotification(
   // Fetch business name and slug for the email
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('slug, name').eq('id', contact.spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
       .select('businessName')
-      .eq('spaceId', contact.spaceId)
       .maybeSingle(),
   ]);
 
   // Look up the portal token so we can include it in the email link
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: contact.spaceId })
     .select('statusPortalToken')
-    .eq('spaceId', contact.spaceId)
     .eq('applicationRef', contact.applicationRef)
     .maybeSingle();
 

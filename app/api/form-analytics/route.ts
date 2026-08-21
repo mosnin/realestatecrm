@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 // ── Validation schemas ──────────────────────────────────────────────────────
 
@@ -145,8 +146,7 @@ export async function POST(req: NextRequest) {
   }));
 
   try {
-    const { error } = await supabase
-      .from('FormAnalyticsEvent')
+    const { error } = await tenantTable(supabase, 'FormAnalyticsEvent', { spaceId })
       .insert(sanitizedEvents);
 
     if (error) {
@@ -185,10 +185,8 @@ export async function GET(req: NextRequest) {
 
   try {
     // Build query
-    let query = supabase
-      .from('FormAnalyticsEvent')
+    let query = tenantTable(supabase, 'FormAnalyticsEvent', { spaceId: space.id })
       .select('id, sessionId, formConfigVersion, eventType, stepIndex, stepTitle, durationMs, metadata, createdAt')
-      .eq('spaceId', space.id)
       .gte('createdAt', cutoff)
       .order('createdAt', { ascending: true })
       .limit(10000);
@@ -315,10 +313,8 @@ export async function GET(req: NextRequest) {
     }[] = [];
 
     try {
-      const { data: leads } = await supabase
-        .from('Contact')
+      const { data: leads } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
         .select('id, name, email, createdAt, scoreLabel, leadScore, tags')
-        .eq('spaceId', space.id)
         .contains('tags', ['application-link'])
         .gte('createdAt', cutoff)
         .order('createdAt', { ascending: false })

@@ -4,15 +4,14 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolve(userId: string, propertyId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: property } = await supabase
-    .from('Property')
+  const { data: property } = await tenantTable(supabase, 'Property', { spaceId: space.id })
     .select('id')
     .eq('id', propertyId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!property) return null;
   return space;
@@ -27,11 +26,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const space = await resolve(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('PropertyPacket')
+  const { data, error } = await tenantTable(supabase, 'PropertyPacket', { spaceId: space.id })
     .select('*')
     .eq('propertyId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
 
   if (error) {
@@ -78,12 +75,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ? (body.includeDocumentIds as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50)
     : [];
   if (includeIds.length > 0) {
-    const { data: docs } = await supabase
-      .from('DealDocument')
+    const { data: docs } = await tenantTable(supabase, 'DealDocument', { spaceId: space.id })
       .select('id')
-      .in('id', includeIds)
-      .eq('spaceId', space.id);
-    const validIds = new Set((docs ?? []).map((r) => r.id as string));
+      .in('id', includeIds);
+    const validIds = new Set(((docs ?? []) as Array<{ id: string }>).map((r) => r.id));
     for (const id of includeIds) {
       if (!validIds.has(id)) {
         return NextResponse.json({ error: 'Unknown document id' }, { status: 400 });
@@ -94,8 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Token: 32 bytes URL-safe = 43 chars base64url, plenty of entropy.
   const token = crypto.randomBytes(32).toString('base64url');
 
-  const { data, error } = await supabase
-    .from('PropertyPacket')
+  const { data, error } = await tenantTable(supabase, 'PropertyPacket', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

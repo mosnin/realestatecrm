@@ -31,6 +31,7 @@ import {
   persistCmaNarrative,
   CmaNarrativeError,
 } from '@/lib/cma-narrative';
+import { tenantTable } from '@/lib/tenant-db';
 import type { CmaPayload } from '@/lib/cma-types';
 
 export const runtime = 'nodejs';
@@ -72,11 +73,9 @@ export async function POST(req: NextRequest) {
 
   // Tenant scoping: the .eq('spaceId', space.id) IS the security boundary —
   // a report id from another workspace resolves to no row, never a 403 leak.
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .select('id, spaceId, payload')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {

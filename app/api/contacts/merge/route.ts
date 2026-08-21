@@ -29,6 +29,7 @@ import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
 import { MAX_CONTACT_MERGE_GROUP as MAX_MERGE_GROUP } from '@/lib/api-limits';
 import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 
 /** Reference tables re-pointed by merge_contacts(), for the preview count. */
@@ -181,17 +182,17 @@ export async function POST(req: NextRequest) {
   // another space — but a duplicate that simply doesn't exist (already merged)
   // is fine and is skipped (idempotency).
   const allIds = [survivorId, ...duplicateIds];
-  const { data: rows, error: loadErr } = await supabase
-    .from('Contact')
+  const { data: rows, error: loadErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .in('id', allIds);
   if (loadErr) {
     console.error('[contacts/merge] load error:', loadErr);
     return NextResponse.json({ error: 'Failed to load contacts' }, { status: 500 });
   }
 
-  const byId = new Map((rows ?? []).map((r) => [r.id as string, r as Record<string, unknown>]));
+  const byId = new Map(
+    ((rows ?? []) as Array<{ id: string } & Record<string, unknown>>).map((r) => [r.id, r]),
+  );
   const survivor = byId.get(survivorId);
   if (!survivor) {
     // Survivor missing from this space → either cross-space or gone. Refuse.
@@ -301,11 +302,9 @@ export async function POST(req: NextRequest) {
 
   // Refresh the survivor's vector index off the merged record (best-effort).
   try {
-    const { data: fresh } = await supabase
-      .from('Contact')
+    const { data: fresh } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('*')
       .eq('id', survivorId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (fresh) syncContact(fresh as Contact).catch(() => {});
   } catch {
