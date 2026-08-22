@@ -54,6 +54,12 @@ describe('Work queue and steering', () => {
     expect(prompt).toContain('boolean | Promise<boolean>');
   });
 
+  it('releases the submit lock once streaming so Enter can queue the next message', () => {
+    const prompt = readFileSync('components/ui/chippi-prompt-box.tsx', 'utf8');
+    expect(prompt).toContain('(isSubmitting && !isLoading)');
+    expect(prompt).not.toContain('disabled || isSubmitting || !hasContent');
+  });
+
   it('keeps the live composer to one stop control', () => {
     const prompt = readFileSync('components/ui/chippi-prompt-box.tsx', 'utf8');
     expect(prompt).toContain('aria-label="Stop generating"');
