@@ -15,9 +15,52 @@ export type TranscriptRenderItem =
       groupId: string;
     };
 
-function isToolProcessNarration(content: string): boolean {
+const PROCESS_OPERATION_RE = /\b(?:try(?:\s+again)?|retry|check|call|look(?:\s+up)?|pull|search|verify|inspect|run|query|fetch|correct|fix|attempt)\b/i;
+const LET_ME_OPERATION_RE = /\b(?:try(?:\s+again)?|retry|check|call|look(?:\s+up)?|pull|find|get|use|list|search|verify|inspect|run|query|fetch|review|provide|set|correct|fix|attempt|parameters?|filters?|function|tool|proper(?:ly)?|again)\b/i;
+const PROCESS_CONTEXT_RE = /\b(?:parameters?|filters?|function|tool|proper(?:ly)?|without\s+filters?|limit)\b/i;
+const PROCESS_LOOKUP_RESULT_RE = /\b(?:get|fetch|pull|look(?:\s+up)?|find|search)\s+(?:the\s+)?(?:details?|leads?|contacts?|results?|information|data)\b/i;
+
+/**
+ * A provider often emits a chain of self-talk around a failed tool call. It
+ * is useful while debugging, but it is not a user-facing answer. Keep the
+ * matcher deliberately anchored to progress leads so a substantive answer
+ * such as "I need to find a buyer" is never dropped by accident.
+ */
+function isToolProcessSentence(sentence: string): boolean {
+  const text = sentence.trim().replace(/^[-*]\s+/, '');
+  if (!text) return true;
+  if (/^let me know\b/i.test(text)) return false;
+  if (/^i\s+see\s+(?:the\s+)?issue\b/i.test(text)) return true;
+  if (/^(?:checking|looking|searching|trying|retrying|fetching|reviewing|calling|verifying|inspecting|running)\b/i.test(text)) {
+    return true;
+  }
+  if (/^let me\b/i.test(text)) return LET_ME_OPERATION_RE.test(text);
+  if (/^i\s+need to\b/i.test(text)) {
+    return PROCESS_OPERATION_RE.test(text) || PROCESS_CONTEXT_RE.test(text);
+  }
+  if (/^i(?:'ll| will| am going to|'m going to)\b/i.test(text)) {
+    return PROCESS_OPERATION_RE.test(text) || PROCESS_CONTEXT_RE.test(text) || PROCESS_LOOKUP_RESULT_RE.test(text);
+  }
+  return false;
+}
+
+/**
+ * Remove only leading process narration. If a model puts the real answer in
+ * the same text block, the answer survives instead of the whole block being
+ * hidden. A null result means the block contains narration only.
+ */
+function stripToolProcessNarration(content: string): string | null {
   const text = content.trim();
-  return /^(?:let me\s+(?:try|retry|check|call|look|pull|find|get|use|see)\b|i\s+(?:need to|see the issue)\b|i(?:'ll| will)\s+(?:try|retry|check|call|look|pull|find|get|use)\b)/i.test(text);
+  if (!text) return null;
+
+  const sentences = text.split(/(?<=[.!?])\s+|[\r\n]+|;\s+/).filter(Boolean);
+  let firstSubstantive = 0;
+  while (firstSubstantive < sentences.length && isToolProcessSentence(sentences[firstSubstantive])) {
+    firstSubstantive++;
+  }
+  if (firstSubstantive === 0) return text;
+  if (firstSubstantive >= sentences.length) return null;
+  return sentences.slice(firstSubstantive).join(' ').trim() || null;
 }
 
 /**
@@ -100,7 +143,14 @@ export function groupTranscriptItems(
       // A provider can exhaust its tool budget immediately after emitting a
       // retry preamble. That preamble is not an answer and must not become the
       // last thing the user sees ("let me try again", "I need to check...").
-      if (finalOrdinaryToolIndex >= 0 && isToolProcessNarration(block.content)) continue;
+      if (finalOrdinaryToolIndex >= 0) {
+        const cleaned = stripToolProcessNarration(block.content);
+        if (!cleaned) continue;
+        if (cleaned !== block.content.trim()) {
+          items.push({ kind: 'text', block: { ...block, content: cleaned }, originalIndex: i });
+          continue;
+        }
+      }
       items.push({ kind: 'text', block, originalIndex: i });
     } else if (block.type === 'permission') {
       items.push({ kind: 'permission', block });

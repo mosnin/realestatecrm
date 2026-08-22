@@ -72,6 +72,18 @@ describe('Work queue and steering', () => {
     expect(prompt).not.toContain('aria-label="Steer active work"');
   });
 
+  it('keeps queued actions compact with Steer primary and Edit/Delete in overflow', () => {
+    const workspace = readFileSync('components/chippi/chippi-workspace.tsx', 'utf8');
+
+    expect(workspace).toMatch(/>\s*Steer\s*<\/button>/);
+    expect(workspace).toContain('aria-label="Queued message options"');
+    expect(workspace).toContain('Edit message');
+    expect(workspace).toContain('Delete message');
+    expect(workspace).toContain('onSelect={() => { void deleteQueuedMessage(q.id); }}');
+    expect(workspace).not.toContain('aria-label="Remove queued message"');
+    expect(workspace.match(/<Trash2\b/g)).toHaveLength(1);
+  });
+
   it('bounds the conversation sidebar query on the server', () => {
     const route = readFileSync('app/api/ai/conversations/route.ts', 'utf8');
     expect(route).toContain('Math.max(1, Math.min(requestedLimit, 50))');

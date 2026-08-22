@@ -72,6 +72,43 @@ describe('groupTranscriptItems', () => {
     }
   });
 
+  it('collapses repeated retry preambles while preserving a substantive final sentence', () => {
+    const items = groupTranscriptItems([
+      { type: 'text', content: 'I will look up the newest leads.' },
+      tool('list_contacts', 'error', { callId: 'retry-1' }),
+      { type: 'text', content: 'Let me try again with the correct parameters.' },
+      tool('list_contacts', 'error', { callId: 'retry-2' }),
+      {
+        type: 'text',
+        content: 'I see the issue. Let me call list_contacts properly. Here are the three newest leads.',
+      },
+    ]);
+
+    expect(items.map((item) => item.kind)).toEqual(['tool-group', 'text']);
+    expect(items.find((item) => item.kind === 'text')).toMatchObject({
+      block: { content: 'Here are the three newest leads.' },
+    });
+  });
+
+  it('does not hide a final answer that starts with ordinary user-facing prose', () => {
+    const finalAnswers = [
+      'I need to find a buyer before the listing expires.',
+      "I'll reach out again tomorrow.",
+      "I'll get that signed.",
+      "I'll share the data with the buyer.",
+    ];
+
+    for (const content of finalAnswers) {
+      const items = groupTranscriptItems([
+        tool('find_deal', 'complete', { callId: `deal-final-${content}` }),
+        { type: 'text', content },
+      ]);
+
+      expect(items).toHaveLength(2);
+      expect(items[1]).toMatchObject({ kind: 'text', block: { content } });
+    }
+  });
+
   it('omits workbench tools when the opener is rolled back', () => {
     const items = groupTranscriptItems(
       [tool('open_spreadsheet_in_workbench', 'complete', { display: 'workbench', callId: 'wb' })],

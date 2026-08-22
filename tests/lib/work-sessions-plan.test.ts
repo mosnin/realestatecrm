@@ -159,6 +159,37 @@ describe('planSession', () => {
     expect(await planSession('ws1')).toBe('failed');
   });
 
+  it('accepts a valid plan wrapped in prose without spending a corrective retry', async () => {
+    llmContent = 'Here is the plan:\n{"steps":[{"title":"Pull comps"}],"question":null}\n';
+    expect(await planSession('ws1')).toBe('awaiting_approval');
+    expect(llmCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries one malformed planner response, then accepts the corrected response', async () => {
+    llmCreate
+      .mockImplementationOnce(async () => ({ choices: [{ message: { content: 'not json' } }] }))
+      .mockImplementationOnce(async () => ({
+        choices: [{ message: { content: '```json\n{"steps":[{"title":"Pull comps"}],"question":null}\n```' } }],
+      }));
+
+    expect(await planSession('ws1')).toBe('awaiting_approval');
+    expect(llmCreate).toHaveBeenCalledTimes(2);
+    expect(llmCreate.mock.calls[1]?.[0]?.messages.at(-1)?.content).toContain('usable planner object');
+  });
+
+  it('fails honestly after the bounded corrective retry is also unreadable', async () => {
+    llmCreate
+      .mockImplementationOnce(async () => ({ choices: [{ message: { content: 'not json' } }] }))
+      .mockImplementationOnce(async () => ({ choices: [{ message: { content: 'still prose' } }] }));
+
+    expect(await planSession('ws1')).toBe('failed');
+    expect(llmCreate).toHaveBeenCalledTimes(2);
+    expect(patches.at(-1)).toMatchObject({
+      status: 'failed',
+      error: 'Planning returned an unreadable plan.',
+    });
+  });
+
   it('does nothing when the session is not in planning', async () => {
     sessionRow = baseSession({ status: 'running' });
     expect(await planSession('ws1')).toBe('running');
