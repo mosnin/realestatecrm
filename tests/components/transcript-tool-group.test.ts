@@ -55,6 +55,23 @@ describe('groupTranscriptItems', () => {
     expect(items[0]?.kind).toBe('tool-group');
   });
 
+  it('does not end a failed tool turn with retry narration', () => {
+    const retryPreambles = [
+      'Let me try that again with the correct parameters.',
+      'I need to provide all the required parameters.',
+      'I see the issue. Let me call it properly.',
+      "I'll get the details on your newest leads.",
+    ];
+
+    for (const content of retryPreambles) {
+      const items = groupTranscriptItems([
+        tool('find_deal', 'error', { callId: `failed-${content}` }),
+        { type: 'text', content },
+      ]);
+      expect(items.map((item) => item.kind)).toEqual(['tool-group']);
+    }
+  });
+
   it('omits workbench tools when the opener is rolled back', () => {
     const items = groupTranscriptItems(
       [tool('open_spreadsheet_in_workbench', 'complete', { display: 'workbench', callId: 'wb' })],

@@ -60,6 +60,11 @@ describe('Work queue and steering', () => {
     expect(prompt).not.toContain('disabled || isSubmitting || !hasContent');
   });
 
+  it('does not duplicate the active turn in the queue rail while its claim settles', () => {
+    const hook = readFileSync('components/ai/hooks/use-agent-task.ts', 'utf8');
+    expect(hook).toContain('.filter((turn) => turn.id !== activeTurnIdRef.current)');
+  });
+
   it('keeps the live composer to one stop control', () => {
     const prompt = readFileSync('components/ui/chippi-prompt-box.tsx', 'utf8');
     expect(prompt).toContain('aria-label="Stop generating"');
