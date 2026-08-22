@@ -502,14 +502,14 @@ function IntegrationsPanel() {
     { icon: Mail, n: 'Gmail', d: 'reading + drafting' },
     { icon: CalendarCheck, n: 'Google Calendar', d: 'availability + booking' },
     { icon: Database, n: 'HubSpot', d: 'contacts + deals, two-way' },
-    { icon: FileSignature, n: 'DocuSign', d: 'send for signature' },
+    { icon: FileSignature, n: 'Documents', d: 'stored on the deal' },
     { icon: MessageSquare, n: 'WhatsApp', d: 'send + follow up' },
     { icon: Phone, n: 'WhatsApp', d: 'send + follow up' },
   ];
   return (
     <>
       <PanelHead title="Integrations" cta="Add tool" />
-      <motion.p variants={cardV} className="mt-3 text-[12px] text-white/45">Connected through Composio. 50+ apps available.</motion.p>
+      <motion.p variants={cardV} className="mt-3 text-[12px] text-white/45">Connected through Composio. Inbox, calendar, CRM, and more.</motion.p>
       <div className="mt-3 grid grid-cols-2 gap-2.5">
         {APPS.map((a) => {
           const Icon = a.icon;

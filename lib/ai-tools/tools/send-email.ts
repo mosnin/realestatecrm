@@ -1,26 +1,32 @@
 /**
- * `send_email` — the first mutating tool. Composes + sends an email to a
- * contact via the existing lib/email `sendEmailFromCRM` helper.
+ * `send_email` — compose + send an email after realtor approval.
  *
- * Approval-gated: the loop will emit `permission_required` for every call,
- * and `continueTurn` runs the handler only after the user approves.
+ * Delivery (no attachments): `sendDraft` so a connected Gmail/Outlook wins.
+ * Attachments still ride the platform Resend sender (inbox actions don't
+ * take files yet) and the result says so.
  *
- * Design decisions:
- * - Addresses must resolve to a Contact in the caller's space. The tool
- *   looks up either by contactId (preferred — deterministic) or by email
- *   address (falls back to "known contact" if one exists, else treats the
- *   address as an off-platform recipient and lets the user confirm).
- * - Either `contactId` or `toEmail` is required; the tool refuses with a
- *   helpful error if both are missing.
- * - Body is plain text (rendered as paragraphs in the Resend template).
- *   HTML is explicitly out of scope — the model is not a safe HTML
- *   author for a first mutating tool.
+ * Compliance runs before delivery. A block is "Blocked because X", never a
+ * fake send. A failed send is "Send failed: …", never success.
+ *
+ * Approval-gated: the loop emits `permission_required` and `continueTurn`
+ * runs the handler only after the user approves.
+ *
+ * Addresses must resolve to a Contact in the caller's space (contactId) or
+ * a free-form toEmail. Body is plain text.
  */
 
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { sendEmailFromCRM, type SendEmailAttachment } from '@/lib/email';
+import {
+  sendEmailFromCRM,
+  ComplianceBlockedError,
+  EmailSendError,
+  type SendEmailAttachment,
+} from '@/lib/email';
+import { describeDelivery, sendDraft, type DeliveryResult } from '@/lib/delivery';
+import { checkSendAllowed } from '@/lib/messaging/compliance';
+import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { makeIdempotencyKey, withIdempotency } from '@/lib/agent/ts-idempotency';
@@ -76,6 +82,24 @@ interface SendEmailResult {
   deliveredTo: string;
   contactId: string | null;
   subject: string;
+  method?: DeliveryResult['method'];
+  fallback?: boolean;
+}
+
+function blockedBecause(reason?: string, detail?: string): string {
+  const why =
+    reason === 'suppressed'
+      ? 'the recipient opted out'
+      : reason === 'no_consent'
+        ? 'no consent on file'
+        : reason === 'quiet_hours'
+          ? 'quiet hours'
+          : reason === 'invalid_address'
+            ? 'the address is not usable'
+            : reason === 'lookup_failed'
+              ? 'messaging rules could not be verified'
+              : reason ?? 'messaging rules';
+  return `Blocked because ${why}: ${detail ?? 'this message was not sent.'}`;
 }
 
 export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
@@ -233,46 +257,106 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       args.subject,
       bodyHash,
     );
+    const decision = await checkSendAllowed({
+      spaceId: ctx.space.id,
+      channel: 'email',
+      address: resolvedEmail,
+      audience: 'consumer',
+      category: 'marketing',
+      contactId: resolvedContactId,
+    });
+    if (!decision.allowed) {
+      const summary = blockedBecause(decision.reason, decision.detail);
+      logger.warn('[tools.send_email] blocked by compliance', {
+        spaceId: ctx.space.id,
+        reason: decision.reason,
+      });
+      if (durableIdempotencyKey) {
+        return {
+          summary,
+          display: 'error',
+          durableExecutionDisposition: 'terminal_failure',
+        };
+      }
+      return { summary, display: 'error' };
+    }
+
+    const hasAttachments = Boolean(resolvedAttachments && resolvedAttachments.length > 0);
+    let delivery: DeliveryResult | null = null;
+
     try {
-      await withIdempotency(idemKey, () =>
-        sendEmailFromCRM({
-          // Consumer outreach on the realtor's behalf. Chat approval is not
-          // consent — the compliance gate still applies.
-          audience: 'consumer',
-          category: 'marketing',
-          spaceId: ctx.space.id,
-          toEmail: resolvedEmail!,
+      await withIdempotency(idemKey, async () => {
+        if (hasAttachments) {
+          // Inbox-connect actions don't take files yet. Attachments go
+          // through the platform sender and the realtor is told that.
+          if (!process.env.RESEND_API_KEY) {
+            throw new EmailSendError(
+              'Platform sender is not configured, and attachments cannot go through a connected inbox yet.',
+              undefined,
+              'terminal_failure',
+            );
+          }
+          await sendEmailFromCRM({
+            audience: 'consumer',
+            category: 'marketing',
+            spaceId: ctx.space.id,
+            contactId: resolvedContactId,
+            toEmail: resolvedEmail!,
+            fromName,
+            subject: args.subject,
+            body: args.body,
+            replyTo: args.replyTo,
+            attachments: resolvedAttachments,
+            idempotencyKey: durableIdempotencyKey,
+          });
+          delivery = { sent: true, method: 'email' };
+          return;
+        }
+
+        const result = await sendDraft(
+          { channel: 'email', subject: args.subject, content: args.body },
+          {
+            name: fromName,
+            email: resolvedEmail,
+            phone: null,
+          },
           fromName,
-          subject: args.subject,
-          body: args.body,
-          replyTo: args.replyTo,
-          attachments: resolvedAttachments,
-          idempotencyKey: durableIdempotencyKey,
-        }),
-      );
+          { spaceId: ctx.space.id, userId: ctx.userId },
+        );
+        if (!result.sent) {
+          const configured = result.error !== 'not_configured';
+          throw new EmailSendError(
+            result.error ?? 'Delivery failed',
+            undefined,
+            configured ? 'retryable' : 'terminal_failure',
+          );
+        }
+        delivery = result;
+      });
     } catch (err) {
       logger.error(
         '[tools.send_email] delivery failed',
         { spaceId: ctx.space.id, to: resolvedEmail },
         err,
       );
+      const blocked = err instanceof ComplianceBlockedError;
+      const summary = blocked
+        ? blockedBecause(err.reason, err.message)
+        : `Send failed: ${err instanceof Error ? err.message : 'unknown error'}`;
       if (durableIdempotencyKey) {
         const disposition = typeof err === 'object' && err && 'durableDisposition' in err
           ? (err as { durableDisposition?: unknown }).durableDisposition
           : 'retryable';
         if (disposition === 'terminal_failure' || disposition === 'reconciliation_required') {
           return {
-            summary: `Send failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+            summary,
             display: 'error',
             durableExecutionDisposition: disposition,
           };
         }
         throw err;
       }
-      return {
-        summary: `Send failed: ${err instanceof Error ? err.message : 'unknown error'}`,
-        display: 'error',
-      };
+      return { summary, display: 'error' };
     }
 
     // Best-effort log of the send as a ContactActivity for the audit trail.
@@ -307,12 +391,38 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
       }
     }
 
+    const sent: DeliveryResult = delivery ?? { sent: true, method: 'email' };
+    if (resolvedContactId) {
+      await recordOutboundMessageSafe(
+        {
+          spaceId: ctx.space.id,
+          contactId: resolvedContactId,
+          channel: 'email',
+          body: args.body,
+          subject: args.subject,
+          metadata: {
+            source: 'send_email',
+            method: sent.method,
+            ...(sent.fallback ? { fallback: true } : {}),
+            ...(hasAttachments ? { attachments: true } : {}),
+          },
+        },
+        { route: 'tools.send_email', spaceId: ctx.space.id },
+      );
+    }
+
+    const voice = hasAttachments
+      ? "from Chippi's sender (attachments cannot go through a connected inbox yet)"
+      : describeDelivery(sent);
+
     return {
-      summary: `Email sent to ${resolvedEmail} — "${args.subject}".`,
+      summary: `Email sent to ${resolvedEmail} — "${args.subject}" ${voice}.`,
       data: {
         deliveredTo: resolvedEmail,
         contactId: resolvedContactId,
         subject: args.subject,
+        method: sent.method,
+        fallback: sent.fallback,
       },
       display: 'success',
     };

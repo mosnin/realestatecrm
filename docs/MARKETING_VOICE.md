@@ -46,7 +46,7 @@ Before shipping a line, ask:
 | "Reads and drafts every lead." | "Chippi reads every new lead. It writes the reply for you." |
 | "Tour booking and follow-ups." | "It books showings. It follows up so you don't forget." |
 | "Every integration included." | "Works with the apps you already use." |
-| "Credits are spent when Chippi does real work." | "You only pay when Chippi actually does something." |
+| "Credits are spent when Chippi does real work." | "Credits cover the AI work — including drafts you review." |
 | "Unused credits roll over for 30 days." | "Didn't use them all? They wait 30 days for you." |
 | "Add an agent, billing updates itself." | "Add someone to your team. We fix the bill for you." |
 

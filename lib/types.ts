@@ -191,6 +191,8 @@ export type SpaceSetting = {
   notifyTourBookings: boolean;
   notifyNewDeals: boolean;
   notifyFollowUps: boolean;
+  /** Default true: inbound first-touch intros send after compose. */
+  autoFirstTouchSend: boolean;
   // Notification digest (opt-in roll-up; default 'off' = per-event sends).
   // The space-level default cadence; members can override via NotificationPreference.
   digestCadence: 'off' | 'daily' | 'weekly';
@@ -422,6 +424,15 @@ export type Deal = {
   address: string | null;
   priority: Priority;
   closeDate: Date | null;
+  /**
+   * First-class contract dates. `contractAcceptedAt` is stamped when the
+   * realtor accepts an offer (or types the date). A DocuSign envelope
+   * completing does not stamp this — we are not the e-sign of record.
+   * Inspection / earnest are realtor-authored; they are not inferred.
+   */
+  contractAcceptedAt?: Date | string | null;
+  inspectionDeadline?: Date | string | null;
+  earnestDueAt?: Date | string | null;
   stageId: string;
   position: number;
   status: 'active' | 'won' | 'lost' | 'on_hold';

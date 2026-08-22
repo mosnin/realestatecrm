@@ -34,6 +34,7 @@ const CADENCE_OPTIONS: { value: DigestCadence; label: string }[] = [
  */
 export function NotificationsSection({ slug }: NotificationsSectionProps) {
   const [notifications, setNotifications] = useState(true);
+  const [autoFirstTouchSend, setAutoFirstTouchSend] = useState(true);
   const [cadence, setCadence] = useState<DigestCadence>('off');
   const [userEmail, setUserEmail] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,6 +55,7 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
         if (spaceData) {
           const s = spaceData.settings ?? spaceData;
           setNotifications(s.notifications ?? true);
+          setAutoFirstTouchSend(s.autoFirstTouchSend !== false);
           setUserEmail(spaceData.ownerEmail ?? spaceData.email ?? '');
         }
         // Effective cadence = member override ?? space default, resolved server-side.
@@ -74,7 +76,7 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
         fetch('/api/spaces', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug, notifications }),
+          body: JSON.stringify({ slug, notifications, autoFirstTouchSend }),
         }),
         fetch('/api/notification-preferences', {
           method: 'PATCH',
@@ -115,6 +117,18 @@ export function NotificationsSection({ slug }: NotificationsSectionProps) {
           </p>
         </div>
         <Switch checked={notifications} onCheckedChange={setNotifications} />
+      </div>
+
+      <div className="flex items-center justify-between gap-4 py-3 border-t border-border/60">
+        <div className="min-w-0">
+          <p className={`${BODY} font-medium`}>Send a first intro when someone applies</p>
+          <p className={`${CAPTION} mt-0.5`}>
+            New apply leads get a personalized intro from your connected inbox
+            (or Chippi&apos;s sender if you have not connected one). Later
+            follow-ups still wait for your tap. Turn this off to draft only.
+          </p>
+        </div>
+        <Switch checked={autoFirstTouchSend} onCheckedChange={setAutoFirstTouchSend} />
       </div>
 
       <div

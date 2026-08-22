@@ -137,8 +137,8 @@ export default function FilesPage() {
                   <p className="mt-1 text-xs text-neutral-600">Filing runs around the clock</p>
                 </div>
                 <div>
-                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">50+</span>
-                  <p className="mt-1 text-xs text-neutral-600">Integrations across email, drive, and CRMs</p>
+                  <span className="text-2xl font-semibold tracking-tight text-zinc-950">OAuth</span>
+                  <p className="mt-1 text-xs text-neutral-600">Email, drive, and CRMs — connect the ones you use</p>
                 </div>
               </div>
             </div>

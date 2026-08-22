@@ -59,7 +59,7 @@ const GUIDES: Guide[] = [
     desc: 'Chippi reads every lead, drafts in your voice, and lines up the next move.',
     steps: [
       'Open the Chippi tab to see your prepared day — new leads, follow-ups, drafts.',
-      'Every draft waits for your tap; nothing sends on its own.',
+      'A new apply lead gets a personalized intro from your inbox unless you turn that off. Later drafts still wait for your tap.',
       'Ask Chippi in plain language to draft, book, or summarize anything.',
     ],
   },
@@ -109,7 +109,7 @@ const GUIDES: Guide[] = [
     desc: 'Connect the tools you already pay for — Chippi works across them.',
     steps: [
       'Add Gmail, Google Calendar, HubSpot, DocuSign, WhatsApp and more.',
-      'Connections are managed through Composio with 50+ apps available.',
+      'Connections are managed through Composio — Gmail, calendar, CRM, and more.',
       'Chippi reads and writes in both directions so your systems stay in sync.',
     ],
   },

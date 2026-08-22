@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     supabase
       .from('SpaceSetting')
       .select(
-        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, digestCadence, phoneNumber, timezone,' +
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, autoFirstTouchSend, digestCadence, phoneNumber, timezone,' +
         'briefEnabled, briefHour, briefEmail, briefSms,' +
         'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
       notifyTourBookings: settings?.notifyTourBookings ?? true,
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
+      autoFirstTouchSend: settings?.autoFirstTouchSend !== false,
       digestCadence: (settings as { digestCadence?: string } | null)?.digestCadence ?? 'off',
       phoneNumber: settings?.phoneNumber ?? '',
       timezone: settings?.timezone ?? 'America/New_York',
@@ -117,6 +118,7 @@ export async function PATCH(req: NextRequest) {
     notifyTourBookings,
     notifyNewDeals,
     notifyFollowUps,
+    autoFirstTouchSend,
     digestCadence,
     briefEnabled,
     briefHour,
@@ -267,6 +269,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof notifyTourBookings === 'boolean') settingsPayload.notifyTourBookings = notifyTourBookings;
   if (typeof notifyNewDeals === 'boolean') settingsPayload.notifyNewDeals = notifyNewDeals;
   if (typeof notifyFollowUps === 'boolean') settingsPayload.notifyFollowUps = notifyFollowUps;
+  if (typeof autoFirstTouchSend === 'boolean') settingsPayload.autoFirstTouchSend = autoFirstTouchSend;
   // Digest cadence (space default): only the three legal values are accepted;
   // anything else is ignored so a malformed payload can't write garbage.
   if (digestCadence === 'off' || digestCadence === 'daily' || digestCadence === 'weekly') {

@@ -22,7 +22,8 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { sendEmailFromCRM } from '@/lib/email';
+import { sendDraft, describeDelivery } from '@/lib/delivery';
+import { checkSendAllowed } from '@/lib/messaging/compliance';
 import { sendSMS } from '@/lib/sms';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
@@ -122,23 +123,64 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${contact.name} has no email on file` }, { status: 422 });
     }
 
-    try {
-      await sendEmailFromCRM({
-        // Agent outreach to a lead — consumer; the gate decides if it goes.
-        audience: 'consumer',
-        category: 'marketing',
-        spaceId,
-        contactId,
-        toEmail: contact.email,
-        fromName,
-        subject: subject!,
-        body: content,
-      });
-      deliveredTo = contact.email;
-    } catch (err) {
-      console.error('[agent/send] email delivery failed', err);
-      return NextResponse.json({ error: 'Email delivery failed' }, { status: 502 });
+    const decision = await checkSendAllowed({
+      spaceId,
+      channel: 'email',
+      address: contact.email,
+      audience: 'consumer',
+      category: 'marketing',
+      contactId,
+    });
+    if (!decision.allowed) {
+      return NextResponse.json(
+        {
+          error: `Blocked because ${decision.reason ?? 'messaging rules'}: ${decision.detail ?? 'this message was not sent.'}`,
+          reason: decision.reason,
+        },
+        { status: 403 },
+      );
     }
+
+    const { data: spaceRow } = await supabase
+      .from('Space')
+      .select('ownerId')
+      .eq('id', spaceId)
+      .maybeSingle();
+    let clerkId: string | undefined;
+    const ownerId = (spaceRow as { ownerId?: string } | null)?.ownerId;
+    if (ownerId) {
+      const { data: owner } = await supabase
+        .from('User')
+        .select('clerkId')
+        .eq('id', ownerId)
+        .maybeSingle();
+      clerkId = (owner as { clerkId?: string } | null)?.clerkId ?? undefined;
+    }
+
+    const delivery = await sendDraft(
+      { channel: 'email', subject: subject!, content },
+      { name: contact.name ?? 'there', email: contact.email, phone: contact.phone },
+      fromName,
+      { spaceId, userId: clerkId },
+    );
+    if (!delivery.sent) {
+      logger.error('[agent/send] email delivery failed', {
+        spaceId,
+        error: delivery.error,
+        method: delivery.method,
+      });
+      return NextResponse.json(
+        { error: `Send failed: ${delivery.error ?? 'delivery failed'}` },
+        { status: 502 },
+      );
+    }
+    deliveredTo = contact.email;
+    logger.info('[agent/send] email sent', {
+      spaceId,
+      method: delivery.method,
+      fallback: delivery.fallback ?? false,
+      via: describeDelivery(delivery),
+    });
   }
 
   if (channel === 'sms') {

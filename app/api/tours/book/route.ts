@@ -7,6 +7,9 @@ import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
+import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar/mirror-tour';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { logger } from '@/lib/logger';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -185,11 +188,53 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
 
+  // Same calendar availability used. If a calendar is connected, the tour
+  // must land there — a confirmed booking that never reached the realtor's
+  // calendar is a lie. No connection → CRM-only (unchanged).
+  const calendar = await mirrorTourBookingToCalendar({
+    spaceId: space.id,
+    tourId,
+    guestName: guestName.trim(),
+    guestEmail: guestEmail.trim().toLowerCase(),
+    guestPhone: guestPhone?.trim() || null,
+    propertyAddress: propertyAddress?.trim() || null,
+    notes: notes?.trim() || null,
+    startsAt: start.toISOString(),
+    endsAt: end.toISOString(),
+    createdBy: 'realtor',
+  });
+  if (calendar.attempted && !calendar.externalOk) {
+    await rollbackTourBooking(space.id, tourId);
+    logger.warn('[tours/book] calendar write failed — tour rolled back', {
+      spaceId: space.id,
+      tourId,
+      via: calendar.via,
+    });
+    return NextResponse.json(
+      { error: 'Could not add this tour to the calendar. Please try another time.' },
+      { status: 502 },
+    );
+  }
+
+  try {
+    await advanceDealFromEvent({
+      spaceId: space.id,
+      contactId,
+      event: 'tour_booked',
+      sourceTourId: tourId,
+      title: guestName.trim(),
+      address: propertyAddress?.trim() || null,
+    });
+  } catch (err) {
+    logger.warn('[tours/book] pipeline advance failed', { spaceId: space.id, tourId }, err);
+  }
+
   // Fetch the created tour for the response
   const { data: tour, error: fetchError } = await supabase
     .from('Tour')
     .select('*')
     .eq('id', tourId)
+    .eq('spaceId', space.id)
     .single();
   if (fetchError) throw fetchError;
 

@@ -221,7 +221,11 @@ describe('POST /api/public/home-value/[slug]', () => {
 
     // First touch fired once for the captured contact.
     expect(fireFirstTouchMock).toHaveBeenCalledTimes(1);
-    expect(fireFirstTouchMock).toHaveBeenCalledWith({ spaceId: 'space_1', contactId: 'contact_1' });
+    expect(fireFirstTouchMock).toHaveBeenCalledWith({
+      spaceId: 'space_1',
+      contactId: 'contact_1',
+      origin: 'inbound',
+    });
   });
 
   it('unknown slug → 404, nothing captured, no CMA call', async () => {

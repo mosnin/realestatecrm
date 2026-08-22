@@ -12,6 +12,11 @@
  * Composio isn't configured, it returns a structured result — it never
  * throws a 500.
  *
+ * Chippi is not the e-sign vendor and does not certify signatures. A
+ * completed envelope updates SignatureRequest status only. It must not
+ * advance the deal or stamp contractAcceptedAt. The realtor accepts the
+ * offer when they are ready.
+ *
  * ─────────────────────────────────────────────────────────────────────────
  *  ⚠️  ACTION SLUGS NEED LIVE VERIFICATION  ⚠️
  * ─────────────────────────────────────────────────────────────────────────
@@ -624,6 +629,9 @@ export async function refreshEnvelopeStatus(
       signatureRequest: { ...request, status, signedDocumentUrl, completedAt },
     };
   }
+
+  // Status only. A completed envelope is not offer-accepted — we do not
+  // certify signatures or move the deal. The realtor accepts the offer.
 
   return { ok: true, signatureRequest: updated as SignatureRequestRow };
 }

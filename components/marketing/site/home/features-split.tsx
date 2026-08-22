@@ -78,9 +78,9 @@ export function FeaturesSplit() {
               <div className="flex cursor-pointer items-center gap-3 transition-transform duration-200 hover:scale-105">
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">100%</span>
+                    <span className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Logged</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-white/60">Sent in your voice, logged in plain words</p>
+                  <p className="text-xs text-slate-600 dark:text-white/60">Every send on the record, in your workspace</p>
                 </div>
               </div>
             </div>

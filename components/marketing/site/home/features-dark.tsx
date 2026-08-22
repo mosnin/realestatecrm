@@ -164,14 +164,14 @@ export function FeaturesDark() {
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
-                      <p className="mb-1 text-xs text-neutral-500">Leads worked</p>
-                      <p className="text-2xl font-semibold text-zinc-950">142</p>
-                      <p className="mt-1 text-xs text-neutral-600">scored on arrival</p>
+                      <p className="mb-1 text-xs text-neutral-500">New apply</p>
+                      <p className="text-2xl font-semibold text-zinc-950">Sent</p>
+                      <p className="mt-1 text-xs text-neutral-600">intro from your inbox</p>
                     </div>
                     <div className="rounded-xl bg-black/[0.03] p-3 ring-1 ring-black/5">
-                      <p className="mb-1 text-xs text-neutral-500">Follow-ups</p>
-                      <p className="text-2xl font-semibold text-zinc-950">94%</p>
-                      <p className="mt-1 text-xs text-neutral-600">on time, automatically</p>
+                      <p className="mb-1 text-xs text-neutral-500">Later follow-ups</p>
+                      <p className="text-2xl font-semibold text-zinc-950">Draft</p>
+                      <p className="mt-1 text-xs text-neutral-600">ready for your tap</p>
                     </div>
                   </div>
                 </DemoShell>

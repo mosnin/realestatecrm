@@ -336,6 +336,8 @@ export interface NotifyWorkflowDispatchParams {
   channel: string;
   /** Best-effort recipient display (name or id), for the notification body. */
   recipient?: string | null;
+  /** Honest sender line from describeDelivery, when we actually sent. */
+  via?: string | null;
 }
 
 /**
@@ -399,6 +401,8 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
   if (!info) return;
 
   const who = params.recipient ? ` to ${params.recipient}` : '';
+  const via = params.via ? ` ${params.via}` : ' on your behalf';
+  const body = `An automatic ${params.channel}${who} was just sent${via}.`;
   const promises: Promise<unknown>[] = [];
 
   // Durable in-app record — NOT channel-gated: every autonomous send must
@@ -408,7 +412,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
       spaceId: params.spaceId,
       type: 'agent_send',
       title: 'Chippi sent a message',
-      body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+      body,
       href: `/s/${info.spaceSlug}`,
     }),
   );
@@ -417,7 +421,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
     promises.push(
       sendPushToSpace(params.spaceId, {
         title: 'Chippi sent a message',
-        body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+        body,
         url: `/s/${info.spaceSlug}`,
       }).catch((err) => logger.error('[notify] auto-send push failed', { spaceId: params.spaceId }, err)),
     );
@@ -429,7 +433,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
         // The realtor's own notification phone — internal, not consumer outreach.
         audience: 'internal',
         to: info.ownerPhone,
-        body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}.`,
+        body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}${params.via ? ` ${params.via}` : ''}.`,
       }).catch((err) => logger.error('[notify] auto-send SMS failed', { spaceId: params.spaceId }, err)),
     );
   }

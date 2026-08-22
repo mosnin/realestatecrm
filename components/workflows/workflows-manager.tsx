@@ -351,8 +351,7 @@ export function WorkflowsManager() {
   const [triggerFilter, setTriggerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'created' | 'name' | 'lastRun' | 'modified'>('created');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const importFileRef = useRef<HTMLInputElement>(null);
+  const [, setBulkBusy] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'workflows' | 'history'>('workflows');
   const [globalRuns, setGlobalRuns] = useState<GlobalRun[] | null>(null);
@@ -361,13 +360,6 @@ export function WorkflowsManager() {
   const [globalRunsStatusFilter, setGlobalRunsStatusFilter] = useState<'all' | 'completed' | 'failed'>('all');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  /** Unique trigger types present in the current workflow list for the filter dropdown. */
-  const triggerTypes = useMemo(() => {
-    const seen = new Set<string>();
-    workflows.forEach((w) => seen.add(w.trigger.type));
-    return Array.from(seen);
-  }, [workflows]);
 
   const filteredWorkflows = useMemo(() => {
     let list = workflows;
@@ -859,240 +851,54 @@ export function WorkflowsManager() {
           <TemplatePicker onPick={pickTemplate} onCancel={closeComposer} />
         </div>
       ) : workflows.length > 0 ? (
-        // Browse chrome reads at People's column width; only the builder and
-        // canvas (working surfaces) span the full 1500px frame.
-        <div className="mx-auto w-full max-w-5xl space-y-2">
-          {/* Tab bar — Workflows / History (People's tablist treatment) */}
-          <div role="tablist" aria-label="Automations view" className="flex items-center gap-5 border-b border-border/70 -mt-1">
-            {(
-              [
-                { value: 'workflows' as const, label: 'Workflows', count: workflows.length },
-                { value: 'history' as const, label: 'History', count: null },
-              ]
-            ).map((tab) => {
-              const active = activeTab === tab.value;
-              return (
-                <button
-                  key={tab.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    switchTab(tab.value);
-                    setActionError('');
-                  }}
-                  className={cn(
-                    'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
-                    active
-                      ? 'text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground font-normal',
-                  )}
-                >
-                  {tab.label}
-                  {tab.count !== null && (
-                    <span
-                      className={cn(
-                        'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
-                        active
-                          ? 'bg-foreground/[0.06] text-foreground/70'
-                          : 'bg-foreground/[0.04] text-muted-foreground',
-                      )}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                  {active && (
-                    <span
-                      aria-hidden
-                      className="absolute left-0 right-0 -bottom-px h-[2px] rounded-full bg-foreground"
-                    />
-                  )}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setShowShortcuts(true)}
-              title="Keyboard shortcuts (?)"
-              className="ml-auto mb-2.5 flex h-5 w-5 items-center justify-center rounded border border-border/60 text-[10px] font-semibold text-muted-foreground/60 hover:border-border hover:text-foreground transition-colors"
-            >
-              ?
-            </button>
-          </div>
-
-          {activeTab === 'workflows' && (<>
-          {/* Status chip strip — People's leadTypeChips pattern */}
-          <div role="tablist" aria-label="Filter workflows" className="flex items-center gap-5 border-b border-border/70 -mt-1">
-            {(
-              [
-                { value: 'all' as const, label: 'All', count: workflows.length },
-                { value: 'on' as const, label: 'On', count: workflows.filter((w) => w.enabled).length },
-                { value: 'off' as const, label: 'Off', count: workflows.filter((w) => !w.enabled).length },
-                { value: 'failed' as const, label: 'Failed', count: workflows.filter((w) => w.lastRunStatus === 'error').length },
-              ]
-            ).map((chip) => {
-              const active = statusFilter === chip.value;
-              return (
-                <button
-                  key={chip.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setStatusFilter(chip.value)}
-                  className={cn(
-                    'relative inline-flex items-center gap-1.5 pb-2.5 pt-0.5 text-sm transition-colors duration-150 ease-out -mb-px',
-                    active
-                      ? chip.value === 'failed'
-                        ? 'text-rose-600 dark:text-rose-400 font-medium'
-                        : 'text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground font-normal',
-                  )}
-                >
-                  {chip.label}
-                  <span
-                    className={cn(
-                      'tabular-nums text-[11px] rounded-full px-1.5 py-0.5 transition-colors duration-150 ease-out',
-                      active
-                        ? chip.value === 'failed'
-                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                          : 'bg-foreground/[0.06] text-foreground/70'
-                        : 'bg-foreground/[0.04] text-muted-foreground',
-                    )}
-                  >
-                    {chip.count}
-                  </span>
-                  {active && (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'absolute left-0 right-0 -bottom-px h-[2px] rounded-full',
-                        chip.value === 'failed' ? 'bg-rose-500' : 'bg-foreground',
-                      )}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Filter row — search + dropdowns + actions, mirroring People's layout */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 sm:flex-initial min-w-[160px]">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[160px] flex-1">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <Input
                 ref={searchInputRef}
-                placeholder={`Search ${workflows.length} workflow${workflows.length === 1 ? '' : 's'}…`}
-                className="pl-9 h-9 w-full sm:w-64 bg-background border-border/70"
+                placeholder="Search"
+                className="h-9 w-full bg-background pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Trigger type filter — only shown when 2+ types exist */}
-              {triggerTypes.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
-                    >
-                      <span className="text-muted-foreground">Trigger:</span>
-                      {triggerFilter === 'all' ? 'All triggers' : triggerFilter.replace(/_/g, ' ')}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem
-                      onSelect={() => setTriggerFilter('all')}
-                      className={cn(triggerFilter === 'all' && 'font-semibold')}
-                    >
-                      All triggers
-                    </DropdownMenuItem>
-                    {triggerTypes.map((t) => (
-                      <DropdownMenuItem
-                        key={t}
-                        onSelect={() => setTriggerFilter(t)}
-                        className={cn('capitalize', triggerFilter === t && 'font-semibold')}
-                      >
-                        {t.replace(/_/g, ' ')}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-
-              {/* Sort */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border/70 bg-background text-xs font-medium text-foreground hover:bg-foreground/[0.04] transition-colors"
-                  >
-                    <span className="text-muted-foreground">Sort:</span>
-                    {WORKFLOW_SORT_LABELS[sortBy]}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  {(Object.keys(WORKFLOW_SORT_LABELS) as WorkflowSortKey[]).map((key) => (
-                    <DropdownMenuItem
-                      key={key}
-                      onSelect={() => setSortBy(key)}
-                      className={cn(sortBy === key && 'font-semibold')}
-                    >
-                      {WORKFLOW_SORT_LABELS[key]}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setComposer('templates');
-                  setActionError('');
-                }}
-              >
-                <Sparkles size={14} />
-                Templates
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => importFileRef.current?.click()}
-                title="Import a workflow from a JSON file"
-              >
-                <Upload size={14} />
-                Import
-              </Button>
-              <input
-                ref={importFileRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void importWorkflowFile(file);
-                  e.target.value = '';
-                }}
-              />
-              <Button size="sm" onClick={openBlank}>
-                <Plus size={14} />
-                New workflow
-              </Button>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {(['all', 'on', 'off'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setStatusFilter(value)}
+                  className={cn(
+                    'rounded-full px-2.5 py-1 capitalize',
+                    statusFilter === value
+                      ? 'bg-foreground text-background'
+                      : 'hover:bg-foreground/[0.05] hover:text-foreground',
+                  )}
+                >
+                  {value}
+                </button>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={() => switchTab(activeTab === 'history' ? 'workflows' : 'history')}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {activeTab === 'history' ? 'Back to list' : 'History'}
+            </button>
+            <Button size="sm" onClick={openBlank}>
+              New
+            </Button>
           </div>
-          </>)}
         </div>
       ) : null}
 
       {workflows.length === 0 && composer === null ? (
-        <div className="mx-auto w-full max-w-5xl">
-          <TemplateGallery onPick={pickTemplate} onScratch={openBlank} />
-        </div>
+        <StarterList onPick={pickTemplate} onScratch={openBlank} />
       ) : workflows.length === 0 ? null : activeTab === 'history' ? (
         <div className="mx-auto w-full max-w-5xl">
           <GlobalHistoryPanel
@@ -1144,28 +950,7 @@ export function WorkflowsManager() {
 
           {/* Browse column — list + selection chrome at People's width; the
               editing builder above intentionally spans the full frame. */}
-          <div className="mx-auto w-full max-w-5xl space-y-6">
-          {/* Select-all — quiet text affordance, replaces the old table-header checkbox */}
-          {filteredWorkflows.length > 0 && (
-            <div className="flex items-center justify-end px-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (filteredWorkflows.every((w) => selectedIds.has(w.id))) {
-                    setSelectedIds(new Set());
-                  } else {
-                    setSelectedIds(new Set(filteredWorkflows.map((w) => w.id)));
-                  }
-                }}
-                className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
-              >
-                {filteredWorkflows.every((w) => selectedIds.has(w.id)) ? 'Deselect all' : 'Select all'}
-              </button>
-            </div>
-          )}
-
-          {/* Workflow list — People's divide-y row vocabulary: no icon chips, no
-              gradients, no colored accents. The flow reads as words. */}
+          <div className="space-y-6">
           <>
             {/* Rows */}
             {filteredWorkflows.length > 0 ? (
@@ -1179,13 +964,8 @@ export function WorkflowsManager() {
                     busy={busyId === workflow.id}
                     testing={testingId === workflow.id}
                     testResult={testResults[workflow.id]}
-                    selected={selectedIds.has(workflow.id)}
-                    onSelect={(v) => setSelectedIds((prev) => {
-                      const next = new Set(prev);
-                      if (v) next.add(workflow.id);
-                      else next.delete(workflow.id);
-                      return next;
-                    })}
+                    selected={false}
+                    onSelect={() => undefined}
                     onEdit={() => {
                       setEditingId(workflow.id);
                       setComposer(null);
@@ -1233,47 +1013,6 @@ export function WorkflowsManager() {
             )}
           </>
 
-          {/* Bulk action bar — appears when items are selected */}
-          {selectedIds.size > 0 && (
-            <div className="sticky bottom-4 z-20 mt-3 flex items-center gap-2 rounded-xl border border-border/70 bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur-sm">
-              <span className="text-[12.5px] font-medium text-foreground">
-                {selectedIds.size} selected
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear
-              </button>
-              <div className="mx-2 h-4 w-px bg-border/60" />
-              <button
-                type="button"
-                disabled={bulkBusy}
-                onClick={() => bulkSetEnabled(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-foreground/[0.06] px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-foreground/[0.1] disabled:opacity-50 transition-colors"
-              >
-                Turn on
-              </button>
-              <button
-                type="button"
-                disabled={bulkBusy}
-                onClick={() => bulkSetEnabled(false)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-[12px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground disabled:opacity-50 transition-colors"
-              >
-                Pause
-              </button>
-              <button
-                type="button"
-                disabled={bulkBusy}
-                onClick={bulkDelete}
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-600 hover:bg-rose-100 disabled:opacity-50 transition-colors dark:bg-rose-950/40 dark:text-rose-400 dark:hover:bg-rose-950/60"
-              >
-                Delete
-              </button>
-              {bulkBusy && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
-            </div>
-          )}
           </div>
         </>
       )}
@@ -1521,8 +1260,8 @@ function WorkflowRow({
   busy,
   testing,
   testResult,
-  selected,
-  onSelect,
+  selected: _selected,
+  onSelect: _onSelect,
   onEdit,
   onCancelEdit: _onCancelEdit,
   onSave: _onSave,
@@ -1617,19 +1356,6 @@ function WorkflowRow({
       )}
     >
     <div className="flex items-start gap-3">
-      {/* Checkbox — quiet, always present, mirrors People's left-edge affordances */}
-      <div className="flex items-center pt-0.5 flex-shrink-0">
-        <input
-          type="checkbox"
-          aria-label={`Select ${workflow.name}`}
-          checked={selected}
-          onChange={(e) => onSelect(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-border accent-foreground cursor-pointer"
-        />
-      </div>
-
-      {/* Name + pills + secondary line — flex-1 (no icon chip: the card leads
-          with the name, and the flow below reads as words) */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
           {renamingName !== null ? (
@@ -1702,8 +1428,6 @@ function WorkflowRow({
             <WebhookUrlChip workflowId={workflow.id} />
           </div>
         )}
-        <WorkflowFlowLine trigger={workflow.trigger} actions={workflow.actions} />
-
         {/* Run health + counts — secondary metadata line, People's realtor-byline slot */}
         <div className="mt-0.5 flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5">
@@ -2950,6 +2674,48 @@ function TemplatePreviewModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StarterList({
+  onPick,
+  onScratch,
+}: {
+  onPick: (state: WorkflowFormState) => void;
+  onScratch: () => void;
+}) {
+  const starters = WORKFLOW_TEMPLATES.filter((t) => t.popular).slice(0, 5);
+  return (
+    <div className="space-y-5">
+      <div className="space-y-1">
+        <p className="text-[15px] font-medium text-foreground">Start with one you already do by hand.</p>
+        <p className={CAPTION}>Pick a starter, read the steps, then turn it on. Or start blank.</p>
+      </div>
+      <ul className="divide-y divide-border/60">
+        {starters.map((template) => (
+          <li key={template.id}>
+            <button
+              type="button"
+              onClick={() => onPick(cloneTemplateState(template))}
+              className="flex w-full items-start justify-between gap-4 py-3 text-left hover:bg-muted/30 -mx-2 px-2 rounded-md"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">{template.name}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{template.description}</span>
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">Use</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={onScratch}
+        className="text-xs text-muted-foreground hover:text-foreground"
+      >
+        Start blank
+      </button>
     </div>
   );
 }
