@@ -70,6 +70,7 @@ describe('resolveBillingAccount — non-redeemer billing is untouched', () => {
 
     const ctx = await resolveBillingAccount('sp1');
     expect(ctx.isComped).toBe(false);
+    expect(ctx.isUnlimited).toBe(false);
     expect(ctx.plan).toBe('free');
     expect(ctx.account).toEqual({ type: 'space', id: 'sp1' });
     expect(ctx.subscriptionStatus).toBe('inactive');
@@ -87,6 +88,7 @@ describe('resolveBillingAccount — non-redeemer billing is untouched', () => {
 
     const ctx = await resolveBillingAccount('sp2');
     expect(ctx.isComped).toBe(false);
+    expect(ctx.isUnlimited).toBe(false);
     expect(ctx.plan).toBe('solo');
     expect(ctx.subscriptionStatus).toBe('active');
   });

@@ -21,7 +21,11 @@ vi.mock('@/lib/supabase', () => ({
       chain.eq = vi.fn(() => chain);
       chain.is = vi.fn(() => chain);
       chain.or = vi.fn(() => chain);
+      chain.contains = vi.fn(() => chain);
       chain.gt = vi.fn(() => chain);
+      chain.gte = vi.fn(() => chain);
+      chain.lt = vi.fn(() => chain);
+      chain.lte = vi.fn(() => chain);
       chain.order = vi.fn((column: string, options: { ascending: boolean }) => {
         orderCalls.push([column, options]);
         return chain;

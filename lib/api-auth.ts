@@ -13,6 +13,7 @@ import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
+import { isUserPlatformAdmin } from '@/lib/permissions';
 import type { Space } from '@/lib/types';
 
 /**
@@ -68,15 +69,9 @@ export async function requireActiveSubscription(
   const status = space.stripeSubscriptionStatus ?? 'inactive';
   if (hasCurrentSubscription(status, space.stripePeriodEnd)) return null;
 
-  // Check if user is a platform admin (admins bypass paywall)
-  if (userId) {
-    const { data: userRow } = await supabase
-      .from('User')
-      .select('platformRole')
-      .eq('clerkId', userId)
-      .maybeSingle();
-    if (userRow?.platformRole === 'admin') return null;
-  }
+  // Application owner / platform admin: unlimited plan access. Feature
+  // bypass only — this does not open another tenant's workspace.
+  if (userId && (await isUserPlatformAdmin(userId))) return null;
 
   return NextResponse.json(
     { error: 'Active subscription required' },
