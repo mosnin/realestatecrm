@@ -274,7 +274,7 @@ export const ToolGroup = memo(function ToolGroup({
     listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [isPending, visibleCount]);
 
-  if (isInterrupted) {
+  if (isInterrupted && !hasNestedTools) {
     return (
       <div
         className={cn(
@@ -300,7 +300,11 @@ export const ToolGroup = memo(function ToolGroup({
           ? `${description.slice(0, 57)}...`
           : description
         : "";
-  const headerLabel = isPending ? shimmerLabel ?? completeLabel : completeLabel;
+  const headerLabel = isPending
+    ? shimmerLabel ?? completeLabel
+    : isInterrupted
+      ? interruptedLabel
+      : completeLabel;
   const showElapsedDisplay = showElapsed && elapsedTime;
   const maskThreshold = 4;
   const streamHeight = Math.max(1, maxVisibleTools) * 28;

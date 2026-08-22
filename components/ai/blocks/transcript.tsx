@@ -1,12 +1,12 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { MessageBlock, ToolCallBlock } from '@/lib/ai-tools/blocks';
+import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { TextBlockView } from './text-block-view';
 import { AttachmentBlockView } from './attachment-block-view';
-import { ToolCallBlockView } from './tool-call-block-view';
 import { ToolGroupBlockView } from './tool-group-block-view';
-import { SubagentBlockView, isSubagentTool } from './subagent-block-view';
+import { SubagentBlockView } from './subagent-block-view';
+import { groupTranscriptItems } from './group-transcript-items';
 import { SubagentTaskBlockView } from './subagent-task-block-view';
 import { WorkSessionBlockView } from './work-session-block-view';
 import { ReasoningBlockView } from './reasoning-block-view';
@@ -106,84 +106,10 @@ export function Transcript({
     }
   }
 
-  // Group consecutive non-subagent tool_call blocks so 2+ collapse into one
-  // ToolGroup header (Claude / ChatGPT pattern). Single-tool runs keep the
-  // existing per-block view — its inline rich-data cards (contacts / deals /
-  // tours / properties) read better solo than buried under a collapsed group.
-  //
-  // Subagents (analyze_pipeline, research_person, planner) break the run and
-  // get their own one-line "Completed Subagent · <task>" row. They're
-  // conceptually distinct from regular tools so they're never grouped.
-  type RenderItem =
-    | { kind: 'text'; block: Extract<MessageBlock, { type: 'text' }>; originalIndex: number }
-    | { kind: 'permission'; block: Extract<MessageBlock, { type: 'permission' }> }
-    | { kind: 'reasoning'; block: Extract<MessageBlock, { type: 'reasoning' }> }
-    | { kind: 'tool-single'; block: ToolCallBlock }
-    | { kind: 'tool-group'; blocks: ToolCallBlock[]; groupId: string }
-    | { kind: 'subagent'; block: ToolCallBlock }
-    | { kind: 'subagent-task'; block: Extract<MessageBlock, { type: 'subagent_task' }> }
-    | { kind: 'work-session'; block: Extract<MessageBlock, { type: 'work_session' }> }
-    | {
-        kind: 'attachments';
-        blocks: Array<Extract<MessageBlock, { type: 'attachment' }>>;
-        groupId: string;
-      };
-
-  const items: RenderItem[] = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i];
-    if (block.type === 'reasoning') {
-      items.push({ kind: 'reasoning', block });
-      continue;
-    }
-    if (block.type === 'attachment') {
-      // Coalesce consecutive attachments into one wrapped chips row, matching
-      // the composer's layout (chips above the message text).
-      const run: Array<Extract<MessageBlock, { type: 'attachment' }>> = [block];
-      while (i + 1 < blocks.length && blocks[i + 1].type === 'attachment') {
-        run.push(blocks[i + 1] as Extract<MessageBlock, { type: 'attachment' }>);
-        i++;
-      }
-      items.push({ kind: 'attachments', blocks: run, groupId: `att-${run[0].id}` });
-      continue;
-    }
-    if (block.type === 'subagent_task') {
-      items.push({ kind: 'subagent-task', block });
-      continue;
-    }
-    if (block.type === 'work_session') {
-      items.push({ kind: 'work-session', block });
-      continue;
-    }
-    if (block.type === 'tool_call') {
-      if (isSubagentTool(block.name)) {
-        items.push({ kind: 'subagent', block });
-        continue;
-      }
-      const run: ToolCallBlock[] = [block];
-      while (
-        i + 1 < blocks.length &&
-        blocks[i + 1].type === 'tool_call' &&
-        !isSubagentTool((blocks[i + 1] as ToolCallBlock).name)
-      ) {
-        run.push(blocks[i + 1] as ToolCallBlock);
-        i++;
-      }
-      if (run.length === 1) {
-        items.push({ kind: 'tool-single', block: run[0] });
-      } else {
-        items.push({
-          kind: 'tool-group',
-          blocks: run,
-          groupId: `group-${run[0].callId}`,
-        });
-      }
-    } else if (block.type === 'text') {
-      items.push({ kind: 'text', block, originalIndex: i });
-    } else if (block.type === 'permission') {
-      items.push({ kind: 'permission', block });
-    }
-  }
+  // Every non-subagent tool in this turn collapses into one dropdown,
+  // including a single call and retries split by intervening text. Subagents
+  // stay on their own row. Workbench cards without an opener are omitted.
+  const items = groupTranscriptItems(blocks, { hideWorkbench: !onOpenWorkbench });
 
   return (
     <div className={cn('space-y-2.5', className)}>
@@ -200,16 +126,6 @@ export function Transcript({
                 announce={announceText}
               />
             );
-          case 'tool-single':
-            return (
-              <ToolCallBlockView
-                key={`tool-${item.block.callId}`}
-                block={item.block}
-                live={liveCallIds?.has(item.block.callId)}
-                onUserIntent={onUserIntent}
-                onOpenWorkbench={onOpenWorkbench}
-              />
-            );
           case 'tool-group':
             return (
               <ToolGroupBlockView
@@ -217,6 +133,7 @@ export function Transcript({
                 blocks={item.blocks}
                 liveCallIds={liveCallIds}
                 onUserIntent={onUserIntent}
+                onOpenWorkbench={onOpenWorkbench}
               />
             );
           case 'subagent':

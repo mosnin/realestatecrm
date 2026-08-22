@@ -39,6 +39,7 @@ import {
 } from '@/lib/ai-tools/tools/delegate-task';
 import { extractApprovals, serializeRunState, type ToolResultSink } from '@/lib/ai-tools/sdk-bridge';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
+import { withApprovalDisplayArgs } from '@/lib/ai-tools/permission-enrich';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { logToolCallStart, logToolCallComplete, logToolCallError } from '@/lib/agent/tool-call-logger';
 import { compactContext, estimateContextChars } from '@/lib/agent/compaction';
@@ -926,7 +927,16 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             });
           }
           const mapped = mapSdkEvent(value as SdkStreamEventLike, ALL_TOOLS);
-          if (mapped) pushEvent(mapped);
+          if (mapped?.type === 'permission_required') {
+            mapped.args = await withApprovalDisplayArgs(
+              input.ctx.space.id,
+              mapped.name,
+              mapped.args,
+            );
+            pushEvent(mapped);
+          } else if (mapped) {
+            pushEvent(mapped);
+          }
         }
         // Stopped: skip the completed/usage/pause bookkeeping (the SDK run
         // was aborted mid-flight; its usage aggregate is unreliable), tell
@@ -993,19 +1003,31 @@ function buildSseStream(input: BuildStreamInput): ReadableStream<Uint8Array> {
             );
             const first = approvals[0];
             if (first) {
+              const args = await withApprovalDisplayArgs(
+                input.ctx.space.id,
+                first.toolName,
+                asRecord(first.arguments),
+              );
+              const otherPendingCalls = await Promise.all(
+                approvals.slice(1).map(async (a) => ({
+                  callId: a.callId,
+                  name: a.toolName,
+                  args: await withApprovalDisplayArgs(
+                    input.ctx.space.id,
+                    a.toolName,
+                    asRecord(a.arguments),
+                  ),
+                  summary: a.summary,
+                })),
+              );
               pushEvent({
                 type: 'permission_required',
                 requestId: pausedRunId,
                 callId: first.callId,
                 name: first.toolName,
-                args: asRecord(first.arguments),
+                args,
                 summary: first.summary,
-                otherPendingCalls: approvals.slice(1).map((a) => ({
-                  callId: a.callId,
-                  name: a.toolName,
-                  args: asRecord(a.arguments),
-                  summary: a.summary,
-                })),
+                otherPendingCalls,
               });
             }
             pendingTurnCompleteReason = 'paused';

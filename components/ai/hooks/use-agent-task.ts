@@ -338,6 +338,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     ((text: string, attachmentIds?: string[], mode?: ChatMode, attachmentsMeta?: AttachmentMeta[]) => Promise<boolean>) | null
   >(null);
   const [pendingApproval, setPendingApproval] = useState<PermissionPromptData | null>(null);
+  const pendingApprovalRef = useRef<PermissionPromptData | null>(null);
+  pendingApprovalRef.current = pendingApproval;
   const [liveCallIds, setLiveCallIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [currentAction, setCurrentAction] = useState<string | null>(null);
@@ -1292,7 +1294,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           const accepted = payload.turn;
           unacceptedSubmissionRef.current = null;
           lastAcceptedTurnRef.current = { turn: accepted, attachmentsMeta };
-          if (isStreamingRef.current || activeTurnIdRef.current) {
+          if (isStreamingRef.current || activeTurnIdRef.current || pendingApprovalRef.current) {
             await loadDurableTurns(convId);
           } else {
             beginAcceptedTurn({
@@ -1314,7 +1316,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
       // Broker compatibility queue. It remains per-tab until the separate
       // BrokerConversation schema receives its own durable ledger.
-      if (isStreamingRef.current) {
+      if (isStreamingRef.current || pendingApprovalRef.current) {
         const localTurn: PendingTurnMessage = {
           id: newId(),
           clientRequestId: newId(),

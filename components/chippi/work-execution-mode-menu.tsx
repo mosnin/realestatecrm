@@ -1,9 +1,10 @@
 'use client';
 
-import { Check, Settings2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { workExecutionChipLabel } from '@/lib/chippi/chat-ux';
 import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
 
 const OPTIONS: Array<{
@@ -38,13 +39,13 @@ export function WorkExecutionModeMenu({
         <Button
           type="button"
           variant="outline"
-          size="icon-sm"
+          size="sm"
           disabled={disabled}
-          aria-label="Work execution settings"
-          title="Work execution settings"
-          className="rounded-full border-border/60 bg-background/90 text-muted-foreground shadow-[0_1px_3px_rgba(0,0,0,0.08)] backdrop-blur-md hover:bg-background hover:text-foreground"
+          aria-label={`Work execution: ${workExecutionChipLabel(value)}`}
+          title="How Chippi works"
+          className="h-8 rounded-full border-border/60 bg-background/90 px-2.5 text-[11px] font-medium text-foreground/80 shadow-[0_1px_3px_rgba(0,0,0,0.08)] backdrop-blur-md hover:bg-background hover:text-foreground"
         >
-          <Settings2 className="size-3.5" />
+          {workExecutionChipLabel(value)}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="center" sideOffset={8} className="w-[296px] rounded-2xl p-2">

@@ -30,6 +30,7 @@ import {
   storeChildPausedResult,
   waitForChildApprovalDecision,
 } from './delegate-child-pause';
+import { withApprovalDisplayArgs } from './permission-enrich';
 
 /** Child budget. Isolated context makes this affordable; the parent loop
  *  stays at CHAT/WORK_MAX_TURNS. */
@@ -221,19 +222,31 @@ export async function runDelegatedChildTurn(input: {
 
       const first = persisted.approvals[0];
       input.ctx.onProgress?.('Specialist waiting for your approval');
+      const args = await withApprovalDisplayArgs(
+        input.ctx.space.id,
+        first.toolName,
+        asRecord(first.arguments),
+      );
+      const otherPendingCalls = await Promise.all(
+        persisted.approvals.slice(1).map(async (approval) => ({
+          callId: approval.callId,
+          name: approval.toolName,
+          args: await withApprovalDisplayArgs(
+            input.ctx.space.id,
+            approval.toolName,
+            asRecord(approval.arguments),
+          ),
+          summary: approval.summary,
+        })),
+      );
       input.ctx.onPermissionRequired?.({
         requestId: persisted.pausedRunId,
         callId: first.callId,
         name: first.toolName,
-        args: asRecord(first.arguments),
+        args,
         summary: first.summary,
         inline: true,
-        otherPendingCalls: persisted.approvals.slice(1).map((approval) => ({
-          callId: approval.callId,
-          name: approval.toolName,
-          args: asRecord(approval.arguments),
-          summary: approval.summary,
-        })),
+        otherPendingCalls,
       });
 
       const waited = await waitForChildApprovalDecision({

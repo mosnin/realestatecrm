@@ -14,6 +14,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ToolApproval, type ToolApprovalStatus } from '@/components/ai/agent-status';
+import {
+  looksTechnical,
+  permissionArgFields,
+  permissionPromptDescription,
+  permissionPromptTitle,
+} from '@/lib/ai-tools/permission-copy';
 
 /** SMS one-segment budget (GSM-7). Long-form is 153/segment after the first. */
 const SMS_SOFT_LIMIT = 160;
@@ -53,7 +59,11 @@ export interface PermissionPromptData {
 function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactElement | null {
   const a = prompt.args as Record<string, unknown>;
   if (prompt.name === 'send_email') {
-    const to = typeof a.toEmail === 'string' ? a.toEmail : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const to = typeof a.toEmail === 'string' && !looksTechnical(a.toEmail)
+      ? a.toEmail
+      : typeof a.contactId === 'string'
+        ? 'Selected contact'
+        : '—';
     const subject = typeof a.subject === 'string' ? a.subject : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
@@ -73,7 +83,11 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
     );
   }
   if (prompt.name === 'send_sms') {
-    const to = typeof a.toPhone === 'string' ? a.toPhone : typeof a.contactId === 'string' ? `contact ${a.contactId}` : '—';
+    const to = typeof a.toPhone === 'string' && !looksTechnical(a.toPhone)
+      ? a.toPhone
+      : typeof a.contactId === 'string'
+        ? 'Selected contact'
+        : '—';
     const body = typeof a.body === 'string' ? a.body : '';
     return (
       <div className="mt-2.5 space-y-1.5 bg-transparent py-1 text-[12px]">
@@ -87,7 +101,18 @@ function PrettyArgs({ prompt }: { prompt: PermissionPromptData }): React.ReactEl
       </div>
     );
   }
-  return null;
+  const fields = permissionArgFields(prompt.name, prompt.args);
+  if (fields.length === 0) return null;
+  return (
+    <div className="mt-2.5 space-y-1.5 bg-transparent py-1 text-[12px]">
+      {fields.map((field) => (
+        <div key={field.label}>
+          <span className="font-medium text-muted-foreground">{field.label}:</span>{' '}
+          <span className="whitespace-pre-wrap text-foreground/90">{field.value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -116,15 +141,15 @@ function InlineComposeCard({
 }) {
   const to =
     kind === 'email'
-      ? typeof args.toEmail === 'string'
+      ? typeof args.toEmail === 'string' && !looksTechnical(args.toEmail)
         ? args.toEmail
         : typeof args.contactId === 'string'
-          ? `Contact ${String(args.contactId).slice(0, 8)}`
+          ? 'Selected contact'
           : '—'
-      : typeof args.toPhone === 'string'
+      : typeof args.toPhone === 'string' && !looksTechnical(args.toPhone)
         ? args.toPhone
         : typeof args.contactId === 'string'
-          ? `Contact ${String(args.contactId).slice(0, 8)}`
+          ? 'Selected contact'
           : '—';
 
   const smsLen = body.length;
@@ -365,17 +390,17 @@ export function PermissionPromptView({
     </div>
   ) : (
     PrettyArgs({ prompt }) ?? (
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words border-y border-border/40 bg-transparent py-2 font-mono text-[11px] text-foreground/80">
-        {JSON.stringify(prompt.args, null, 2)}
-      </pre>
+      <p className="border-y border-border/40 bg-transparent py-2 text-[12px] leading-relaxed text-foreground/85">
+        {prompt.summary}
+      </p>
     )
   );
 
   return (
     <ToolApproval
       tool={prompt.name}
-      title={isSendEmail ? 'Allow this email to send?' : isSendSms ? 'Allow this text to send?' : 'Allow this tool to run?'}
-      description={prompt.summary}
+      title={permissionPromptTitle(prompt.name, prompt.summary, prompt.args)}
+      description={permissionPromptDescription(prompt.summary)}
       status={approvalStatus}
       defaultOpen
       actions={
@@ -421,7 +446,7 @@ export function PermissionPromptView({
             className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting === 'deny' ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-            Deny
+            {isSendTool ? 'Deny' : "Don't"}
           </button>
           {!isSendTool && !requiresExactApproval ? (
             <button
@@ -447,7 +472,7 @@ export function PermissionPromptView({
             {prompt.otherPendingCalls!.map((call) => (
               <div key={call.callId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock size={10} className="shrink-0" />
-                <span>{call.name}</span>
+                <span>{permissionPromptTitle(call.name, call.summary, call.args)}</span>
               </div>
             ))}
           </div>
