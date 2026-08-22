@@ -19,7 +19,7 @@ export default async function VerifyPage({
   return (
     <AuthShell
       title="Verify your email"
-      subtitle="We sent a 6-digit code to your inbox. Enter it to finish."
+      subtitle="We sent a 6-digit code to your inbox. Enter it with your password to finish."
     >
       <VerifyForm initialEmail={initialEmail} />
     </AuthShell>

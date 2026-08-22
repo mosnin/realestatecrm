@@ -12,6 +12,7 @@ import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
 import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
+import { escapeLike } from '@/lib/escape-like';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
   let contactId: string | null = null;
   const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
-    .ilike('email', guestEmail.trim())
+    .ilike('email', escapeLike(guestEmail.trim()))
     .maybeSingle();
 
   if (contactRow) {

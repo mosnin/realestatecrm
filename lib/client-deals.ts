@@ -43,6 +43,7 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { escapeLike } from '@/lib/escape-like';
 import type { DealStageKind } from '@/lib/types';
 import { unscoped } from '@/lib/supabase-guard';
 
@@ -102,14 +103,6 @@ export interface ClientDealDetail extends ClientDealSummary {
 }
 
 /* ─── Internal helpers ──────────────────────────────────────────────────────*/
-
-/** Escape LIKE/ILIKE metacharacters so a full email matches literally (still
- *  case-insensitively). `%` and `_` are legal in email local parts; without
- *  this a client registered as `%@gmail.com` would match every gmail Contact.
- *  Mirrors the guard in lib/client-portal-data.ts. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
 
 /** Canonical pipeline order. Used only as a tiebreaker when stages share a
  *  position (shouldn't happen) and to map a stage kind → client progress. The

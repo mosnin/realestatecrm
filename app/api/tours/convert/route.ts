@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { tenantTable } from '@/lib/tenant-db';
+import { escapeLike } from '@/lib/escape-like';
 
 /**
  * Convert a completed tour into a deal.
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     // Try to find by email
     const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .ilike('email', tour.guestEmail)
+      .ilike('email', escapeLike(String(tour.guestEmail ?? '')))
       .maybeSingle();
 
     if (contactRow) {
