@@ -9,19 +9,16 @@ work is Inngest (crons in `lib/inngest/cron-functions.ts` + events in
 
 ## Product non-negotiables (do not regress these)
 
-1. **Chat must feel alive.** The direct path streams token-by-token behind an
-   escalation hold-back window (`lib/chat/direct-stream.ts`), and both paths
-   emit `status` SSE events rendered as the thinking indicator's action line
-   (`components/ai/hooks/use-agent-task.ts` → `currentAction`,
-   `components/ai/blocks/thinking-indicator.tsx`). Never reintroduce
-   buffer-the-whole-reply behavior; never leave multi-second gaps with no
-   status/tool/reasoning signal on the wire.
-2. **Turns survive the browser leaving.** Stream `cancel()` handlers must NOT
-   abort the turn: all three chat paths (direct, TS SDK, Modal proxy) keep
-   running after disconnect, persist the assistant message, and register an
-   `after()` keep-alive so Vercel doesn't suspend the function. If you touch
-   these paths, preserve that contract and its bounds (LLM client timeout,
-   SDK maxTurns, idle watchdog, loop-guard).
+1. **One assistant turn produces one visible answer.** Stream the final answer,
+   and keep a compact activity disclosure for tools when useful. Internal
+   retries, tool schemas, parameter corrections, and progress narration must
+   never become separate transcript messages or repeated user-facing text.
+2. **The user controls every turn.** Stop must cancel the exact active turn and
+   restore the composer; Steer must replace direction without duplicating the
+   queued message; edit and remove must work while a message is pending. Work
+   may continue after navigation only when the active state remains visible and
+   stoppable. A stale, failed, or invisible turn must never hold the composer or
+   the queue.
 3. **Tenant scoping.** Every Supabase query in request paths must scope by
    `spaceId` / `brokerageId` derived from the authenticated context. The
    service-role key bypasses RLS — the `.eq(...)` IS the security boundary.

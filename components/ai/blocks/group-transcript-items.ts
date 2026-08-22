@@ -25,6 +25,22 @@ export function groupTranscriptItems(
   blocks: MessageBlock[],
   opts: { hideWorkbench?: boolean } = {},
 ): TranscriptRenderItem[] {
+  // Tool-adjacent text before the final tool call is internal progress, not a
+  // user-facing answer. Models sometimes narrate retries ("let me try again")
+  // between failed calls; rendering each fragment made one assistant turn look
+  // like several repetitive messages. Keep the compact tool disclosure, but
+  // only render text produced after the final ordinary tool call.
+  let finalOrdinaryToolIndex = -1;
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    if (
+      block.type === 'tool_call'
+      && !isSubagentTool(block.name)
+      && !(opts.hideWorkbench && block.display === 'workbench')
+    ) {
+      finalOrdinaryToolIndex = i;
+    }
+  }
   const groupedTools = blocks.filter((block): block is ToolCallBlock => {
     if (block.type !== 'tool_call') return false;
     if (isSubagentTool(block.name)) return false;
@@ -75,6 +91,7 @@ export function groupTranscriptItems(
       continue;
     }
     if (block.type === 'text') {
+      if (finalOrdinaryToolIndex >= 0 && i < finalOrdinaryToolIndex) continue;
       items.push({ kind: 'text', block, originalIndex: i });
     } else if (block.type === 'permission') {
       items.push({ kind: 'permission', block });

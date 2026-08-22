@@ -12,6 +12,7 @@ import { claimConversationMode } from '@/lib/chat/conversation-mode';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {
   enqueueConversationTurn,
+  recoverExpiredConversationTurns,
   type ConversationTurnAttachment,
   type ConversationTurnRecord,
 } from '@/lib/chat/turn-control';
@@ -65,6 +66,12 @@ export async function GET(req: NextRequest) {
   }
   const bound = await callerConversation(auth.userId, conversationId);
   if (!bound) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  // Reconcile an already-expired running/approval lease before reporting the
+  // queue. This uses the existing token-fenced database authority; without it,
+  // a closed tab could leave an invisible active id that made every new send
+  // queue forever even though no work was running.
+  await recoverExpiredConversationTurns(supabase, 20).catch(() => {});
 
   // Load blockers separately so a long pending queue can never hide the one
   // running/paused/failed row that makes a client-side dispatch unsafe.

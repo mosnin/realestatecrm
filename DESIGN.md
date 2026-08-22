@@ -19,8 +19,9 @@ content, or product concepts.
 3. **Text carries hierarchy.** Use a quiet eyebrow, an editorial title, one
    status sentence, and generous space. Decorative icons do not substitute for
    information architecture.
-4. **Lists are lists.** CRM records render as hairline-divided rows. Cards are
-   reserved for meaningful regions, choices, galleries, and working surfaces.
+4. **Content has boundaries.** Compact CRM indexes render as hairline-divided
+   rows. Long-form actionable records such as message drafts may use quiet,
+   bounded rows when that prevents overlap and keeps each action with its text.
 5. **Truthful state.** Counts, progress, activity, and completion language must
    come from persisted product data. Never decorate an empty state with a fake
    metric or implied work.
@@ -116,7 +117,7 @@ removes travel, count-up, shimmer, and stagger.
 - category-colored cards and arbitrary status colors;
 - gradients, glows, or ASCII/CSS art outside the sanctioned shared atmosphere;
 - a second sidebar, dock, or navigation hierarchy;
-- dense grids of bordered cards for record lists;
+- unbounded record content, overlapping actions, or repeated heavy card grids;
 - fake data, vanity metrics, or loading states that change final geometry;
 - page-specific radii, shadows, and typography that fork the Today system.
 

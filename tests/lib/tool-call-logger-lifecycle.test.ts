@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe('tool-call execution ledger lifecycle', () => {
   it('retains start and completion writes', async () => {
-    const stepId = await logToolCallStart('space_1', 'search_contacts', { query: 'Sam' });
+    const stepId = await logToolCallStart('space_1', 'search_contacts', { query: 'Sam' }, 'task_1');
     await logToolCallComplete(stepId, 'Found one contact');
 
     expect(afterMock).toHaveBeenCalledTimes(2);
@@ -42,7 +42,7 @@ describe('tool-call execution ledger lifecycle', () => {
   });
 
   it('retains the failed terminal write', async () => {
-    const stepId = await logToolCallStart('space_1', 'create_deal', {});
+    const stepId = await logToolCallStart('space_1', 'create_deal', {}, 'task_1');
     await logToolCallError(stepId, 'Provider unavailable');
 
     expect(afterMock).toHaveBeenCalledTimes(2);
@@ -50,5 +50,13 @@ describe('tool-call execution ledger lifecycle', () => {
       status: 'failed',
       errorMessage: 'Provider unavailable',
     }));
+  });
+
+  it('does not write a task execution step for a direct chat tool call', async () => {
+    const stepId = await logToolCallStart('space_1', 'search_contacts', { query: 'Sam' });
+    await logToolCallComplete(stepId, 'Found one contact');
+
+    expect(insertMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

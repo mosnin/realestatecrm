@@ -39,16 +39,6 @@ export function shouldShowInlineWorkActivity(opts: {
   );
 }
 
-export function chatModeChipLabel(mode: 'chat' | 'work'): string {
-  return mode === 'work' ? 'Work · can act' : 'Chat · answers';
-}
-
-export function emptyStateSubtitle(mode: 'chat' | 'work'): string {
-  return mode === 'work'
-    ? 'Tell me the outcome. I will go do it.'
-    : 'Ask anything. I will look it up.';
-}
-
 export function workExecutionChipLabel(mode: 'review' | 'autonomous'): string {
   return mode === 'review' ? 'Review' : 'Can act';
 }

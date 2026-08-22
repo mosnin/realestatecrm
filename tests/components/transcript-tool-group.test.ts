@@ -22,22 +22,26 @@ function tool(
 }
 
 describe('groupTranscriptItems', () => {
-  it('folds tools split by text into one dropdown and keeps subagents separate', () => {
+  it('folds tools into one dropdown, hides retry narration, and keeps the final answer', () => {
     const blocks: MessageBlock[] = [
       { type: 'text', content: 'Checking the book.' },
       tool('pipeline_summary', 'error', { callId: 'call_1' }),
       { type: 'text', content: 'Trying another lookup.' },
       tool('find_deal', 'complete', { callId: 'call_2' }),
+      { type: 'text', content: 'I found the deal.' },
       tool('delegate_task', 'complete', { callId: 'call_sub' }),
     ];
 
     const items = groupTranscriptItems(blocks);
     expect(items.map((item) => item.kind)).toEqual([
-      'text',
       'tool-group',
       'text',
       'subagent',
     ]);
+    expect(items.find((item) => item.kind === 'text')).toMatchObject({
+      kind: 'text',
+      block: { content: 'I found the deal.' },
+    });
     const group = items.find((item) => item.kind === 'tool-group');
     expect(group?.kind === 'tool-group' && group.blocks.map((b) => b.name)).toEqual([
       'pipeline_summary',

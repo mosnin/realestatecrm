@@ -211,7 +211,9 @@ export interface UseAgentTaskResult {
    */
   queuedMessages: PendingTurnMessage[];
   /** Drop a queued message by its stable database id before it dispatches. */
-  removeQueuedMessage: (turnId: string) => Promise<void>;
+  removeQueuedMessage: (turnId: string) => Promise<boolean>;
+  /** Edit text while a turn is still pending. */
+  updateQueuedMessage: (turnId: string, text: string) => Promise<boolean>;
 }
 
 export interface PendingTurnMessage {
@@ -257,7 +259,7 @@ function queuedMessagesFromTurns(
 function nextDispatchableQueuedTurn(
   turns: readonly ConversationTurnRecord[],
 ): ConversationTurnRecord | null {
-  if (turns.some((turn) => turn.status === 'running' || turn.status === 'paused' || turn.status === 'failed')) {
+  if (turns.some((turn) => turn.status === 'running' || turn.status === 'paused')) {
     return null;
   }
   return turns
@@ -952,10 +954,8 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // the history loader, so the loader sees the flag already set and
         // doesn't blank the thread it just watched stream in.
         onTurnSettledRef.current?.(rec.conversationId);
-        if (durableTurnQueueEnabled && (
-          turnOutcomeRef.current === 'complete' || turnOutcomeRef.current === 'cancelled'
-        )) {
-          // PostgreSQL — not this component — decides whether a paused/failed
+        if (durableTurnQueueEnabled && turnOutcomeRef.current !== 'paused') {
+          // PostgreSQL — not this component — decides whether a paused
           // turn holds the queue and which pending instruction is next.
           await drainDurableQueueRef.current?.(rec.conversationId);
         } else if (durableTurnQueueEnabled) {
@@ -1234,6 +1234,29 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     return () => { cancelled = true; };
   }, [durableTurnQueueEnabled, initialConversationId, loadDurableTurns]);
 
+  // A queued instruction must not depend on a one-time render effect. Poll
+  // only while this tab has visible queued work and no local stream; this
+  // reconciles a server turn that settled while the tab was backgrounded and
+  // immediately dispatches the next pending instruction.
+  useEffect(() => {
+    if (
+      !durableTurnQueueEnabled
+      || !initialConversationId
+      || queuedMessages.length === 0
+      || isStreaming
+    ) return;
+    const reconcile = () => { void drainDurableQueue(initialConversationId); };
+    reconcile();
+    const timer = window.setInterval(reconcile, 2500);
+    return () => window.clearInterval(timer);
+  }, [
+    drainDurableQueue,
+    durableTurnQueueEnabled,
+    initialConversationId,
+    isStreaming,
+    queuedMessages.length,
+  ]);
+
   const send = useCallback(
     async (
       text: string,
@@ -1413,17 +1436,46 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     if (!durableTurnQueueEnabled) {
       queuedRef.current = queuedRef.current.filter((turn) => turn.id !== turnId);
       setQueuedMessages(queuedRef.current);
-      return;
+      return true;
+    }
+    let removed = false;
+    try {
+      const response = await fetch(`/api/ai/turns/${encodeURIComponent(turnId)}`, {
+        method: 'DELETE',
+      });
+      removed = response.ok;
+      if (!removed) setError('That queued message could not be removed.');
+    } catch {
+      setError('That queued message could not be removed.');
+    } finally {
+      const conversationId = conversationIdRef.current;
+      if (conversationId) await loadDurableTurns(conversationId).catch(() => {});
+    }
+    return removed;
+  }, [durableTurnQueueEnabled, loadDurableTurns]);
+
+  const updateQueuedMessage = useCallback(async (turnId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    if (!durableTurnQueueEnabled) {
+      queuedRef.current = queuedRef.current.map((turn) =>
+        turn.id === turnId ? { ...turn, text: trimmed } : turn,
+      );
+      setQueuedMessages(queuedRef.current);
+      return true;
     }
     const response = await fetch(`/api/ai/turns/${encodeURIComponent(turnId)}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      setError('That queued message could not be removed.');
-      return;
-    }
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: trimmed }),
+    }).catch(() => null);
     const conversationId = conversationIdRef.current;
-    if (conversationId) await loadDurableTurns(conversationId);
+    if (conversationId) await loadDurableTurns(conversationId).catch(() => {});
+    if (!response?.ok) {
+      setError('That queued message could not be edited.');
+      return false;
+    }
+    return true;
   }, [durableTurnQueueEnabled, loadDurableTurns]);
 
   const submitInlineDecision = useCallback(
@@ -1577,8 +1629,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
             return;
           }
           if (sameTurn?.status === 'failed') {
-            setError('This turn failed and is holding the queue. Remove it before retrying the instruction.');
-            return;
+            await removeQueuedMessage(sameTurn.id);
           }
         } catch {
           setError('Chippi could not verify the saved turn yet. Try again in a moment.');
@@ -1589,7 +1640,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     const last = lastUserInputRef.current;
     if (!last) return;
     await send(last.text, last.attachmentIds);
-  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, send]);
+  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, removeQueuedMessage, send]);
 
   // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
   useEffect(() => {
@@ -1650,5 +1701,6 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     rateLimitSeconds,
     queuedMessages,
     removeQueuedMessage,
+    updateQueuedMessage,
   };
 }

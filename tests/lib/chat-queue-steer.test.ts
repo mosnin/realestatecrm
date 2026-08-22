@@ -54,11 +54,11 @@ describe('Work queue and steering', () => {
     expect(prompt).toContain('boolean | Promise<boolean>');
   });
 
-  it('exposes distinct queue and steer controls while Work is active', () => {
+  it('keeps the live composer to one stop control', () => {
     const prompt = readFileSync('components/ui/chippi-prompt-box.tsx', 'utf8');
-    expect(prompt).toContain('aria-label="Queue message"');
-    expect(prompt).toContain('aria-label="Steer active work"');
-    expect(prompt).toContain('Stop at the next safe point and follow this');
+    expect(prompt).toContain('aria-label="Stop generating"');
+    expect(prompt).not.toContain('aria-label="Queue message"');
+    expect(prompt).not.toContain('aria-label="Steer active work"');
   });
 
   it('bounds the conversation sidebar query on the server', () => {

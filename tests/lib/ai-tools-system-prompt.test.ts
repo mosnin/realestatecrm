@@ -114,7 +114,8 @@ describe('buildSystemPrompt', () => {
   it('pins one full-book read and refuses to invent a PDF artifact', () => {
     const prompt = buildSystemPrompt({ ...makeCtx(), workMode: true });
     expect(prompt).toContain('call `list_contacts` once');
-    expect(prompt).toContain('Do not split the same read into hot, warm, cold, and unscored calls');
+    expect(prompt).toContain('{"view":"all"}');
+    expect(prompt).toContain('Never retry this tool with invented parameters');
     expect(prompt).toContain('cannot guarantee a PDF artifact');
     expect(prompt).toContain('PDF export is not available');
     expect(prompt).toContain('persisted session or file receipt');

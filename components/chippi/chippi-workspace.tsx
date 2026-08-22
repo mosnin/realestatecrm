@@ -18,7 +18,7 @@ import {
   type SentAttachmentMeta,
 } from '@/components/ui/chippi-prompt-box';
 import { Button } from '@/components/ui/button';
-import { History, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag } from 'lucide-react';
+import { History, Settings, ArrowLeft, Play, Loader2, NotebookText, RotateCcw, MoreHorizontal, SquarePen, BookOpen, Inbox, Flag, Trash2, Pencil } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import {
@@ -48,7 +48,6 @@ import type { BrowserActionLogEntry } from '@/components/chippi/browser-control-
 import { PanelResizeHandle } from '@/components/chippi/panel-resize-handle';
 import { ApprovalsPill } from '@/components/chippi/approvals-pill';
 import { WorkExecutionModeMenu } from '@/components/chippi/work-execution-mode-menu';
-import { ChatModeChip } from '@/components/chippi/chat-mode-chip';
 import { WorkActivityTimeline } from '@/components/chippi/work-activity-timeline';
 import { useChatLiveEdge } from '@/components/chippi/use-chat-live-edge';
 import { chatSurfaceEndpoints } from '@/lib/chat/surface-endpoints';
@@ -67,7 +66,6 @@ import {
 import { consumeWorkDraftHandoff } from '@/lib/chippi/work-draft-handoff';
 import { getSuggestionsForTurn } from '@/lib/ai-tools/suggestions';
 import {
-  emptyStateSubtitle,
   shouldShowFollowUpSuggestions,
   shouldShowInlineWorkActivity,
   shouldShowPlanCard,
@@ -420,6 +418,8 @@ export function ChippiWorkspace({
   const [chatCelebration, setChatCelebration] = useState<
     { messageId: string; kind: ApprovalKind; subject?: string } | null
   >(null);
+  const [queuedEditId, setQueuedEditId] = useState<string | null>(null);
+  const [queuedEditText, setQueuedEditText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Single switch for every bespoke animation on this surface: the hero→dock
@@ -590,6 +590,7 @@ export function ChippiWorkspace({
     rateLimitSeconds,
     queuedMessages,
     removeQueuedMessage,
+    updateQueuedMessage,
   } = useAgentTask({
     spaceSlug: slug,
     conversationId: activeConversationId,
@@ -1198,6 +1199,21 @@ export function ChippiWorkspace({
     [steer],
   );
 
+  const steerQueuedMessage = useCallback(async (turnId: string, text: string, mode: ChatMode) => {
+    const removed = await removeQueuedMessage(turnId);
+    if (!removed) return;
+    await handleSteer(text, [], mode);
+  }, [handleSteer, removeQueuedMessage]);
+
+  const saveQueuedEdit = useCallback(async () => {
+    if (!queuedEditId) return;
+    const saved = await updateQueuedMessage(queuedEditId, queuedEditText);
+    if (saved) {
+      setQueuedEditId(null);
+      setQueuedEditText('');
+    }
+  }, [queuedEditId, queuedEditText, updateQueuedMessage]);
+
   // Auto-send when arriving from the command palette via ?q= — fires once on
   // mount only. handleSendRef lets us read the latest handleSend without
   // adding it to the deps array (which would re-trigger on every send).
@@ -1597,35 +1613,85 @@ export function ChippiWorkspace({
           hiddenSessionIds={inlineWorkSessionIds}
         />
       )}
-      {/* Queued messages — typed while Chippi was working; each dispatches in
-          order as a turn finishes. × drops one before it sends. */}
+      {/* Keep the existing composer and mode control exactly where they are.
+          Queue controls live in one bounded rail immediately above it. */}
       {queuedMessages.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+        <div className="mb-2 space-y-1.5">
           {queuedMessages.map((q) => (
-            <span
+            <div
               key={q.id}
-              className="inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground"
+              className="flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-sm"
             >
-              <span className="truncate">{q.text}</span>
-              <span className="shrink-0 text-muted-foreground/60">
-                · {q.status === 'failed' ? 'needs attention' : q.kind === 'steer' ? 'steering next' : 'queued'}
-              </span>
+              {queuedEditId === q.id ? (
+                <input
+                  autoFocus
+                  value={queuedEditText}
+                  onChange={(event) => setQueuedEditText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void saveQueuedEdit();
+                    if (event.key === 'Escape') setQueuedEditId(null);
+                  }}
+                  aria-label="Edit queued message"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none"
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{q.text}</span>
+              )}
+              {queuedEditId === q.id ? (
+                <button
+                  type="button"
+                  onClick={() => { void saveQueuedEdit(); }}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  Save
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { void steerQueuedMessage(q.id, q.text, q.mode); }}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  Steer
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { void removeQueuedMessage(q.id); }}
                 aria-label="Remove queued message"
-                className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
               >
-                ×
+                <Trash2 size={14} />
               </button>
-            </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Queued message options"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-40">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setQueuedEditId(q.id);
+                      setQueuedEditText(q.text);
+                    }}
+                  >
+                    <Pencil size={14} />
+                    Edit message
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ))}
         </div>
       )}
       <ChippiPromptBox
         placeholder="Tell me what you need, or press / for skills…"
         onSend={handleSend}
-        onSteer={chatMode === 'work' ? handleSteer : undefined}
+        onSteer={handleSteer}
         onMentionSearch={handleMentionSearch}
         onAbort={abort}
         // NOT locked while streaming or waiting on an approval — typing
@@ -1901,12 +1967,6 @@ export function ChippiWorkspace({
                   >
                     {greeting || ' '}
                   </motion.h1>
-                  <div className="mb-3 flex justify-center">
-                    <ChatModeChip mode={chatMode} />
-                  </div>
-                  <p className="mb-6 text-center text-[13px] text-muted-foreground sm:mb-8">
-                    {emptyStateSubtitle(chatMode)}
-                  </p>
                 </div>
               </motion.div>
             ) : (
@@ -1928,11 +1988,10 @@ export function ChippiWorkspace({
               >
                 {/* Conversation title — quiet, only when we have one */}
                 {activeConversationId && (
-                  <div className="mb-6 flex items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <div className="mb-6">
+                    <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                       {conversations.find((c) => c.id === activeConversationId)?.title ?? ''}
                     </p>
-                    <ChatModeChip mode={chatMode} />
                   </div>
                 )}
 

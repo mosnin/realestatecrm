@@ -20,41 +20,11 @@ import { defineTool } from '../types';
 
 const parameters = z
   .object({
-    scoreLabel: z
-      .enum(['hot', 'warm', 'cold', 'unscored'])
-      .optional()
-      .describe('Filter to one AI lead-score tier. Omit to list every tier.'),
-    leadType: z
-      .enum(['rental', 'buyer', 'seller'])
-      .optional()
-      .describe('Segment: buyer / rental / seller. Alias of segment. Omit for all.'),
-    segment: z
-      .enum(['rental', 'buyer', 'seller'])
-      .optional()
-      .describe('Same as leadType — Contact.leadType segment.'),
-    stage: z
-      .enum(['QUALIFICATION', 'TOUR', 'APPLICATION'])
-      .optional()
-      .describe('Pipeline stage stored on Contact.type.'),
-    tag: z.string().max(100).optional().describe('Contacts whose tags[] contain this tag.'),
-    source: z
-      .enum(['web_form', 'brokerage_form', 'api', 'import', 'referral', 'manual', 'agent', 'other'])
-      .optional()
-      .describe('Structured lead source on Contact.source.'),
-    status: z
-      .enum(['active', 'snoozed', 'archived', 'all'])
-      .optional()
-      .describe('Derived from Contact.snoozedUntil. Default lists every status.'),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .optional()
-      .default(50)
-      .describe('Max contacts to return, newest first. Default 50.'),
+    view: z
+      .enum(['all', 'hot', 'warm', 'cold', 'unscored', 'rentals', 'buyers', 'sellers'])
+      .describe('Which newest contacts to list. Use all when the user did not ask for a filter.'),
   })
-  .describe('List workspace contacts as cards. Filter by segment, stage, tag, source, status, or score.');
+  .describe('List the newest workspace contacts as cards using one explicit view.');
 
 interface ContactRow {
   id: string;
@@ -71,21 +41,22 @@ export const listContactsTool = defineTool<typeof parameters, { contacts: Contac
   name: 'list_contacts',
   riskLevel: 'safe',
   description:
-    'List workspace contacts as cards. Filter by segment, stage, tag, source, status, or score. Use for "who are my leads", "my hot buyers".',
+    'List the newest workspace contacts as cards. Pass exactly one view: all, hot, warm, cold, unscored, rentals, buyers, or sellers.',
   parameters,
   requiresApproval: false,
 
   async handler(args, ctx) {
-    const limit = Math.min(args.limit ?? 50, 100);
-
-    const org: LeadOrgFilters = {
-      scoreLabel: args.scoreLabel,
-      segment: args.segment ?? args.leadType,
-      stage: args.stage,
-      tag: args.tag?.trim() || undefined,
-      source: args.source,
-      status: args.status,
-    };
+    const scoreLabel = ['hot', 'warm', 'cold', 'unscored'].includes(args.view)
+      ? args.view as 'hot' | 'warm' | 'cold' | 'unscored'
+      : undefined;
+    const segment = args.view === 'rentals'
+      ? 'rental'
+      : args.view === 'buyers'
+        ? 'buyer'
+        : args.view === 'sellers'
+          ? 'seller'
+          : undefined;
+    const org: LeadOrgFilters = { scoreLabel, segment };
 
     let query = applyLeadOrgFilters(
       supabase
@@ -97,7 +68,7 @@ export const listContactsTool = defineTool<typeof parameters, { contacts: Contac
       { spaceId: ctx.space.id, ownerId: ctx.space.ownerId },
     )
       .order('updatedAt', { ascending: false })
-      .limit(limit);
+      .limit(50);
 
     const { data, error } = await query.abortSignal(ctx.signal);
     if (error) {
@@ -109,17 +80,7 @@ export const listContactsTool = defineTool<typeof parameters, { contacts: Contac
     }
 
     const contacts = (data ?? []) as ContactRow[];
-    const filterNote = [
-      args.scoreLabel,
-      args.segment ?? args.leadType,
-      args.stage,
-      args.tag,
-      args.source,
-      args.status,
-    ]
-      .filter(Boolean)
-      .join(' ');
-    const prefix = filterNote ? `${filterNote} ` : '';
+    const prefix = args.view === 'all' ? '' : `${args.view} `;
     const noun = contacts.length === 1 ? 'contact' : 'contacts';
     return {
       summary:

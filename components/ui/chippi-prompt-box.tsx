@@ -24,7 +24,6 @@ import {
   ClipboardCheck,
   Target,
   Plug,
-  CornerDownLeft,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -1001,79 +1000,30 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     //   else                 → inert Send slot for layout consistency
     function renderRightButton() {
       if (isLoading) {
-        // While streaming, a drafted message can be QUEUED — it sends the
-        // moment the current reply finishes (Enter does the same). The Stop
-        // control stays put so interrupting is never more than one tap.
-        const queueButton =
-          hasContent && !sendDisabled ? (
+        // Enter still queues typed text and ⌘↵ still steers. Keep the visible
+        // control surface to one stable Stop button; queued-message actions
+        // live in the rail above the composer.
+        if (onAbort) {
+          return (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={handleSubmit}
-                  aria-label="Queue message"
+                  onClick={onAbort}
+                  aria-label="Stop generating"
                   className={cn(
                     'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                    'border border-border bg-background text-foreground hover:bg-accent',
+                    'bg-foreground text-background hover:bg-foreground/90',
                     'transition-all duration-150 active:scale-[0.96]',
                   )}
                 >
-                  <ArrowUp size={14} strokeWidth={2.25} />
+                  <Square size={12} strokeWidth={2.25} className="fill-current" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={6}>
-                Queue — sends when Chippi finishes
+                Stop
               </TooltipContent>
             </Tooltip>
-          ) : null;
-        const steerButton =
-          hasContent && !sendDisabled && onSteer && attachments.length === 0 ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={handleSteer}
-                  aria-label="Steer active work"
-                  className={cn(
-                    'inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-2.5',
-                    'border border-border bg-background text-[11px] font-medium text-foreground',
-                    'transition-all duration-150 hover:bg-accent active:scale-[0.98]',
-                  )}
-                >
-                  <CornerDownLeft size={12} strokeWidth={2} />
-                  Steer
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={6}>
-                Stop at the next safe point and follow this · ⌘↵
-              </TooltipContent>
-            </Tooltip>
-          ) : null;
-        if (onAbort) {
-          return (
-            <div className="flex items-center gap-1.5">
-              {steerButton}
-              {queueButton}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={onAbort}
-                    aria-label="Stop generating"
-                    className={cn(
-                      'inline-flex items-center justify-center w-8 h-8 rounded-full',
-                      'bg-foreground text-background hover:bg-foreground/90',
-                      'transition-all duration-150 active:scale-[0.96]',
-                    )}
-                  >
-                    <Square size={12} strokeWidth={2.25} className="fill-current" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6}>
-                  Stop
-                </TooltipContent>
-              </Tooltip>
-            </div>
           );
         }
         return (

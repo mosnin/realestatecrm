@@ -23,13 +23,19 @@ async function persistToolCallStart(
   args: Record<string, unknown>,
   taskId?: string
 ): Promise<string> {
+  // ExecutionStep belongs to an AgentTask and taskId is NOT NULL. Direct chat
+  // tool calls have a conversation turn, not an AgentTask; attempting to force
+  // them into this ledger generated one database error per tool call. Their
+  // telemetry and transcript blocks are persisted elsewhere, so skip this
+  // task-only ledger unless a real parent task is present.
+  if (!taskId) return stepId;
   const inputSummary = JSON.stringify(args).slice(0, 500);
 
   try {
     await tenantTable(supabase, 'ExecutionStep', { spaceId }).insert({
       id: stepId,
       spaceId,
-      taskId: taskId ?? null,
+      taskId,
       stepIndex: 0,
       stepType: 'tool_call',
       toolName,
