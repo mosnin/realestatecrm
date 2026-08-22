@@ -13,6 +13,8 @@ const patches: Record<string, unknown>[] = [];
 let claimAvailable = true;
 let claimError: Error | null = null;
 let sessionReadError: Error | null = null;
+let propertyRows: Array<Record<string, unknown>> = [];
+let propertyError: Error | null = null;
 const { dispatchWorkspaceRun } = vi.hoisted(() => ({
   dispatchWorkspaceRun: vi.fn(),
 }));
@@ -56,20 +58,27 @@ vi.mock('@/lib/supabase', () => ({
       }
       throw new Error(`unexpected RPC ${name}`);
     },
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({
-            data: table === 'WorkSession' && !sessionReadError ? sessionRow : null,
-            error: table === 'WorkSession' ? sessionReadError : null,
-          }),
+    from: (table: string) => {
+      const afterSelect: Record<string, unknown> = {
+        eq: () => afterSelect,
+        order: () => afterSelect,
+        limit: async () => ({
+          data: table === 'Property' ? propertyRows : [],
+          error: table === 'Property' ? propertyError : null,
         }),
-      }),
-      update: (patch: Record<string, unknown>) => {
-        patches.push(patch);
-        return { eq: async () => ({}) };
-      },
-    }),
+        maybeSingle: async () => ({
+          data: table === 'WorkSession' && !sessionReadError ? sessionRow : null,
+          error: table === 'WorkSession' ? sessionReadError : null,
+        }),
+      };
+      return {
+        select: () => afterSelect,
+        update: (patch: Record<string, unknown>) => {
+          patches.push(patch);
+          return { eq: async () => ({}) };
+        },
+      };
+    },
   },
 }));
 
@@ -114,6 +123,8 @@ beforeEach(() => {
   claimError = null;
   sessionReadError = null;
   sessionRow = baseSession();
+  propertyRows = [];
+  propertyError = null;
   llmContent = '{"steps":[{"title":"Pull comps"},{"title":"Review the deal"}],"question":null}';
   llmCreate.mockReset();
   llmCreate.mockImplementation(async () => ({ choices: [{ message: { content: llmContent } }] }));
@@ -241,5 +252,55 @@ describe('planSession', () => {
     expect(dispatchWorkspaceRun).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'run-current', workSessionId: 'ws1' }),
     );
+  });
+
+  it('plans a workspace session from a matched property without calling the LLM', async () => {
+    propertyRows = [{ id: 'prop-1', address: '12 Oak Street', mlsNumber: 'MLS12345' }];
+    sessionRow = baseSession({
+      kind: 'workspace',
+      goal: 'Prep the 12 Oak Street listing packet',
+      autonomy: 'plan_first',
+    });
+
+    expect(await planSession('ws1')).toBe('awaiting_approval');
+    expect(llmCreate).not.toHaveBeenCalled();
+    const plan = patches.at(-1)!.plan as Array<{ id: string; title: string; status: string }>;
+    expect(plan).toHaveLength(4);
+    expect(plan[0]).toMatchObject({
+      id: 's1',
+      title: 'Confirm target property: 12 Oak Street',
+      status: 'pending',
+    });
+  });
+
+  it('asks which property to use when workspace planning cannot identify one', async () => {
+    propertyRows = [{ id: 'prop-1', address: '88 Pine', mlsNumber: 'OTHER99' }];
+    sessionRow = baseSession({
+      kind: 'workspace',
+      goal: 'Build a listing packet',
+      allowQuestions: true,
+    });
+
+    expect(await planSession('ws1')).toBe('awaiting_input');
+    expect(llmCreate).not.toHaveBeenCalled();
+    expect(patches.at(-1)).toMatchObject({
+      status: 'awaiting_input',
+      question: 'Which property should I use? Please provide the address or MLS number.',
+    });
+  });
+
+  it('uses a generic first step when workspace questions are disabled and no property matches', async () => {
+    sessionRow = baseSession({
+      kind: 'workspace',
+      goal: 'Build a listing packet',
+      allowQuestions: false,
+      autonomy: 'just_go',
+    });
+
+    expect(await planSession('ws1')).toBe('running');
+    expect(llmCreate).not.toHaveBeenCalled();
+    const plan = patches.at(-1)!.plan as Array<{ title: string }>;
+    expect(plan).toHaveLength(4);
+    expect(plan[0].title).toBe('Identify or flag the target property');
   });
 });
