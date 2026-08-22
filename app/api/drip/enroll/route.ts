@@ -20,6 +20,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { enrollContact } from '@/lib/drip/engine';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -37,10 +38,8 @@ export async function GET(req: NextRequest) {
   const sequenceId = searchParams.get('sequenceId');
   const contactId = searchParams.get('contactId');
 
-  let query = supabase
-    .from('DripEnrollment')
+  let query = tenantTable(supabase, 'DripEnrollment', { spaceId: space.id })
     .select(SELECT)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(MAX_LIST);
   if (sequenceId) query = query.eq('sequenceId', sequenceId);
@@ -61,10 +60,8 @@ export async function GET(req: NextRequest) {
   const contactIds = Array.from(new Set(enrollments.map((e) => e.contactId).filter(Boolean)));
   let contactsById = new Map<string, { name: string | null; email: string | null }>();
   if (contactIds.length > 0) {
-    const { data: contactRows, error: contactErr } = await supabase
-      .from('Contact')
+    const { data: contactRows, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name, email')
-      .eq('spaceId', space.id)
       .in('id', contactIds);
     if (contactErr) {
       logger.warn('[drip/enroll] contact join failed — returning enrollments without names', {

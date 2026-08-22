@@ -16,6 +16,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
 import { findCalendarConnection, deleteEventThrough } from '@/lib/calendar/mirror';
@@ -47,11 +48,9 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
   },
 
   async handler(args, ctx) {
-    const { data: tour, error: tourErr } = await supabase
-      .from('Tour')
+    const { data: tour, error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .select('id, contactId, guestName, guestEmail, guestPhone, propertyAddress, startsAt, endsAt, status, googleEventId')
       .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (tourErr) {
       return { summary: `Tour lookup failed: ${tourErr.message}`, display: 'error' };
@@ -67,11 +66,9 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Tour')
+    const { error: updateErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .update({ status: 'cancelled', updatedAt: new Date().toISOString() })
-      .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.tourId);
     if (updateErr) {
       logger.error('[tools.cancel_tour] update failed', { tourId: args.tourId }, updateErr);
       return { summary: `Cancel failed: ${updateErr.message}`, display: 'error' };
@@ -87,11 +84,9 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
         if (ok) {
           // Clear the stale id so a future sync doesn't try to update a
           // deleted event.
-          await supabase
-            .from('Tour')
+          await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
             .update({ googleEventId: null })
-            .eq('id', args.tourId)
-            .eq('spaceId', ctx.space.id);
+            .eq('id', args.tourId);
         }
       });
     }
@@ -129,7 +124,7 @@ export const cancelTourTool = defineTool<typeof parameters, CancelTourResult>({
     }
 
     if (tour.contactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: tour.contactId,

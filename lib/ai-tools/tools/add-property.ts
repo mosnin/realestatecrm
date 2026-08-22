@@ -14,6 +14,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -89,7 +90,7 @@ export const addPropertyTool = defineTool<typeof parameters, AddPropertyResult>(
       notes: args.notes?.trim() || null,
     };
 
-    const { error: insertErr } = await supabase.from('Property').insert(row);
+    const { error: insertErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id }).insert(row);
     if (insertErr) {
       logger.error('[tools.add_property] insert failed', { address: row.address }, insertErr);
       return { summary: `Couldn't add the property: ${insertErr.message}`, display: 'error' };

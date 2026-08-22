@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { tenantTable } from '@/lib/tenant-db';
 
 // ── GET /api/agent/approvals ──────────────────────────────────────────────────
 // Returns all AgentTask rows in 'paused' status with a non-null
@@ -31,10 +32,8 @@ export async function GET(req: NextRequest) {
 
   // Filter: paused tasks where metadata->approvalRequired is not null.
   // Supabase PostgREST supports `not` with `is` for null checks on jsonb paths.
-  const { data: tasks, error } = await supabase
-    .from('AgentTask')
+  const { data: tasks, error } = await tenantTable(supabase, 'AgentTask', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .eq('status', 'paused')
     .not('metadata->approvalRequired', 'is', null)
     .order('createdAt', { ascending: false })
@@ -88,9 +87,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'action must be "approve" or "reject"' }, { status: 400 });
   }
 
-  // Fetch the task and verify it belongs to this space and is paused.
-  const { data: task, error: fetchError } = await supabase
-    .from('AgentTask')
+  // Fetch the task scoped to this space. A foreign taskId must 404 (not
+  // 403) so a guessed id cannot confirm another tenant's task exists.
+  const { data: task, error: fetchError } = await tenantTable(supabase, 'AgentTask', {
+    spaceId: space.id,
+  })
     .select('id, spaceId, status, metadata')
     .eq('id', taskId)
     .maybeSingle();
@@ -101,9 +102,6 @@ export async function POST(req: NextRequest) {
   }
   if (!task) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-  }
-  if (task.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   if (task.status !== 'paused') {
     return NextResponse.json(
@@ -137,8 +135,9 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('AgentTask')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentTask', {
+    spaceId: space.id,
+  })
     .update({
       status: newStatus,
       metadata: metadataPatch,

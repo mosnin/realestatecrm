@@ -21,6 +21,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { defineTool } from '../types';
 import {
   avgTimeToCloseDays,
@@ -87,8 +88,10 @@ export const analyzeRealtorTool = defineTool<typeof parameters, AnalyzeRealtorRe
     if (!callerUser) {
       return { summary: 'Broker access required.', display: 'error' };
     }
-    const { data: callerMemberships } = await supabase
-      .from('BrokerageMembership')
+    const { data: callerMemberships } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'membership lookup by userId to discover caller brokerages',
+    )
       .select('brokerageId, role')
       .eq('userId', (callerUser as { id: string }).id)
       .in('role', ['broker_owner', 'broker_admin']);
@@ -104,6 +107,7 @@ export const analyzeRealtorTool = defineTool<typeof parameters, AnalyzeRealtorRe
       .from('BrokerageMembership')
       .select('brokerageId, userId')
       .eq('userId', args.realtorUserId)
+      .in('brokerageId', Array.from(callerBrokerageIds))
       .maybeSingle();
     if (!realtorMembership) {
       return { summary: 'That user is not a brokerage member.', display: 'error' };

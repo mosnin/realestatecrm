@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 export interface DeadLetterInput {
@@ -33,8 +34,9 @@ export async function recordDeadLetter(input: DeadLetterInput): Promise<void> {
   const stack = err instanceof Error ? err.stack ?? null : null;
 
   try {
-    const { error } = await supabase.from('DeadLetterEvent').insert({
-      spaceId: input.spaceId || 'unknown',
+    const spaceId = input.spaceId || 'unknown';
+    const { error } = await tenantTable(supabase, 'DeadLetterEvent', { spaceId }).insert({
+      spaceId,
       eventType: input.eventType,
       eventPayload: input.eventPayload ?? {},
       errorMessage: message.slice(0, 2000),

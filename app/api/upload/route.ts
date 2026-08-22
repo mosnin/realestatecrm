@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { uploadObject, getPublicUrl, buildKey, deleteObject, publicUrlToKey } from '@/lib/storage';
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many uploads' }, { status: 429 });
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   try {
     const formData = await req.formData();
@@ -122,15 +123,12 @@ export async function POST(req: NextRequest) {
     };
     const field = fieldMap[type];
     if (field) {
-      const { data: existing } = await supabase
-        .from('SpaceSetting')
+      const { data: existing } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .select(field)
-        .eq('spaceId', space.id)
         .maybeSingle();
       const previousValue = (existing as Record<string, string | null> | null)?.[field] ?? null;
 
-      await supabase
-        .from('SpaceSetting')
+      await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .upsert({ spaceId: space.id, [field]: publicUrl }, { onConflict: 'spaceId' });
 
       // Fire-and-forget the previous object cleanup. publicUrlToKey

@@ -18,6 +18,7 @@
  */
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { dealHealth } from '@/lib/deals/health';
@@ -110,73 +111,55 @@ export async function GET() {
     topOverdueRes,
   ] = await Promise.all([
     // ── Counts ─────────────────────────────────────────────────────────────
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .contains('tags', ['new-lead']),
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .gte('leadScore', HOT_LEAD_THRESHOLD),
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .not('followUpAt', 'is', null)
       .lt('followUpAt', nowIso),
 
     // ── Active deals (full read so we can classify health AND pick the
     //    longest-stuck one) ──────────────────────────────────────────────
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('id, title, status, stageChangedAt, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
-      .eq('spaceId', space.id)
       .eq('status', 'active')
       .limit(500),
 
     // ── Counts continued ──────────────────────────────────────────────────
-    supabase
-      .from('AgentDraft')
+    tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .eq('status', 'pending'),
-    supabase
-      .from('AgentQuestion')
+    tenantTable(supabase, 'AgentQuestion', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .eq('status', 'pending'),
 
     // ── Named subjects (1 row each — light reads) ─────────────────────────
     // Most-recent new applicant.
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name')
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .contains('tags', ['new-lead'])
       .order('createdAt', { ascending: false })
       .limit(1)
       .maybeSingle(),
     // Hottest contact (highest score above threshold).
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name')
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .gte('leadScore', HOT_LEAD_THRESHOLD)
       .order('leadScore', { ascending: false })
       .limit(1)
       .maybeSingle(),
     // Person with the most-overdue follow-up.
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name, followUpAt')
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .not('followUpAt', 'is', null)
       .lt('followUpAt', nowIso)

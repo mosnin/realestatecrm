@@ -14,6 +14,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import type { DealStageKind } from '@/lib/types';
 
@@ -91,20 +92,16 @@ export interface EnsurePipelinesResult {
 export async function ensureDefaultPipelines(spaceId: string): Promise<EnsurePipelinesResult> {
   const created: DefaultPipelineType[] = [];
 
-  const { data: pipelineRows, error: pipeErr } = await supabase
-    .from('Pipeline')
+  const { data: pipelineRows, error: pipeErr } = await tenantTable(supabase, 'Pipeline', { spaceId })
     .select('id, name, position')
-    .eq('spaceId', spaceId)
     .order('position', { ascending: true });
   if (pipeErr) {
     logger.warn('[deals.pipelines] pipeline lookup failed', { spaceId, err: pipeErr.message });
     return { created };
   }
 
-  const { data: stageRows, error: stageErr } = await supabase
-    .from('DealStage')
-    .select('id, pipelineType, pipelineId')
-    .eq('spaceId', spaceId);
+  const { data: stageRows, error: stageErr } = await tenantTable(supabase, 'DealStage', { spaceId })
+    .select('id, pipelineType, pipelineId');
   if (stageErr) {
     logger.warn('[deals.pipelines] stage lookup failed', { spaceId, err: stageErr.message });
     return { created };
@@ -127,7 +124,7 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<EnsurePip
       const orphans = typed.filter((s) => !s.pipelineId);
       if (orphans.length > 0 && !attached) {
         const pipelineId = crypto.randomUUID();
-        const { error: insertErr } = await supabase.from('Pipeline').insert({
+        const { error: insertErr } = await tenantTable(supabase, 'Pipeline', { spaceId }).insert({
           id: pipelineId,
           spaceId,
           name: def.name,
@@ -144,11 +141,9 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<EnsurePip
           continue;
         }
         nextPosition += 1;
-        const { error: updateErr } = await supabase
-          .from('DealStage')
+        const { error: updateErr } = await tenantTable(supabase, 'DealStage', { spaceId })
           .update({ pipelineId })
-          .in('id', orphans.map((s) => s.id))
-          .eq('spaceId', spaceId);
+          .in('id', orphans.map((s) => s.id));
         if (updateErr) {
           logger.warn('[deals.pipelines] orphan backfill failed', {
             spaceId,
@@ -163,7 +158,7 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<EnsurePip
     }
 
     const pipelineId = crypto.randomUUID();
-    const { error: insertErr } = await supabase.from('Pipeline').insert({
+    const { error: insertErr } = await tenantTable(supabase, 'Pipeline', { spaceId }).insert({
       id: pipelineId,
       spaceId,
       name: def.name,
@@ -191,7 +186,7 @@ export async function ensureDefaultPipelines(spaceId: string): Promise<EnsurePip
       pipelineType: def.pipelineType,
       pipelineId,
     }));
-    const { error: seedErr } = await supabase.from('DealStage').insert(inserts);
+    const { error: seedErr } = await tenantTable(supabase, 'DealStage', { spaceId }).insert(inserts);
     if (seedErr) {
       logger.warn('[deals.pipelines] stage seed failed', {
         spaceId,

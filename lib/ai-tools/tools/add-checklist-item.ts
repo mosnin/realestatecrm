@@ -14,8 +14,10 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+
 
 const CHECKLIST_KINDS = [
   'earnest_money',
@@ -71,11 +73,9 @@ export const addChecklistItemTool = defineTool<typeof parameters, AddChecklistIt
   async handler(args, ctx) {
     // Deal must exist in this space — we don't take the FK's word for it
     // because an out-of-space dealId would still satisfy the FK.
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -86,18 +86,16 @@ export const addChecklistItemTool = defineTool<typeof parameters, AddChecklistIt
 
     // Position = current max + 1 so the item appears at the bottom of the
     // checklist. Matches POST /api/deals/[id]/checklist.
-    const { data: maxRow } = await supabase
-      .from('DealChecklistItem')
+    const { data: maxRow } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: ctx.space.id })
       .select('position')
       .eq('dealId', args.dealId)
       .order('position', { ascending: false })
       .limit(1)
       .maybeSingle();
-    const nextPosition = (maxRow?.position ?? -1) + 1;
+    const nextPosition = ((maxRow as { position?: number } | null)?.position ?? -1) + 1;
 
     const itemId = crypto.randomUUID();
-    const { data: inserted, error: insertErr } = await supabase
-      .from('DealChecklistItem')
+    const { data: inserted, error: insertErr } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: ctx.space.id })
       .insert({
         id: itemId,
         dealId: args.dealId,

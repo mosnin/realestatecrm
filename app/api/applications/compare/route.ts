@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * GET — Compare multiple applicants side by side.
@@ -22,10 +23,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'At least 2 IDs required' }, { status: 400 });
   }
 
-  const { data: contacts } = await supabase
-    .from('Contact')
+  const { data: contacts } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .select('id, name, email, phone, budget, leadType, leadScore, scoreLabel, scoreSummary, applicationData, applicationStatus, createdAt')
-    .eq('spaceId', auth.space.id)
     .in('id', ids);
 
   if (!contacts?.length) {

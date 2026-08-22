@@ -1,7 +1,7 @@
 /**
  * Route-level test for POST /api/chippi/post-tour.
  *
- * Covers: auth-fail (401), no-space (403), empty transcript (400),
+ * Covers: auth-fail (401), no-space (404), empty transcript (400),
  * happy-path returns proposals (OpenAI mocked).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -83,11 +83,12 @@ describe('POST /api/chippi/post-tour', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 403 when user has no space', async () => {
+  it('returns 404 when user has no space (no Forbidden oracle)', async () => {
     mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
     mockGetSpaceForUser.mockResolvedValue(null);
     const res = await POST(makeReq({ transcript: 'hi' }));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(await res.json())).not.toContain('Forbidden');
   });
 
   it('returns 400 when transcript is empty', async () => {

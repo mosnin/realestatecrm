@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { dealHealth } from '@/lib/deals/health';
 import type { Deal } from '@/lib/types';
 import type { Signal, SignalGatherer, SignalKind, SignalUrgency } from '../types';
@@ -45,10 +46,8 @@ function daysUntil(dateInput: string | Date | null): number | null {
 export const pipelineSource: SignalGatherer = {
   source: 'pipeline',
   async gather(spaceId: string): Promise<Signal[]> {
-    const { data, error } = await supabase
-      .from('Deal')
+    const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('id, title, status, stageChangedAt, updatedAt, closeDate, followUpAt, nextAction, nextActionDueAt')
-      .eq('spaceId', spaceId)
       .eq('status', 'active');
 
     if (error || !data) return [];

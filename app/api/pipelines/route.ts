@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 import type { Pipeline } from '@/lib/types';
 import { ensureDefaultPipelines } from '@/lib/deals/default-pipelines';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 async function listPipelines(spaceId: string): Promise<Pipeline[]> {
-  const { data, error } = await supabase
-    .from('Pipeline')
+  const { data, error } = await tenantTable(supabase, 'Pipeline', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('position', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Pipeline[];
 }
-
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -32,7 +30,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: { slug?: string; name?: string; color?: string; emoji?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, name, color, emoji } = body;
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -55,18 +58,16 @@ export async function POST(req: NextRequest) {
       : null;
 
   // Get the max position to append at end
-  const { data: last, error: lastError } = await supabase
-    .from('Pipeline')
+  const { data: last, error: lastError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .select('position')
-    .eq('spaceId', space.id)
     .order('position', { ascending: false })
     .limit(1);
   if (lastError) throw lastError;
-  const position = last && last.length > 0 ? last[0].position + 1 : 0;
+  const lastRows = (last ?? []) as { position: number }[];
+  const position = lastRows.length > 0 ? lastRows[0].position + 1 : 0;
 
   const id = crypto.randomUUID();
-  const { data: pipeline, error: insertError } = await supabase
-    .from('Pipeline')
+  const { data: pipeline, error: insertError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .insert({
       id,
       spaceId: space.id,

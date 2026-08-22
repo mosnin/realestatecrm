@@ -15,6 +15,8 @@ import { normalizeArea, parseAreaQuery, type NormalizedArea } from '@/lib/areas'
 import { getOrCreateAreaReport } from '@/lib/area-report-store';
 import { tailorVerdict } from '@/lib/area-analysis';
 import { toAreaCardData, summariseArea, type AreaCardData } from '@/lib/area-card';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -55,8 +57,8 @@ async function areaFromProperty(
   spaceId: string,
   propertyId: string,
 ): Promise<NormalizedArea | null> {
-  const { data } = await supabase
-    .from('Property')
+  const { data } = await unscoped(supabase
+    .from('Property'), 'post-fetch: caller verified parent scope before this id query')
     .select('city, "stateRegion", "postalCode"')
     .eq('id', propertyId)
     .or(`spaceId.eq.${spaceId},assignedSpaceId.eq.${spaceId}`)

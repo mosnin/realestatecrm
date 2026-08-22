@@ -15,7 +15,7 @@ import { createSpaceTokenRequest } from '@/lib/realtime/ably';
  *
  * Status shapes mirror the other authed routes:
  *   401 — not signed in (requireAuth)
- *   403 — signed in but no space (getSpaceForUser)
+ *   404 — signed in but no space (getSpaceForUser)
  *   503 — real-time not configured (ABLY_API_KEY unset). The client treats
  *         this as "live updates off" and keeps its DB-loaded feed.
  */
@@ -25,7 +25,7 @@ export async function GET() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // createSpaceTokenRequest returns null only when ABLY_API_KEY is unset.
   const tokenRequest = await createSpaceTokenRequest(space.id, userId);

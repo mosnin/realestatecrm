@@ -7,6 +7,8 @@ import { logger } from '@/lib/logger';
 import { sendPushToSpace } from '@/lib/push';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { loadBrokerageScopedReviewDeal } from '@/lib/broker-review-scope';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -59,8 +61,8 @@ async function shapeReview(row: ReviewRow): Promise<ShapedReview> {
       .eq('id', row.requestingUserId)
       .maybeSingle<UserLite>(),
     loadBrokerageScopedReviewDeal({ dealId: row.dealId, brokerageId: row.brokerageId }),
-    supabase
-      .from('DealReviewComment')
+    unscoped(supabase
+      .from('DealReviewComment'), 'broker: membership-proved cross-space access')
       .select('id, reviewRequestId, authorUserId, body, createdAt')
       .eq('reviewRequestId', row.id)
       .order('createdAt', { ascending: true }),

@@ -16,6 +16,9 @@ import {
 } from '@/lib/storage';
 import { generateImage, generateVideo, type GeneratedAsset } from '@/lib/studio/fal';
 import { STUDIO_MODELS, DEFAULT_IMAGE_MODEL } from '@/lib/studio/models';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const MAX_PROMPT = 2000;
 
@@ -65,10 +68,8 @@ export async function runStudioGeneration(args: {
   // Brand kit — fold the realtor's palette into the prompt so output comes
   // out on-brand. The original prompt is what gets logged; fal sees the augment.
   let effectivePrompt = prompt;
-  const { data: brand } = await supabase
-    .from('StudioBrand')
+  const { data: brand } = await tenantTable(supabase, 'StudioBrand', { spaceId: args.spaceId })
     .select('colors')
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   const brandColors = (brand?.colors as string[] | null) ?? [];
   if (brandColors.length > 0) {
@@ -76,7 +77,7 @@ export async function runStudioGeneration(args: {
   }
 
   const generationId = crypto.randomUUID();
-  const { error: genErr } = await supabase.from('StudioGeneration').insert({
+  const { error: genErr } = await tenantTable(supabase, 'StudioGeneration', { spaceId: args.spaceId }).insert({
     id: generationId,
     spaceId: args.spaceId,
     userId: args.userId,
@@ -100,8 +101,8 @@ export async function runStudioGeneration(args: {
   }
 
   const markFailed = async (message: string): Promise<void> => {
-    await supabase
-      .from('StudioGeneration')
+    await unscoped(supabase
+      .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         status: 'failed',
         errorMessage: message,
@@ -162,7 +163,7 @@ export async function runStudioGeneration(args: {
     throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
-  const { error: fileErr } = await supabase.from('File').insert({
+  const { error: fileErr } = await tenantTable(supabase, 'File', { spaceId: args.spaceId }).insert({
     id: fileId,
     spaceId: args.spaceId,
     userId: args.userId,
@@ -180,8 +181,8 @@ export async function runStudioGeneration(args: {
     throw new StudioGenerationError("Generation didn't go through — usually temporary.", 500);
   }
 
-  await supabase
-    .from('StudioGeneration')
+  await unscoped(supabase
+    .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'completed',
       fileId,

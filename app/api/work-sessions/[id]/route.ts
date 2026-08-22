@@ -3,6 +3,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { kickPlan, kickExecute } from '@/lib/work-sessions/kick';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -24,11 +25,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
-  const { data, error } = await supabase
-    .from('WorkSession')
+  const { data, error } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
     .select('*')
     .eq('id', id)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: 'Could not load the session.' }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -46,11 +45,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!read.ok) return read.response;
   const { action, answer } = (read.data ?? {}) as { action?: string; answer?: string };
 
-  const { data: session, error: sessionError } = await supabase
-    .from('WorkSession')
+  const { data: session, error: sessionError } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
     .select('id, status, workspaceRunId')
     .eq('id', id)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   if (sessionError) return NextResponse.json({ error: 'Could not load the session.' }, { status: 500 });
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -60,11 +57,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (status !== 'awaiting_approval') {
       return NextResponse.json({ error: 'This session is not waiting for approval.' }, { status: 409 });
     }
-    const { data: transitioned, error: transitionError } = await supabase
-      .from('WorkSession')
+    const { data: transitioned, error: transitionError } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
       .update({ status: 'running', updatedAt: new Date().toISOString() })
       .eq('id', id)
-      .eq('spaceId', auth.space.id)
       .eq('status', 'awaiting_approval')
       .select('id')
       .maybeSingle();
@@ -80,11 +75,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const cleanAnswer = typeof answer === 'string' ? answer.trim().slice(0, 1000) : '';
     if (!cleanAnswer) return NextResponse.json({ error: 'Type an answer first.' }, { status: 400 });
-    const { data: transitioned, error: transitionError } = await supabase
-      .from('WorkSession')
+    const { data: transitioned, error: transitionError } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
       .update({ answer: cleanAnswer, question: null, status: 'planning', updatedAt: new Date().toISOString() })
       .eq('id', id)
-      .eq('spaceId', auth.space.id)
       .eq('status', 'awaiting_input')
       .select('id')
       .maybeSingle();

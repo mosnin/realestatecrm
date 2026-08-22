@@ -29,10 +29,13 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { notifyBroker } from '@/lib/broker-notify';
 import { sendPushToSpace } from '@/lib/push';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface BrokerageSlaPolicy {
   id: string;
@@ -92,10 +95,8 @@ async function ensureSlaFollowUpTask(args: {
 
   try {
     // Dedup: is there already an open SLA follow-up for this contact?
-    const { data: existing, error: lookupError } = await supabase
-      .from('AgentTask')
+    const { data: existing, error: lookupError } = await tenantTable(supabase, 'AgentTask', { spaceId })
       .select('id')
-      .eq('spaceId', spaceId)
       .eq('triggerSource', SLA_TASK_TRIGGER)
       .eq('metadata->>contactId', contactId)
       .in('status', OPEN_TASK_STATUSES)
@@ -122,7 +123,7 @@ async function ensureSlaFollowUpTask(args: {
     // (contactId/kind) that the lookup above keys on — enqueueTask doesn't
     // expose a metadata field, so the row is written directly here.
     const now = new Date().toISOString();
-    const { error: insertError } = await supabase.from('AgentTask').insert({
+    const { error: insertError } = await tenantTable(supabase, 'AgentTask', { spaceId }).insert({
       spaceId,
       title: title.slice(0, 255),
       description,
@@ -232,8 +233,8 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
           body: `Assigned to ${realtor} ${waited} minutes ago and still no first response. Reassign or step in.`,
           metadata: { kind: 'lead_sla_breach', contactId: c.id, spaceId: c.spaceId, realtor, waitedMinutes: waited },
         });
-        await supabase
-          .from('Contact')
+        await unscoped(supabase
+          .from('Contact'), 'broker: membership-proved cross-space access')
           .update({ tags: [...tags, ESCALATED_TAG] })
           .eq('id', c.id);
         result.escalated += 1;
@@ -246,8 +247,8 @@ export async function sweepBrokerageSla(brokerage: BrokerageSlaPolicy): Promise<
         title: 'A lead is waiting on you',
         body: `${c.name} has been waiting ${waited} minutes. Reach out now.`,
       }).catch(() => 0);
-      await supabase
-        .from('Contact')
+      await unscoped(supabase
+        .from('Contact'), 'broker: membership-proved cross-space access')
         .update({ tags: [...tags, NUDGED_TAG] })
         .eq('id', c.id);
       result.nudged += 1;

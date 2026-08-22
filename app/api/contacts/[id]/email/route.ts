@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { sendDraft, describeDelivery } from '@/lib/delivery';
@@ -27,13 +28,13 @@ export async function POST(
   // Get space first, then query contact scoped to that space to prevent
   // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: contactRows, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contactRows, error: contactError } = await tenantTable(supabase, 'Contact', {
+    spaceId: space.id,
+  })
     .select('spaceId, name, email')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .limit(1);
   if (contactError) throw contactError;
   if (!contactRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -100,15 +101,17 @@ export async function POST(
   // line on the detail page both reflect this send immediately — not just the
   // activity row, which not every consumer reads.
   const now = new Date().toISOString();
-  const { error: contactUpdateError } = await supabase
-    .from('Contact')
+  const { error: contactUpdateError } = await tenantTable(supabase, 'Contact', {
+    spaceId: space.id,
+  })
     .update({ lastContactedAt: now, updatedAt: now })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (contactUpdateError) console.error('[email/route] failed to update lastContactedAt', contactUpdateError);
 
   // Log as ContactActivity — non-blocking; email already sent
-  const { error: activityError } = await supabase.from('ContactActivity').insert({
+  const { error: activityError } = await tenantTable(supabase, 'ContactActivity', {
+    spaceId: space.id,
+  }).insert({
     id: crypto.randomUUID(),
     contactId: id,
     spaceId: space.id,

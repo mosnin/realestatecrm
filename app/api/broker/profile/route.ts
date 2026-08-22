@@ -20,6 +20,7 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { audit } from '@/lib/audit';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { tenantTable } from '@/lib/tenant-db';
 
 interface MemberProfile {
   displayName: string | null;
@@ -37,11 +38,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from('BrokerageMembership')
+  const { data, error } = await tenantTable(supabase, 'BrokerageMembership', {
+    brokerageId: ctx.brokerage.id,
+  })
     .select('displayName, title, bio, photoUrl, phone')
     .eq('id', ctx.membership.id)
-    .maybeSingle<MemberProfile>();
+    .maybeSingle();
 
   if (error) {
     // Degrade gracefully if the profile columns don't exist yet
@@ -125,14 +127,14 @@ export async function PATCH(req: Request) {
 
   // Self-scoped: update the caller's OWN membership row only. The id comes
   // from the resolved broker context, never from the client.
-  const { data: updatedMembership, error: updateErr } = await supabase
-    .from('BrokerageMembership')
+  const { data: updatedMembership, error: updateErr } = await tenantTable(supabase, 'BrokerageMembership', {
+    brokerageId: ctx.brokerage.id,
+  })
     .update(updates)
     .eq('id', ctx.membership.id)
-    .eq('brokerageId', ctx.brokerage.id)
     .eq('userId', ctx.dbUserId)
     .select('id')
-    .maybeSingle<{ id: string }>();
+    .maybeSingle();
 
   if (updateErr) {
     console.error('[broker/profile] update failed', updateErr);

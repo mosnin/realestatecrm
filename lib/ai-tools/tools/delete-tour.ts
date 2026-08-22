@@ -11,6 +11,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
 import { defineTool } from '../types';
@@ -44,11 +45,9 @@ export const deleteTourTool = defineTool<typeof parameters, DeleteTourResult>({
   },
 
   async handler(args, ctx) {
-    const { data: tour, error: tourErr } = await supabase
-      .from('Tour')
+    const { data: tour, error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .select('id, contactId, guestName, googleEventId')
       .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (tourErr) {
       return { summary: `Tour lookup failed: ${tourErr.message}`, display: 'error' };
@@ -61,7 +60,7 @@ export const deleteTourTool = defineTool<typeof parameters, DeleteTourResult>({
     // the Tour FK on ContactActivity isn't involved, and recording the
     // reason while the contactId is still in hand keeps the audit trail.
     if (tour.contactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: tour.contactId,
@@ -74,11 +73,9 @@ export const deleteTourTool = defineTool<typeof parameters, DeleteTourResult>({
       }
     }
 
-    const { error: deleteErr } = await supabase
-      .from('Tour')
+    const { error: deleteErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .delete()
-      .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.tourId);
     if (deleteErr) {
       logger.error('[tools.delete_tour] delete failed', { tourId: args.tourId }, deleteErr);
       return { summary: `Delete failed: ${deleteErr.message}`, display: 'error' };

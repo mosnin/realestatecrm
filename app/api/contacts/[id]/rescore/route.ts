@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
@@ -26,7 +27,7 @@ export async function POST(
   // Get space first, then query contact scoped to that space to prevent
   // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Credit gate (no-op unless CREDITS_ENFORCED). Refuse up front when the
   // account can't afford a lead score; charged on success below.
@@ -48,25 +49,22 @@ export async function POST(
     throw err;
   }
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('Contact')
+  const { data: rows, error: fetchError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (fetchError) {
     console.error('[rescore] Fetch error:', fetchError);
     return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
   }
-  if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const contactRows = (rows ?? []) as Contact[];
+  if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const contact = rows[0] as Contact;
+  const contact = contactRows[0];
 
   // Mark as pending while scoring
-  await supabase
-    .from('Contact')
+  await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .update({ scoringStatus: 'pending' })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   // Score against the form-config snapshot stored on the contact at submission.
   const formConfig: IntakeFormConfig | null =
@@ -88,17 +86,14 @@ export async function POST(
     });
   } catch (scoringErr) {
     // Reset status to 'failed' so the contact is not stuck in 'pending'
-    await supabase
-      .from('Contact')
+    await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
-      .eq('id', id)
-      .eq('spaceId', space.id);
+      .eq('id', id);
     console.error('[rescore] Scoring failed:', scoringErr);
     return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
   }
 
-  const { error: updateError } = await supabase
-    .from('Contact')
+  const { error: updateError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .update({
       scoringStatus: result.scoringStatus,
       leadScore: result.leadScore,
@@ -107,8 +102,7 @@ export async function POST(
       scoreDetails: result.scoreDetails,
       updatedAt: new Date().toISOString(),
     })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (updateError) {
     console.error('[rescore] Update error:', updateError);

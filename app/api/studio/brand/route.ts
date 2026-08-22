@@ -11,6 +11,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -26,12 +27,10 @@ export async function GET() {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('StudioBrand')
+  const { data, error } = await tenantTable(supabase, 'StudioBrand', { spaceId: space.id })
     .select('colors, voice, handles')
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (error) {
     logger.error('[studio.brand] read failed', { spaceId: space.id }, error);
@@ -50,7 +49,7 @@ export async function PUT(req: NextRequest) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let body: { colors?: unknown; voice?: unknown; handles?: unknown };
   try {
@@ -75,7 +74,7 @@ export async function PUT(req: NextRequest) {
     linkedin: clean(h.linkedin),
   };
 
-  const { error } = await supabase.from('StudioBrand').upsert(
+  const { error } = await tenantTable(supabase, 'StudioBrand', { spaceId: space.id }).upsert(
     {
       spaceId: space.id,
       colors,

@@ -830,8 +830,8 @@ function StagePlan({
         />
         <PlanCard
           eyebrow="Today"
-          title="Your intake link is live"
-          body="Share it on listings, email signatures, and your social bios — every submission flows straight to me for triage."
+          title="Your intake link is ready"
+          body="Share it on listings, email signatures, and your social bios — every submission lands in your book. I'll draft a next step when you have credits."
         />
       </div>
 

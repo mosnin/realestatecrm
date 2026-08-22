@@ -4,17 +4,16 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import type { MessageChannel } from '@/lib/message-templates';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_CHANNELS: MessageChannel[] = ['sms', 'email', 'note'];
 
 async function resolve(userId: string, id: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data } = await supabase
-    .from('MessageTemplate')
+  const { data } = await tenantTable(supabase, 'MessageTemplate', { spaceId: space.id })
     .select('*')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!data) return null;
   return { space, template: data };
@@ -58,11 +57,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     patch.body = content;
   }
 
-  const { data, error } = await supabase
-    .from('MessageTemplate')
+  const { data, error } = await tenantTable(supabase, 'MessageTemplate', { spaceId: ctx.space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
 
@@ -82,11 +79,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const ctx = await resolve(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('MessageTemplate')
+  const { error } = await tenantTable(supabase, 'MessageTemplate', { spaceId: ctx.space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', ctx.space.id);
+    .eq('id', id);
 
   if (error) {
     logger.error('[templates] delete failed', { templateId: id }, error);

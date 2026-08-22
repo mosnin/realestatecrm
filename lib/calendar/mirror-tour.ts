@@ -11,6 +11,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { findCalendarConnection, writeEventThrough } from '@/lib/calendar/mirror';
 import { createGoogleEvent } from '@/lib/gcal-helpers';
@@ -69,10 +70,10 @@ export async function mirrorTourBookingToCalendar(
     };
   }
 
-  const { data: tokenRow } = await supabase
-    .from('GoogleCalendarToken')
+  const { data: tokenRow } = await tenantTable(supabase, 'GoogleCalendarToken', {
+    spaceId: input.spaceId,
+  })
     .select('accessToken, refreshToken, expiresAt, calendarId')
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
   if (!tokenRow) {
     return { attempted: false, reason: 'no_connection' };
@@ -89,11 +90,9 @@ export async function mirrorTourBookingToCalendar(
     if (!created.ok) {
       return { attempted: true, externalOk: false, via: 'legacy' };
     }
-    const { error: stampErr } = await supabase
-      .from('Tour')
+    const { error: stampErr } = await tenantTable(supabase, 'Tour', { spaceId: input.spaceId })
       .update({ googleEventId: created.googleEventId })
-      .eq('id', input.tourId)
-      .eq('spaceId', input.spaceId);
+      .eq('id', input.tourId);
     if (stampErr) {
       logger.warn('[calendar.mirror-tour] failed to stamp googleEventId', {
         spaceId: input.spaceId,
@@ -113,15 +112,13 @@ export async function mirrorTourBookingToCalendar(
 
 /** Cancel a just-created tour when the calendar write failed. Scoped. */
 export async function rollbackTourBooking(spaceId: string, tourId: string): Promise<void> {
-  const { error } = await supabase
-    .from('Tour')
+  const { error } = await tenantTable(supabase, 'Tour', { spaceId })
     .update({
       status: 'cancelled',
       updatedAt: new Date().toISOString(),
       notes: 'Cancelled: could not add this tour to the realtor calendar.',
     })
-    .eq('id', tourId)
-    .eq('spaceId', spaceId);
+    .eq('id', tourId);
   if (error) {
     logger.error('[calendar.mirror-tour] rollback failed', { spaceId, tourId, err: error.message });
   }

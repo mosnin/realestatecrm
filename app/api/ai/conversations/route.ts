@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceFromSlug } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { RESERVED_TITLE_LIKE_PATTERNS } from '@/lib/chat/conversation-access';
 import { parseConversationMode } from '@/lib/chat/conversation-mode';
@@ -39,10 +40,8 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
     if (!owner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const { data, error } = await supabase
-      .from('Conversation')
+    const { data, error } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
       .select('*')
-      .eq('spaceId', space.id)
       // Reserved broker/team prefixes are sourced from
       // lib/chat/conversation-access so the realtor exclusion set lives in one
       // place. The realtor surface never serves broker-Chippi or team chats.
@@ -52,7 +51,7 @@ export async function GET(req: NextRequest) {
       .limit(limit);
     if (error) return NextResponse.json({ error: 'Failed to load conversations' }, { status: 500 });
 
-    const conversations = data ?? [];
+    const conversations = (data ?? []) as Array<{ id: string; [key: string]: unknown }>;
 
     // Fetch the last message for each conversation to provide a preview line.
     // Single query: grab the most-recent message per conversationId for this
@@ -63,19 +62,14 @@ export async function GET(req: NextRequest) {
       // PostgREST doesn't support GROUP BY, so we fetch with a high-enough
       // limit and deduplicate in JS. We order descending so the first row we
       // see for each conversationId is the latest one.
-      const { data: msgs } = await supabase
-        .from('Message')
+      const { data: msgs } = await tenantTable(supabase, 'Message', { spaceId: space.id })
         .select('conversationId, content')
         .in('conversationId', ids)
-        // Defense-in-depth: the ids come from already-filtered conversations,
-        // but Message also carries spaceId. Keep previews scoped to this
-        // workspace so malformed legacy rows cannot bleed into the sidebar.
-        .eq('spaceId', space.id)
         .order('createdAt', { ascending: false })
         .limit(limit * 20); // bounded generous cap; deduplication below
 
       if (msgs) {
-        for (const msg of msgs) {
+        for (const msg of msgs as Array<{ conversationId?: string; content?: string }>) {
           if (msg.conversationId && !(msg.conversationId in previewMap)) {
             const text = (msg.content ?? '').replace(/\s+/g, ' ').trim();
             previewMap[msg.conversationId] = text.length > 60 ? text.slice(0, 59) + '…' : text;
@@ -121,8 +115,7 @@ export async function POST(req: NextRequest) {
     if (!owner) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('Conversation')
+    const { data, error } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
       .insert({
         id: crypto.randomUUID(),
         spaceId: space.id,

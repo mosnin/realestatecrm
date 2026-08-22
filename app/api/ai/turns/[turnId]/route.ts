@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { cancelQueuedConversationTurn } from '@/lib/chat/turn-control';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
 
@@ -19,18 +20,14 @@ export async function DELETE(
   }
   const space = await getSpaceForUser(auth.userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const { data: turn } = await supabase
-    .from('ConversationTurn')
+  const { data: turn } = await tenantTable(supabase, 'ConversationTurn', { spaceId: space.id })
     .select('id, conversationId')
     .eq('id', turnId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!turn) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const { data: conversation } = await supabase
-    .from('Conversation')
+  const { data: conversation } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
     .select('id, title')
     .eq('id', turn.conversationId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!conversation || isReservedConversationTitle(conversation.title)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });

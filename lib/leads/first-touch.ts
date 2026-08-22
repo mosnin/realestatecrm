@@ -41,6 +41,7 @@
 
 import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
@@ -374,11 +375,9 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
   }
 
   // ── Contact, scoped to the tenant ─────────────────────────────────────
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email, phone')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (!contactRow) return { created: false, reason: 'contact_not_found' };
   const contact = contactRow as ContactRow;
@@ -394,10 +393,8 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
 
   // ── Per-contact dedupe (one first touch per lead, ever) ───────────────
   const idempotencyKey = `first-touch:${spaceId}:${contactId}`;
-  const { data: existing } = await supabase
-    .from('AgentDraft')
+  const { data: existing } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('id')
-    .eq('spaceId', spaceId)
     .eq('contactId', contactId)
     .eq('idempotencyKey', idempotencyKey)
     .limit(1)
@@ -442,8 +439,7 @@ async function performFirstTouch(input: FireFirstTouchInput): Promise<FirstTouch
 
   // ── Persist the pending draft. Unique idempotencyKey is the race
   //    backstop. Status stays pending until a send actually lands. ───────
-  const { data: inserted, error: insertError } = await supabase
-    .from('AgentDraft')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .insert({
       spaceId,
       contactId,

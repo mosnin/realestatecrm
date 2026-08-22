@@ -14,6 +14,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 
 export const runtime = 'nodejs';
@@ -34,12 +35,10 @@ export async function GET() {
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('File')
+  const { data, error } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .select('id, name, sizeBytes, createdAt')
-    .eq('spaceId', space.id)
     .eq('mimeType', DOC_MIME)
     .order('createdAt', { ascending: false })
     .limit(500);
@@ -50,7 +49,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    documents: (data ?? []).map((d) => ({
+    documents: ((data ?? []) as { id: string; name: string; sizeBytes: number; createdAt: string }[]).map((d) => ({
       id: d.id,
       title: d.name,
       sizeBytes: Number(d.sizeBytes ?? 0),
@@ -65,7 +64,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let body: { title?: unknown; content?: unknown };
   try {
@@ -100,8 +99,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save document' }, { status: 500 });
   }
 
-  const { data: inserted, error } = await supabase
-    .from('File')
+  const { data: inserted, error } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .insert({
       id,
       spaceId: space.id,

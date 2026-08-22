@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import type {
   IntakeFormConfig,
@@ -557,10 +558,8 @@ export async function getFormConfig(
   spaceId: string
 ): Promise<IntakeFormConfig | null> {
   // Fetch the space setting with its form config
-  const { data: setting, error: settingError } = await supabase
-    .from('SpaceSetting')
+  const { data: setting, error: settingError } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('"formConfig", "formConfigSource"')
-    .eq('spaceId', spaceId)
     .single();
 
   if (settingError || !setting) {
@@ -635,10 +634,8 @@ export async function getFormConfigs(
   spaceId: string,
   brokerageId?: string | null,
 ): Promise<DualFormConfigs> {
-  const { data: setting, error: settingError } = await supabase
-    .from('SpaceSetting')
+  const { data: setting, error: settingError } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('"formConfig", "formConfigSource", "rentalFormConfig", "buyerFormConfig"')
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (settingError || !setting) {

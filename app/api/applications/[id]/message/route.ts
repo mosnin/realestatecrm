@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * POST /api/applications/[id]/message
@@ -39,8 +40,9 @@ export async function POST(
   const sanitized = content.trim().replace(/<[^>]*>/g, '');
 
   // Get contact details for email notification
-  const { data: contact, error: fetchError } = await supabase
-    .from('Contact')
+  const { data: contact, error: fetchError } = await tenantTable(supabase, 'Contact', {
+    spaceId: auth.space.id,
+  })
     .select('email, name, spaceId, applicationRef, statusPortalToken')
     .eq('id', contactId)
     .single();
@@ -50,11 +52,12 @@ export async function POST(
   }
 
   // Create the message
-  const { data: message, error: insertError } = await supabase
-    .from('ApplicationMessage')
+  const { data: message, error: insertError } = await tenantTable(supabase, 'ApplicationMessage', {
+    spaceId: auth.space.id,
+  })
     .insert({
       contactId,
-      spaceId: contact.spaceId,
+      spaceId: auth.space.id,
       senderType: 'realtor',
       content: sanitized,
     })
@@ -94,8 +97,9 @@ export async function GET(
   const auth = await requireContactAccess(contactId);
   if (auth instanceof NextResponse) return auth;
 
-  const { data: messages, error } = await supabase
-    .from('ApplicationMessage')
+  const { data: messages, error } = await tenantTable(supabase, 'ApplicationMessage', {
+    spaceId: auth.space.id,
+  })
     .select('id, senderType, content, readAt, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: true });
@@ -111,8 +115,7 @@ export async function GET(
     .map((m: { id: string }) => m.id);
 
   if (unreadApplicantIds.length > 0) {
-    await supabase
-      .from('ApplicationMessage')
+    await tenantTable(supabase, 'ApplicationMessage', { spaceId: auth.space.id })
       .update({ readAt: new Date().toISOString() })
       .in('id', unreadApplicantIds);
   }
@@ -134,10 +137,8 @@ async function sendMessageNotification(
 
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('slug, name').eq('id', contact.spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
       .select('businessName')
-      .eq('spaceId', contact.spaceId)
       .maybeSingle(),
   ]);
 

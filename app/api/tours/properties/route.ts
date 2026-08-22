@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -10,10 +11,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('TourPropertyProfile')
+  const { data, error } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: true });
   if (error) throw error;
 
@@ -31,8 +30,7 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('TourPropertyProfile')
+  const { data, error } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

@@ -31,7 +31,9 @@
 
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSignedDownloadUrl, uploadObject, buildKey } from '@/lib/storage';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -172,11 +174,9 @@ export async function dealHasOpenSignatureRequests(
   dealId: string,
   spaceId: string,
 ): Promise<OpenSignaturesResult> {
-  const { data, error } = await supabase
-    .from('SignatureRequest')
+  const { data, error } = await tenantTable(supabase, 'SignatureRequest', { spaceId })
     .select('id, status')
     .eq('dealId', dealId)
-    .eq('spaceId', spaceId)
     .in('status', OPEN_SIGNATURE_STATUSES as unknown as string[]);
 
   if (error) {
@@ -309,11 +309,9 @@ export async function sendForSignature(
 
   // 2. Load the document — scoped to the space so a caller can't sign
   //    someone else's file.
-  const { data: doc, error: docError } = await supabase
-    .from('DealDocument')
+  const { data: doc, error: docError } = await tenantTable(supabase, 'DealDocument', { spaceId: input.spaceId })
     .select('id, dealId, label, storagePath, contentType')
     .eq('id', input.documentId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
 
   if (docError) {
@@ -381,8 +379,7 @@ export async function sendForSignature(
 
   // 5. Record the request.
   const now = new Date().toISOString();
-  const { data: inserted, error: insertError } = await supabase
-    .from('SignatureRequest')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'SignatureRequest', { spaceId: input.spaceId })
     .insert({
       spaceId: input.spaceId,
       dealId: input.dealId?.trim() || (doc.dealId as string | null) || null,
@@ -498,11 +495,9 @@ export interface RefreshEnvelopeStatusInput {
 export async function refreshEnvelopeStatus(
   input: RefreshEnvelopeStatusInput,
 ): Promise<RefreshEnvelopeStatusResult> {
-  const { data: row, error: rowError } = await supabase
-    .from('SignatureRequest')
+  const { data: row, error: rowError } = await tenantTable(supabase, 'SignatureRequest', { spaceId: input.spaceId })
     .select(REQUEST_COLUMNS)
     .eq('id', input.signatureRequestId)
-    .eq('spaceId', input.spaceId)
     .maybeSingle();
 
   if (rowError || !row) return { ok: false, reason: 'not_found' };
@@ -549,8 +544,8 @@ export async function refreshEnvelopeStatus(
   // No change → just bump updatedAt and return. (request.status is already
   // narrowed to non-terminal here, so an unchanged status can't be completed.)
   if (status === request.status) {
-    await supabase
-      .from('SignatureRequest')
+    await unscoped(supabase
+      .from('SignatureRequest'), 'post-fetch: caller verified parent scope before this id query')
       .update({ updatedAt: new Date().toISOString() })
       .eq('id', request.id);
     return { ok: true, signatureRequest: { ...request, status } };
@@ -588,7 +583,7 @@ export async function refreshEnvelopeStatus(
 
         // Attach back as a DealDocument when tied to a deal.
         if (request.dealId) {
-          await supabase.from('DealDocument').insert({
+          await tenantTable(supabase, 'DealDocument', { spaceId: request.spaceId }).insert({
             dealId: request.dealId,
             spaceId: request.spaceId,
             kind: 'other',
@@ -610,8 +605,8 @@ export async function refreshEnvelopeStatus(
     }
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('SignatureRequest')
+  const { data: updated, error: updateError } = await unscoped(supabase
+    .from('SignatureRequest'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status,
       signedDocumentUrl,

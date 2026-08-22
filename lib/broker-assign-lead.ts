@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
 import { normalizeLeadSource } from '@/lib/lead-source';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export type AssignLeadResult =
   | { ok: true; newContactId: string; assignedToSpaceId: string }
@@ -46,8 +49,8 @@ export async function assignLeadToRealtor(params: {
     value: brokerSpace.id,
   };
   if (!contact) {
-    const { data: contactByBrokerageId, error: brokerageContactError } = await supabase
-      .from('Contact')
+    const { data: contactByBrokerageId, error: brokerageContactError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .select('*')
       .eq('id', contactId)
       .eq('brokerageId', brokerage.id)
@@ -97,7 +100,7 @@ export async function assignLeadToRealtor(params: {
   const newContactId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  const { error: cloneError } = await supabase.from('Contact').insert({
+  const { error: cloneError } = await tenantTable(supabase, 'Contact', { spaceId: realtorSpace.id }).insert({
     id: newContactId,
     spaceId: realtorSpace.id,
     name: contact.name,
@@ -144,8 +147,8 @@ export async function assignLeadToRealtor(params: {
     assignedAt: now,
   });
 
-  const { error: updateError } = await supabase
-    .from('Contact')
+  const { error: updateError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .update({
       tags: [...existingTags.filter((t: string) => t !== 'new-lead'), 'assigned'],
       notes: assignmentNote,

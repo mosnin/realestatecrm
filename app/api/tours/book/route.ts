@@ -9,6 +9,7 @@ import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
 import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar/mirror-tour';
 import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 /** Public endpoint — guests book a tour without authentication. */
@@ -58,10 +59,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Get duration from settings
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('tourDuration')
-    .eq('spaceId', space.id)
     .maybeSingle();
   let duration = settings?.tourDuration ?? 30;
 
@@ -69,11 +68,11 @@ export async function POST(req: NextRequest) {
   // and use its tour duration if available
   let validPropertyProfileId: string | null = null;
   if (propertyProfileId) {
-    const { data: profileRow } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profileRow } = await tenantTable(supabase, 'TourPropertyProfile', {
+      spaceId: space.id,
+    })
       .select('id, tourDuration')
       .eq('id', propertyProfileId)
-      .eq('spaceId', space.id)
       .eq('isActive', true)
       .maybeSingle();
     if (profileRow) {
@@ -110,10 +109,8 @@ export async function POST(req: NextRequest) {
 
   // Try to match to existing contact by email, or create one
   let contactId: string | null = null;
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .ilike('email', guestEmail.trim())
     .maybeSingle();
 
@@ -124,17 +121,15 @@ export async function POST(req: NextRequest) {
     // before the update committed, so first-touch attribution was missed
     // intermittently. Cost is one extra serial query; the route already
     // does several.
-    const { error: srcErr } = await supabase
-      .from('Contact')
+    const { error: srcErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .update({ sourceLabel: 'tour-booking' })
       .eq('id', contactId)
-      .eq('spaceId', space.id)
       .is('sourceLabel', null);
     if (srcErr) console.error('[book] Source update failed:', srcErr);
   } else {
     // Auto-create a contact for this tour guest
     const newContactId = crypto.randomUUID();
-    const { error: createErr } = await supabase.from('Contact').insert({
+    const { error: createErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
       id: newContactId,
       spaceId: space.id,
       name: guestName.trim(),
@@ -230,19 +225,19 @@ export async function POST(req: NextRequest) {
   }
 
   // Fetch the created tour for the response
-  const { data: tour, error: fetchError } = await supabase
-    .from('Tour')
+  const { data: tour, error: fetchError } = await tenantTable(supabase, 'Tour', {
+    spaceId: space.id,
+  })
     .select('*')
     .eq('id', tourId)
-    .eq('spaceId', space.id)
     .single();
   if (fetchError) throw fetchError;
 
   // Send confirmation email (non-blocking)
-  const { data: settingsFull } = await supabase
-    .from('SpaceSetting')
+  const { data: settingsFull } = await tenantTable(supabase, 'SpaceSetting', {
+    spaceId: space.id,
+  })
     .select('businessName')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const emailData: TourEmailData = {
     guestName: tour.guestName,

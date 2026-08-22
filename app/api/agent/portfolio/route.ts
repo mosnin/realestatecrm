@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
@@ -31,19 +32,15 @@ export async function GET() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch contacts and active deals in parallel
   const [contactsResult, dealsResult] = await Promise.all([
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('leadScore, leadType, lastContactedAt, followUpAt, type')
-      .eq('spaceId', space.id)
       .limit(2000),
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('value, probability, closeDate')
-      .eq('spaceId', space.id)
       .eq('status', 'active')
       .limit(500),
   ]);

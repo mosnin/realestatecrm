@@ -19,6 +19,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const TERMINAL_RUN_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 const TERMINAL_EVENT_TYPES = new Set(['swarm_completed', 'swarm_failed', 'swarm_cancelled']);
@@ -37,15 +39,14 @@ export async function GET(
 
   // Verify the run belongs to the caller's space.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: run } = await supabase
-    .from('SwarmRun')
+  const { data: run } = await tenantTable(supabase, 'SwarmRun', { spaceId: space.id })
     .select('id, spaceId, status')
     .eq('id', runId)
     .maybeSingle();
 
-  if (!run || run.spaceId !== space.id) {
+  if (!run) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

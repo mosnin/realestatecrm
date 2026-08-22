@@ -36,6 +36,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { listTriggersForConnection } from '@/lib/integrations/triggers';
 import type { Signal, SignalGatherer } from '../types';
@@ -407,10 +408,8 @@ async function findActiveConnection(spaceId: string): Promise<{
   id: string;
   userId: string;
 } | null> {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('id, userId')
-    .eq('spaceId', spaceId)
     .eq('toolkit', 'hubspot')
     .eq('status', 'active')
     .maybeSingle();
@@ -418,20 +417,16 @@ async function findActiveConnection(spaceId: string): Promise<{
 }
 
 async function loadChippiDeals(spaceId: string): Promise<ChippiDealRow[]> {
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, title, closeDate, stageId, DealStage:stageId(kind, position)')
-    .eq('spaceId', spaceId)
     .eq('status', 'active');
   if (error || !data) return [];
   return data as unknown as ChippiDealRow[];
 }
 
 async function loadChippiContacts(spaceId: string): Promise<ChippiContactRow[]> {
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email')
-    .eq('spaceId', spaceId)
     .not('email', 'is', null);
   if (error || !data) return [];
   return data as ChippiContactRow[];

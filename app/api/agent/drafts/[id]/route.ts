@@ -9,6 +9,7 @@ import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
 import { LEVENSHTEIN_CAP, normalizedLevenshtein } from '@/lib/draft-feedback';
 import type { InboxChannel } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Pulls feedback fields from the PATCH body and validates them server-side.
@@ -45,7 +46,7 @@ export async function PATCH(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
   const body = await req.json();
@@ -65,11 +66,9 @@ export async function PATCH(
   }
 
   // Verify the draft belongs to this space and is still pending
-  const { data: existing, error: fetchError } = await supabase
-    .from('AgentDraft')
+  const { data: existing, error: fetchError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .select('id, status, contactId, dealId, channel, subject, content, outcome')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .single();
 
   if (fetchError || !existing) {
@@ -106,11 +105,9 @@ export async function PATCH(
       dismissPatch.outcome = 'no_response';
       dismissPatch.outcomeDetectedAt = new Date().toISOString();
     }
-    const { data: updated, error: updateError } = await supabase
-      .from('AgentDraft')
+    const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
       .update(dismissPatch)
       .eq('id', id)
-      .eq('spaceId', space.id)
       .select()
       .single();
 
@@ -133,11 +130,9 @@ export async function PATCH(
   // Fetch contact info needed for delivery (email / phone)
   let contact = { name: 'Contact', email: null as string | null, phone: null as string | null };
   if (existing.contactId) {
-    const { data: contactRow } = await supabase
-      .from('Contact')
+    const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('name, email, phone')
       .eq('id', existing.contactId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (contactRow) contact = contactRow;
   }
@@ -175,11 +170,9 @@ export async function PATCH(
     : 0;
   if (decisionMs !== null) patch.decision_ms = decisionMs;
 
-  const { data: updated, error: updateError } = await supabase
-    .from('AgentDraft')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
 
@@ -221,7 +214,7 @@ export async function PATCH(
     // consistent. Best-effort, like the agent/send write.
     if (existing.contactId) {
       try {
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId: space.id }).insert({
           id: crypto.randomUUID(),
           spaceId: space.id,
           contactId: existing.contactId,

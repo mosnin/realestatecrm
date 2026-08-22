@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { groupDuplicates, DEDUP_SCAN_CAP, type DedupContact } from '@/lib/contact-dedup';
+import { tenantTable } from '@/lib/tenant-db';
 
 /** Slim row the detector returns to the client (enough to render a preview). */
 type DupRow = DedupContact & {
@@ -36,10 +37,8 @@ export async function GET(req: NextRequest) {
   // Load this space's contacts, newest first, capped. Duplicates are
   // overwhelmingly recent (double-submits, re-imports), so the most-recent
   // slice catches the vast majority while keeping the O(n^2) scan bounded.
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id, name, email, phone, type, tags, leadScore, budget, createdAt')
-    .eq('spaceId', space.id)
     .is('brokerageId', null) // exclude brokerage leads (shown on /broker/leads)
     .order('createdAt', { ascending: false })
     .limit(DEDUP_SCAN_CAP);

@@ -29,6 +29,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 /**
@@ -128,7 +129,7 @@ export async function createAppNotification(
     const priority: AppNotificationPriority =
       input.priority === 'high' || input.priority === 'low' ? input.priority : 'medium';
 
-    const { error } = await supabase.from('AppNotification').insert({
+    const { error } = await tenantTable(supabase, 'AppNotification', { spaceId }).insert({
       spaceId,
       type: input.type,
       title,

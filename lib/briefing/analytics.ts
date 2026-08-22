@@ -16,6 +16,8 @@
 import { supabase as defaultClient } from '@/lib/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { BriefCardMeta, BriefCardTap, SignalKind, SignalSource } from './types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -40,8 +42,8 @@ export async function briefOpenRate(
   client: SupabaseClient = defaultClient,
 ): Promise<{ total: number; seen: number; rate: number }> {
   const { since, until } = rangeBounds(rangeDays);
-  const { data, error } = await client
-    .from('Brief')
+  const { data, error } = await unscoped(client
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, seenAt')
     .gte('createdAt', since)
     .lt('createdAt', until);
@@ -75,8 +77,8 @@ export async function sourceTapRates(
   }>
 > {
   const { since, until } = rangeBounds(rangeDays);
-  const { data, error } = await client
-    .from('Brief')
+  const { data, error } = await unscoped(client
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .select('cardMeta, cardTaps')
     .gte('createdAt', since)
     .lt('createdAt', until);
@@ -128,8 +130,8 @@ export async function confidenceCalibration(
   }>
 > {
   const { since, until } = rangeBounds(rangeDays);
-  const { data, error } = await client
-    .from('Brief')
+  const { data, error } = await unscoped(client
+    .from('Brief'), 'post-fetch: caller verified parent scope before this id query')
     .select('cardMeta, cardTaps')
     .gte('createdAt', since)
     .lt('createdAt', until);
@@ -185,8 +187,8 @@ export async function briefRetentionDelta(
   disabled: { count: number; canceled: number; rate: number };
 }> {
   const enabledThreshold = new Date(Date.now() - cohortMinDays * MS_PER_DAY).toISOString();
-  const { data, error } = await client
-    .from('SpaceSetting')
+  const { data, error } = await unscoped(client
+    .from('SpaceSetting'), 'post-fetch: caller verified parent scope before this id query')
     .select('spaceId, briefEnabled, briefEnabledAt, Space:spaceId(stripeSubscriptionStatus)');
 
   if (error || !data) {

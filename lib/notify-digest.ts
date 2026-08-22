@@ -25,6 +25,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type { DigestSection } from '@/lib/email';
 import type { EffectiveEventTypes } from '@/lib/notify-prefs';
 
@@ -101,23 +102,22 @@ export async function buildDigestSections(
 
   // ── New leads ──────────────────────────────────────────────────────────
   if (eventTypes.newLeads) {
-    const { data: leads, error } = await supabase
-      .from('Contact')
+    const { data: leads, error } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, createdAt')
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .contains('tags', ['new-lead'])
       .gte('createdAt', since)
       .lte('createdAt', until)
       .order('createdAt', { ascending: false })
       .limit(MAX_ITEMS_PER_SECTION + 1);
-    if (!error && leads && leads.length > 0) {
+    const leadRows = (leads ?? []) as Array<{ name: string | null }>;
+    if (!error && leadRows.length > 0) {
       sections.push({
         label: 'New leads',
         href: '/leads',
         items: capItems(
-          leads.map((c) => (c.name as string) || 'Unnamed lead'),
-          leads.length,
+          leadRows.map((c) => c.name || 'Unnamed lead'),
+          leadRows.length,
         ),
       });
     }
@@ -125,31 +125,34 @@ export async function buildDigestSections(
 
   // ── Tour bookings ──────────────────────────────────────────────────────
   if (eventTypes.tourBookings) {
-    const { data: tours, error } = await supabase
-      .from('Tour')
+    const { data: tours, error } = await tenantTable(supabase, 'Tour', { spaceId })
       .select('id, guestName, startsAt, propertyAddress, createdAt')
-      .eq('spaceId', spaceId)
       .gte('createdAt', since)
       .lte('createdAt', until)
       .order('createdAt', { ascending: false })
       .limit(MAX_ITEMS_PER_SECTION + 1);
-    if (!error && tours && tours.length > 0) {
+    const tourRows = (tours ?? []) as Array<{
+      guestName: string | null;
+      startsAt: string | null;
+      propertyAddress: string | null;
+    }>;
+    if (!error && tourRows.length > 0) {
       sections.push({
         label: 'Tour bookings',
         href: '/calendar',
         items: capItems(
-          tours.map((t) => {
+          tourRows.map((t) => {
             const when = t.startsAt
-              ? new Date(t.startsAt as string).toLocaleDateString('en-US', {
+              ? new Date(t.startsAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
                 })
               : '';
             const prop = t.propertyAddress ? ` — ${t.propertyAddress}` : '';
-            const name = (t.guestName as string) || 'Guest';
+            const name = t.guestName || 'Guest';
             return when ? `${name} (${when})${prop}` : `${name}${prop}`;
           }),
-          tours.length,
+          tourRows.length,
         ),
       });
     }
@@ -157,24 +160,23 @@ export async function buildDigestSections(
 
   // ── New deals ──────────────────────────────────────────────────────────
   if (eventTypes.newDeals) {
-    const { data: deals, error } = await supabase
-      .from('Deal')
+    const { data: deals, error } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('id, title, value, createdAt')
-      .eq('spaceId', spaceId)
       .gte('createdAt', since)
       .lte('createdAt', until)
       .order('createdAt', { ascending: false })
       .limit(MAX_ITEMS_PER_SECTION + 1);
-    if (!error && deals && deals.length > 0) {
+    const dealRows = (deals ?? []) as Array<{ title: string | null; value: number | null }>;
+    if (!error && dealRows.length > 0) {
       sections.push({
         label: 'New deals',
         href: '/deals',
         items: capItems(
-          deals.map((d) => {
-            const title = (d.title as string) || 'Untitled deal';
+          dealRows.map((d) => {
+            const title = d.title || 'Untitled deal';
             return d.value != null ? `${title} — ${fmtCurrency(Number(d.value))}` : title;
           }),
-          deals.length,
+          dealRows.length,
         ),
       });
     }

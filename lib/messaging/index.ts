@@ -18,6 +18,7 @@ import {
   publishMessageEvent,
   publishUserEvent,
 } from '@/lib/realtime/ably';
+import { tenantTable } from '@/lib/tenant-db';
 import type {
   Channel,
   ChannelMessage,
@@ -69,11 +70,9 @@ export async function getMembership(
   channelId: string,
   userId: string,
 ): Promise<{ channel: Channel; memberId: string; lastReadMessageId: string | null } | null> {
-  const { data: channel } = await supabase
-    .from('Channel')
+  const { data: channel } = await tenantTable(supabase, 'Channel', { brokerageId })
     .select('*')
     .eq('id', channelId)
-    .eq('brokerageId', brokerageId)
     .maybeSingle();
   if (!channel) return null;
 
@@ -94,12 +93,17 @@ export async function getMembership(
 
 /** Every brokerage member with their profile + last-seen (the roster). */
 export async function rosterForBrokerage(brokerageId: string): Promise<MessagingMember[]> {
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
-    .select('userId, role, User!inner(id, name, email, avatar, lastSeenAt)')
-    .eq('brokerageId', brokerageId);
+  const { data: memberships } = await tenantTable(supabase, 'BrokerageMembership', { brokerageId })
+    .select('userId, role, User!inner(id, name, email, avatar, lastSeenAt)');
   if (!memberships) return [];
-  return memberships.map((m) => {
+  const membershipRows = memberships as Array<{
+    userId: string;
+    role: MessagingMember['role'];
+    User:
+      | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }
+      | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }[];
+  }>;
+  return membershipRows.map((m) => {
     // PostgREST types embedded to-one relations as arrays; it's an object at
     // runtime. Normalize either shape.
     const rel = (m as unknown as { User: { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null } | { name: string | null; email: string; avatar: string | null; lastSeenAt: string | null }[] }).User;
@@ -159,8 +163,7 @@ export async function listChannels(
   const rosterById = new Map(roster.map((r) => [r.userId, r]));
 
   // Last message per channel + unread counts. Pull recent messages once.
-  const { data: recentMsgs } = await supabase
-    .from('ChannelMessage')
+  const { data: recentMsgs } = await tenantTable(supabase, 'ChannelMessage', { brokerageId })
     .select('id, channelId, body, kind, senderId, createdAt')
     .in('channelId', channelIds)
     .is('deletedAt', null)
@@ -225,12 +228,12 @@ export async function listChannels(
 
 /** Message history for a channel, oldest→newest within a newest-first page. */
 export async function listMessages(
+  brokerageId: string,
   channelId: string,
   opts: { before?: string; limit?: number } = {},
 ): Promise<ChannelMessage[]> {
   const limit = Math.min(opts.limit ?? HISTORY_PAGE, HISTORY_PAGE);
-  let q = supabase
-    .from('ChannelMessage')
+  let q = tenantTable(supabase, 'ChannelMessage', { brokerageId })
     .select('*')
     .eq('channelId', channelId)
     .is('deletedAt', null)
@@ -256,25 +259,20 @@ export async function ensureDmChannel(
 ): Promise<{ channel: Channel; created: boolean }> {
   const key = dmKeyFor([userId, otherUserId]);
 
-  const { data: existing } = await supabase
-    .from('Channel')
+  const { data: existing } = await tenantTable(supabase, 'Channel', { brokerageId })
     .select('*')
-    .eq('brokerageId', brokerageId)
     .eq('dmKey', key)
     .maybeSingle();
   if (existing) return { channel: existing as Channel, created: false };
 
-  const { data: created, error } = await supabase
-    .from('Channel')
+  const { data: created, error } = await tenantTable(supabase, 'Channel', { brokerageId })
     .insert({ brokerageId, kind: 'dm', visibility: 'private', dmKey: key, createdById })
     .select('*')
     .single();
   // Lost the race (another request created it first) → fetch the winner.
   if (error || !created) {
-    const { data: raced } = await supabase
-      .from('Channel')
+    const { data: raced } = await tenantTable(supabase, 'Channel', { brokerageId })
       .select('*')
-      .eq('brokerageId', brokerageId)
       .eq('dmKey', key)
       .maybeSingle();
     if (raced) return { channel: raced as Channel, created: false };
@@ -287,7 +285,7 @@ export async function ensureDmChannel(
     { channelId: channel.id, userId: otherUserId, role: 'member' },
   ]);
   if (memberError) {
-    await supabase.from('Channel').delete().eq('id', channel.id);
+    await tenantTable(supabase, 'Channel', { brokerageId }).delete().eq('id', channel.id);
     logger.error('[messaging] failed to create DM memberships', { brokerageId, channelId: channel.id }, memberError);
     throw new Error('Failed to open direct message');
   }
@@ -300,8 +298,7 @@ export async function createNamedChannel(
   createdById: string,
   opts: { name: string; topic?: string | null; visibility?: 'public' | 'private'; memberIds: string[] },
 ): Promise<Channel> {
-  const { data, error } = await supabase
-    .from('Channel')
+  const { data, error } = await tenantTable(supabase, 'Channel', { brokerageId })
     .insert({
       brokerageId,
       kind: 'channel',
@@ -327,7 +324,7 @@ export async function createNamedChannel(
     })),
   );
   if (memberError) {
-    await supabase.from('Channel').delete().eq('id', channel.id);
+    await tenantTable(supabase, 'Channel', { brokerageId }).delete().eq('id', channel.id);
     logger.error('[messaging] failed to create channel memberships', { brokerageId, channelId: channel.id }, memberError);
     throw new Error('Failed to create channel');
   }
@@ -348,8 +345,7 @@ export async function postMessage(
   const body = (input.body ?? '').slice(0, MAX_BODY) || null;
   const attachments = input.attachments ?? [];
 
-  const { data, error } = await supabase
-    .from('ChannelMessage')
+  const { data, error } = await tenantTable(supabase, 'ChannelMessage', { brokerageId: channel.brokerageId })
     .insert({
       channelId: channel.id,
       brokerageId: channel.brokerageId,
@@ -364,7 +360,9 @@ export async function postMessage(
   if (error || !data) throw new Error('Failed to send message');
   const message = data as ChannelMessage;
 
-  await supabase.from('Channel').update({ updatedAt: new Date().toISOString() }).eq('id', channel.id);
+  await tenantTable(supabase, 'Channel', { brokerageId: channel.brokerageId })
+    .update({ updatedAt: new Date().toISOString() })
+    .eq('id', channel.id);
 
   // Sender has implicitly read their own message.
   await supabase
@@ -403,8 +401,7 @@ export async function markRead(
   userId: string,
   messageId: string,
 ): Promise<void> {
-  const { data: msg } = await supabase
-    .from('ChannelMessage')
+  const { data: msg } = await tenantTable(supabase, 'ChannelMessage', { brokerageId: channel.brokerageId })
     .select('id, createdAt')
     .eq('id', messageId)
     .eq('channelId', channel.id)

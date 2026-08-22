@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { logger } from '@/lib/logger';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * PATCH /api/broker/properties/[id]/assign — assign a pool property to a member
@@ -36,8 +38,8 @@ export async function PATCH(
   }
 
   // The property must be in this brokerage's pool.
-  const { data: prop } = await supabase
-    .from('Property')
+  const { data: prop } = await unscoped(supabase
+    .from('Property'), 'broker: membership-proved cross-space access')
     .select('id, brokerageId')
     .eq('id', id)
     .eq('brokerageId', ctx.brokerage.id)
@@ -75,8 +77,8 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await unscoped(supabase
+    .from('Property'), 'broker: membership-proved cross-space access')
     .update({ assignedSpaceId: target, updatedAt: new Date().toISOString() })
     .eq('id', id)
     .eq('brokerageId', ctx.brokerage.id)

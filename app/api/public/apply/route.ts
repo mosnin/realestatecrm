@@ -21,6 +21,8 @@ import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/li
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { logger } from '@/lib/logger';
 import { recordConsent } from '@/lib/messaging/compliance';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -663,8 +665,8 @@ export async function POST(req: NextRequest) {
         leadType: contactLeadType,
       });
 
-      const { error: scoreUpdateError } = await supabase
-        .from('Contact')
+      const { error: scoreUpdateError } = await unscoped(supabase
+        .from('Contact'), 'public intake: slug/token then scoped write')
         .update({
           scoringStatus: scoring.scoringStatus,
           leadScore: scoring.leadScore,
@@ -686,8 +688,8 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       logger.error('[apply] scoring failed', { contactId: contact.id }, error);
       try {
-        await supabase
-          .from('Contact')
+        await unscoped(supabase
+          .from('Contact'), 'public intake: slug/token then scoped write')
           .update({
             scoringStatus: 'failed',
             leadScore: null,

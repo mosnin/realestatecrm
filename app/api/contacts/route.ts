@@ -8,6 +8,7 @@ import { fireFirstTouch } from '@/lib/leads/first-touch';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
 import type { Contact } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -25,10 +26,8 @@ export async function GET(req: NextRequest) {
   const includeSnoozed = req.nextUrl.searchParams.get('includeSnoozed') === '1';
   const onlySnoozed = req.nextUrl.searchParams.get('onlySnoozed') === '1';
 
-  let query = supabase
-    .from('Contact')
+  let query = tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
 
   if (!includeSnoozed && !onlySnoozed) {
@@ -92,9 +91,17 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags, source, sourceDetail } = body;
 
+  if (typeof slug !== 'string' || !slug) {
+    return NextResponse.json({ error: 'slug required' }, { status: 400 });
+  }
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
@@ -126,10 +133,8 @@ export async function POST(req: NextRequest) {
   // No new DB constraint: case-mismatched emails would be rejected by a
   // unique index, which may not be desired across all data.
   if (emailVal) {
-    const { data: existing, error: dupErr } = await supabase
-      .from('Contact')
+    const { data: existing, error: dupErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .eq('spaceId', space.id)
       .ilike('email', emailVal)
       .limit(1)
       .maybeSingle();
@@ -164,7 +169,7 @@ export async function POST(req: NextRequest) {
   const sourceVal = normalizeLeadSource(source) ?? 'manual';
   const sourceDetailVal = sourceDetail ? String(sourceDetail).trim().slice(0, 500) : null;
 
-  const { data: contact, error } = await supabase.from('Contact').insert({
+  const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
     id,
     spaceId: space.id,
     name: name.trim().slice(0, 200),

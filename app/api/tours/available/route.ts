@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSpaceFromSlug } from '@/lib/space';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { fetchCalendarBusySlots } from '@/lib/calendar/busy-times';
@@ -34,10 +35,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Load space settings
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('tourDuration, tourStartHour, tourEndHour, tourDaysAvailable, timezone, tourBufferMinutes, tourBlockedDates')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   // If a property profile is specified, use its settings instead of defaults
@@ -51,11 +50,11 @@ export async function GET(req: NextRequest) {
 
   let propertyProfile: any = null;
   if (propertyId) {
-    const { data: profile } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profile } = await tenantTable(supabase, 'TourPropertyProfile', {
+      spaceId: space.id,
+    })
       .select('*')
       .eq('id', propertyId)
-      .eq('spaceId', space.id)
       .eq('isActive', true)
       .maybeSingle();
     if (profile) {
@@ -76,10 +75,8 @@ export async function GET(req: NextRequest) {
   endDate.setDate(endDate.getDate() + 14);
 
   // Fetch existing tours in range (filter by property if specified)
-  let toursQuery = supabase
-    .from('Tour')
+  let toursQuery = tenantTable(supabase, 'Tour', { spaceId: space.id })
     .select('startsAt, endsAt')
-    .eq('spaceId', space.id)
     .in('status', ['scheduled', 'confirmed'])
     .gte('startsAt', startDate.toISOString())
     .lte('startsAt', endDate.toISOString());
@@ -101,10 +98,9 @@ export async function GET(req: NextRequest) {
   const blockedSet = new Set(blockedDates);
 
   // Fetch overrides (single-date and recurring) scoped to this property or global
-  let overridesQuery = supabase
-    .from('TourAvailabilityOverride')
-    .select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId')
-    .eq('spaceId', space.id);
+  let overridesQuery = tenantTable(supabase, 'TourAvailabilityOverride', {
+    spaceId: space.id,
+  }).select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId');
   const { data: overridesRaw } = await overridesQuery;
 
   // Build effective overrides for each date in range, expanding recurring ones
@@ -230,10 +226,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Also fetch all active property profiles for this space (so the booking page can show them)
-  const { data: profiles } = await supabase
-    .from('TourPropertyProfile')
+  const { data: profiles } = await tenantTable(supabase, 'TourPropertyProfile', {
+    spaceId: space.id,
+  })
     .select('id, name, address, tourDuration, isActive')
-    .eq('spaceId', space.id)
     .eq('isActive', true)
     .order('createdAt', { ascending: true });
 

@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { ensureDmChannel, postMessage, rosterForBrokerage } from '@/lib/messaging';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   RUN_POLICY_HEADER,
   runPolicyEnforcementMode,
@@ -121,8 +122,10 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
-  const { data: membership } = await supabase
-    .from('BrokerageMembership')
+  const { data: membership } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'membership lookup by userId then team send uses that brokerageId',
+  )
     .select('brokerageId')
     .eq('userId', senderId)
     .limit(1)

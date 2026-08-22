@@ -15,13 +15,16 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { coalesceTextBlocks, type MessageBlock } from '@/lib/ai-tools/blocks';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Bump the parent conversation's updatedAt so the sidebar orders by recency. */
 async function touchConversation(conversationId: string): Promise<void> {
-  const { error } = await supabase
-    .from('BrokerConversation')
+  const { error } = await unscoped(supabase
+    .from('BrokerConversation'), 'post-fetch: caller verified parent scope before this id query')
     .update({ updatedAt: new Date().toISOString() })
     .eq('id', conversationId);
   if (error) {
@@ -40,7 +43,7 @@ export async function saveBrokerUserMessage(
   input: SaveBrokerUserMessageInput,
 ): Promise<{ messageId: string }> {
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrokerMessage').insert({
+  const { error } = await tenantTable(supabase, 'BrokerMessage', { brokerageId: input.brokerageId }).insert({
     id,
     brokerageId: input.brokerageId,
     conversationId: input.conversationId,
@@ -73,7 +76,7 @@ export async function saveBrokerAssistantMessage(
     .trim();
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrokerMessage').insert({
+  const { error } = await tenantTable(supabase, 'BrokerMessage', { brokerageId: input.brokerageId }).insert({
     id,
     brokerageId: input.brokerageId,
     conversationId: input.conversationId,

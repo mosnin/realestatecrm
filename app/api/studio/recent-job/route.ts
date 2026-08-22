@@ -18,6 +18,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSignedDownloadUrl } from '@/lib/storage';
 
 export const runtime = 'nodejs';
@@ -31,15 +32,13 @@ export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const url = new URL(req.url);
   const source = url.searchParams.get('source');
 
-  const baseQuery = supabase
-    .from('StudioGeneration')
-    .select('id, status, kind, fileId, errorMessage, sourceFileId, createdAt')
-    .eq('spaceId', space.id);
+  const baseQuery = tenantTable(supabase, 'StudioGeneration', { spaceId: space.id })
+    .select('id, status, kind, fileId, errorMessage, sourceFileId, createdAt');
   const filtered =
     source === 'create'
       ? baseQuery.is('sourceFileId', null)
@@ -68,11 +67,9 @@ export async function GET(req: Request) {
   }
 
   if (status === 'completed' && data.fileId) {
-    const { data: file } = await supabase
-      .from('File')
+    const { data: file } = await tenantTable(supabase, 'File', { spaceId: space.id })
       .select('storageKey')
       .eq('id', data.fileId as string)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (file?.storageKey) {
       const downloadUrl = await getSignedDownloadUrl(file.storageKey as string, 3600);

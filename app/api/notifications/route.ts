@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   notificationForNewLeadsCount,
   notificationForUpcomingTour,
@@ -47,10 +48,8 @@ async function fetchStoredNotifications(
 ): Promise<ComputedNotification[]> {
   try {
     const since = new Date(Date.now() - STORED_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    const { data, error } = await supabase
-      .from('AppNotification')
+    const { data, error } = await tenantTable(supabase, 'AppNotification', { spaceId })
       .select('id, type, title, body, href, priority, createdAt')
-      .eq('spaceId', spaceId)
       .gte('createdAt', since.toISOString())
       .order('createdAt', { ascending: false })
       .limit(STORED_LIMIT);
@@ -108,17 +107,13 @@ async function computeNotifications(
   // read/dismiss freshness check work: once read, this stays hidden until a
   // genuinely newer lead arrives — instead of re-surfacing every fetch (which
   // it would if createdAt were wall-clock now()).
-  const { count: newLeads } = await supabase
-    .from('Contact')
+  const { count: newLeads } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('*', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .is('brokerageId', null)
     .contains('tags', ['new-lead']);
   if (newLeads && newLeads > 0) {
-    const { data: latestLead } = await supabase
-      .from('Contact')
+    const { data: latestLead } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('createdAt')
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .contains('tags', ['new-lead'])
       .order('createdAt', { ascending: false })
@@ -138,16 +133,15 @@ async function computeNotifications(
 
   // 2. Tours starting in the next 24 hours
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const { data: upcomingTours } = await supabase
-    .from('Tour')
+  const { data: upcomingTours } = await tenantTable(supabase, 'Tour', { spaceId })
     .select('id, guestName, startsAt, propertyAddress')
-    .eq('spaceId', spaceId)
     .in('status', ['scheduled', 'confirmed'])
     .gte('startsAt', now.toISOString())
     .lte('startsAt', in24h.toISOString())
     .order('startsAt', { ascending: true })
     .limit(5);
-  for (const t of upcomingTours ?? []) {
+  const upcoming = (upcomingTours ?? []) as { id: string; guestName: string; startsAt: string; propertyAddress: string }[];
+  for (const t of upcoming) {
     const copy = notificationForUpcomingTour(
       t.guestName,
       new Date(t.startsAt),
@@ -166,15 +160,14 @@ async function computeNotifications(
   }
 
   // 3. Follow-ups that are due
-  const { data: dueFollowUps } = await supabase
-    .from('Contact')
+  const { data: dueFollowUps } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, followUpAt')
-    .eq('spaceId', spaceId)
     .not('followUpAt', 'is', null)
     .lte('followUpAt', now.toISOString())
     .order('followUpAt', { ascending: true })
     .limit(5);
-  for (const c of dueFollowUps ?? []) {
+  const due = (dueFollowUps ?? []) as { id: string; name: string; followUpAt: string }[];
+  for (const c of due) {
     const copy = notificationForFollowUpDue(c.name, new Date(c.followUpAt), now);
     notifications.push({
       id: `followup-${c.id}`,
@@ -190,16 +183,12 @@ async function computeNotifications(
   // 4. Waitlist entries needing attention. Same stable-timestamp treatment as
   // the new-leads aggregate: carry the newest waiting entry's createdAt so the
   // read/dismiss state sticks until a newer entry joins the waitlist.
-  const { count: waitlistCount } = await supabase
-    .from('TourWaitlist')
+  const { count: waitlistCount } = await tenantTable(supabase, 'TourWaitlist', { spaceId })
     .select('*', { count: 'exact', head: true })
-    .eq('spaceId', spaceId)
     .eq('status', 'waiting');
   if (waitlistCount && waitlistCount > 0) {
-    const { data: latestWaiting } = await supabase
-      .from('TourWaitlist')
+    const { data: latestWaiting } = await tenantTable(supabase, 'TourWaitlist', { spaceId })
       .select('createdAt')
-      .eq('spaceId', spaceId)
       .eq('status', 'waiting')
       .order('createdAt', { ascending: false })
       .limit(1)
@@ -217,27 +206,24 @@ async function computeNotifications(
   }
 
   // 5. Completed tours needing follow-up (no deal yet)
-  const { data: completedNoFollowUp } = await supabase
-    .from('Tour')
+  const { data: completedNoFollowUp } = await tenantTable(supabase, 'Tour', { spaceId })
     .select('id, guestName, updatedAt')
-    .eq('spaceId', spaceId)
     .eq('status', 'completed')
     .order('updatedAt', { ascending: false })
     .limit(10);
 
   if (completedNoFollowUp?.length) {
-    const tourIds = completedNoFollowUp.map((t: any) => t.id);
-    const { data: dealsFromTours } = await supabase
-      .from('Deal')
+    const completed = completedNoFollowUp as { id: string; guestName: string; updatedAt: string }[];
+    const tourIds = completed.map((t) => t.id);
+    const { data: dealsFromTours } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('sourceTourId')
-      .eq('spaceId', spaceId)
       .in('sourceTourId', tourIds);
-    const dealsSet = new Set((dealsFromTours ?? []).map((d: any) => d.sourceTourId));
-    const needsAction = completedNoFollowUp.filter((t: any) => !dealsSet.has(t.id));
+    const dealsSet = new Set(((dealsFromTours ?? []) as { sourceTourId: string }[]).map((d) => d.sourceTourId));
+    const needsAction = completed.filter((t) => !dealsSet.has(t.id));
     if (needsAction.length > 0) {
       // Newest updatedAt among the tours needing action → stable timestamp so
       // this aggregate stays read until a newer tour starts needing follow-up.
-      const latestUpdatedAt = needsAction.reduce<string | null>((max, t: any) => {
+      const latestUpdatedAt = needsAction.reduce<string | null>((max, t) => {
         return !max || new Date(t.updatedAt).getTime() > new Date(max).getTime()
           ? t.updatedAt
           : max;
@@ -289,10 +275,8 @@ export async function GET(req: NextRequest) {
   // is unavailable we still return the raw computed list rather than 500.
   let stateByKey = new Map<string, NotificationStateRow>();
   try {
-    const { data: states } = await supabase
-      .from('NotificationState')
+    const { data: states } = await tenantTable(supabase, 'NotificationState', { spaceId: space.id })
       .select('key, readAt, dismissedAt, sourceCreatedAt')
-      .eq('spaceId', space.id)
       .eq('userId', userId);
     stateByKey = new Map((states ?? []).map((s: NotificationStateRow) => [s.key, s]));
   } catch (err) {
@@ -351,9 +335,9 @@ async function stampState(
   if (patch.readAt) row.readAt = patch.readAt;
   if (patch.dismissedAt) row.dismissedAt = patch.dismissedAt;
 
-  await supabase
-    .from('NotificationState')
-    .upsert(row, { onConflict: 'spaceId,userId,key' });
+  await tenantTable(supabase, 'NotificationState', { spaceId }).upsert(row, {
+    onConflict: 'spaceId,userId,key',
+  });
 }
 
 /**
@@ -391,7 +375,7 @@ export async function PATCH(req: NextRequest) {
       // detectable).
       const current = await listNotifications(space.id, slug);
       if (current.length === 0) return NextResponse.json({ success: true });
-      await supabase.from('NotificationState').upsert(
+      await tenantTable(supabase, 'NotificationState', { spaceId: space.id }).upsert(
         current.map((n) => ({
           spaceId: space.id,
           userId,

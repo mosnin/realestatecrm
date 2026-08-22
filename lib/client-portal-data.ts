@@ -6,6 +6,8 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface PortalApplication {
   contactId: string;
@@ -57,15 +59,15 @@ export async function getClientPortalData(email: string): Promise<ClientPortalDa
   const lower = email.trim().toLowerCase();
 
   const [{ data: contacts }, { data: tours }] = await Promise.all([
-    supabase
-      .from('Contact')
+    unscoped(supabase
+      .from('Contact'), 'post-fetch: client portal ownership proof')
       .select(
         'id, name, email, applicationStatus, applicationStatusNote, applicationRef, spaceId, createdAt, Space(name, slug)',
       )
       .ilike('email', escapeLike(lower))
       .order('createdAt', { ascending: false }),
-    supabase
-      .from('Tour')
+    unscoped(supabase
+      .from('Tour'), 'post-fetch: client portal ownership proof')
       .select('id, propertyAddress, startsAt, status, spaceId, contactId, guestEmail, Space(name, slug)')
       .ilike('guestEmail', lower)
       .order('startsAt', { ascending: false }),
@@ -114,8 +116,8 @@ export async function getClientPortalData(email: string): Promise<ClientPortalDa
  *  / info-request endpoints before any read or write on a contact. */
 export async function clientOwnsContact(email: string, contactId: string): Promise<boolean> {
   const lower = email.trim().toLowerCase();
-  const { data } = await supabase
-    .from('Contact')
+  const { data } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
     .select('id')
     .eq('id', contactId)
     .ilike('email', escapeLike(lower))

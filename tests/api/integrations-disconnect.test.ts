@@ -18,12 +18,12 @@ vi.mock('@/lib/space', () => ({
   getSpaceForUser: vi.fn(),
 }));
 
-const { getByIdMock, revokeMock } = vi.hoisted(() => ({
-  getByIdMock: vi.fn(),
+const { getByIdForSpaceMock, revokeMock } = vi.hoisted(() => ({
+  getByIdForSpaceMock: vi.fn(),
   revokeMock: vi.fn(),
 }));
 vi.mock('@/lib/integrations/connections', () => ({
-  getById: getByIdMock,
+  getByIdForSpace: getByIdForSpaceMock,
   revoke: revokeMock,
 }));
 
@@ -77,7 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
   mockGetSpaceForUser.mockResolvedValue(SPACE);
-  getByIdMock.mockResolvedValue(fakeRow());
+  getByIdForSpaceMock.mockResolvedValue(fakeRow());
   revokeMock.mockResolvedValue(undefined);
 });
 
@@ -91,12 +91,12 @@ describe('DELETE /api/integrations/[id]', () => {
 
     expect(res).toBe(unauth);
     expect(res.status).toBe(401);
-    expect(getByIdMock).not.toHaveBeenCalled();
+    expect(getByIdForSpaceMock).not.toHaveBeenCalled();
     expect(revokeMock).not.toHaveBeenCalled();
   });
 
   it('404 when the row does not exist', async () => {
-    getByIdMock.mockResolvedValue(null);
+    getByIdForSpaceMock.mockResolvedValue(null);
     const [req, ctx] = makeReq('does_not_exist');
     const res = await DELETE(req, ctx);
     const body = await res.json();
@@ -105,13 +105,11 @@ describe('DELETE /api/integrations/[id]', () => {
     expect(revokeMock).not.toHaveBeenCalled();
   });
 
-  it('403 when the row belongs to a different space (privilege boundary)', async () => {
-    // The whole point of this route's space check — without it, anyone
-    // who guesses a UUID can revoke another agent's Gmail integration.
-    getByIdMock.mockResolvedValue(fakeRow({ spaceId: 'other_space' }));
+  it('404 when the row belongs to a different space (no existence oracle)', async () => {
+    getByIdForSpaceMock.mockResolvedValue(null);
     const [req, ctx] = makeReq('conn_1');
     const res = await DELETE(req, ctx);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(revokeMock).not.toHaveBeenCalled();
   });
 
@@ -125,7 +123,7 @@ describe('DELETE /api/integrations/[id]', () => {
 
   it('happy path: revokes the row and returns { ok: true }', async () => {
     const row = fakeRow({ id: 'conn_42' });
-    getByIdMock.mockResolvedValue(row);
+    getByIdForSpaceMock.mockResolvedValue(row);
 
     const [req, ctx] = makeReq('conn_42');
     const res = await DELETE(req, ctx);

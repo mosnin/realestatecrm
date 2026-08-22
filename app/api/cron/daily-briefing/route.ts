@@ -27,6 +27,8 @@ import { shouldGenerateFor } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import { monitorCron } from '@/lib/cron-monitor';
 import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -142,8 +144,8 @@ async function handler(req: NextRequest) {
 
   // Read every space's brief settings in one query. SpaceSetting is the
   // truth source — spaces without a settings row get the defaults.
-  const { data: settings, error } = await supabase
-    .from('SpaceSetting')
+  const { data: settings, error } = await unscoped(supabase
+    .from('SpaceSetting'), 'cron: cross-tenant discovery then per-row work')
     .select('spaceId, timezone, briefEnabled, briefHour')
     .eq('briefEnabled', true)
     .limit(MAX_PER_TICK);

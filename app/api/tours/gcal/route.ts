@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { encrypt, decrypt, decryptOrPassthrough } from '@/lib/crypto';
+import { tenantTable } from '@/lib/tenant-db';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
@@ -16,10 +17,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data: token } = await supabase
-    .from('GoogleCalendarToken')
+  const { data: token } = await tenantTable(supabase, 'GoogleCalendarToken', { spaceId: space.id })
     .select('id, calendarId, createdAt')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!GOOGLE_CLIENT_ID) {
@@ -95,8 +94,7 @@ export async function POST(req: NextRequest) {
       upsertPayload.refreshToken = encrypt(tokens.refresh_token);
     }
 
-    const { error } = await supabase
-      .from('GoogleCalendarToken')
+    const { error } = await tenantTable(supabase, 'GoogleCalendarToken', { spaceId: space.id })
       .upsert(upsertPayload, { onConflict: 'spaceId' });
     if (error) throw error;
 
@@ -108,10 +106,8 @@ export async function POST(req: NextRequest) {
     const { tourId } = body;
     if (!tourId) return NextResponse.json({ error: 'tourId required' }, { status: 400 });
 
-    const { data: tokenRow } = await supabase
-      .from('GoogleCalendarToken')
+    const { data: tokenRow } = await tenantTable(supabase, 'GoogleCalendarToken', { spaceId: space.id })
       .select('*')
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!tokenRow) return NextResponse.json({ error: 'Google Calendar not connected' }, { status: 400 });
 
@@ -122,11 +118,9 @@ export async function POST(req: NextRequest) {
     // Without this filter a caller could sync ANY tenant's tour (copying its
     // guest PII into their own calendar) and overwrite the victim's
     // googleEventId. A cross-tenant tourId now matches no row → 404.
-    const { data: tour } = await supabase
-      .from('Tour')
+    const { data: tour } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
       .select('*')
       .eq('id', tourId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
@@ -160,11 +154,9 @@ export async function POST(req: NextRequest) {
         // Clear the stale event ID in the DB so it gets re-created on retry.
         // Scope to the caller's space so the update can never touch another
         // tenant's row.
-        await supabase
-          .from('Tour')
+        await tenantTable(supabase, 'Tour', { spaceId: space.id })
           .update({ googleEventId: null })
-          .eq('id', tourId)
-          .eq('spaceId', space.id);
+          .eq('id', tourId);
         googleEventId = null; // Re-create below
       }
     }
@@ -187,18 +179,16 @@ export async function POST(req: NextRequest) {
       googleEventId = created.id;
     }
 
-    await supabase
-      .from('Tour')
+    await tenantTable(supabase, 'Tour', { spaceId: space.id })
       .update({ googleEventId })
-      .eq('id', tourId)
-      .eq('spaceId', space.id);
+      .eq('id', tourId);
 
     return NextResponse.json({ synced: true, googleEventId });
   }
 
   // Disconnect
   if (action === 'disconnect') {
-    await supabase.from('GoogleCalendarToken').delete().eq('spaceId', space.id);
+    await tenantTable(supabase, 'GoogleCalendarToken', { spaceId: space.id }).delete();
     return NextResponse.json({ connected: false });
   }
 
@@ -236,14 +226,12 @@ async function getValidAccessToken(tokenRow: any, spaceId: string): Promise<stri
   const tokens = await res.json();
   if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
 
-  await supabase
-    .from('GoogleCalendarToken')
+  await tenantTable(supabase, 'GoogleCalendarToken', { spaceId })
     .update({
       accessToken: encrypt(tokens.access_token),
       expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
       updatedAt: new Date().toISOString(),
-    })
-    .eq('spaceId', spaceId);
+    });
 
   return tokens.access_token;
 }

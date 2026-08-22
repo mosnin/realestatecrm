@@ -6,13 +6,18 @@ import { sendTourFollowUp, type TourEmailData } from '@/lib/tour-emails';
 import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { deleteGoogleEvent } from '@/lib/gcal-helpers';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 async function resolveTour(userId: string, tourId: string) {
-  const { data: tour, error } = await supabase.from('Tour').select('*').eq('id', tourId).maybeSingle();
+  const space = await getSpaceForUser(userId);
+  if (!space) return null;
+  const { data: tour, error } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
+    .select('*')
+    .eq('id', tourId)
+    .maybeSingle();
   if (error) throw error;
   if (!tour) return null;
-  const space = await getSpaceForUser(userId);
-  if (!space || tour.spaceId !== space.id) return null;
   return { tour, space };
 }
 
@@ -105,11 +110,9 @@ export async function PATCH(
   // this tour's prep card.
   if (body.contactId !== undefined) {
     if (body.contactId) {
-      const { data: contactRow, error: cErr } = await supabase
-        .from('Contact')
+      const { data: contactRow, error: cErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id')
         .eq('id', body.contactId)
-        .eq('spaceId', ctx.space.id)
         .maybeSingle();
       if (cErr) throw cErr;
       if (!contactRow) {
@@ -121,14 +124,9 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
-    .from('Tour')
+  const { data, error } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
     .update(update)
     .eq('id', id)
-    // resolveTour proved space ownership at read time; scope the write
-    // by spaceId too so a between-check-and-write reassignment can't
-    // cross-tenant the row.
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
   if (error) throw error;
@@ -136,40 +134,36 @@ export async function PATCH(
   // Auto-create follow-up reminder when tour is completed (24h later)
   if (body.status === 'completed' && ctx.tour.status !== 'completed' && data.contactId) {
     const followUpAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .update({ followUpAt, type: 'TOUR' })
       .eq('id', data.contactId)
       .is('followUpAt', null)
-      .then(({ error: fuErr }) => { if (fuErr) console.error('[tour] Follow-up set failed:', fuErr); });
+      .then(({ error: fuErr }: { error: unknown }) => { if (fuErr) console.error('[tour] Follow-up set failed:', fuErr); });
 
     // Log activity on the contact
-    supabase.from('ContactActivity').insert({
+    tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       contactId: data.contactId,
       spaceId: ctx.space.id,
       type: 'follow_up',
       content: `Auto follow-up set for 24h after tour completion${data.propertyAddress ? ` — ${data.propertyAddress}` : ''}`,
-    }).then(({ error: actErr }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });
+    }).then(({ error: actErr }: { error: unknown }) => { if (actErr) console.error('[tour] Activity log failed:', actErr); });
   }
 
   // Auto-set follow-up for no-shows (48h later)
   if (body.status === 'no_show' && ctx.tour.status !== 'no_show' && data.contactId) {
     const followUpAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .update({ followUpAt })
       .eq('id', data.contactId)
       .is('followUpAt', null)
-      .then(({ error: fuErr }) => { if (fuErr) console.error('[tour] No-show follow-up failed:', fuErr); });
+      .then(({ error: fuErr }: { error: unknown }) => { if (fuErr) console.error('[tour] No-show follow-up failed:', fuErr); });
   }
 
   // Send follow-up email when marked completed
   if (body.status === 'completed' && ctx.tour.status !== 'completed') {
-    const { data: settings } = await supabase
-      .from('SpaceSetting')
+    const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: ctx.space.id })
       .select('businessName')
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     const { data: spaceRow } = await supabase.from('Space').select('name, slug').eq('id', ctx.space.id).maybeSingle();
     const emailData: TourEmailData = {
@@ -248,11 +242,9 @@ export async function PATCH(
       if (ok) {
         // Clear the stale id so a re-sync doesn't try to update a
         // deleted event. Best-effort — orphaned id is survivable.
-        await supabase
-          .from('Tour')
+        await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
           .update({ googleEventId: null })
-          .eq('id', id)
-          .eq('spaceId', ctx.space.id);
+          .eq('id', id);
       }
     });
   }
@@ -277,12 +269,9 @@ export async function DELETE(
   // a ghost slot indefinitely.
   const googleEventId = ctx.tour.googleEventId as string | null | undefined;
 
-  const { error } = await supabase
-    .from('Tour')
+  const { error } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
     .delete()
-    .eq('id', id)
-    // Scope by spaceId so the delete can't cross-tenant on reassignment.
-    .eq('spaceId', ctx.space.id);
+    .eq('id', id);
   if (error) throw error;
 
   // Fire-and-forget the GCal cleanup. The DB has already committed; a

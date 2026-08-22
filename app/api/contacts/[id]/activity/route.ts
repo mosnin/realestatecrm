@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(
   _req: NextRequest,
@@ -14,11 +15,9 @@ export async function GET(
   const offset = Math.max(0, parseInt(_req.nextUrl.searchParams.get('offset') ?? '0') || 0);
 
   const { space } = auth;
-  const { data, error } = await supabase
-    .from('ContactActivity')
+  const { data, error } = await tenantTable(supabase, 'ContactActivity', { spaceId: space.id })
     .select('*')
     .eq('contactId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) {
@@ -53,8 +52,7 @@ export async function POST(
     return NextResponse.json({ error: 'Metadata too large' }, { status: 413 });
   }
 
-  const { data, error } = await supabase
-    .from('ContactActivity')
+  const { data, error } = await tenantTable(supabase, 'ContactActivity', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       contactId: id,

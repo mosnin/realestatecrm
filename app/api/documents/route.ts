@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
@@ -74,13 +76,15 @@ export async function POST(req: NextRequest) {
   let rateLimitKey: string;
   if (uploadedBy === 'guest') {
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data: guestContact } = await supabase
-      .from('Contact')
-      .select('spaceId')
-      .eq('id', contactId)
-      .contains('tags', ['application-link'])
-      .gte('createdAt', fiveMinAgo)
-      .maybeSingle();
+    const { data: guestContact } = await unscoped(
+      supabase
+        .from('Contact')
+        .select('spaceId')
+        .eq('id', contactId)
+        .contains('tags', ['application-link'])
+        .gte('createdAt', fiveMinAgo),
+      'capability window: application-link tag + 5-min createdAt on public intake',
+    ).maybeSingle();
     if (!guestContact) {
       return NextResponse.json({ error: 'Contact not found or upload window expired' }, { status: 404 });
     }
@@ -92,8 +96,9 @@ export async function POST(req: NextRequest) {
     const auth = await requireContactAccess(contactId);
     if (auth instanceof NextResponse) return auth;
 
-    const { data: authedContact } = await supabase
-      .from('Contact')
+    const { data: authedContact } = await tenantTable(supabase, 'Contact', {
+      spaceId: auth.space.id,
+    })
       .select('spaceId')
       .eq('id', contactId)
       .single();
@@ -136,8 +141,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
-  const { data: doc, error } = await supabase
-    .from('ContactDocument')
+  const { data: doc, error } = await tenantTable(supabase, 'ContactDocument', {
+    spaceId: resolvedSpaceId,
+  })
     .insert({
       contactId,
       spaceId: resolvedSpaceId,
@@ -171,8 +177,9 @@ export async function GET(req: NextRequest) {
   const auth = await requireContactAccess(contactId);
   if (auth instanceof NextResponse) return auth;
 
-  const { data: docs } = await supabase
-    .from('ContactDocument')
+  const { data: docs } = await tenantTable(supabase, 'ContactDocument', {
+    spaceId: auth.space.id,
+  })
     .select('id, fileName, fileType, fileSize, uploadedBy, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: false });

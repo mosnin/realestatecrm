@@ -4,6 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { formConfigSchema } from '@/lib/form-config-schema';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MAX_FORM_CONFIG_SIZE = 512_000; // 500KB
 const MAX_TOTAL_QUESTIONS = 200;
@@ -20,10 +21,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data: settings, error } = await supabase
-    .from('SpaceSetting')
+  const { data: settings, error } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('rentalFormConfig, buyerFormConfig, formConfig, formConfigSource')
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (error) {
     console.error('[form-config] GET query failed', error);
@@ -106,24 +105,19 @@ export async function PUT(req: NextRequest) {
   const column = leadType === 'rental' ? 'rentalFormConfig' : 'buyerFormConfig';
 
   // Upsert into SpaceSetting
-  const { data: existing } = await supabase
-    .from('SpaceSetting')
+  const { data: existing } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (existing) {
-    const { error: updateErr } = await supabase
-      .from('SpaceSetting')
-      .update({ [column]: formConfig, formConfigSource: 'custom' })
-      .eq('spaceId', space.id);
+    const { error: updateErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
+      .update({ [column]: formConfig, formConfigSource: 'custom' });
     if (updateErr) {
       console.error('[form-config] update failed', updateErr);
       return NextResponse.json({ error: 'Failed to save form config' }, { status: 500 });
     }
   } else {
-    const { error: insertErr } = await supabase
-      .from('SpaceSetting')
+    const { error: insertErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .insert({
         id: crypto.randomUUID(),
         spaceId: space.id,
@@ -190,10 +184,8 @@ export async function DELETE(req: NextRequest) {
   // If not, both configs are now null and we should reset source to legacy.
   let resolvedSource: 'custom' | 'legacy' = leadType ? 'custom' : 'legacy';
   if (leadType) {
-    const { data: currentSettings } = await supabase
-      .from('SpaceSetting')
+    const { data: currentSettings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .select('rentalFormConfig, buyerFormConfig')
-      .eq('spaceId', space.id)
       .maybeSingle();
 
     const otherColumn = leadType === 'rental' ? 'buyerFormConfig' : 'rentalFormConfig';
@@ -206,10 +198,8 @@ export async function DELETE(req: NextRequest) {
     }
   }
 
-  const { error: updateErr } = await supabase
-    .from('SpaceSetting')
-    .update(updates)
-    .eq('spaceId', space.id);
+  const { error: updateErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
+    .update(updates);
 
   if (updateErr) {
     console.error('[form-config] delete failed', updateErr);

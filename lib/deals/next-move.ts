@@ -22,6 +22,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   getLLMClient,
   hasLLMKey,
@@ -254,13 +255,11 @@ export async function computeNextMove(
 ): Promise<NextMove | null> {
   const now = opts.now ?? new Date();
 
-  const { data: dealRow, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: dealRow, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(
       'id, title, address, status, stageId, closeDate, followUpAt, nextAction, nextActionDueAt, stageChangedAt, updatedAt',
     )
     .eq('id', dealId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (dealErr) {
     logger.warn('[next-move] deal load failed', { dealId, err: dealErr.message });
@@ -271,25 +270,21 @@ export async function computeNextMove(
 
   // A closed/held deal has no "next move" — clear any stale chip and stop.
   if (deal.status !== 'active') {
-    await supabase
-      .from('Deal')
+    await tenantTable(supabase, 'Deal', { spaceId })
       .update({ nextMoveText: null, nextMoveKind: null, nextMoveComputedAt: now.toISOString() })
-      .eq('id', dealId)
-      .eq('spaceId', spaceId);
+      .eq('id', dealId);
     return null;
   }
 
   // ── Small scoped context loads ─────────────────────────────────────────
   const [stageResult, dcResult, dealActResult] = await Promise.all([
     deal.stageId
-      ? supabase.from('DealStage').select('name').eq('id', deal.stageId).eq('spaceId', spaceId).maybeSingle()
+      ? tenantTable(supabase, 'DealStage', { spaceId }).select('name').eq('id', deal.stageId).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from('DealContact').select('contactId').eq('dealId', dealId).limit(3),
-    supabase
-      .from('DealActivity')
+    tenantTable(supabase, 'DealActivity', { spaceId })
       .select('type, content, createdAt')
       .eq('dealId', dealId)
-      .eq('spaceId', spaceId)
       .order('createdAt', { ascending: false })
       .limit(4),
   ]);
@@ -301,22 +296,18 @@ export async function computeNextMove(
   if (contactIds.length > 0) {
     // Ownership-scoped: DealContact has no spaceId column, so the Contact
     // read re-asserts tenancy rather than trusting the join table.
-    const { data: contactRows } = await supabase
-      .from('Contact')
+    const { data: contactRows } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, lastContactedAt')
       .in('id', contactIds)
-      .eq('spaceId', spaceId)
       .limit(1);
     contact = ((contactRows ?? []) as ContactSnapshot[])[0] ?? null;
   }
 
   let contactActivityRows: Array<{ type: string; content: string | null; createdAt: string }> = [];
   if (contact) {
-    const { data } = await supabase
-      .from('ContactActivity')
+    const { data } = await tenantTable(supabase, 'ContactActivity', { spaceId })
       .select('type, content, createdAt')
       .eq('contactId', contact.id)
-      .eq('spaceId', spaceId)
       .order('createdAt', { ascending: false })
       .limit(4);
     contactActivityRows = (data ?? []) as typeof contactActivityRows;
@@ -371,15 +362,13 @@ export async function computeNextMove(
   const composed = (await composeMoveWithLLM(spaceId, facts)) ?? fallbackMove(facts);
 
   const computedAt = now.toISOString();
-  const { error: writeErr } = await supabase
-    .from('Deal')
+  const { error: writeErr } = await tenantTable(supabase, 'Deal', { spaceId })
     .update({
       nextMoveText: composed.move,
       nextMoveKind: composed.kind,
       nextMoveComputedAt: computedAt,
     })
-    .eq('id', dealId)
-    .eq('spaceId', spaceId);
+    .eq('id', dealId);
   if (writeErr) {
     logger.warn('[next-move] write failed', { dealId, err: writeErr.message });
     return null;

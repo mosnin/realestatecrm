@@ -3,6 +3,8 @@ import { getBrokerMemberContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { channelIdsForUser } from '@/lib/messaging';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export const runtime = 'nodejs';
 
@@ -27,8 +29,7 @@ export async function GET(req: Request) {
   if (!myChannels.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // A message the caller can see must reference this attachment.
-  const { data } = await supabase
-    .from('ChannelMessage')
+  const { data } = await tenantTable(supabase, 'ChannelMessage', { brokerageId: ctx.brokerage.id })
     .select('id')
     .in('channelId', myChannels)
     .is('deletedAt', null)

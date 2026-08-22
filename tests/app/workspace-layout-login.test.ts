@@ -15,16 +15,30 @@ const {
   getSpaceFromSlugMock,
   redirectMock,
   notFoundMock,
+  isAccountCompedMock,
+  subscriptionState,
 } = vi.hoisted(() => ({
   authMock: vi.fn(async () => ({ userId: 'clerk_1' })),
   loadDashboardUserMock: vi.fn(),
   getSpaceFromSlugMock: vi.fn(),
   redirectMock: vi.fn((href: string) => {
-    throw new Error(`redirect:${href}`);
+    const err = new Error(`redirect:${href}`) as Error & { digest?: string };
+    err.digest = 'NEXT_REDIRECT';
+    throw err;
   }),
   notFoundMock: vi.fn(() => {
     throw new Error('notFound');
   }),
+  isAccountCompedMock: vi.fn(async () => true),
+  subscriptionState: {
+    data: {
+      stripeSubscriptionStatus: 'active' as string,
+      stripePeriodEnd: '2099-01-01T00:00:00.000Z' as string | null,
+      stripeSubscriptionId: 'sub' as string | null,
+      trialUsedAt: null as string | null,
+    },
+    error: null as { message: string } | null,
+  },
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: authMock }));
@@ -44,6 +58,10 @@ vi.mock('@/lib/supabase', () => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
+          maybeSingle: vi.fn(async () => ({
+            data: subscriptionState.data,
+            error: subscriptionState.error,
+          })),
           is: vi.fn(() => ({
             contains: vi.fn(async () => ({ count: 0, error: null })),
             not: vi.fn(() => ({
@@ -52,8 +70,8 @@ vi.mock('@/lib/supabase', () => ({
           })),
           eq: vi.fn(() => ({
             maybeSingle: vi.fn(async () => ({
-              data: { stripeSubscriptionStatus: 'active', stripePeriodEnd: null, stripeSubscriptionId: 'sub', trialUsedAt: null },
-              error: null,
+              data: subscriptionState.data,
+              error: subscriptionState.error,
             })),
           })),
           in: vi.fn(async () => ({ count: 0, error: null })),
@@ -62,10 +80,17 @@ vi.mock('@/lib/supabase', () => ({
     })),
   },
 }));
-vi.mock('@/lib/billing/comp', () => ({ isAccountComped: vi.fn(async () => true) }));
+vi.mock('@/lib/billing/comp', () => ({ isAccountComped: isAccountCompedMock }));
 vi.mock('@/lib/onboarding', () => ({ ensureOnboardingBackfill: vi.fn(async () => false) }));
 vi.mock('@/lib/permissions', () => ({ getBrokerContext: vi.fn() }));
-vi.mock('@/lib/api-auth', () => ({ hasCurrentSubscription: vi.fn(() => true) }));
+vi.mock('@/lib/api-auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api-auth')>();
+  return {
+    ...actual,
+    canAccessWorkspace: actual.canAccessWorkspace,
+    hasCurrentSubscription: actual.hasCurrentSubscription,
+  };
+});
 vi.mock('@/lib/greetings', () => ({ pickGreeting: () => 'Welcome back.' }));
 vi.mock('@/lib/realtime/voice-feature', () => ({ realtimeVoiceGatewayReady: () => false }));
 vi.mock('@/components/dashboard/sidebar', () => ({ Sidebar: () => null }));
@@ -105,6 +130,14 @@ function treeHas(node: unknown, needle: string): boolean {
 beforeEach(() => {
   vi.clearAllMocks();
   authMock.mockResolvedValue({ userId: 'clerk_1' });
+  isAccountCompedMock.mockResolvedValue(true);
+  subscriptionState.data = {
+    stripeSubscriptionStatus: 'active',
+    stripePeriodEnd: '2099-01-01T00:00:00.000Z',
+    stripeSubscriptionId: 'sub',
+    trialUsedAt: null,
+  };
+  subscriptionState.error = null;
 });
 
 describe('DashboardLayout login gate', () => {
@@ -151,5 +184,77 @@ describe('DashboardLayout login gate', () => {
     const ui = (await renderLayout()) as ReactElement;
     expect(treeHas(ui, "couldn't load your workspace")).toBe(false);
     expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
+  });
+
+  it('lets a never-subscribed Free space into Today (CRM is not paywalled)', async () => {
+    isAccountCompedMock.mockResolvedValue(false);
+    subscriptionState.data = {
+      stripeSubscriptionStatus: 'inactive',
+      stripePeriodEnd: null,
+      stripeSubscriptionId: null,
+      trialUsedAt: null,
+    };
+    loadDashboardUserMock.mockResolvedValue({
+      id: 'user-1',
+      name: 'Ada',
+      onboard: true,
+      isPlatformAdmin: false,
+      space: { id: 'space-1' },
+    });
+    getSpaceFromSlugMock.mockResolvedValue({
+      id: 'space-1',
+      slug: 'acme',
+      name: 'Acme',
+      ownerId: 'user-1',
+    });
+    const ui = (await renderLayout()) as ReactElement;
+    expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('sends a lapsed paid relationship to billing-required', async () => {
+    isAccountCompedMock.mockResolvedValue(false);
+    subscriptionState.data = {
+      stripeSubscriptionStatus: 'canceled',
+      stripePeriodEnd: '2026-01-01T00:00:00.000Z',
+      stripeSubscriptionId: 'sub_old',
+      trialUsedAt: '2026-01-01T00:00:00.000Z',
+    };
+    loadDashboardUserMock.mockResolvedValue({
+      id: 'user-1',
+      name: 'Ada',
+      onboard: true,
+      isPlatformAdmin: false,
+      space: { id: 'space-1' },
+    });
+    getSpaceFromSlugMock.mockResolvedValue({
+      id: 'space-1',
+      slug: 'acme',
+      name: 'Acme',
+      ownerId: 'user-1',
+    });
+    await expect(renderLayout()).rejects.toThrow('redirect:/billing-required?slug=acme&reason=canceled');
+  });
+
+  it('does not paywall a Free workspace when the subscription lookup errors', async () => {
+    isAccountCompedMock.mockResolvedValue(false);
+    subscriptionState.data = null as never;
+    subscriptionState.error = { message: 'connection reset' };
+    loadDashboardUserMock.mockResolvedValue({
+      id: 'user-1',
+      name: 'Ada',
+      onboard: true,
+      isPlatformAdmin: false,
+      space: { id: 'space-1' },
+    });
+    getSpaceFromSlugMock.mockResolvedValue({
+      id: 'space-1',
+      slug: 'acme',
+      name: 'Acme',
+      ownerId: 'user-1',
+    });
+    const ui = (await renderLayout()) as ReactElement;
+    expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });

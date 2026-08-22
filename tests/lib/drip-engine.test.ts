@@ -179,6 +179,7 @@ describe('enrollContact', () => {
     const result = await enrollContact({ spaceId: 'space-1', sequenceId: 'seq-1', contactId: 'contact-x' });
 
     expect(result.outcome).toBe('contact_not_found');
+    expect(calls.some((c) => c.table === 'DripEnrollment' && c.op === 'insert')).toBe(false);
   });
 
   it('inserts a spaceId-stamped enrollment on the happy path', async () => {

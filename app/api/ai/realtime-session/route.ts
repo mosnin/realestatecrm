@@ -12,6 +12,7 @@ import {
   resolveVoiceWorkExecutionMode,
 } from '@/lib/realtime/voice-delegation';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { isRealtorConversation } from '@/lib/chat/conversation-access';
 import { isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
 import { logger } from '@/lib/logger';
@@ -63,11 +64,9 @@ export async function POST(req: Request) {
   let attachedConversationMode: 'chat' | 'work' | null = null;
   let workExecutionMode: WorkExecutionMode = 'review';
   if (conversationId) {
-    const { data, error } = await supabase
-      .from('Conversation')
+    const { data, error } = await tenantTable(supabase, 'Conversation', { spaceId: auth.space.id })
       .select('id, spaceId, title, mode, executionMode')
       .eq('id', conversationId)
-      .eq('spaceId', auth.space.id)
       .maybeSingle();
     if (error) return NextResponse.json({ error: 'Could not verify conversation.' }, { status: 500 });
     if (!isRealtorConversation(data, auth.space.id)) {

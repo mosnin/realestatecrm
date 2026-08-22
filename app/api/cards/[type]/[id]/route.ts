@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 // ── GET /api/cards/[type]/[id]?spaceId=... ───────────────────────────────────
 // Returns rich data for expandable chat cards. Auth required — user must own
@@ -64,13 +66,11 @@ export async function GET(
 // ── Contact ──────────────────────────────────────────────────────────────────
 
 async function handleContact(id: string, spaceId: string): Promise<NextResponse> {
-  const { data: row, error } = await supabase
-    .from('Contact')
+  const { data: row, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select(
       'id, name, email, phone, tags, leadType, leadScore, scoreLabel, budget, followUpAt, lastContactedAt',
     )
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (error) {
@@ -80,11 +80,9 @@ async function handleContact(id: string, spaceId: string): Promise<NextResponse>
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch last 3 ContactActivity entries as recentActivity.
-  const { data: activities, error: actError } = await supabase
-    .from('ContactActivity')
+  const { data: activities, error: actError } = await tenantTable(supabase, 'ContactActivity', { spaceId })
     .select('id, type, content, createdAt')
     .eq('contactId', id)
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false })
     .limit(3);
 
@@ -136,13 +134,11 @@ async function handleContact(id: string, spaceId: string): Promise<NextResponse>
 // ── Deal ─────────────────────────────────────────────────────────────────────
 
 async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
-  const { data: row, error } = await supabase
-    .from('Deal')
+  const { data: row, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(
       'id, title, stageId, value, commissionRate, propertyId, nextAction, closeDate, priority',
     )
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (error) {
@@ -155,16 +151,14 @@ async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
   // parallel to keep latency low.
   const [stageResult, propertyResult, contactsResult, activityResult] = await Promise.all([
     row.stageId
-      ? supabase
-          .from('DealStage')
+      ? tenantTable(supabase, 'DealStage', { spaceId })
           .select('id, name')
           .eq('id', row.stageId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
 
     row.propertyId
-      ? supabase
-          .from('Property')
+      ? tenantTable(supabase, 'Property', { spaceId })
           .select('id, address')
           .eq('id', row.propertyId)
           .maybeSingle()
@@ -175,11 +169,9 @@ async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
       .select('contactId, Contact(id, name)')
       .eq('dealId', id),
 
-    supabase
-      .from('DealActivity')
+    tenantTable(supabase, 'DealActivity', { spaceId })
       .select('id, type, content, createdAt')
       .eq('dealId', id)
-      .eq('spaceId', spaceId)
       .order('createdAt', { ascending: false })
       .limit(3),
   ]);
@@ -235,13 +227,11 @@ async function handleDeal(id: string, spaceId: string): Promise<NextResponse> {
 // ── Tour ─────────────────────────────────────────────────────────────────────
 
 async function handleTour(id: string, spaceId: string): Promise<NextResponse> {
-  const { data: row, error } = await supabase
-    .from('Tour')
+  const { data: row, error } = await tenantTable(supabase, 'Tour', { spaceId })
     .select(
       'id, startsAt, endsAt, status, notes, contactId, propertyAddress, guestName, guestEmail, guestPhone',
     )
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (error) {
@@ -253,11 +243,9 @@ async function handleTour(id: string, spaceId: string): Promise<NextResponse> {
   // Join Contact by contactId if present.
   let contact: { id: string; name: string; phone: string | null; email: string | null } | null = null;
   if (row.contactId) {
-    const { data: contactRow } = await supabase
-      .from('Contact')
+    const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId })
       .select('id, name, phone, email')
       .eq('id', row.contactId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     if (contactRow) {
       contact = {
@@ -303,13 +291,11 @@ async function handleTour(id: string, spaceId: string): Promise<NextResponse> {
 // ── Property ─────────────────────────────────────────────────────────────────
 
 async function handleProperty(id: string, spaceId: string): Promise<NextResponse> {
-  const { data: row, error } = await supabase
-    .from('Property')
+  const { data: row, error } = await tenantTable(supabase, 'Property', { spaceId })
     .select(
       'id, address, listPrice, beds, baths, squareFeet, listingStatus, notes, photos, createdAt',
     )
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (error) {
@@ -319,11 +305,9 @@ async function handleProperty(id: string, spaceId: string): Promise<NextResponse
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Count linked deals.
-  const { count: dealCount, error: dcError } = await supabase
-    .from('Deal')
+  const { count: dealCount, error: dcError } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id', { count: 'exact', head: true })
-    .eq('propertyId', id)
-    .eq('spaceId', spaceId);
+    .eq('propertyId', id);
 
   if (dcError) {
     console.error('[cards/property/GET] deal count error:', dcError);

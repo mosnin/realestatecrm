@@ -31,6 +31,7 @@ import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
 import { formatCompact } from '@/lib/formatting';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   resolveEffectivePrefs,
   isEmailDigestSuppressed,
@@ -73,10 +74,8 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
   try {
     const [{ data: space }, { data: settings }] = await Promise.all([
       supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-      supabase
-        .from('SpaceSetting')
+      tenantTable(supabase, 'SpaceSetting', { spaceId })
         .select('phoneNumber')
-        .eq('spaceId', spaceId)
         .maybeSingle(),
     ]);
 

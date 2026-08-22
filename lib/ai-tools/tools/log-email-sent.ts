@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -41,11 +42,9 @@ export const logEmailSentTool = defineTool<typeof parameters, LogEmailResult>({
   },
 
   async handler(args, ctx) {
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (!contact) {
       return { summary: 'Contact not found in this workspace.', display: 'error' };
@@ -54,7 +53,7 @@ export const logEmailSentTool = defineTool<typeof parameters, LogEmailResult>({
 
     const sentAt = args.sentAt ?? new Date().toISOString();
     const activityId = crypto.randomUUID();
-    const { error } = await supabase.from('ContactActivity').insert({
+    const { error } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       contactId: c.id,
       spaceId: ctx.space.id,

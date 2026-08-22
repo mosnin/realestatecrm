@@ -292,14 +292,15 @@ describe('POST /api/broker/reviews/[id]/comments', () => {
     expect(res.status).toBe(400);
   });
 
-  it('403 when caller is neither a broker member nor the requesting agent', async () => {
+  it('404 when caller is neither a broker member nor the requesting agent', async () => {
     auth.brokerageRole = null; // not in brokerage at all
     mockByTable.DealReviewRequest = {
       single: { id: 'r_1', brokerageId: 'b_1', requestingUserId: 'someone_else', status: 'open' },
     };
     mockByTable.User = { single: { id: 'u_1', clerkId: 'clerk_1' } };
     const res = await invoke('r_1', { body: 'hi' });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(await res.json())).not.toContain('Forbidden');
   });
 
   it('201 when caller IS the requesting agent (non-broker)', async () => {

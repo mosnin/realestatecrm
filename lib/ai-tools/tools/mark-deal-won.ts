@@ -15,10 +15,13 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { fireReviewAsk } from '@/lib/reputation/review-engine';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -55,11 +58,9 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, status, value')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -79,11 +80,9 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
     if (args.finalValue !== undefined) updates.value = args.finalValue;
     if (args.note !== undefined) updates.wonLostNote = args.note;
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update(updates)
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error(
         '[tools.mark_deal_won] update failed',
@@ -96,7 +95,7 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
     const recordedValue = args.finalValue ?? deal.value;
     const valueLabel = recordedValue != null ? `$${Number(recordedValue).toLocaleString()}` : 'unspecified';
 
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,
@@ -117,8 +116,8 @@ export const markDealWonTool = defineTool<typeof parameters, MarkDealWonResult>(
       );
     }
 
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

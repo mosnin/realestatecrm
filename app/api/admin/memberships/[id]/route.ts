@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { unscoped } from '@/lib/supabase-guard';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -49,8 +50,10 @@ export async function PATCH(req: Request, { params }: Params) {
     );
   }
 
-  const { data: membership } = await supabase
-    .from('BrokerageMembership')
+  const { data: membership } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'admin: platform-admin membership lookup by id',
+  )
     .select('id, role, userId, brokerageId')
     .eq('id', id)
     .maybeSingle();
@@ -67,8 +70,10 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Role unchanged', role });
   }
 
-  const { error } = await supabase
-    .from('BrokerageMembership')
+  const { error } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'admin: platform-admin membership update by id',
+  )
     .update({ role })
     .eq('id', id);
   if (error) {
@@ -108,8 +113,10 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
 
   // Fetch membership first so we can unlink the space
-  const { data: membership } = await supabase
-    .from('BrokerageMembership')
+  const { data: membership } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'admin: platform-admin membership lookup by id',
+  )
     .select('userId, brokerageId')
     .eq('id', id)
     .maybeSingle();
@@ -126,7 +133,10 @@ export async function DELETE(_req: Request, { params }: Params) {
     await supabase.from('Space').update({ brokerageId: null }).eq('id', space.id);
   }
 
-  const { error } = await supabase.from('BrokerageMembership').delete().eq('id', id);
+  const { error } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'admin: platform-admin membership delete by id',
+  ).delete().eq('id', id);
   if (error) {
     console.error('[admin/memberships] delete failed', error);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

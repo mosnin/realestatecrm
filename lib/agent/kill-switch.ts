@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 // 30-second TTL cache to avoid DB hammering on every tool call
 const cache = new Map<string, { disabled: boolean; expiresAt: number }>();
@@ -10,10 +11,8 @@ export async function isSpaceDisabled(spaceId: string): Promise<boolean> {
   if (cached && Date.now() < cached.expiresAt) return cached.disabled;
 
   // Query DB: SELECT id FROM "DisabledSpace" WHERE "spaceId" = spaceId AND "isActive" = true LIMIT 1
-  const { data, error } = await supabase
-    .from('DisabledSpace')
+  const { data, error } = await tenantTable(supabase, 'DisabledSpace', { spaceId })
     .select('id')
-    .eq('spaceId', spaceId)
     .eq('isActive', true)
     .limit(1)
     .maybeSingle();
@@ -37,8 +36,7 @@ export async function disableSpace(
 ): Promise<void> {
   // Upsert: insert a new DisabledSpace row with isActive = true.
   // If one already exists (UNIQUE constraint on spaceId+isActive), update it.
-  const { error } = await supabase
-    .from('DisabledSpace')
+  const { error } = await tenantTable(supabase, 'DisabledSpace', { spaceId })
     .upsert(
       { spaceId, reason, disabledBy, isActive: true, reenabledAt: null },
       { onConflict: 'spaceId,isActive' }
@@ -55,10 +53,8 @@ export async function disableSpace(
 export async function reenableSpace(spaceId: string): Promise<void> {
   // UPDATE DisabledSpace SET isActive = false, reenabledAt = now()
   // WHERE spaceId = spaceId AND isActive = true
-  const { error } = await supabase
-    .from('DisabledSpace')
+  const { error } = await tenantTable(supabase, 'DisabledSpace', { spaceId })
     .update({ isActive: false, reenabledAt: new Date().toISOString() })
-    .eq('spaceId', spaceId)
     .eq('isActive', true);
 
   if (error) {

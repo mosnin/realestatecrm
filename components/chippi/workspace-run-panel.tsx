@@ -91,7 +91,7 @@ export function WorkspaceRunPanel({
       setOpeningFileId(null);
     }
   };
-  if (!runId) return <div className="grid h-full place-items-center p-6 text-center"><div><SquareTerminal className="mx-auto mb-3 size-5 text-muted-foreground" /><p className="text-sm font-medium">No workspace open</p><p className="mt-1 text-xs text-muted-foreground">Start a Workspace Run from /work to see Chippi’s files and live execution here.</p></div></div>;
+  if (!runId) return <div className="grid h-full place-items-center p-6 text-center"><div><SquareTerminal className="mx-auto mb-3 size-5 text-muted-foreground" /><p className="text-sm font-medium">No workspace open</p><p className="mt-1 text-xs text-muted-foreground">Start a Workspace Run from Work mode in Chippi when this feature is enabled for your workspace.</p></div></div>;
   if (!run) return <div className="p-5 text-xs text-muted-foreground"><Loader2 className="mr-2 inline size-3 animate-spin" />Loading workspace…</div>;
   const taskActive = run.tasks.some((task) => active(task.status));
   const launchReceipt = run.launchReceipts?.[0];

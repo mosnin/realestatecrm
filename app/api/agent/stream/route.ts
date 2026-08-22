@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return new Response('Forbidden', { status: 403 });
+    return new Response('Not found', { status: 404 });
   }
 
   // Guard BEFORE opening the SSE stream — each connection holds a long-lived

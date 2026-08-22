@@ -25,6 +25,8 @@ import { supabase } from '@/lib/supabase';
 import { runWorkflow, type WorkflowRow } from '@/lib/workflows/executor';
 import { monitorCron } from '@/lib/cron-monitor';
 import { isScheduleDueWithWatermark, type ScheduleConfig } from '@/lib/workflows/schedule';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 // A schedule workflow's actions drive the same headless agent runtime the
@@ -80,8 +82,8 @@ async function handler(req: NextRequest) {
   let rows: ScheduleWorkflowRow[] = [];
   let watermarkColumnAvailable = true;
   {
-    const { data, error: queryErr } = await supabase
-      .from('Workflow')
+    const { data, error: queryErr } = await unscoped(supabase
+      .from('Workflow'), 'cron: cross-tenant discovery then per-row work')
       .select('id, spaceId, trigger, conditions, actions, autonomy, lastScheduledFireAt')
       .eq('enabled', true)
       .eq('trigger->>type', 'schedule')
@@ -95,8 +97,8 @@ async function handler(req: NextRequest) {
         '[cron/workflows] watermark select failed — retrying without lastScheduledFireAt (migration not applied yet?)',
         queryErr,
       );
-      const { data: legacyData, error: legacyErr } = await supabase
-        .from('Workflow')
+      const { data: legacyData, error: legacyErr } = await unscoped(supabase
+        .from('Workflow'), 'cron: cross-tenant discovery then per-row work')
         .select('id, spaceId, trigger, conditions, actions, autonomy')
         .eq('enabled', true)
         .eq('trigger->>type', 'schedule')
@@ -187,8 +189,8 @@ async function handler(req: NextRequest) {
       // Thrown failures do not. Returned failures cannot be safely replayed
       // until ScheduleOccurrence + per-step idempotency are active.
       if (occurrenceHandled && watermarkColumnAvailable && slot) {
-        const { error: stampErr } = await supabase
-          .from('Workflow')
+        const { error: stampErr } = await unscoped(supabase
+          .from('Workflow'), 'cron: cross-tenant discovery then per-row work')
           .update({ lastScheduledFireAt: slot.toISOString() })
           .eq('id', row.id);
         if (stampErr) {

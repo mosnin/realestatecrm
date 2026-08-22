@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { scoreLeadApplicationDynamic } from '@/lib/lead-scoring';
 import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
 import type { Contact, IntakeFormConfig } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -35,17 +36,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'contactId and spaceId required' }, { status: 400 });
   }
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('Contact')
+  const { data: rows, error: fetchError } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('*')
-    .eq('id', contactId)
-    .eq('spaceId', spaceId);
+    .eq('id', contactId);
 
   if (fetchError || !rows?.length) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
   }
 
-  const contact = rows[0] as Contact;
+  const contact = (rows as Contact[])[0];
 
   // Skip contacts with no scoreable data
   if (!contact.applicationData && !contact.formConfigSnapshot) {
@@ -79,11 +78,9 @@ export async function POST(req: NextRequest) {
   // themselves are also scoped. Treat the bearer secret as proving "this
   // caller is Modal" — never as proving "this payload's spaceId is what
   // Modal was originally authorized for."
-  await supabase
-    .from('Contact')
+  await tenantTable(supabase, 'Contact', { spaceId })
     .update({ scoringStatus: 'pending' })
-    .eq('id', contactId)
-    .eq('spaceId', spaceId);
+    .eq('id', contactId);
 
   const formConfig = (contact as Record<string, unknown>).formConfigSnapshot as IntakeFormConfig | null ?? null;
   const resolvedLeadType = contact.leadType || (contact as Record<string, unknown>).formLeadType as string || 'rental';
@@ -100,8 +97,7 @@ export async function POST(req: NextRequest) {
       leadType: resolvedLeadType as 'rental' | 'buyer',
     });
 
-    await supabase
-      .from('Contact')
+    await tenantTable(supabase, 'Contact', { spaceId })
       .update({
         scoringStatus: result.scoringStatus,
         leadScore: result.leadScore,
@@ -110,19 +106,16 @@ export async function POST(req: NextRequest) {
         scoreDetails: result.scoreDetails,
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', contactId)
-      .eq('spaceId', spaceId);
+      .eq('id', contactId);
 
     // Charge only after a successful score (best-effort; never blocks the result).
     await chargeWorkflow(spaceId, 'lead_score');
 
     return NextResponse.json({ success: true, score: result.leadScore, label: result.scoreLabel });
   } catch {
-    await supabase
-      .from('Contact')
+    await tenantTable(supabase, 'Contact', { spaceId })
       .update({ scoringStatus: 'failed', updatedAt: new Date().toISOString() })
-      .eq('id', contactId)
-      .eq('spaceId', spaceId);
+      .eq('id', contactId);
     return NextResponse.json({ error: 'Scoring failed' }, { status: 500 });
   }
 }

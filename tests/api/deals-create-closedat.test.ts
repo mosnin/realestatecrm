@@ -149,4 +149,16 @@ describe('POST /api/deals — status + closedAt on create', () => {
     expect(res.status).toBe(400);
     expect(lastInsertValues).toBeNull();
   });
+
+  it('400s on malformed JSON instead of throwing 500', async () => {
+    const res = await POST(
+      new NextRequest('http://localhost/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not-json',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(lastInsertValues).toBeNull();
+  });
 });

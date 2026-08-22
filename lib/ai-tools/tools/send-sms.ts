@@ -18,6 +18,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { sendSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
@@ -88,11 +89,9 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     let resolvedContactId: string | null = null;
 
     if (args.contactId) {
-      const { data: contact, error } = await supabase
-        .from('Contact')
+      const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, name, phone')
         .eq('id', args.contactId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle();
       if (error) {
@@ -115,10 +114,8 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     } else if (args.toPhone) {
       resolvedPhone = args.toPhone;
       // Best-effort link back to a matching Contact for the audit trail.
-      const { data: maybeContact } = await supabase
-        .from('Contact')
+      const { data: maybeContact } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id')
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .eq('phone', args.toPhone)
         .maybeSingle();
@@ -135,11 +132,9 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // prefixes (chat-attachments/, onboarding/, property-photos/) qualify.
     let mediaUrls: string[] | undefined;
     if (args.mediaFileIds && args.mediaFileIds.length > 0) {
-      const { data: rows, error: fileErr } = await supabase
-        .from('File')
+      const { data: rows, error: fileErr } = await tenantTable(supabase, 'File', { spaceId: ctx.space.id })
         .select('id, name, storageKey, sizeBytes, isPublic')
-        .in('id', args.mediaFileIds)
-        .eq('spaceId', ctx.space.id);
+        .in('id', args.mediaFileIds);
       if (fileErr) {
         return { summary: `Media lookup failed: ${fileErr.message}`, display: 'error' };
       }
@@ -200,7 +195,7 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // ContactActivity.type enum doesn't include an 'sms' value, so we log
     // under 'note' with a metadata flag the UI can special-case later.
     if (resolvedContactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: resolvedContactId,

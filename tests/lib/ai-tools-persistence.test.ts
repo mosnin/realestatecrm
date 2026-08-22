@@ -15,13 +15,20 @@ vi.mock('@/lib/supabase', () => ({
         inserts.push({ table, row });
         return Promise.resolve({ data: null, error: nextError });
       },
-      // Chainable read used by the attachment-block resolver:
-      // .select(...).in(...).eq(...) → { data, error }.
-      select: () => ({
-        in: () => ({
-          eq: () => Promise.resolve({ data: attachmentRows, error: null }),
-        }),
-      }),
+      // Chainable read used by the attachment-block resolver.
+      // tenantTable() applies .eq('spaceId') before .in('id', …).
+      select: () => {
+        const chain: {
+          in: () => typeof chain;
+          eq: () => typeof chain;
+          then: (resolve: (v: unknown) => unknown) => Promise<unknown>;
+        } = {
+          in: () => chain,
+          eq: () => chain,
+          then: (resolve) => Promise.resolve({ data: attachmentRows, error: null }).then(resolve),
+        };
+        return chain;
+      },
     }),
   },
 }));

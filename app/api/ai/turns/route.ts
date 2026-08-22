@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { sanitizeUserInput } from '@/lib/agent/prompt-sanitizer';
 import { isReservedConversationTitle } from '@/lib/chat/conversation-access';
@@ -47,11 +48,9 @@ const enqueueSchema = z.object({
 async function callerConversation(userId: string, conversationId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: conversation } = await supabase
-    .from('Conversation')
+  const { data: conversation } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
     .select('id, spaceId, title, mode')
     .eq('id', conversationId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!conversation || isReservedConversationTitle(conversation.title)) return null;
   return { space, conversation };
@@ -70,18 +69,14 @@ export async function GET(req: NextRequest) {
   // Load blockers separately so a long pending queue can never hide the one
   // running/paused/failed row that makes a client-side dispatch unsafe.
   const [blockers, pending] = await Promise.all([
-    supabase
-      .from('ConversationTurn')
+    tenantTable(supabase, 'ConversationTurn', { spaceId: bound.space.id })
       .select(PUBLIC_TURN_COLUMNS)
-      .eq('spaceId', bound.space.id)
       .eq('conversationId', conversationId)
       .in('status', ['running', 'paused', 'failed'])
       .order('updatedAt', { ascending: false })
       .limit(50),
-    supabase
-      .from('ConversationTurn')
+    tenantTable(supabase, 'ConversationTurn', { spaceId: bound.space.id })
       .select(PUBLIC_TURN_COLUMNS)
-      .eq('spaceId', bound.space.id)
       .eq('conversationId', conversationId)
       .eq('status', 'pending')
       .order('priority', { ascending: false })
@@ -138,12 +133,15 @@ export async function POST(req: NextRequest) {
     if (manifestIds.length !== ids.length || manifestIds.some((id, index) => id !== ids[index])) {
       return NextResponse.json({ error: 'Attachment manifest mismatch' }, { status: 400 });
     }
-    const { data: attachments } = await supabase
-      .from('Attachment')
+    const { data: attachments } = await tenantTable(supabase, 'Attachment', { spaceId: bound.space.id })
       .select('id, filename, mimeType')
-      .eq('spaceId', bound.space.id)
       .in('id', ids);
-    const byId = new Map((attachments ?? []).map((attachment) => [attachment.id, attachment]));
+    const storedAttachments = (attachments ?? []) as Array<{
+      id: string;
+      filename: string;
+      mimeType: string;
+    }>;
+    const byId = new Map(storedAttachments.map((attachment) => [attachment.id, attachment]));
     if (manifest.some((item) => {
       const stored = byId.get(item.id);
       return !stored || stored.filename !== item.filename || stored.mimeType !== item.mimeType;

@@ -8,6 +8,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -40,11 +41,9 @@ export const noteOnPersonTool = defineTool<typeof parameters, NoteOnPersonResult
   },
 
   async handler(args, ctx) {
-    const { data: contact, error: lookupErr } = await supabase
-      .from('Contact')
+    const { data: contact, error: lookupErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.personId)
-      .eq('spaceId', ctx.space.id)
       .is('brokerageId', null)
       .maybeSingle();
     if (lookupErr) {
@@ -58,7 +57,7 @@ export const noteOnPersonTool = defineTool<typeof parameters, NoteOnPersonResult
     }
 
     const activityId = crypto.randomUUID();
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: activityId,
       contactId: args.personId,
       spaceId: ctx.space.id,

@@ -5,15 +5,14 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidCommissionParty, type CommissionBasis } from '@/lib/commissions';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveDeal(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return null;
   return space;
@@ -28,11 +27,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const space = await resolveDeal(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('CommissionSplit')
+  const { data, error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: space.id })
     .select('*')
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: true });
 
   if (error) {
@@ -83,8 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     paidAt = d.toISOString();
   }
 
-  const { data, error } = await supabase
-    .from('CommissionSplit')
+  const { data, error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,

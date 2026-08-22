@@ -32,6 +32,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { createTrigger, deleteTrigger } from './composio';
 import { fireRoutineRun } from '@/lib/routines';
@@ -1133,10 +1134,8 @@ async function resolveContactByEmail(
   normalizedEmail: string,
 ): Promise<string | null> {
   if (!normalizedEmail) return null;
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id')
-    .eq('spaceId', spaceId)
     .ilike('email', escapeLike(normalizedEmail))
     .maybeSingle();
   if (error) throw error;

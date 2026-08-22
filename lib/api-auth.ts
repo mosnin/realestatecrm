@@ -11,6 +11,8 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 import type { Space } from '@/lib/types';
 
 /**
@@ -128,6 +130,25 @@ export function isPremiumAccessBlocked(
 }
 
 /**
+ * Workspace CRM access (Today, contacts, deals). The product has a Free
+ * plan with a one-time 100-credit grant — never-subscribed spaces must
+ * reach the CRM. AI spend is still gated by assertCanSpend.
+ *
+ * A lapsed *paid* relationship (Stripe subscription id or a used trial,
+ * but no current period) is sent to billing-required. Comp / admin
+ * bypasses live at the call site, not here.
+ */
+export function canAccessWorkspace(args: {
+  status: string | null | undefined;
+  periodEnd: string | Date | null | undefined;
+  hasSubscriptionHistory: boolean;
+  now?: Date;
+}): boolean {
+  if (hasCurrentSubscription(args.status, args.periodEnd, args.now)) return true;
+  return !args.hasSubscriptionHistory;
+}
+
+/**
  * Verifies the calling user owns the given workspace slug, OR is a
  * broker_owner/broker_admin of the brokerage that manages this space.
  * Returns { userId, space } or a 4xx NextResponse.
@@ -165,8 +186,10 @@ export async function requireSpaceOwner(
     // .maybeSingle() throw (PostgREST errors on >1 row), 500ing a legitimate
     // multi-brokerage admin. Mirror the context helpers in lib/permissions.ts:
     // fetch all, then deterministically prefer broker_owner over broker_admin.
-    const { data: memberships } = await supabase
-      .from('BrokerageMembership')
+    const { data: memberships } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'membership lookup by userId then verify space owner against those brokerageIds',
+    )
       .select('role, brokerageId, createdAt')
       .eq('userId', dbUser.id)
       .in('role', ['broker_owner', 'broker_admin'])
@@ -227,11 +250,9 @@ export async function requireContactAccess(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: rows, error } = await supabase
-    .from('Contact')
+  const { data: rows, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('spaceId')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .limit(1)
     .maybeSingle();
 

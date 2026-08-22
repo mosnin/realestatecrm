@@ -16,6 +16,9 @@ import {
 import { transformImage, type GeneratedAsset } from '@/lib/studio/fal';
 import { STUDIO_EDIT_TOOLS } from '@/lib/studio/models';
 import { StudioGenerationError, type StudioGenerationResult } from '@/lib/studio/generate';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const MAX_PROMPT = 2000;
 
@@ -48,11 +51,9 @@ export async function runStudioEdit(args: {
   // fit under fal's input ceiling. Skipping the category check sends fal a
   // PDF or a 4K video and bills the failed call.
   const MAX_EDIT_BYTES = 20 * 1024 * 1024;
-  const { data: source } = await supabase
-    .from('File')
+  const { data: source } = await tenantTable(supabase, 'File', { spaceId: args.spaceId })
     .select('storageKey, category, sizeBytes')
     .eq('id', args.sourceFileId)
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   if (!source?.storageKey) {
     throw new StudioGenerationError('The image to edit was not found.', 404);
@@ -66,7 +67,7 @@ export async function runStudioEdit(args: {
   const sourceUrl = await getSignedDownloadUrl(source.storageKey as string, 3600);
 
   const generationId = crypto.randomUUID();
-  const { error: genErr } = await supabase.from('StudioGeneration').insert({
+  const { error: genErr } = await tenantTable(supabase, 'StudioGeneration', { spaceId: args.spaceId }).insert({
     id: generationId,
     spaceId: args.spaceId,
     userId: args.userId,
@@ -86,8 +87,8 @@ export async function runStudioEdit(args: {
   }
 
   const markFailed = async (message: string): Promise<void> => {
-    await supabase
-      .from('StudioGeneration')
+    await unscoped(supabase
+      .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         status: 'failed',
         errorMessage: message,
@@ -139,7 +140,7 @@ export async function runStudioEdit(args: {
     throw new StudioGenerationError("Edit didn't go through — usually temporary.", 500);
   }
 
-  const { error: fileErr } = await supabase.from('File').insert({
+  const { error: fileErr } = await tenantTable(supabase, 'File', { spaceId: args.spaceId }).insert({
     id: fileId,
     spaceId: args.spaceId,
     userId: args.userId,
@@ -157,8 +158,8 @@ export async function runStudioEdit(args: {
     throw new StudioGenerationError("Edit didn't go through — usually temporary.", 500);
   }
 
-  await supabase
-    .from('StudioGeneration')
+  await unscoped(supabase
+    .from('StudioGeneration'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'completed',
       fileId,

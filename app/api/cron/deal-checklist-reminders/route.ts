@@ -4,6 +4,8 @@ import { sendPushToSpace } from '@/lib/push';
 import { redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * GET /api/cron/deal-checklist-reminders
@@ -73,8 +75,8 @@ async function handler(req: NextRequest) {
   // Open + overdue: dueAt in the past, not completed. spaceId and dealId live
   // directly on DealChecklistItem, so the only join we need is to Deal for the
   // human-readable title.
-  const { data: items, error } = await supabase
-    .from('DealChecklistItem')
+  const { data: items, error } = await unscoped(supabase
+    .from('DealChecklistItem'), 'cron: cross-tenant discovery then per-row work')
     .select('id, label, dealId, spaceId, dueAt')
     .lt('dueAt', timestamp)
     .is('completedAt', null);
@@ -89,8 +91,8 @@ async function handler(req: NextRequest) {
 
   // Resolve deal titles in one pass.
   const dealIds = [...new Set(items.map((i) => i.dealId))];
-  const { data: deals } = await supabase
-    .from('Deal')
+  const { data: deals } = await unscoped(supabase
+    .from('Deal'), 'cron: cross-tenant discovery then per-row work')
     .select('id, title')
     .in('id', dealIds);
   const titleById = new Map((deals ?? []).map((d) => [d.id, d.title as string]));

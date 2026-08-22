@@ -16,6 +16,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { computeNextMove } from '@/lib/deals/next-move';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -41,11 +42,9 @@ export async function POST(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: dealRows, error } = await supabase
-    .from('Deal')
+  const { data: dealRows, error } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .limit(1);
   if (error) {
     return NextResponse.json({ error: 'Failed to load deal' }, { status: 500 });

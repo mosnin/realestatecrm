@@ -5,6 +5,8 @@ import { getClientUser } from '@/lib/client-auth';
 import { clientOwnsContact } from '@/lib/client-portal-data';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   uploadObject,
   deleteObject,
@@ -52,8 +54,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (docId) {
-    const { data: doc } = await supabase
-      .from('ClientDocument')
+    const { data: doc } = await unscoped(supabase
+      .from('ClientDocument'), 'post-fetch: client portal ownership proof')
       .select('fileKey')
       .eq('id', docId)
       .eq('contactId', contactId)
@@ -63,8 +65,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ url });
   }
 
-  const { data } = await supabase
-    .from('ClientDocument')
+  const { data } = await unscoped(supabase
+    .from('ClientDocument'), 'post-fetch: client portal ownership proof')
     .select('id, fileName, contentType, sizeBytes, uploadedBy, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: false });
@@ -108,8 +110,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'File content does not match declared type' }, { status: 400 });
   }
 
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
     .select('spaceId')
     .eq('id', contactId)
     .maybeSingle();
@@ -129,8 +131,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 
-  const { data: doc, error } = await supabase
-    .from('ClientDocument')
+  const { data: doc, error } = await tenantTable(supabase, 'ClientDocument', { spaceId })
     .insert({
       contactId,
       spaceId,

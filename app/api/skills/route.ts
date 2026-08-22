@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -25,10 +26,8 @@ export async function GET(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
-  const { data } = await supabase
-    .from('UserSkill')
+  const { data } = await tenantTable(supabase, 'UserSkill', { spaceId: auth.space.id })
     .select('id, title, description, prompt, enabled, createdAt')
-    .eq('spaceId', auth.space.id)
     .order('createdAt', { ascending: false })
     .limit(MAX_SKILLS);
   return NextResponse.json({ skills: data ?? [] });
@@ -51,16 +50,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Write the prompt the skill should run (at least 10 characters).' }, { status: 400 });
   }
 
-  const { count } = await supabase
-    .from('UserSkill')
-    .select('*', { count: 'exact', head: true })
-    .eq('spaceId', auth.space.id);
+  const { count } = await tenantTable(supabase, 'UserSkill', { spaceId: auth.space.id })
+    .select('*', { count: 'exact', head: true });
   if ((count ?? 0) >= MAX_SKILLS) {
     return NextResponse.json({ error: `You've reached the limit of ${MAX_SKILLS} skills.` }, { status: 409 });
   }
 
-  const { data, error } = await supabase
-    .from('UserSkill')
+  const { data, error } = await tenantTable(supabase, 'UserSkill', { spaceId: auth.space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: auth.space.id,

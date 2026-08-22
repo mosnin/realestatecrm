@@ -31,6 +31,8 @@ import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
 import { extractAttachmentText } from '@/lib/extraction/extract';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 // Up to 50 downloads + parses per tick; each is typically sub-second but a
@@ -72,8 +74,8 @@ async function handler(req: NextRequest) {
   const startedAt = Date.now();
 
   // ── 1. Pending attachments with bytes to fetch, oldest first ────────────
-  const { data: pendingRows, error: pendingErr } = await supabase
-    .from('Attachment')
+  const { data: pendingRows, error: pendingErr } = await unscoped(supabase
+    .from('Attachment'), 'cron: cross-tenant discovery then per-row work')
     .select('id, spaceId, storagePath, filename, mimeType')
     .eq('extractionStatus', 'pending')
     .not('storagePath', 'is', null)
@@ -143,8 +145,8 @@ async function handler(req: NextRequest) {
       // terminal, so writing them stops us re-downloading the row forever.
       const extraction = await extractAttachmentText(buffer, row.mimeType, row.filename);
 
-      const { error: updateErr } = await supabase
-        .from('Attachment')
+      const { error: updateErr } = await unscoped(supabase
+        .from('Attachment'), 'cron: cross-tenant discovery then per-row work')
         .update({
           extractedText: extraction.text,
           extractionStatus: extraction.status,

@@ -4,16 +4,15 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl, deleteObject } from '@/lib/storage';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveDoc(userId: string, dealId: string, docId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: doc } = await supabase
-    .from('DealDocument')
+  const { data: doc } = await tenantTable(supabase, 'DealDocument', { spaceId: space.id })
     .select('*')
     .eq('id', docId)
     .eq('dealId', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!doc) return null;
   return { space, doc };
@@ -62,12 +61,10 @@ export async function DELETE(
   // delete fails we tolerate a small amount of leaked bytes rather than leave
   // a dangling row pointing at deleted bytes (which would show a broken
   // download link in the UI).
-  const { error: dbError } = await supabase
-    .from('DealDocument')
+  const { error: dbError } = await tenantTable(supabase, 'DealDocument', { spaceId: ctx.space.id })
     .delete()
     .eq('id', docId)
-    .eq('dealId', id)
-    .eq('spaceId', ctx.space.id);
+    .eq('dealId', id);
 
   if (dbError) {
     logger.error('[deals/docs] delete failed', { dealId: id, docId }, dbError);

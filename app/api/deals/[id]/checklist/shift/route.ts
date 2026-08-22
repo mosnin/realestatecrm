@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Shift every unchecked, dated checklist item on a deal by N days.
@@ -24,11 +25,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -44,11 +43,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (days === 0) return NextResponse.json({ updated: 0 });
 
-  const { data: items, error: fetchError } = await supabase
-    .from('DealChecklistItem')
+  const { data: items, error: fetchError } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
     .select('id, dueAt, completedAt')
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .is('completedAt', null)
     .not('dueAt', 'is', null);
 
@@ -60,16 +57,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const ms = days * 86_400_000;
   let updated = 0;
   const failures: string[] = [];
-  for (const row of items ?? []) {
-    const existing = new Date(row.dueAt as string);
+  const shiftRows = (items ?? []) as { id: string; dueAt: string }[];
+  for (const row of shiftRows) {
+    const existing = new Date(row.dueAt);
     if (isNaN(existing.getTime())) continue;
     const next = new Date(existing.getTime() + ms);
-    const { error: upErr } = await supabase
-      .from('DealChecklistItem')
+    const { error: upErr } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
       .update({ dueAt: next.toISOString(), updatedAt: new Date().toISOString() })
-      .eq('id', row.id as string)
-      .eq('spaceId', space.id);
-    if (upErr) failures.push(row.id as string);
+      .eq('id', row.id);
+    if (upErr) failures.push(row.id);
     else updated += 1;
   }
 

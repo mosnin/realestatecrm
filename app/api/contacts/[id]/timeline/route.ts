@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Returns system-generated timeline events for a contact:
@@ -21,8 +22,8 @@ export async function GET(
   // Get space first, then query contact scoped to that space to prevent
   // cross-tenant information disclosure.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { data: contact } = await supabase.from('Contact').select('spaceId').eq('id', contactId).eq('spaceId', space.id).maybeSingle();
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).select('spaceId').eq('id', contactId).maybeSingle();
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const events: Array<{
@@ -35,11 +36,9 @@ export async function GET(
   }> = [];
 
   // Fetch tours for this contact
-  const { data: tours } = await supabase
-    .from('Tour')
+  const { data: tours } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
     .select('id, startsAt, endsAt, status, propertyAddress, createdAt, updatedAt')
     .eq('contactId', contactId)
-    .eq('spaceId', space.id)
     .order('startsAt', { ascending: false })
     .limit(50);
 

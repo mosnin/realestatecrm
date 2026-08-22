@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -97,9 +99,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   const dealIds = Array.from(new Set(rows.map((r) => r.dealId)));
 
   const [dealsRes, commentsRes] = await Promise.all([
-    supabase.from('Deal').select('id, title, value').in('id', dealIds),
-    supabase
-      .from('DealReviewComment')
+    unscoped(supabase.from('Deal'), 'post-fetch: review request scoped by brokerage then child by id').select('id, title, value').in('id', dealIds),
+    unscoped(supabase
+      .from('DealReviewComment'), 'post-fetch: review request scoped by brokerage then child by id')
       .select('id, reviewRequestId')
       .in('reviewRequestId', reviewIds),
   ]);

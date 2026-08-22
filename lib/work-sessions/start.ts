@@ -2,6 +2,7 @@ import 'server-only';
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { kickPlan } from './kick';
 import { createWorkspaceRun } from '@/lib/workspace-runs/server';
 import type { WorkSessionRow } from './types';
@@ -33,8 +34,7 @@ export async function startWorkSession(
   input: StartWorkSessionInput,
 ): Promise<StartWorkSessionResult> {
   const id = input.id ?? crypto.randomUUID();
-  const insert = await supabase
-    .from('WorkSession')
+  const insert = await tenantTable(supabase, 'WorkSession', { spaceId: input.spaceId })
     .insert({
       id,
       spaceId: input.spaceId,
@@ -51,11 +51,11 @@ export async function startWorkSession(
   let session = insert.data as WorkSessionRow | null;
 
   if (!session && input.id) {
-    const { data: existing, error: existingError } = await supabase
-      .from('WorkSession')
+    const { data: existing, error: existingError } = await tenantTable(supabase, 'WorkSession', {
+      spaceId: input.spaceId,
+    })
       .select('*')
       .eq('id', id)
-      .eq('spaceId', input.spaceId)
       .maybeSingle();
     if (existingError) throw existingError;
     session = existing as WorkSessionRow | null;
@@ -71,10 +71,10 @@ export async function startWorkSession(
     const runId = crypto.randomUUID();
     const workspace = await createWorkspaceRun({ id: runId, workSessionId: session.id, spaceId: input.spaceId, goal: input.goal });
     if (workspace.id !== runId || !session.workspaceRunId) {
-      const { data: linked, error: linkError } = await supabase.from('WorkSession').update({ workspaceRunId: workspace.id }).eq('id', session.id).eq('spaceId', input.spaceId).select('*').maybeSingle();
+      const { data: linked, error: linkError } = await tenantTable(supabase, 'WorkSession', { spaceId: input.spaceId }).update({ workspaceRunId: workspace.id }).eq('id', session.id).select('*').maybeSingle();
       if (linkError || !linked || (linked as WorkSessionRow).workspaceRunId !== workspace.id) {
         const error = 'Workspace Run could not be linked to this session.';
-        await supabase.from('WorkSession').update({ status: 'failed', error, updatedAt: new Date().toISOString() }).eq('id', session.id).eq('spaceId', input.spaceId);
+        await tenantTable(supabase, 'WorkSession', { spaceId: input.spaceId }).update({ status: 'failed', error, updatedAt: new Date().toISOString() }).eq('id', session.id);
         throw new Error(error);
       }
       session = linked as WorkSessionRow;

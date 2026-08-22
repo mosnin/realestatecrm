@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Convert a completed tour into a deal.
@@ -8,7 +9,12 @@ import { requireSpaceOwner } from '@/lib/api-auth';
  * links the contact, and records the sourceTourId.
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: { slug?: string; tourId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, tourId } = body;
 
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -19,18 +25,15 @@ export async function POST(req: NextRequest) {
   const { space } = auth;
 
   // Fetch the tour
-  const { data: tour, error: tourError } = await supabase
-    .from('Tour')
+  const { data: tour, error: tourError } = await tenantTable(supabase, 'Tour', { spaceId: space.id })
     .select('*')
     .eq('id', tourId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (tourError) throw tourError;
   if (!tour) return NextResponse.json({ error: 'Tour not found' }, { status: 404 });
 
   // Check if already converted
-  const { data: existingDeal } = await supabase
-    .from('Deal')
+  const { data: existingDeal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('sourceTourId', tourId)
     .maybeSingle();
@@ -39,10 +42,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Get the first deal stage for this space (used as default)
-  const { data: firstStage } = await supabase
-    .from('DealStage')
+  const { data: firstStage } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .order('position', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -55,10 +56,8 @@ export async function POST(req: NextRequest) {
   let contactId = tour.contactId;
   if (!contactId) {
     // Try to find by email
-    const { data: contactRow } = await supabase
-      .from('Contact')
+    const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .eq('spaceId', space.id)
       .ilike('email', tour.guestEmail)
       .maybeSingle();
 
@@ -67,7 +66,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Create a new contact
       const newContactId = crypto.randomUUID();
-      const { error: contactErr } = await supabase.from('Contact').insert({
+      const { error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
         id: newContactId,
         spaceId: space.id,
         name: tour.guestName,
@@ -88,11 +87,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Determine the next position in the first stage
-  const { data: maxPositionRow } = await supabase
-    .from('Deal')
+  const { data: maxPositionRow } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('position')
     .eq('stageId', firstStage.id)
-    .eq('spaceId', space.id)
     .order('position', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -100,8 +97,7 @@ export async function POST(req: NextRequest) {
 
   // Create the deal
   const dealId = crypto.randomUUID();
-  const { data: deal, error: dealError } = await supabase
-    .from('Deal')
+  const { data: deal, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .insert({
       id: dealId,
       spaceId: space.id,
@@ -127,7 +123,9 @@ export async function POST(req: NextRequest) {
     if (dcError) console.error('[convert] DealContact link failed:', dcError);
     // Update tour with contact link if it wasn't set
     if (!tour.contactId) {
-      await supabase.from('Tour').update({ contactId }).eq('id', tourId);
+      await tenantTable(supabase, 'Tour', { spaceId: space.id })
+        .update({ contactId })
+        .eq('id', tourId);
     }
   }
 

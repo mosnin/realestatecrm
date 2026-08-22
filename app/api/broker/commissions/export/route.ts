@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 type LedgerStatus = 'pending' | 'paid' | 'void';
 
@@ -124,8 +125,7 @@ export async function GET(req: NextRequest) {
   const start = new Date(Date.UTC(year, monthNum - 1, 1, 0, 0, 0, 0));
   const next = new Date(Date.UTC(year, monthNum, 1, 0, 0, 0, 0));
 
-  let query = supabase
-    .from('CommissionLedger')
+  let query = tenantTable(supabase, 'CommissionLedger', { brokerageId: ctx.brokerage.id })
     .select(
       [
         'id',

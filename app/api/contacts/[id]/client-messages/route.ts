@@ -4,6 +4,8 @@ import { requireContactAccess } from '@/lib/api-auth';
 import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export const runtime = 'nodejs';
 
@@ -18,14 +20,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const auth = await requireContactAccess(contactId);
   if (auth instanceof NextResponse) return auth;
 
-  const { data } = await supabase
-    .from('ClientMessage')
+  const { data } = await tenantTable(supabase, 'ClientMessage', { spaceId: auth.space.id })
     .select('id, senderType, body, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: true });
 
-  await supabase
-    .from('ClientMessage')
+  await tenantTable(supabase, 'ClientMessage', { spaceId: auth.space.id })
     .update({ readAt: new Date().toISOString() })
     .eq('contactId', contactId)
     .eq('senderType', 'client')
@@ -52,8 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { allowed } = await checkRateLimit(`contacts:msg:${userId}`, 60, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many messages.' }, { status: 429 });
 
-  const { data: inserted, error } = await supabase
-    .from('ClientMessage')
+  const { data: inserted, error } = await tenantTable(supabase, 'ClientMessage', { spaceId: space.id })
     .insert({ contactId, spaceId: space.id, senderType: 'realtor', body: text })
     .select('id, senderType, body, createdAt')
     .single();
@@ -62,8 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Failed to send.' }, { status: 500 });
   }
 
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('email')
     .eq('id', contactId)
     .maybeSingle();

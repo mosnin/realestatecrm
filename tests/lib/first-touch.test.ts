@@ -118,6 +118,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 import { fireFirstTouch, FIRST_TOUCH_REASONING } from '@/lib/leads/first-touch';
+import { supabase } from '@/lib/supabase';
 
 const FUTURE = new Date(Date.now() + 30 * 86_400_000).toISOString();
 
@@ -573,8 +574,10 @@ describe('fireFirstTouch', () => {
       origin: 'inbound',
     });
 
-    expect(outcome).toEqual({ created: false, reason: 'contact_not_found' });
-    expect(inserts).toHaveLength(0);
-    expect(sendDraftMock).not.toHaveBeenCalled();
+      expect(outcome).toEqual({ created: false, reason: 'contact_not_found' });
+      expect(inserts).toHaveLength(0);
+      expect(sendDraftMock).not.toHaveBeenCalled();
+      expect(sendPushMock).not.toHaveBeenCalled();
+      expect(vi.mocked(supabase.from).mock.calls.filter((c) => c[0] === 'AgentDraft')).toHaveLength(0);
   });
 });

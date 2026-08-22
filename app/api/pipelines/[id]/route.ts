@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -16,13 +17,11 @@ export async function PATCH(
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('Pipeline')
+  const { data: rows, error: fetchError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (fetchError) throw fetchError;
   if (!rows || rows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -58,11 +57,9 @@ export async function PATCH(
     return NextResponse.json(existing);
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('Pipeline')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .update(updates)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
   if (updateError) throw updateError;
@@ -90,13 +87,11 @@ export async function DELETE(
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: rows, error: fetchError } = await supabase
-    .from('Pipeline')
+  const { data: rows, error: fetchError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (fetchError) throw fetchError;
   if (!rows || rows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -105,10 +100,8 @@ export async function DELETE(
     typeof rawTarget === 'string' && rawTarget.trim().length > 0 ? rawTarget.trim() : null;
 
   // Get all stages in this pipeline
-  const { data: stages, error: stagesError } = await supabase
-    .from('DealStage')
+  const { data: stages, error: stagesError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
     .eq('pipelineId', id);
   if (stagesError) throw stagesError;
   const stageIds = (stages ?? []).map((s: { id: string }) => s.id);
@@ -116,10 +109,8 @@ export async function DELETE(
   // Count deals across all stages
   let dealCount = 0;
   if (stageIds.length > 0) {
-    const { count, error: countError } = await supabase
-      .from('Deal')
+    const { count, error: countError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', space.id)
       .in('stageId', stageIds);
     if (countError) throw countError;
     dealCount = count ?? 0;
@@ -141,35 +132,28 @@ export async function DELETE(
     }
 
     // Validate target pipeline belongs to same space
-    const { data: targetRows, error: targetError } = await supabase
-      .from('Pipeline')
+    const { data: targetRows, error: targetError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
       .select('id')
-      .eq('id', targetPipelineId)
-      .eq('spaceId', space.id);
+      .eq('id', targetPipelineId);
     if (targetError) throw targetError;
     if (!targetRows || targetRows.length === 0) {
       return NextResponse.json({ error: 'Target pipeline not found' }, { status: 400 });
     }
 
     // Move all stages from deleted pipeline to target pipeline
-    const { error: moveError } = await supabase
-      .from('DealStage')
+    const { error: moveError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
       .update({ pipelineId: targetPipelineId })
-      .eq('spaceId', space.id)
       .eq('pipelineId', id);
     if (moveError) throw moveError;
   } else if (stageIds.length > 0) {
     // No deals — delete all stages first to avoid ON DELETE SET NULL leaving orphans
-    const { error: deleteStagesError } = await supabase
-      .from('DealStage')
+    const { error: deleteStagesError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
       .delete()
-      .eq('spaceId', space.id)
       .eq('pipelineId', id);
     if (deleteStagesError) throw deleteStagesError;
   }
 
-  const { error: deleteError } = await supabase
-    .from('Pipeline')
+  const { error: deleteError } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
     .delete()
     .eq('id', id)
     .eq('spaceId', space.id);

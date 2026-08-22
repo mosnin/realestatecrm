@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { buildKey, uploadObject } from '@/lib/storage';
 import { validateParentWorkspaceCompletionManifest } from '@/lib/workspace-runs/parent-manifest';
 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const sequence = Number(body.sequence);
   const type = typeof body.type === 'string' ? body.type : '';
   if (!runId || !spaceId || !launchToken || !Number.isInteger(sequence) || sequence < 1 || !allowedTypes.has(type)) return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
-  const { data: run, error: runError } = await supabase.from('WorkspaceRun').select('id,workSessionId,status,launchToken,cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle();
+  const { data: run, error: runError } = await tenantTable(supabase, 'WorkspaceRun', { spaceId }).select('id,workSessionId,status,launchToken,cancellationRequestedAt').eq('id', runId).maybeSingle();
   if (runError) return NextResponse.json({ error: 'Could not verify launch' }, { status: 500 });
   if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (run.launchToken !== launchToken) return NextResponse.json({ ok: true, ignored: 'stale_launch', cancellationRequested: true });
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   // The initial read can be stale while the VM is uploading files. Re-read
   // immediately before publication so a cancellation always wins completion.
   const currentResult = type === 'completed'
-    ? await supabase.from('WorkspaceRun').select('launchToken,cancellationRequestedAt').eq('id', runId).eq('spaceId', spaceId).maybeSingle()
+    ? await tenantTable(supabase, 'WorkspaceRun', { spaceId }).select('launchToken,cancellationRequestedAt').eq('id', runId).maybeSingle()
     : { data: run, error: null };
   if (currentResult.error) return NextResponse.json({ error: 'Could not verify publication state' }, { status: 500 });
   const current = currentResult.data;

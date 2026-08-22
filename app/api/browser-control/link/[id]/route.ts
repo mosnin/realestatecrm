@@ -12,6 +12,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { getCurrentDbUser } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { endSessionsForLink } from '@/lib/browser-control/session';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,21 +27,17 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   // Ownership check scoped to (spaceId, userId) BEFORE any mutation — a
   // caller cannot revoke another user's link even within the same space.
-  const { data: link, error: findErr } = await supabase
-    .from('BrowserLink')
+  const { data: link, error: findErr } = await tenantTable(supabase, 'BrowserLink', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .eq('userId', dbUser.id)
     .maybeSingle();
   if (findErr) return NextResponse.json({ error: 'Failed to load link' }, { status: 500 });
   if (!link) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error: revokeErr } = await supabase
-    .from('BrowserLink')
+  const { error: revokeErr } = await tenantTable(supabase, 'BrowserLink', { spaceId: space.id })
     .update({ revokedAt: new Date().toISOString() })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (revokeErr) return NextResponse.json({ error: 'Failed to revoke link' }, { status: 500 });
 
   await endSessionsForLink(id, { spaceId: space.id });

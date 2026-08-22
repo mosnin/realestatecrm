@@ -3,6 +3,7 @@ import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { auth } from '@clerk/nextjs/server';
+import { unscoped } from '@/lib/supabase-guard';
 
 /** GET /api/admin/invitations — list all invitations across all brokerages */
 export async function GET() {
@@ -15,8 +16,10 @@ export async function GET() {
   const { allowed } = await checkRateLimit(`admin:read:${session.userId}`, 60, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
 
-  const { data: invitations, error } = await supabase
-    .from('Invitation')
+  const { data: invitations, error } = await unscoped(
+    supabase.from('Invitation'),
+    'admin: platform-admin cross-tenant invitation list',
+  )
     .select('id, email, roleToAssign, status, expiresAt, createdAt, brokerageId, Brokerage(name)')
     .order('createdAt', { ascending: false })
     .limit(200);

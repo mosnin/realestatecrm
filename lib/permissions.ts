@@ -13,6 +13,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
 
 // ── Platform admin ────────────────────────────────────────────────────────────
 
@@ -189,8 +190,10 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
 
   // Fetch all broker-level memberships. A user may own one brokerage and
   // manage another — prefer broker_owner so they always land on their own brokerage.
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
+  const { data: memberships } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'membership lookup by userId to resolve broker context',
+  )
     .select('*')
     .eq('userId', user.id)
     .in('role', ['broker_owner', 'broker_admin'])
@@ -248,8 +251,10 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
   // Offboarding gate — see getBrokerContext above for rationale.
   if ((user as { status?: string }).status === 'offboarded') return null;
 
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
+  const { data: memberships } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'membership lookup by userId to resolve broker member context',
+  )
     .select('*')
     .eq('userId', user.id)
     .in('role', ['broker_owner', 'broker_admin', 'realtor_member'])

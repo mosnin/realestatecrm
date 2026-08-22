@@ -22,6 +22,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { sendDraft, describeDelivery } from '@/lib/delivery';
 import { checkSendAllowed } from '@/lib/messaging/compliance';
 import { sendSMS } from '@/lib/sms';
@@ -93,11 +94,9 @@ export async function POST(req: NextRequest) {
 
   // Validate contact belongs to this space — the spaceId check is the
   // tenant isolation boundary. Never trust the LLM's contactId without it.
-  const { data: contact, error: contactErr } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email, phone')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (contactErr) {
@@ -109,10 +108,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Resolve sender display name from SpaceSetting, same as the on-demand agent
-  const { data: spaceSetting } = await supabase
-    .from('SpaceSetting')
+  const { data: spaceSetting } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('businessName')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   const fromName = (spaceSetting?.businessName as string | undefined) ?? spaceId;
 
@@ -207,7 +204,7 @@ export async function POST(req: NextRequest) {
 
   // Audit the send to the contact's activity feed — non-fatal
   try {
-    await supabase.from('ContactActivity').insert({
+    await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
       id: crypto.randomUUID(),
       spaceId,
       contactId,

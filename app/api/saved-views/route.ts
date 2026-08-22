@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import type { SavedView, SavedViewEntity } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_ENTITIES: readonly SavedViewEntity[] = ['contact', 'deal'];
 const MAX_NAME_LEN = 80;
@@ -44,10 +45,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('SavedView')
+  const { data, error } = await tenantTable(supabase, 'SavedView', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .eq('entity', entity)
     .order('createdAt', { ascending: false });
   if (error) {
@@ -102,10 +101,8 @@ export async function POST(req: NextRequest) {
   const { userId, space } = auth;
 
   // Enforce the per-(space, entity) cap before inserting.
-  const { count } = await supabase
-    .from('SavedView')
+  const { count } = await tenantTable(supabase, 'SavedView', { spaceId: space.id })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', space.id)
     .eq('entity', entity);
   if ((count ?? 0) >= MAX_VIEWS_PER_BUCKET) {
     return NextResponse.json(
@@ -114,8 +111,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
-    .from('SavedView')
+  const { data, error } = await tenantTable(supabase, 'SavedView', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       userId,
@@ -146,11 +142,9 @@ export async function DELETE(req: NextRequest) {
   // Scope the delete to the space. A viewId belonging to another workspace
   // matches zero rows here (returned via `select`), so we answer 404 rather
   // than leaking its existence or deleting it.
-  const { data: deleted, error } = await supabase
-    .from('SavedView')
+  const { data: deleted, error } = await tenantTable(supabase, 'SavedView', { spaceId: space.id })
     .delete()
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select('id');
   if (error) {
     console.error('[saved-views/DELETE] delete error:', error);

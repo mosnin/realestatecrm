@@ -35,6 +35,7 @@
 
 import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { sendPushToSpace } from '@/lib/push';
@@ -159,10 +160,8 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
   }
 
   // ── Review URL must be configured (the feature's opt-in) ──────────────
-  const { data: settingRow } = await supabase
-    .from('SpaceSetting')
+  const { data: settingRow } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('reviewUrl')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   const reviewUrl = ((settingRow as { reviewUrl?: string | null } | null)?.reviewUrl ?? '').trim();
   if (!reviewUrl) {
@@ -171,10 +170,8 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
   }
 
   // ── Per-deal dedupe (one campaign per deal, ever) ─────────────────────
-  const { data: existing } = await supabase
-    .from('ReviewCampaign')
+  const { data: existing } = await tenantTable(supabase, 'ReviewCampaign', { spaceId })
     .select('id')
-    .eq('spaceId', spaceId)
     .eq('dealId', dealId)
     .limit(1)
     .maybeSingle();
@@ -183,11 +180,9 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
   }
 
   // ── Contact, scoped to the tenant ─────────────────────────────────────
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, email, phone')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (!contactRow) return { created: false, reason: 'contact_not_found' };
   const contact = contactRow as ContactRow;
@@ -203,8 +198,7 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
   // ── Create the campaign row FIRST so we have the id for the tracked link,
   //    which is embedded in the draft body. Status starts 'drafted'; it flips
   //    to 'sent' once the pending draft actually exists. ──────────────────
-  const { data: campaignRow, error: campaignErr } = await supabase
-    .from('ReviewCampaign')
+  const { data: campaignRow, error: campaignErr } = await tenantTable(supabase, 'ReviewCampaign', { spaceId })
     .insert({
       spaceId,
       dealId,
@@ -248,8 +242,7 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
 
   // ── Persist the PENDING draft. It rides the normal approve → send path;
   //    nothing goes out until the realtor approves it. ────────────────────
-  const { data: inserted, error: insertError } = await supabase
-    .from('AgentDraft')
+  const { data: inserted, error: insertError } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .insert({
       spaceId,
       contactId,
@@ -269,21 +262,17 @@ async function performReviewAsk(input: FireReviewAskInput): Promise<ReviewAskOut
     logger.error('[review-ask] draft insert failed', { spaceId, dealId, err: insertError?.message });
     // Mark the campaign skipped so a stuck 'drafted' row can't wedge the
     // per-deal dedupe forever while never being sent.
-    await supabase
-      .from('ReviewCampaign')
+    await tenantTable(supabase, 'ReviewCampaign', { spaceId })
       .update({ status: 'skipped', updatedAt: new Date().toISOString() })
-      .eq('id', campaignId)
-      .eq('spaceId', spaceId);
+      .eq('id', campaignId);
     return { created: false, reason: 'insert_failed', campaignId };
   }
   const draftId = (inserted as { id: string }).id;
 
   // ── Flip the campaign to 'sent' (the nudge cron keys on this + sentAt) ─
-  await supabase
-    .from('ReviewCampaign')
+  await tenantTable(supabase, 'ReviewCampaign', { spaceId })
     .update({ status: 'sent', sentAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-    .eq('id', campaignId)
-    .eq('spaceId', spaceId);
+    .eq('id', campaignId);
 
   // ── Notify the realtor. Only after the draft actually exists. ─────────
   const clientName = (contact.name ?? '').trim() || 'your client';

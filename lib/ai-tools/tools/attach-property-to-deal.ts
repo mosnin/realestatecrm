@@ -10,9 +10,12 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -40,11 +43,9 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, propertyId')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -53,11 +54,9 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       return { summary: `No deal with id "${args.dealId}".`, display: 'error' };
     }
 
-    const { data: property, error: propErr } = await supabase
-      .from('Property')
+    const { data: property, error: propErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .select('id, address')
       .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (propErr) {
       return { summary: `Property lookup failed: ${propErr.message}`, display: 'error' };
@@ -74,17 +73,15 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ propertyId: property.id, updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error('[tools.attach_property_to_deal] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Link failed: ${updateErr.message}`, display: 'error' };
     }
 
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,
@@ -96,8 +93,8 @@ export const attachPropertyToDealTool = defineTool<typeof parameters, AttachProp
       logger.warn('[tools.attach_property_to_deal] activity insert failed', { dealId: args.dealId }, activityErr);
     }
 
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

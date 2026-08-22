@@ -87,7 +87,7 @@ import { POST } from '@/app/api/agent/send/route';
 import { sendDraft } from '@/lib/delivery';
 import { sendSMS } from '@/lib/sms';
 
-const mockSendEmail = vi.mocked(sendDraft);
+const mockSendDraft = vi.mocked(sendDraft);
 const mockSendSMS = vi.mocked(sendSMS);
 
 function makeReq(body: unknown, auth = 'Bearer test-secret'): NextRequest {
@@ -122,7 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(queues)) delete queues[k];
   inserts.length = 0;
-  mockSendEmail.mockResolvedValue({ sent: true, method: 'gmail' });
+  mockSendDraft.mockResolvedValue({ sent: true, method: 'gmail' });
   mockSendSMS.mockResolvedValue(true);
 });
 
@@ -200,7 +200,7 @@ describe('POST /api/agent/send — Phase 2 inbox wire-in', () => {
     const json = (await res.json()) as { success: boolean };
     expect(json.success).toBe(true);
     // The send still happened.
-    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendDraft).toHaveBeenCalledTimes(1);
   });
 
   it('does not record when the send itself failed (e.g. SMS delivery failure)', async () => {

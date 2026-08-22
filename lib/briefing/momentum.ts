@@ -18,6 +18,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 interface Counts {
   sent: number;
@@ -59,17 +60,13 @@ export async function composeMomentum(spaceId: string): Promise<string | null> {
   const { start, end } = yesterdayBounds();
 
   const [sentRes, activityRes] = await Promise.all([
-    supabase
-      .from('AgentDraft')
+    tenantTable(supabase, 'AgentDraft', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .eq('status', 'sent')
       .gte('updatedAt', start)
       .lt('updatedAt', end),
-    supabase
-      .from('ContactActivity')
+    tenantTable(supabase, 'ContactActivity', { spaceId })
       .select('type')
-      .eq('spaceId', spaceId)
       .gte('createdAt', start)
       .lt('createdAt', end),
   ]);

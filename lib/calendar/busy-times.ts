@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { executeToolForEntity } from '@/lib/integrations/composio';
 import { decrypt, decryptOrPassthrough, encrypt } from '@/lib/crypto';
@@ -96,10 +97,8 @@ async function fetchLegacyGoogleBusy(
   timeMin: Date,
   timeMax: Date,
 ): Promise<BusySlot[]> {
-  const { data: tokenRow } = await supabase
-    .from('GoogleCalendarToken')
+  const { data: tokenRow } = await tenantTable(supabase, 'GoogleCalendarToken', { spaceId })
     .select('accessToken, refreshToken, expiresAt, calendarId')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (!tokenRow) return [];
 
@@ -169,14 +168,11 @@ async function getLegacyAccessToken(
   if (!res.ok) throw new Error('Failed to refresh Google token');
   const tokens = (await res.json()) as { access_token?: string; expires_in?: number };
   if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
-  await supabase
-    .from('GoogleCalendarToken')
-    .update({
-      accessToken: encrypt(tokens.access_token),
-      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('spaceId', spaceId);
+  await tenantTable(supabase, 'GoogleCalendarToken', { spaceId }).update({
+    accessToken: encrypt(tokens.access_token),
+    expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
   return tokens.access_token;
 }
 

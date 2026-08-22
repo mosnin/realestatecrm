@@ -20,6 +20,8 @@ import { supabase } from '@/lib/supabase';
 import { fireBrokerRoutineRun } from '@/lib/broker-routines';
 import { monitorCron } from '@/lib/cron-monitor';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 // Match the space-routine cron's budget: broker dispatch shares fireRoutineRun's
@@ -57,8 +59,8 @@ async function handler(req: NextRequest) {
   const nowIso = new Date().toISOString();
 
   // ── 1. Due routines ─────────────────────────────────────────────────────
-  const { data: dueRows, error: dueErr } = await supabase
-    .from('BrokerRoutine')
+  const { data: dueRows, error: dueErr } = await unscoped(supabase
+    .from('BrokerRoutine'), 'cron: cross-tenant discovery then per-row work')
     .select('id, brokerageId, instruction')
     .eq('enabled', true)
     .lte('nextRunAt', nowIso)
@@ -112,15 +114,15 @@ async function handler(req: NextRequest) {
     await Promise.all(
       skippedRoutines.map(async (r) => {
         const nowIso = new Date().toISOString();
-        const { error: stampErr } = await supabase
-          .from('BrokerRoutine')
+        const { error: stampErr } = await unscoped(supabase
+          .from('BrokerRoutine'), 'cron: cross-tenant discovery then per-row work')
           .update({ lastRunAt: nowIso, lastRunStatus: 'skipped' })
           .eq('id', r.id);
         if (stampErr) {
           // Pre-migration fallback — see cron/routines: stamping lastRunAt
           // alone still advances nextRunAt, which is the anti-starvation part.
-          const { error: fallbackErr } = await supabase
-            .from('BrokerRoutine')
+          const { error: fallbackErr } = await unscoped(supabase
+            .from('BrokerRoutine'), 'cron: cross-tenant discovery then per-row work')
             .update({ lastRunAt: nowIso })
             .eq('id', r.id);
           if (fallbackErr) {
@@ -151,8 +153,8 @@ async function handler(req: NextRequest) {
 
       // Stamping lastRunAt fires the trigger that advances nextRunAt — even
       // on 'error', so a permanently failing dispatch can't jam the queue.
-      await supabase
-        .from('BrokerRoutine')
+      await unscoped(supabase
+        .from('BrokerRoutine'), 'cron: cross-tenant discovery then per-row work')
         .update({ lastRunAt: new Date().toISOString(), lastRunStatus: status })
         .eq('id', routine.id);
     }

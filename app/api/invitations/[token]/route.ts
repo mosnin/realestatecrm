@@ -7,6 +7,8 @@ import { notificationForMemberJoined } from '@/lib/notification-voice';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSeatCapacity } from '@/lib/brokerage-seats';
 import { syncBrokerageSeatBilling } from '@/lib/billing/brokerage-seat-billing';
+import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 
 /**
  * GET /api/invitations/[token]
@@ -32,8 +34,10 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  const { data: inv } = await supabase
-    .from('Invitation')
+  const { data: inv } = await unscoped(
+    supabase.from('Invitation'),
+    'capability token: invitation token lookup',
+  )
     .select('id, status, email, roleToAssign, expiresAt, brokerageId, Brokerage(name, logoUrl)')
     .eq('token', token)
     .maybeSingle();
@@ -63,8 +67,10 @@ export async function POST(_req: Request, { params }: Params) {
   }
 
   // Fetch the invitation with its brokerage
-  const { data: inv } = await supabase
-    .from('Invitation')
+  const { data: inv } = await unscoped(
+    supabase.from('Invitation'),
+    'capability token: invitation token lookup',
+  )
     .select('*')
     .eq('token', token)
     .maybeSingle();
@@ -75,7 +81,9 @@ export async function POST(_req: Request, { params }: Params) {
   }
   if (new Date(inv.expiresAt) < new Date()) {
     // Mark expired
-    await supabase.from('Invitation').update({ status: 'expired' }).eq('id', inv.id);
+    await tenantTable(supabase, 'Invitation', { brokerageId: inv.brokerageId })
+      .update({ status: 'expired' })
+      .eq('id', inv.id);
     return NextResponse.json({ error: 'Invitation has expired' }, { status: 410 });
   }
 
@@ -146,7 +154,9 @@ export async function POST(_req: Request, { params }: Params) {
     .maybeSingle();
   if (existingMembership) {
     // Mark accepted and return OK
-    await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
+    await tenantTable(supabase, 'Invitation', { brokerageId: inv.brokerageId })
+      .update({ status: 'accepted' })
+      .eq('id', inv.id);
     return NextResponse.json({ message: 'Already a member', roleToAssign: inv.roleToAssign }, { status: 200 });
   }
 
@@ -243,7 +253,9 @@ export async function POST(_req: Request, { params }: Params) {
   }
 
   // Mark invitation accepted
-  await supabase.from('Invitation').update({ status: 'accepted' }).eq('id', inv.id);
+  await tenantTable(supabase, 'Invitation', { brokerageId: inv.brokerageId })
+    .update({ status: 'accepted' })
+    .eq('id', inv.id);
 
   void audit({ actorClerkId: clerkId, action: 'CREATE', resource: 'BrokerageMembership', metadata: { brokerageId: inv.brokerageId, role: inv.roleToAssign, method: 'email_invitation', invitationId: inv.id } });
 

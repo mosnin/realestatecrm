@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">1. Who We Are</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>1.1. Chippi Inc. operates a B2B SaaS agentic OS for real estate agents and brokerages. The platform combines an autonomous AI agent with intake forms, AI lead scoring, deal pipelines, tour scheduling, voice AI, MCP server integration, and brokerage team management.</p>
+          <p>1.1. Chippi Inc. operates a B2B SaaS agentic OS for real estate agents and brokerages. The platform combines an autonomous AI agent with intake forms, AI lead scoring, deal pipelines, tour scheduling, optional voice assistant when configured, MCP server integration, and brokerage team management.</p>
           <p>1.2. With respect to Subscriber Data (including Applicant data), Chippi acts as a <strong className="text-foreground">Data Processor</strong>. We process data on behalf of our Subscribers (real estate agents and brokerages), who are the <strong className="text-foreground">Data Controllers</strong>.</p>
           <p>1.3. For data we collect directly about Subscribers for account and billing purposes, Chippi acts as the Data Controller.</p>
         </div>
@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2 className="text-xl font-semibold">6. AI Data Usage</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>6.1. AI features (including lead scoring and voice AI assistant) process data solely to provide scoring results and advisory outputs to Subscribers.</p>
+          <p>6.1. AI features (including lead scoring and optional voice assistant when configured) process data solely to provide scoring results and advisory outputs to Subscribers.</p>
           <p>6.2. <strong className="text-foreground">We do not use Subscriber Data or Applicant data to train artificial intelligence models.</strong></p>
           <p>6.3. AI-generated scores and recommendations are <strong className="text-foreground">advisory only</strong> and do not constitute automated legal decision-making. Subscribers retain full responsibility for all decisions made using AI outputs.</p>
           <p>6.4. AI processing is performed through our integration with OpenAI. Data sent to OpenAI is subject to our data processing agreements with them and is not used by OpenAI for model training.</p>
@@ -100,9 +100,9 @@ export default function PrivacyPolicyPage() {
             <li><strong className="text-foreground">Supabase</strong> &mdash; database hosting and data storage infrastructure.</li>
             <li><strong className="text-foreground">Clerk</strong> &mdash; user authentication, session management, and identity services.</li>
             <li><strong className="text-foreground">Stripe</strong> &mdash; payment processing, subscription billing, and financial transaction management.</li>
-            <li><strong className="text-foreground">OpenAI</strong> &mdash; AI-powered lead scoring, voice AI assistant, and analytical features.</li>
+            <li><strong className="text-foreground">OpenAI</strong> &mdash; AI-powered lead scoring, optional voice assistant when enabled, and analytical features.</li>
             <li><strong className="text-foreground">Resend</strong> &mdash; transactional email delivery (lead alerts, account notifications).</li>
-            <li><strong className="text-foreground">Telnyx</strong> &mdash; SMS delivery and voice communications.</li>
+            <li><strong className="text-foreground">Telnyx</strong> &mdash; SMS delivery and voice communications (when configured).</li>
             <li><strong className="text-foreground">Vercel</strong> &mdash; application hosting and performance monitoring.</li>
             <li><strong className="text-foreground">Sentry</strong> &mdash; error monitoring and diagnostics.</li>
             <li><strong className="text-foreground">Amplitude</strong> &mdash; product analytics and session replay to understand and improve in-product usage.</li>

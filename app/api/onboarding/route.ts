@@ -4,12 +4,14 @@ import { supabase } from '@/lib/supabase';
 import { grantFreeSignup } from '@/lib/billing/grants';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import { getOnboardingStatus, ensureOnboardingBackfill } from '@/lib/onboarding';
+import { ensureDefaultPipelines } from '@/lib/pipelines';
 import { resolveSelfServePlan } from '@/lib/plans';
 import { sendWelcomeEmail } from '@/lib/email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { emit as emitTelemetry } from '@/lib/telemetry';
 import { SAMPLE_LEAD_NAME } from '@/lib/onboarding-draft';
 import type { User, Space, SpaceSetting } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Seed the sample lead the realtor just watched Chippi work in the reveal
@@ -22,15 +24,13 @@ import type { User, Space, SpaceSetting } from '@/lib/types';
  */
 async function seedSampleLead(spaceId: string, draftBody: string | null): Promise<void> {
   try {
-    const { count } = await supabase
-      .from('Contact')
-      .select('*', { count: 'exact', head: true })
-      .eq('spaceId', spaceId);
+    const { count } = await tenantTable(supabase, 'Contact', { spaceId })
+      .select('*', { count: 'exact', head: true });
     if ((count ?? 0) > 0) return;
 
     const contactId = crypto.randomUUID();
     const followUpAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: contactErr } = await supabase.from('Contact').insert({
+    const { error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId }).insert({
       id: contactId,
       spaceId,
       name: SAMPLE_LEAD_NAME,
@@ -53,7 +53,7 @@ async function seedSampleLead(spaceId: string, draftBody: string | null): Promis
     }
 
     if (draftBody) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
         id: crypto.randomUUID(),
         contactId,
         spaceId,
@@ -96,10 +96,8 @@ export async function GET() {
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('SpaceSetting')
+      const { data: settingsData, error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .select('*')
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (settingsError) throw settingsError;
       settings = settingsData as SpaceSetting | null;
@@ -226,10 +224,8 @@ export async function POST(req: NextRequest) {
 
     let settings: SpaceSetting | null = null;
     if (space) {
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('SpaceSetting')
+      const { data: settingsData, error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .select('*')
-        .eq('spaceId', space.id)
         .maybeSingle();
       if (settingsError) throw settingsError;
       settings = settingsData as SpaceSetting | null;
@@ -289,8 +285,7 @@ export async function POST(req: NextRequest) {
       if (updateError) throw updateError;
 
       if (space) {
-        const { error: settingsError } = await supabase
-          .from('SpaceSetting')
+        const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
           .upsert(
             {
               id: crypto.randomUUID(),
@@ -411,8 +406,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (space) {
-        const { error: settingsError } = await supabase
-          .from('SpaceSetting')
+        const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
           .upsert(
             {
               id: crypto.randomUUID(),
@@ -466,15 +460,6 @@ export async function POST(req: NextRequest) {
       if (ownerError) throw ownerError;
       if (existingOwnerSpace) return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
 
-      const DEFAULT_STAGES = [
-        { name: 'New', color: '#94a3b8', position: 0 },
-        { name: 'Reviewing', color: '#60a5fa', position: 1 },
-        { name: 'Showing', color: '#a78bfa', position: 2 },
-        { name: 'Applied', color: '#f59e0b', position: 3 },
-        { name: 'Approved', color: '#22c55e', position: 4 },
-        { name: 'Declined', color: '#ef4444', position: 5 }
-      ];
-
       // Direct inserts instead of RPC — avoids UUID/TEXT type mismatch issues
       // and works without requiring the migration to be deployed first.
       const spaceId = crypto.randomUUID();
@@ -511,8 +496,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. Create SpaceSetting
-      const { error: settingsInsertErr } = await supabase
-        .from('SpaceSetting')
+      const { error: settingsInsertErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
         .insert({
           id: settingsId,
           spaceId,
@@ -529,18 +513,13 @@ export async function POST(req: NextRequest) {
         // Space was created — don't fail the whole flow for settings
       }
 
-      // 3. Create default deal stages
-      const stageRows = DEFAULT_STAGES.map((stage) => ({
-        id: crypto.randomUUID(),
-        spaceId,
-        name: stage.name,
-        color: stage.color,
-        position: stage.position,
-      }));
-      const { error: stagesErr } = await supabase.from('DealStage').insert(stageRows);
-      if (stagesErr) {
-        console.error('[onboarding] DealStage insert failed:', stagesErr);
-        // Non-fatal — stages can be created later
+      // 3. Bootstrap Rental + Buyer pipelines (and their stages) so the
+      // deals board is usable on first paint — same helper GET /api/pipelines
+      // uses. Non-fatal: space creation must not fail if this insert races.
+      try {
+        await ensureDefaultPipelines(spaceId);
+      } catch (e) {
+        console.error('[onboarding] pipeline bootstrap failed:', e);
       }
 
       const newSpace = createdSpace as Space;
@@ -569,8 +548,7 @@ export async function POST(req: NextRequest) {
 
       if (!space) return NextResponse.json({ error: 'No space found' }, { status: 400 });
 
-      const { error: notifError } = await supabase
-        .from('SpaceSetting')
+      const { error: notifError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .upsert(
           {
             id: crypto.randomUUID(),
@@ -582,30 +560,20 @@ export async function POST(req: NextRequest) {
         .select();
       if (notifError) throw notifError;
 
-      const { error: connError } = await supabase
-        .from('SpaceSetting')
+      const { error: connError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
         .update({
           myConnections: JSON.stringify({ defaultSubmissionStatus: defaultSubmissionStatus || 'New' }),
-        })
-        .eq('spaceId', space.id);
+        });
       if (connError) throw connError;
 
       return NextResponse.json({ success: true });
     }
 
     if (action === 'skip') {
-      // Mark user as onboarded without requiring a workspace
-      // They'll be redirected to /setup to complete later
-      const { error } = await supabase
-        .from('User')
-        .update({
-          onboard: true,
-          onboardingCurrentStep: 7,
-          onboardingCompletedAt: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-      if (error) throw error;
-      return NextResponse.json({ success: true, redirect: '/setup' });
+      // Do not mark onboard=true without a workspace — that stranded users
+      // between "completed" and /setup with no recovery path. Leave the
+      // flag false so /setup and the onboarding flow stay reachable.
+      return NextResponse.json({ success: true, onboard: false, redirect: '/setup' });
     }
 
     if (action === 'complete') {
@@ -733,8 +701,7 @@ export async function POST(req: NextRequest) {
         profileUpdate.leadSources = leadSources.filter((s) => typeof s === 'string').slice(0, 20);
       }
 
-      const { error: profileErr } = await supabase
-        .from('AIUserProfile')
+      const { error: profileErr } = await tenantTable(supabase, 'AIUserProfile', { spaceId: space.id })
         .upsert(
           {
             id: crypto.randomUUID(),

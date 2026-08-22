@@ -8,6 +8,7 @@ import { hasSameWorkbookSource, parseStoredWorkbook, validateStoredWorkbookConte
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
 import { parseWorkbookTransformReceipt } from '@/lib/chippi/workbook-transform';
+import { tenantTable } from '@/lib/tenant-db';
 
 /** Never forward arbitrary ArtifactVersion.metadata to the browser. The only
  * transform metadata surfaced is the bounded, server-authored receipt. */
@@ -43,11 +44,9 @@ export async function GET(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: artifact, error: artifactError } = await supabase
-    .from('Artifact')
+  const { data: artifact, error: artifactError } = await tenantTable(supabase, 'Artifact', { spaceId: space.id })
     .select('*')
     .eq('id', artifactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (artifactError) {
@@ -66,19 +65,17 @@ export async function GET(
   if (requestedVersion !== null) {
     const versionNumber = Number.parseInt(requestedVersion, 10);
     if (!Number.isInteger(versionNumber) || versionNumber < 1) return NextResponse.json({ error: 'Invalid version number' }, { status: 400 });
-    const { data: version, error: versionError } = await supabase
-      .from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata')
-      .eq('artifactId', artifactId).eq('spaceId', space.id).eq('versionNumber', versionNumber).maybeSingle();
+    const { data: version, error: versionError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: space.id })
+      .select('id, versionNumber, createdAt, createdByAgent, content, metadata')
+      .eq('artifactId', artifactId).eq('versionNumber', versionNumber).maybeSingle();
     if (versionError) return NextResponse.json({ error: 'Failed to fetch artifact version' }, { status: 500 });
     if (!version) return NextResponse.json({ error: 'Version not found' }, { status: 404 });
     return NextResponse.json({ version: versionWithSafeReceipt(version) });
   }
 
-  const { data: versions, error: versionsError } = await supabase
-    .from('ArtifactVersion')
+  const { data: versions, error: versionsError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId })
     .select('id, versionNumber, createdAt, createdByAgent')
     .eq('artifactId', artifactId)
-    .eq('spaceId', artifact.spaceId)
     .order('versionNumber', { ascending: false })
     .limit(21);
 
@@ -88,10 +85,10 @@ export async function GET(
   }
 
   const [{ data: source, error: sourceError }, { data: current, error: currentError }] = await Promise.all([
-    supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).eq('spaceId', space.id).eq('versionNumber', 1).maybeSingle(),
+    tenantTable(supabase, 'ArtifactVersion', { spaceId: space.id }).select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).eq('versionNumber', 1).maybeSingle(),
     artifact.currentVersionId
-      ? supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('id', artifact.currentVersionId).eq('artifactId', artifactId).eq('spaceId', space.id).maybeSingle()
-      : supabase.from('ArtifactVersion').select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).eq('spaceId', space.id).order('versionNumber', { ascending: false }).limit(1).maybeSingle(),
+      ? tenantTable(supabase, 'ArtifactVersion', { spaceId: space.id }).select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('id', artifact.currentVersionId).eq('artifactId', artifactId).maybeSingle()
+      : tenantTable(supabase, 'ArtifactVersion', { spaceId: space.id }).select('id, versionNumber, createdAt, createdByAgent, content, metadata').eq('artifactId', artifactId).order('versionNumber', { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (sourceError || currentError || !source || !current) return NextResponse.json({ error: 'Failed to fetch workbook content' }, { status: 500 });
   const incomplete = (versions?.length ?? 0) > 20;
@@ -141,11 +138,9 @@ export async function PATCH(
   // before the id lookup so foreign ids cannot form an existence oracle.
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const { data: artifact, error: artifactError } = await supabase
-    .from('Artifact')
+  const { data: artifact, error: artifactError } = await tenantTable(supabase, 'Artifact', { spaceId: space.id })
     .select('*')
     .eq('id', artifactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (artifactError) {
@@ -162,11 +157,9 @@ export async function PATCH(
     if (!validation.workbook) return NextResponse.json({ error: validation.error ?? 'Invalid workbook content' }, { status: 400 });
     const metadataValidation = validateWorkbookVersionMetadata(metadata);
     if (!metadataValidation.metadata) return NextResponse.json({ error: metadataValidation.error ?? 'Invalid workbook metadata' }, { status: 400 });
-    const { data: sourceVersion, error: sourceError } = await supabase
-      .from('ArtifactVersion')
+    const { data: sourceVersion, error: sourceError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId })
       .select('content')
       .eq('artifactId', artifactId)
-      .eq('spaceId', artifact.spaceId)
       .eq('versionNumber', 1)
       .maybeSingle();
     const sourceWorkbook = sourceVersion?.content ? parseStoredWorkbook(sourceVersion.content) : null;
@@ -183,11 +176,9 @@ export async function PATCH(
   }
 
   // Get max versionNumber for this artifact
-  const { data: maxRow, error: maxError } = await supabase
-    .from('ArtifactVersion')
+  const { data: maxRow, error: maxError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId })
     .select('versionNumber')
     .eq('artifactId', artifactId)
-    .eq('spaceId', artifact.spaceId)
     .order('versionNumber', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -200,8 +191,7 @@ export async function PATCH(
   const nextVersionNumber = (maxRow?.versionNumber ?? 0) + 1;
 
   // Insert new ArtifactVersion
-  const { data: newVersion, error: versionError } = await supabase
-    .from('ArtifactVersion')
+  const { data: newVersion, error: versionError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId })
     .insert({
       artifactId,
       spaceId: artifact.spaceId,
@@ -220,16 +210,14 @@ export async function PATCH(
   }
 
   // Update Artifact.currentVersionId and updatedAt
-  const { data: updatedArtifact, error: updateError } = await supabase
-    .from('Artifact')
+  const { data: updatedArtifact, error: updateError } = await tenantTable(supabase, 'Artifact', { spaceId: artifact.spaceId })
     .update({ currentVersionId: newVersion.id, updatedAt: new Date().toISOString() })
     .eq('id', artifactId)
-    .eq('spaceId', artifact.spaceId)
     .select()
     .single();
 
   if (updateError || !updatedArtifact) {
-    await supabase.from('ArtifactVersion').delete().eq('id', newVersion.id).eq('spaceId', artifact.spaceId);
+    await tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId }).delete().eq('id', newVersion.id);
     console.error('[PATCH /api/agent/artifacts/[artifactId]] update artifact error:', updateError);
     return NextResponse.json({ error: 'Failed to update artifact' }, { status: 500 });
   }

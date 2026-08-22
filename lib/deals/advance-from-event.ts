@@ -14,6 +14,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import type { DealStageKind } from '@/lib/types';
 import {
@@ -125,10 +126,8 @@ function isAheadOrEqual(current: StageRow, target: StageRow): boolean {
 }
 
 async function loadStages(spaceId: string): Promise<StageRow[] | null> {
-  const { data, error } = await supabase
-    .from('DealStage')
+  const { data, error } = await tenantTable(supabase, 'DealStage', { spaceId })
     .select('id, name, kind, position, pipelineId, pipelineType')
-    .eq('spaceId', spaceId)
     .order('position', { ascending: true });
   if (error) {
     logger.warn('[deals.advance] stage lookup failed', { spaceId, err: error.message });
@@ -161,11 +160,9 @@ async function loadContactLeadType(
   contactId: string | null | undefined,
 ): Promise<DefaultPipelineType | null> {
   if (!contactId) return null;
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('leadType')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (error) {
     logger.warn('[deals.advance] contact leadType lookup failed', { spaceId, err: error.message });
@@ -179,11 +176,9 @@ async function loadContactLeadType(
 async function stampContractAcceptedAt(spaceId: string, deal: DealRow): Promise<void> {
   if (deal.contractAcceptedAt) return;
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('Deal')
+  const { error } = await tenantTable(supabase, 'Deal', { spaceId })
     .update({ contractAcceptedAt: now, updatedAt: now })
     .eq('id', deal.id)
-    .eq('spaceId', spaceId)
     .is('contractAcceptedAt', null);
   if (error) {
     logger.warn('[deals.advance] contractAcceptedAt stamp failed', {
@@ -196,11 +191,9 @@ async function stampContractAcceptedAt(spaceId: string, deal: DealRow): Promise<
 
 async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
   if (input.dealId) {
-    const { data, error } = await supabase
-      .from('Deal')
+    const { data, error } = await tenantTable(supabase, 'Deal', { spaceId: input.spaceId })
       .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
       .eq('id', input.dealId)
-      .eq('spaceId', input.spaceId)
       .maybeSingle();
     if (error) {
       logger.warn('[deals.advance] deal lookup failed', { spaceId: input.spaceId, err: error.message });
@@ -210,10 +203,8 @@ async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
   }
 
   if (input.sourceTourId) {
-    const { data, error } = await supabase
-      .from('Deal')
+    const { data, error } = await tenantTable(supabase, 'Deal', { spaceId: input.spaceId })
       .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
-      .eq('spaceId', input.spaceId)
       .eq('sourceTourId', input.sourceTourId)
       .maybeSingle();
     if (error) {
@@ -240,11 +231,11 @@ async function findDeal(input: AdvanceFromEventInput): Promise<DealRow | null> {
   const ids = ((links ?? []) as Array<{ dealId: string }>).map((r) => r.dealId);
   if (ids.length === 0) return null;
 
-  const { data: deals, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: deals, error: dealErr } = await tenantTable(supabase, 'Deal', {
+    spaceId: input.spaceId,
+  })
     .select('id, stageId, title, status, sourceTourId, contractAcceptedAt')
-    .in('id', ids)
-    .eq('spaceId', input.spaceId);
+    .in('id', ids);
   if (dealErr) {
     logger.warn('[deals.advance] deals-for-contact lookup failed', {
       spaceId: input.spaceId,
@@ -263,18 +254,16 @@ async function createDeal(
   const title = (input.title ?? '').trim().slice(0, 255) || EVENT_LABEL[input.event];
   const now = new Date().toISOString();
 
-  const { data: last } = await supabase
-    .from('Deal')
+  const { data: last } = await tenantTable(supabase, 'Deal', { spaceId: input.spaceId })
     .select('position')
     .eq('stageId', stage.id)
-    .eq('spaceId', input.spaceId)
     .order('position', { ascending: false })
     .limit(1)
     .maybeSingle();
   const position = ((last as { position?: number } | null)?.position ?? -1) + 1;
 
   const dealId = crypto.randomUUID();
-  const { error } = await supabase.from('Deal').insert({
+  const { error } = await tenantTable(supabase, 'Deal', { spaceId: input.spaceId }).insert({
     id: dealId,
     spaceId: input.spaceId,
     title,
@@ -308,7 +297,9 @@ async function createDeal(
     }
   }
 
-  const { error: actErr } = await supabase.from('DealActivity').insert({
+  const { error: actErr } = await tenantTable(supabase, 'DealActivity', {
+    spaceId: input.spaceId,
+  }).insert({
     id: crypto.randomUUID(),
     dealId,
     spaceId: input.spaceId,
@@ -330,8 +321,7 @@ async function moveDeal(
   to: StageRow,
 ): Promise<boolean> {
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('Deal')
+  const { error } = await tenantTable(supabase, 'Deal', { spaceId: input.spaceId })
     .update({
       stageId: to.id,
       stageChangedAt: now,
@@ -341,14 +331,15 @@ async function moveDeal(
         ? { contractAcceptedAt: now }
         : {}),
     })
-    .eq('id', deal.id)
-    .eq('spaceId', input.spaceId);
+    .eq('id', deal.id);
   if (error) {
     logger.warn('[deals.advance] deal update failed', { spaceId: input.spaceId, dealId: deal.id, err: error.message });
     return false;
   }
 
-  const { error: actErr } = await supabase.from('DealActivity').insert({
+  const { error: actErr } = await tenantTable(supabase, 'DealActivity', {
+    spaceId: input.spaceId,
+  }).insert({
     id: crypto.randomUUID(),
     dealId: deal.id,
     spaceId: input.spaceId,

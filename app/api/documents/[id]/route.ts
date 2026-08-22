@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { requireContactAccess } from '@/lib/api-auth';
+import { requireAuth } from '@/lib/api-auth';
+import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 
@@ -22,13 +24,19 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const space = await getSpaceForUser(authResult.userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   const { id } = await params;
 
-  // Resolve the doc first so we know which contact to check access against.
-  // Without this, an attacker could iterate document UUIDs without an obvious
-  // contactId; the requireContactAccess call below is what gates them.
-  const { data: doc, error } = await supabase
-    .from('ContactDocument')
+  // Scope first: a foreign document id must 404 with no PII. Looking the
+  // row up unscoped and then checking contact access leaked existence
+  // (and held victim metadata) before the gate ran.
+  const { data: doc, error } = await tenantTable(supabase, 'ContactDocument', {
+    spaceId: space.id,
+  })
     .select('id, contactId, fileName, fileType, storageKey')
     .eq('id', id)
     .maybeSingle();
@@ -38,9 +46,6 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to load document' }, { status: 500 });
   }
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  const auth = await requireContactAccess(doc.contactId);
-  if (auth instanceof NextResponse) return auth;
 
   // Legacy path: file stored inline as a data URL. Hand back as-is.
   if (typeof doc.storageKey === 'string' && doc.storageKey.startsWith('data:')) {
@@ -79,10 +84,16 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const space = await getSpaceForUser(authResult.userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   const { id } = await params;
 
-  const { data: doc, error } = await supabase
-    .from('ContactDocument')
+  const { data: doc, error } = await tenantTable(supabase, 'ContactDocument', {
+    spaceId: space.id,
+  })
     .select('id, contactId, spaceId, storageKey')
     .eq('id', id)
     .maybeSingle();
@@ -93,14 +104,11 @@ export async function DELETE(
   }
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const auth = await requireContactAccess(doc.contactId);
-  if (auth instanceof NextResponse) return auth;
-
-  const { error: dbError } = await supabase
-    .from('ContactDocument')
+  const { error: dbError } = await tenantTable(supabase, 'ContactDocument', {
+    spaceId: space.id,
+  })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', doc.spaceId);
+    .eq('id', id);
 
   if (dbError) {
     logger.error('[documents/id] delete failed', { id }, dbError);

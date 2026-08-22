@@ -17,14 +17,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 async function unsubscribe(token: string): Promise<NextResponse> {
   if (!token || typeof token !== 'string' || token.length < 8) {
     return NextResponse.json({ error: 'Invalid token.' }, { status: 400 });
   }
 
-  const { data: setting } = await supabase
-    .from('SpaceSetting')
+  const { data: setting } = await unscoped(supabase
+    .from('SpaceSetting'), 'capability token: unsubscribe')
     .select('id, spaceId, briefEmail')
     .eq('unsubscribeToken', token)
     .maybeSingle();
@@ -36,7 +38,7 @@ async function unsubscribe(token: string): Promise<NextResponse> {
   }
 
   if (setting.briefEmail) {
-    await supabase.from('SpaceSetting').update({ briefEmail: false }).eq('id', setting.id);
+    await unscoped(supabase.from('SpaceSetting'), 'capability token: unsubscribe').update({ briefEmail: false }).eq('id', setting.id);
   }
 
   return htmlResponse('You&#39;re unsubscribed from the daily brief.');

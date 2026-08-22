@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
@@ -119,11 +120,9 @@ export async function POST(req: NextRequest) {
       // Verify the draft belongs to this space AND is still pending. The
       // single-draft PATCH route does exactly this check; we repeat it
       // per-item so a stale draftId in the batch fails alone, not the batch.
-      const { data: existing, error: fetchError } = await supabase
-        .from('AgentDraft')
+      const { data: existing, error: fetchError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
         .select('id, status, contactId, channel, subject, content')
         .eq('id', draftId)
-        .eq('spaceId', space.id)
         .maybeSingle();
 
       if (fetchError || !existing) {
@@ -141,11 +140,9 @@ export async function POST(req: NextRequest) {
       // draft isn't linked to a contact (e.g. an internal note).
       let contact = { name: 'Contact', email: null as string | null, phone: null as string | null };
       if (existing.contactId) {
-        const { data: contactRow } = await supabase
-          .from('Contact')
+        const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
           .select('name, email, phone')
           .eq('id', existing.contactId)
-          .eq('spaceId', space.id)
           .maybeSingle();
         if (contactRow) contact = contactRow;
       }
@@ -179,11 +176,9 @@ export async function POST(req: NextRequest) {
       };
       if (contentChanged) updatePatch.content = finalContent;
 
-      const { error: updateError } = await supabase
-        .from('AgentDraft')
+      const { error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
         .update(updatePatch)
-        .eq('id', draftId)
-        .eq('spaceId', space.id);
+        .eq('id', draftId);
 
       if (updateError) {
         // Delivery may have already happened — surface the DB error to the

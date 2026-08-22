@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { requestChatStop } from '@/lib/chat/stop-signal';
 import { requestConversationTurnCancellationV2 } from '@/lib/chat/turn-control';
@@ -49,19 +50,15 @@ export async function POST(req: NextRequest) {
   // branch below.
   const space = await getSpaceForUser(userId);
   if (space) {
-    const { data: convo } = await supabase
-      .from('Conversation')
+    const { data: convo } = await tenantTable(supabase, 'Conversation', { spaceId: space.id })
       .select('id, title')
       .eq('id', conversationId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (convo && !isReservedConversationTitle((convo as { title?: string | null }).title)) {
       try {
-        const { data: turn } = await supabase
-          .from('ConversationTurn')
+        const { data: turn } = await tenantTable(supabase, 'ConversationTurn', { spaceId: space.id })
           .select('id, attemptToken, status')
           .eq('id', turnId)
-          .eq('spaceId', space.id)
           .eq('conversationId', conversationId)
           .maybeSingle();
         if (!turn || turn.status !== 'running' || !turn.attemptToken) {
@@ -92,11 +89,11 @@ export async function POST(req: NextRequest) {
   // but not another brokerage's.
   const brokerCtx = await resolveBrokerContext();
   if (brokerCtx) {
-    const { data: brokerConvo } = await supabase
-      .from('BrokerConversation')
+    const { data: brokerConvo } = await tenantTable(supabase, 'BrokerConversation', {
+      brokerageId: brokerCtx.brokerage.id,
+    })
       .select('id')
       .eq('id', conversationId)
-      .eq('brokerageId', brokerCtx.brokerage.id)
       .maybeSingle();
     if (brokerConvo) {
       // Broker chat has not migrated to ConversationTurn yet. The caller must

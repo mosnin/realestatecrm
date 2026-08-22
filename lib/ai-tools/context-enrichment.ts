@@ -20,6 +20,8 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface SubjectContext {
   kind: 'deal' | 'person';
@@ -155,8 +157,8 @@ export async function enrichContext(
 
     let stage: string | undefined;
     if (d.stageId) {
-      const { data: stageRow } = await supabase
-        .from('DealStage')
+      const { data: stageRow } = await unscoped(supabase
+        .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
         .select('name')
         .eq('id', d.stageId)
         .maybeSingle();

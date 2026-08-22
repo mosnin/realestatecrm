@@ -373,6 +373,30 @@ describe('markThreadRead', () => {
     );
   });
 
+  it('scopes a foreign threadId to the caller space (no cross-tenant write)', async () => {
+    enqueue('InboxMessage', { data: null, error: null });
+    enqueue('InboxThread', { data: null, error: null });
+
+    await markThreadRead('thread_victim', 'space_caller');
+
+    const msgEqs = tableOps('InboxMessage').filter((o) => o.op === 'eq');
+    expect(msgEqs.map((o) => [o.arg, o.arg2])).toEqual(
+      expect.arrayContaining([
+        ['threadId', 'thread_victim'],
+        ['spaceId', 'space_caller'],
+      ]),
+    );
+    expect(msgEqs).not.toContainEqual(expect.objectContaining({ arg: 'spaceId', arg2: 'space_victim' }));
+
+    const threadEqs = tableOps('InboxThread').filter((o) => o.op === 'eq');
+    expect(threadEqs.map((o) => [o.arg, o.arg2])).toEqual(
+      expect.arrayContaining([
+        ['id', 'thread_victim'],
+        ['spaceId', 'space_caller'],
+      ]),
+    );
+  });
+
   it('throws when the message update errors', async () => {
     enqueue('InboxMessage', { data: null, error: { message: 'db down' } });
     await expect(markThreadRead('thread_1', 'space_1')).rejects.toMatchObject({ message: 'db down' });

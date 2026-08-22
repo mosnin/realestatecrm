@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -28,11 +29,9 @@ export async function GET(
 
   const { id } = await params;
 
-  const { data, error } = await supabase
-    .from('CallLog')
+  const { data, error } = await tenantTable(supabase, 'CallLog', { spaceId: space.id })
     .select(CALL_COLUMNS)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {

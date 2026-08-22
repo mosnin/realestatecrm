@@ -5,6 +5,9 @@ import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { logger } from '@/lib/logger';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { _sanitisePropertyBody as sanitiseBody } from '@/app/api/properties/route';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * GET /api/broker/properties — the brokerage's property pool.
@@ -62,8 +65,8 @@ export async function GET() {
 
   const members = await loadMemberSpaces(ctx.brokerage.id, ctx.brokerage.ownerId);
 
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await unscoped(supabase
+    .from('Property'), 'broker: membership-proved cross-space access')
     .select('*')
     .eq('brokerageId', ctx.brokerage.id)
     .order('updatedAt', { ascending: false })
@@ -123,7 +126,10 @@ export async function POST(req: NextRequest) {
     ...out,
   };
 
-  const { data, error } = await supabase.from('Property').insert(insert).select().single();
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: ownerSpace.id as string })
+    .insert(insert)
+    .select()
+    .single();
   if (error) {
     if ((error as { code?: string }).code === '23505') {
       return NextResponse.json({ error: 'A property with that MLS number already exists' }, { status: 409 });

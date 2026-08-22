@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * GET /api/applications/portal?ref={applicationRef}&token={statusPortalToken}
@@ -33,8 +36,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Validate both applicationRef AND statusPortalToken match (defense in depth)
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'capability token: application portal')
     .select(
       'id, name, applicationStatus, applicationStatusNote, applicationRef, spaceId, createdAt',
     )
@@ -52,23 +55,23 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch status history
-  const { data: statusHistory } = await supabase
-    .from('ApplicationStatusUpdate')
+  const { data: statusHistory } = await unscoped(supabase
+    .from('ApplicationStatusUpdate'), 'capability token: application portal')
     .select('id, fromStatus, toStatus, note, createdAt')
     .eq('contactId', contact.id)
     .order('createdAt', { ascending: true });
 
   // Fetch messages
-  const { data: messages } = await supabase
-    .from('ApplicationMessage')
+  const { data: messages } = await unscoped(supabase
+    .from('ApplicationMessage'), 'capability token: application portal')
     .select('id, senderType, content, readAt, createdAt')
     .eq('contactId', contact.id)
     .order('createdAt', { ascending: true });
 
   // Fetch tours linked to this contact. Filter to active/recent statuses
   // — applicants don't need to see cancelled tours linger in their portal.
-  const { data: tours } = await supabase
-    .from('Tour')
+  const { data: tours } = await unscoped(supabase
+    .from('Tour'), 'capability token: application portal')
     .select('id, startsAt, endsAt, propertyAddress, notes, status')
     .eq('contactId', contact.id)
     .in('status', ['scheduled', 'confirmed', 'completed'])
@@ -80,17 +83,15 @@ export async function GET(req: NextRequest) {
       .filter((m: { senderType: string; readAt: string | null }) => m.senderType === 'realtor' && !m.readAt)
       .map((m: { id: string }) => m.id);
 
-    await supabase
-      .from('ApplicationMessage')
+    await unscoped(supabase
+      .from('ApplicationMessage'), 'capability token: application portal')
       .update({ readAt: new Date().toISOString() })
       .in('id', unreadIds);
   }
 
   // Fetch business name for display
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
     .select('businessName')
-    .eq('spaceId', contact.spaceId)
     .maybeSingle();
 
   return NextResponse.json({

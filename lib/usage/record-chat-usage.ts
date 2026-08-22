@@ -15,6 +15,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { detectProvider } from '@/lib/llm';
 import { after } from 'next/server';
@@ -125,11 +126,12 @@ async function persistChatUsage(input: RecordChatUsageInput): Promise<void> {
     // A keyed row upserts-ignore: a replayed turn is a no-op, not a second
     // credit debit. Unkeyed rows keep the plain insert (unchanged behavior).
     if (input.idempotencyKey) {
-      await supabase
-        .from('ChatUsage')
-        .upsert(row, { onConflict: 'spaceId,idempotencyKey', ignoreDuplicates: true });
+      await tenantTable(supabase, 'ChatUsage', { spaceId: input.spaceId }).upsert(row, {
+        onConflict: 'spaceId,idempotencyKey',
+        ignoreDuplicates: true,
+      });
     } else {
-      await supabase.from('ChatUsage').insert(row);
+      await tenantTable(supabase, 'ChatUsage', { spaceId: input.spaceId }).insert(row);
     }
   } catch (err) {
     logger.warn('[record-chat-usage] insert failed', { spaceId: input.spaceId }, err);

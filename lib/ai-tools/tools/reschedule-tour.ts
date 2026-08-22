@@ -17,6 +17,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { findCalendarConnection, updateEventThrough } from '@/lib/calendar/mirror';
@@ -65,11 +66,9 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
   },
 
   async handler(args, ctx) {
-    const { data: tour, error: tourErr } = await supabase
-      .from('Tour')
+    const { data: tour, error: tourErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .select('id, startsAt, endsAt, contactId, propertyAddress, guestName, guestEmail, guestPhone, status')
       .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (tourErr) {
       return { summary: `Tour lookup failed: ${tourErr.message}`, display: 'error' };
@@ -96,22 +95,20 @@ export const rescheduleTourTool = defineTool<typeof parameters, RescheduleTourRe
       newEnds = new Date(newStarts.getTime() + duration);
     }
 
-    const { error: updateErr } = await supabase
-      .from('Tour')
+    const { error: updateErr } = await tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .update({
         startsAt: newStarts.toISOString(),
         endsAt: newEnds.toISOString(),
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', args.tourId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.tourId);
     if (updateErr) {
       logger.error('[tools.reschedule_tour] update failed', { tourId: args.tourId }, updateErr);
       return { summary: `Reschedule failed: ${updateErr.message}`, display: 'error' };
     }
 
     if (tour.contactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId: tour.contactId,

@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 import { audit } from '@/lib/audit';
 import { syncDeal } from '@/lib/vectorize';
 import type { Deal } from '@/lib/types';
@@ -109,18 +110,15 @@ export async function POST(req: NextRequest) {
   const { userId, space } = auth;
 
   // Load only the rows actually in this space. Missing ids → not_found.
-  const { data: rows, error: loadErr } = await supabase
-    .from('Deal')
+  const { data: rows, error: loadErr } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id, status')
-    .eq('spaceId', space.id)
     .in('id', ids);
   if (loadErr) {
     console.error('[deals/bulk] load error:', loadErr);
     return NextResponse.json({ error: 'Failed to load deals' }, { status: 500 });
   }
-  const byId = new Map(
-    (rows ?? []).map((r) => [r.id as string, r as { id: string; status: string }]),
-  );
+  const loaded = (rows ?? []) as { id: string; status: string }[];
+  const byId = new Map(loaded.map((r) => [r.id, r]));
 
   const results: PerIdResult[] = [];
   const nowIso = new Date().toISOString();
@@ -145,11 +143,9 @@ export async function POST(req: NextRequest) {
       updates.priority = priorityVal;
     }
 
-    const { data: updated, error: updErr } = await supabase
-      .from('Deal')
+    const { data: updated, error: updErr } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .update(updates)
       .eq('id', id)
-      .eq('spaceId', space.id)
       .select()
       .maybeSingle();
     if (updErr || !updated) {

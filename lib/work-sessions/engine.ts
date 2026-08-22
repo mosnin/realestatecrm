@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 
 import { run, Agent } from '@openai/agents';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { getLLMClient, resolveChatModel } from '@/lib/llm';
 import { getAgentModel } from '@/lib/ai-tools/agent-model';
@@ -42,6 +43,8 @@ import { selectWorkspaceTarget, type WorkspaceProperty } from '@/lib/workspace-r
 import type { PlanStep, WorkSessionRow } from './types';
 export type { PlanStep, WorkSessionRow } from './types';
 import { proposeActions } from './actions';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const MAX_STEPS = 6;
 const STEP_MAX_TURNS = 12;
@@ -57,7 +60,7 @@ type WorkSessionPhase = 'plan' | 'step' | 'artifact';
 // ── Row helpers ──────────────────────────────────────────────────────────────
 
 export async function getSession(id: string): Promise<WorkSessionRow | null> {
-  const { data, error } = await supabase.from('WorkSession').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await unscoped(supabase.from('WorkSession'), 'post-fetch: caller verified parent scope before this id query').select('*').eq('id', id).maybeSingle();
   // A queue handler must distinguish "missing" from "the database could not
   // answer". Treating both as null acknowledges the Cloudflare message and
   // can strand a live session with no later delivery.
@@ -66,8 +69,8 @@ export async function getSession(id: string): Promise<WorkSessionRow | null> {
 }
 
 async function patchSession(id: string, patch: Record<string, unknown>): Promise<void> {
-  const { error } = await supabase
-    .from('WorkSession')
+  const { error } = await unscoped(supabase
+    .from('WorkSession'), 'post-fetch: caller verified parent scope before this id query')
     .update({ ...patch, updatedAt: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
@@ -237,7 +240,7 @@ export async function planSession(
   // Workspace Runs use an honest fixed packet plan; unlike research, the VM
   // will execute exactly these four visible deliverable steps.
   if (session.kind === 'workspace') {
-    const { data: properties, error: propertiesError } = await supabase.from('Property').select('*').eq('spaceId', session.spaceId).order('updatedAt', { ascending: false }).limit(50);
+    const { data: properties, error: propertiesError } = await tenantTable(supabase, 'Property', { spaceId: session.spaceId }).select('*').order('updatedAt', { ascending: false }).limit(50);
     if (propertiesError) throw propertiesError;
     const target = selectWorkspaceTarget(`${session.goal}\n${session.answer ?? ''}`, (properties ?? []) as WorkspaceProperty[]);
     if (!target && session.allowQuestions && !session.answer) {

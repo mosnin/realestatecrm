@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * POST /api/applications/portal/tour/[tourId]/respond
@@ -71,8 +74,8 @@ export async function POST(
   }
 
   // Verify token + application
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'capability token: application portal')
     .select('id, spaceId, name')
     .eq('applicationRef', applicationRef)
     .eq('statusPortalToken', token)
@@ -87,8 +90,8 @@ export async function POST(
   }
 
   // Validate tour belongs to this contact + space (defense in depth)
-  const { data: tour, error: tourError } = await supabase
-    .from('Tour')
+  const { data: tour, error: tourError } = await unscoped(supabase
+    .from('Tour'), 'capability token: application portal')
     .select('id, spaceId, contactId, status, startsAt, propertyAddress')
     .eq('id', tourId)
     .maybeSingle();
@@ -130,11 +133,9 @@ export async function POST(
   // both insert their receipt message — cluttering the realtor's thread
   // with duplicates. With CAS, only the first writer's UPDATE returns a
   // row; the second sees zero affected rows and skips the message insert.
-  const { data: updated, error: updateError } = await supabase
-    .from('Tour')
+  const { data: updated, error: updateError } = await tenantTable(supabase, 'Tour', { spaceId: contact.spaceId })
     .update({ status: targetStatus, updatedAt: new Date().toISOString() })
     .eq('id', tourId)
-    .eq('spaceId', contact.spaceId)
     .eq('status', tour.status)
     .select('id');
   if (updateError) {
@@ -171,8 +172,7 @@ export async function POST(
       ? `✓ Confirmed tour ${tourTime}${propLine}.${safeNotes ? `\n\n${safeNotes}` : ''}`
       : `✗ Can't make tour ${tourTime}${propLine}.${safeNotes ? `\n\n${safeNotes}` : ''}`;
 
-  await supabase
-    .from('ApplicationMessage')
+  await tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,

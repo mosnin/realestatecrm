@@ -18,6 +18,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   sendEmailFromCRM,
   ComplianceBlockedError,
@@ -126,11 +127,11 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     let resolvedContactId: string | null = null;
 
     if (args.contactId) {
-      const { data: contact, error } = await supabase
-        .from('Contact')
+      const { data: contact, error } = await tenantTable(supabase, 'Contact', {
+        spaceId: ctx.space.id,
+      })
         .select('id, email, name')
         .eq('id', args.contactId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle();
       if (error) {
@@ -153,10 +154,10 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     } else if (args.toEmail) {
       resolvedEmail = args.toEmail;
       // Best-effort contact lookup so the tool result carries the link.
-      const { data: maybeContact } = await supabase
-        .from('Contact')
+      const { data: maybeContact } = await tenantTable(supabase, 'Contact', {
+        spaceId: ctx.space.id,
+      })
         .select('id')
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .eq('email', args.toEmail)
         .maybeSingle();
@@ -175,10 +176,10 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     // on onboarding) → the Space's display name. We intentionally do NOT
     // include User.name here because that's the owner's personal name,
     // which they may not want on every outbound email.
-    const { data: settings } = await supabase
-      .from('SpaceSetting')
+    const { data: settings } = await tenantTable(supabase, 'SpaceSetting', {
+      spaceId: ctx.space.id,
+    })
       .select('businessName')
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     const fromName =
       (settings?.businessName as string | undefined) || ctx.space.name;
@@ -191,11 +192,11 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     let resolvedAttachments: SendEmailAttachment[] | undefined;
     if (args.attachmentFileIds && args.attachmentFileIds.length > 0) {
       const ids = args.attachmentFileIds;
-      const { data: rows, error: fileErr } = await supabase
-        .from('File')
+      const { data: rows, error: fileErr } = await tenantTable(supabase, 'File', {
+        spaceId: ctx.space.id,
+      })
         .select('id, name, mimeType, sizeBytes, storageKey')
-        .in('id', ids)
-        .eq('spaceId', ctx.space.id);
+        .in('id', ids);
       if (fileErr) {
         return { summary: `Attachment lookup failed: ${fileErr.message}`, display: 'error' };
       }
@@ -366,7 +367,9 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     // transport-level exception.
     if (resolvedContactId) {
       try {
-        const { error: auditErr } = await supabase.from('ContactActivity').insert({
+        const { error: auditErr } = await tenantTable(supabase, 'ContactActivity', {
+          spaceId: ctx.space.id,
+        }).insert({
           id: durableIdempotencyKey
             ? `work-session-email-activity-${crypto.createHash('sha256').update(durableIdempotencyKey).digest('hex').slice(0, 32)}`
             : crypto.randomUUID(),

@@ -51,7 +51,9 @@ export function collectUnexpectedErrors(page: Page): string[] {
     // though the pixel/CDN requests are blocked, and logs this to
     // console.error when that fetch is aborted — same deliberate-block noise
     // as the other analytics vendors, just phrased without "net::ERR_".
-    if (/Amplitude Logger/i.test(text)) return true;
+    // After a few blocked retries it also emits "Event rejected due to
+    // exceeded retry count" (seen on the marketing home money-path).
+    if (/Amplitude Logger.*(?:remote config|exceeded retry count)/i.test(text)) return true;
     return false;
   };
 

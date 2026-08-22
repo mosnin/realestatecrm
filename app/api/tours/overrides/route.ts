@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /** GET — list overrides for the next 90 days */
 export async function GET(req: NextRequest) {
@@ -12,10 +14,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  let query = supabase
-    .from('TourAvailabilityOverride')
+  let query = tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .order('date', { ascending: true });
 
   // Filter by property or show global-only
@@ -70,10 +70,8 @@ export async function POST(req: NextRequest) {
   // Check for an existing override on this date+property combination and delete it first
   // (handles NULL propertyProfileId case where upsert uniqueness may not work)
   {
-    let existingQuery = supabase
-      .from('TourAvailabilityOverride')
+    let existingQuery = tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id })
       .select('id')
-      .eq('spaceId', space.id)
       .eq('date', date);
     if (propertyProfileId) {
       existingQuery = existingQuery.eq('propertyProfileId', propertyProfileId);
@@ -83,7 +81,7 @@ export async function POST(req: NextRequest) {
     const { data: existingRows } = await existingQuery;
     if (existingRows && existingRows.length > 0) {
       const ids = existingRows.map((r: { id: string }) => r.id);
-      await supabase.from('TourAvailabilityOverride').delete().in('id', ids);
+      await tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id }).delete().in('id', ids);
     }
   }
 
@@ -98,17 +96,14 @@ export async function POST(req: NextRequest) {
 
   // Validate property profile if provided
   if (propertyProfileId) {
-    const { data: profile } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profile } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: space.id })
       .select('id')
       .eq('id', propertyProfileId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!profile) return NextResponse.json({ error: 'Property profile not found' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('TourAvailabilityOverride')
+  const { data, error } = await tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: space.id,

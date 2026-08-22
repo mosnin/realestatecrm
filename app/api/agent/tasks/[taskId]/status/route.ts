@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   canTransition,
   transitionTask,
@@ -51,15 +52,13 @@ async function handleStatusTransition(
 
   const space = await getSpaceForUser(userId);
   if (!space) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Fetch current task to verify ownership and read current status.
-  const { data: task, error: fetchError } = await supabase
-    .from('AgentTask')
+  const { data: task, error: fetchError } = await tenantTable(supabase, 'AgentTask', { spaceId: space.id })
     .select('id, status')
     .eq('id', taskId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (fetchError) {
@@ -102,8 +101,7 @@ async function handleStatusTransition(
   const actionType = actionTypeMap[status];
   if (actionType) {
     const activityTask = Promise.resolve(
-      supabase
-        .from('AgentActivityLog')
+      tenantTable(supabase, 'AgentActivityLog', { spaceId: space.id })
         .insert({
           spaceId: space.id,
           runId: taskId,

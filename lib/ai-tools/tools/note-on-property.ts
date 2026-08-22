@@ -14,6 +14,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -43,11 +44,9 @@ export const noteOnPropertyTool = defineTool<typeof parameters, NoteOnPropertyRe
   },
 
   async handler(args, ctx) {
-    const { data: property, error: fetchErr } = await supabase
-      .from('Property')
+    const { data: property, error: fetchErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .select('id, address, notes')
       .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (fetchErr) {
       return { summary: `Property lookup failed: ${fetchErr.message}`, display: 'error' };
@@ -62,11 +61,9 @@ export const noteOnPropertyTool = defineTool<typeof parameters, NoteOnPropertyRe
     const existing = ((property.notes as string | null) ?? '').trim();
     const next = existing ? `${existing}\n${appendedLine}` : appendedLine;
 
-    const { error: updateErr } = await supabase
-      .from('Property')
+    const { error: updateErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .update({ notes: next, updatedAt: new Date().toISOString() })
-      .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.propertyId);
     if (updateErr) {
       logger.error('[tools.note_on_property] update failed', { propertyId: args.propertyId }, updateErr);
       return { summary: `Note save failed: ${updateErr.message}`, display: 'error' };

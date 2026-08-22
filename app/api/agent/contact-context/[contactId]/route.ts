@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(
   _req: NextRequest,
@@ -16,34 +17,28 @@ export async function GET(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { contactId } = await params;
 
   // Validate contact belongs to this space
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const [goalRes, activityRes] = await Promise.all([
-    supabase
-      .from('AgentGoal')
+    tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
       .select('goalType')
-      .eq('spaceId', space.id)
       .eq('contactId', contactId)
       .eq('status', 'active')
       .order('priority', { ascending: false })
       .limit(1)
       .maybeSingle(),
 
-    supabase
-      .from('ContactActivity')
+    tenantTable(supabase, 'ContactActivity', { spaceId: space.id })
       .select('content, createdAt')
-      .eq('spaceId', space.id)
       .eq('contactId', contactId)
       .or('content.like.[Agent]%,content.like.[Outcome]%')
       .order('createdAt', { ascending: false })

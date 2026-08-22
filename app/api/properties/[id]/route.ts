@@ -5,15 +5,14 @@ import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { deleteObjectsBestEffort, publicUrlToKey } from '@/lib/storage';
 import { _sanitisePropertyBody as sanitise } from '@/app/api/properties/route';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolve(userId: string, id: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data } = await supabase
-    .from('Property')
+  const { data } = await tenantTable(supabase, 'Property', { spaceId: space.id })
     .select('*')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!data) return null;
   return { space, property: data };
@@ -30,18 +29,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   // Include linked deals + tours so the detail page can show usage.
   const [dealsResult, toursResult] = await Promise.all([
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, status, value, closeDate, stageId')
       .eq('propertyId', id)
-      .eq('spaceId', ctx.space.id)
       .order('updatedAt', { ascending: false })
       .limit(20),
-    supabase
-      .from('Tour')
+    tenantTable(supabase, 'Tour', { spaceId: ctx.space.id })
       .select('id, guestName, startsAt, status')
       .eq('propertyId', id)
-      .eq('spaceId', ctx.space.id)
       .order('startsAt', { ascending: false })
       .limit(20),
   ]);
@@ -71,11 +66,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const patch = { ...out, updatedAt: new Date().toISOString() };
 
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
 
@@ -112,11 +105,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   // Linked deals/tours get ON DELETE SET NULL'd — the link vanishes, the
   // deal/tour survives with its string address intact.
-  const { error } = await supabase
-    .from('Property')
+  const { error } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', ctx.space.id);
+    .eq('id', id);
 
   if (error) {
     logger.error('[properties/DELETE] failed', { propertyId: id }, error);

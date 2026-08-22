@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * GET — Generate a plain-text formatted rental application for download.
@@ -16,8 +17,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireContactAccess(contactId);
   if (auth instanceof NextResponse) return auth;
 
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .select('*')
     .eq('id', contactId)
     .single();
@@ -27,10 +27,8 @@ export async function GET(req: NextRequest) {
   const app = contact.applicationData as Record<string, any> | null;
   if (!app) return NextResponse.json({ error: 'No application data' }, { status: 400 });
 
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
     .select('businessName')
-    .eq('spaceId', contact.spaceId)
     .maybeSingle();
 
   const { data: space } = await supabase

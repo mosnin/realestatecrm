@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import {
@@ -43,10 +44,8 @@ export async function GET() {
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data, error } = await supabase
-    .from('AgentDraft')
+  const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .select('feedback_action, edit_distance, decision_ms, outcome_signal')
-    .eq('spaceId', space.id)
     .not('feedback_action', 'is', null)
     .gte('createdAt', draftStatsWindowStart());
 

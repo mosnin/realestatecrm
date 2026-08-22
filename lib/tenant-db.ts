@@ -75,7 +75,6 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   // documents, portal messages).
   CmaReport: 'spaceId',
   PropertyPacket: 'spaceId',
-  DealContact: 'spaceId',
   ClientMessage: 'spaceId',
   ApplicationMessage: 'spaceId',
   ApplicationStatusUpdate: 'spaceId',
@@ -83,6 +82,76 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   MessagingSuppression: 'spaceId',
   MessagingConsent: 'spaceId',
   WorkSessionAction: 'spaceId',
+  // Chat + agent deliverables (highest PII / secret surface after Contact).
+  // DealContact is intentionally omitted: it is a junction with no spaceId
+  // column (scoped through Deal/Contact), so registering spaceId here would
+  // be a WRONG column — the only real hazard this registry can introduce.
+  Message: 'spaceId',
+  Artifact: 'spaceId',
+  ArtifactVersion: 'spaceId',
+  ContactDocument: 'spaceId',
+  GoogleCalendarToken: 'spaceId',
+  McpApiKey: 'spaceId',
+  ChatUsage: 'spaceId',
+  Offer: 'spaceId',
+  OfferEvent: 'spaceId',
+  TourPropertyProfile: 'spaceId',
+  TourAvailabilityOverride: 'spaceId',
+  WorkspaceRun: 'spaceId',
+  WorkspaceRunFile: 'spaceId',
+  AgentPausedRun: 'spaceId',
+  SavedView: 'spaceId',
+  IntegrationEvent: 'spaceId',
+  PushSubscription: 'spaceId',
+  // Cycle 2: verified spaceId tables that request paths already query.
+  // Omitted on purpose: SupportTicket / TelemetryEvent / AuditLog / CreditTxn /
+  // AgentEventInbox (nullable spaceId), ChannelMember / WorkflowRunStep /
+  // DealContact (no scope column — parent FK).
+  WorkflowRun: 'spaceId',
+  WorkspaceRunTask: 'spaceId',
+  WorkspaceRunTaskFile: 'spaceId',
+  WorkspaceRunLaunchReceipt: 'spaceId',
+  WorkspaceWorkbookSource: 'spaceId',
+  ConversationTurn: 'spaceId',
+  MessageTemplate: 'spaceId',
+  NotificationPreference: 'spaceId',
+  TourWaitlist: 'spaceId',
+  TourFeedback: 'spaceId',
+  StudioGeneration: 'spaceId',
+  StudioBrand: 'spaceId',
+  UserSkill: 'spaceId',
+  CustomPlugin: 'spaceId',
+  AgentSettings: 'spaceId',
+  AgentQuestion: 'spaceId',
+  AgentGoal: 'spaceId',
+  ExecutionStep: 'spaceId',
+  DripEnrollment: 'spaceId',
+  DripSequence: 'spaceId',
+  ClientDocument: 'spaceId',
+  ClientInfoRequest: 'spaceId',
+  CommissionSplit: 'spaceId',
+  McpAuthCode: 'spaceId',
+  FormDraft: 'spaceId',
+  FormAnalyticsEvent: 'spaceId',
+  CalendarEvent: 'spaceId',
+  CalendarEventMirror: 'spaceId',
+  // Cycle 2 completeness: verified NOT NULL spaceId tables the guard was
+  // still blind to. Omitted on purpose (nullable spaceId, same class as
+  // SupportTicket / TelemetryEvent): AuditLog, CreditTxn, AgentEventInbox.
+  AIUserProfile: 'spaceId',
+  NotificationState: 'spaceId',
+  DeadLetterEvent: 'spaceId',
+  DisabledSpace: 'spaceId',
+  BriefTipHistory: 'spaceId',
+  GoalDecomposition: 'spaceId',
+  TaskCheckpoint: 'spaceId',
+  CalendarNote: 'spaceId',
+  WorkspaceRunTaskPlanClaim: 'spaceId',
+  AgentJobRun: 'spaceId',
+  AgentActionProposal: 'spaceId',
+  AgentRunArtifact: 'spaceId',
+  ScheduleOccurrence: 'spaceId',
+  InviteCodeRedemption: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',
@@ -93,7 +162,18 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   DealRoutingRule: 'brokerageId',
   BrokerageTemplate: 'brokerageId',
   Channel: 'brokerageId',
-  ChannelMember: 'brokerageId',
+  // ChannelMember is a junction (channelId + userId) with no brokerageId —
+  // registering brokerageId here would be a WRONG column. Scope through
+  // Channel, same as DealContact is scoped through Deal/Contact.
+  ChannelMessage: 'brokerageId',
+  BrokerageIntegrationConnection: 'brokerageId',
+  BrokerMessage: 'brokerageId',
+  BrokerageMembership: 'brokerageId',
+  Invitation: 'brokerageId',
+  BrokerageRemoval: 'brokerageId',
+  CommissionLedger: 'brokerageId',
+  BrokerageChatConversation: 'brokerageId',
+  BrokerageChatMessage: 'brokerageId',
 };
 
 export function isTenantTable(table: string): boolean {
@@ -126,13 +206,19 @@ type Scope = { spaceId: string } | { brokerageId: string };
 // table union into supabase-js's heavily-overloaded `.from()` signatures makes
 // tsc instantiate the generic per-literal and OOM. This keeps inference O(1).
 interface LooseBuilder {
-  select: (columns?: string, options?: unknown) => LooseFilter;
+  // `any` so `.select().order().limit()` / `.select().maybeSingle()` chain
+  // without a follow-up `.eq` — the real PostgREST builder is thenable.
+  select: (columns?: string, options?: unknown) => any;
   update: (values: Record<string, unknown>) => LooseFilter;
   delete: () => LooseFilter;
-  insert: (values: Record<string, unknown> | Record<string, unknown>[]) => unknown;
+  insert: (values: Record<string, unknown> | Record<string, unknown>[]) => any;
+  upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: unknown) => any;
 }
 interface LooseFilter {
-  eq: (column: string, value: string) => unknown;
+  // Return `any` so callers can keep chaining `.eq('id', …).maybeSingle()`
+  // after the pre-applied tenant scope — the real PostgREST builder supports
+  // that; a tighter type here blocked tenantTable() adoption.
+  eq: (column: string, value: string) => any;
 }
 interface LooseClient {
   from: (table: string) => LooseBuilder;
@@ -172,6 +258,17 @@ export function tenantTable(client: SupabaseClient, table: string, scope: Scope)
         }
       }
       return base.insert(values);
+    },
+    upsert: (values: Record<string, unknown> | Record<string, unknown>[], options?: unknown) => {
+      const rows = Array.isArray(values) ? values : [values];
+      for (const row of rows) {
+        if (row[column] !== value) {
+          throw new Error(
+            `tenantTable: upsert into "${table}" must set ${column}=${value} on every row`,
+          );
+        }
+      }
+      return base.upsert(values, options);
     },
   };
 }

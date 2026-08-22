@@ -7,6 +7,7 @@ import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { workbookContentHash } from '@/lib/chippi/workbench-store';
 import { validateStoredWorkbookContent, validateWorkbookVersionMetadata } from '@/lib/chippi/workbench-format';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { tenantTable } from '@/lib/tenant-db';
 
 // GET /api/agent/artifacts?spaceId=xxx[&taskId=yyy][&type=zzz]
 export async function GET(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   const space = await getSpaceForUser(userId);
   if (!space || space.id !== spaceId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   try {
@@ -40,10 +41,8 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get('type');
   if (type === 'workbook' && !isWorkbenchEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  let query = supabase
-    .from('Artifact')
+  let query = tenantTable(supabase, 'Artifact', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false })
     .limit(50);
 
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
 
   const space = await getSpaceForUser(userId);
   if (!space || space.id !== spaceId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   try {
@@ -136,8 +135,7 @@ export async function POST(req: NextRequest) {
   };
   if (taskId) artifactInsert.taskId = taskId;
 
-  const { data: artifact, error: artifactError } = await supabase
-    .from('Artifact')
+  const { data: artifact, error: artifactError } = await tenantTable(supabase, 'Artifact', { spaceId })
     .insert(artifactInsert)
     .select()
     .single();
@@ -148,8 +146,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Step 2: insert ArtifactVersion
-  const { data: version, error: versionError } = await supabase
-    .from('ArtifactVersion')
+  const { data: version, error: versionError } = await tenantTable(supabase, 'ArtifactVersion', { spaceId })
     .insert({
       artifactId: artifact.id,
       spaceId,
@@ -162,22 +159,20 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (versionError || !version) {
-    await supabase.from('Artifact').delete().eq('id', artifact.id).eq('spaceId', spaceId);
+    await tenantTable(supabase, 'Artifact', { spaceId }).delete().eq('id', artifact.id);
     console.error('[POST /api/agent/artifacts] Insert version error:', versionError);
     return NextResponse.json({ error: 'Failed to create artifact version' }, { status: 500 });
   }
 
   // Step 3: update Artifact.currentVersionId
-  const { data: updatedArtifact, error: updateError } = await supabase
-    .from('Artifact')
+  const { data: updatedArtifact, error: updateError } = await tenantTable(supabase, 'Artifact', { spaceId })
     .update({ currentVersionId: version.id })
     .eq('id', artifact.id)
-    .eq('spaceId', spaceId)
     .select()
     .single();
 
   if (updateError || !updatedArtifact) {
-    await supabase.from('Artifact').delete().eq('id', artifact.id).eq('spaceId', spaceId);
+    await tenantTable(supabase, 'Artifact', { spaceId }).delete().eq('id', artifact.id);
     console.error('[POST /api/agent/artifacts] Update currentVersionId error:', updateError);
     return NextResponse.json({ error: 'Failed to link artifact version' }, { status: 500 });
   }

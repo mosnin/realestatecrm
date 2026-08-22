@@ -20,8 +20,11 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -59,8 +62,10 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
     if (!callerUser) {
       return { summary: 'Broker access required.', display: 'error' };
     }
-    const { data: callerMemberships } = await supabase
-      .from('BrokerageMembership')
+    const { data: callerMemberships } = await unscoped(
+      supabase.from('BrokerageMembership'),
+      'membership lookup by userId to discover caller brokerages',
+    )
       .select('brokerageId')
       .eq('userId', (callerUser as { id: string }).id)
       .in('role', ['broker_owner', 'broker_admin']);
@@ -76,6 +81,7 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
       .from('BrokerageMembership')
       .select('brokerageId, userId')
       .eq('userId', args.realtorUserId)
+      .in('brokerageId', Array.from(callerBrokerageIds))
       .maybeSingle();
     if (
       !realtorMembership ||
@@ -85,8 +91,8 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
     }
 
     // ── Contact must exist (in this space OR linked to the brokerage) ──────
-    const { data: contact } = await supabase
-      .from('Contact')
+    const { data: contact } = await unscoped(supabase
+      .from('Contact'), 'post-fetch: caller verified parent scope before this id query')
       .select('id, name, spaceId, brokerageId')
       .eq('id', args.personId)
       .maybeSingle();
@@ -140,7 +146,7 @@ export const assignLeadToRealtorTool = defineTool<typeof parameters, AssignResul
       return { summary: `Reassignment failed: ${updateErr.message}`, display: 'error' };
     }
 
-    const { error: activityErr } = await supabase.from('ContactActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       contactId: c.id,
       spaceId: c.spaceId,

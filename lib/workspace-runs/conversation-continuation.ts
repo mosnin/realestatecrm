@@ -1,6 +1,7 @@
 import 'server-only';
 import crypto from 'node:crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { isWorkspaceRunFollowUpsEnabledForSpace } from '@/lib/chippi/workspace-run-flag';
 import { enqueueWorkspaceRunTask, findWorkspaceRunTaskByIdempotency, getWorkspaceRun, kickWorkspaceRunTask, planWorkspaceRunTask, releaseWorkspaceRunTaskPlan, reserveWorkspaceRunTaskPlan, workspaceTaskFiles } from './server';
 
@@ -34,11 +35,15 @@ function errorMessage(error: unknown): string {
 }
 
 async function completedRunForConversation(spaceId: string, conversationId: string): Promise<{ id: string } | null> {
-  const { data: sessions } = await supabase.from('WorkSession').select('workspaceRunId').eq('spaceId', spaceId).eq('conversationId', conversationId).eq('kind', 'workspace').order('createdAt', { ascending: false }).limit(20);
-  const ids = (sessions ?? []).map((row: any) => row.workspaceRunId).filter((id: unknown): id is string => typeof id === 'string');
+  const { data: sessions } = await tenantTable(supabase, 'WorkSession', { spaceId }).select('workspaceRunId').eq('conversationId', conversationId).eq('kind', 'workspace').order('createdAt', { ascending: false }).limit(20);
+  const sessionRows = (sessions ?? []) as Array<{ workspaceRunId?: unknown }>;
+  const ids = sessionRows
+    .map((row) => row.workspaceRunId)
+    .filter((id): id is string => typeof id === 'string');
   if (!ids.length) return null;
-  const { data: runs } = await supabase.from('WorkspaceRun').select('id').eq('spaceId', spaceId).in('id', ids).eq('status', 'completed');
-  const completed = new Set((runs ?? []).map((run: any) => run.id));
+  const { data: runs } = await tenantTable(supabase, 'WorkspaceRun', { spaceId }).select('id').in('id', ids).eq('status', 'completed');
+  const runRows = (runs ?? []) as Array<{ id?: unknown }>;
+  const completed = new Set(runRows.map((run) => run.id).filter((id): id is string => typeof id === 'string'));
   return ids.map((id) => completed.has(id) ? { id } : null).find(Boolean) ?? null;
 }
 

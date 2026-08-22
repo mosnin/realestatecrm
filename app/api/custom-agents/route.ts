@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
+import { tenantTable } from '@/lib/tenant-db';
 
 const ALLOWED_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'] as const;
 type AllowedModel = (typeof ALLOWED_MODELS)[number];
@@ -41,10 +42,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from('CustomAgent')
+  const { data, error } = await tenantTable(supabase, 'CustomAgent', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .eq('isActive', true)
     .order('createdAt', { ascending: false });
 
@@ -126,8 +125,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Space is disabled' }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from('CustomAgent')
+  const { data, error } = await tenantTable(supabase, 'CustomAgent', { spaceId })
     .insert({
       spaceId,
       name: name.trim(),

@@ -24,6 +24,8 @@ import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import { uploadObject, deleteObject, getSignedDownloadUrl, buildKey } from '@/lib/storage';
 import { extractAttachmentText } from '@/lib/extraction/extract';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /** TTL for the URL returned on POST. The chat UI uses it for the inline
  *  preview the moment the upload completes; 20 minutes is long enough for
@@ -115,7 +117,7 @@ export async function POST(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let formData: FormData;
   try {
@@ -210,7 +212,7 @@ export async function POST(req: NextRequest) {
     logger.warn('[ai/attachments] extraction failed', { spaceId: space.id, mimeType });
   }
 
-  const { error: insertError } = await supabase.from('Attachment').insert({
+  const { error: insertError } = await tenantTable(supabase, 'Attachment', { spaceId: space.id }).insert({
     id,
     spaceId: space.id,
     userId,
@@ -253,14 +255,13 @@ export async function DELETE(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  const { data, error } = await supabase
-    .from('Attachment')
-    .select('id, spaceId, storagePath')
+  const { data, error } = await tenantTable(supabase, 'Attachment', { spaceId: space.id })
+    .select('id, storagePath')
     .eq('id', id)
     .maybeSingle();
   if (error) {
@@ -268,9 +269,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (data.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   // Delete the storage object first; if the row delete fails afterwards the
   // worst case is an orphaned DB row pointing at a missing object — survivable.
@@ -278,7 +276,9 @@ export async function DELETE(req: NextRequest) {
     logger.warn('[ai/attachments] storage remove failed', { spaceId: space.id }, err);
   });
 
-  const { error: delError } = await supabase.from('Attachment').delete().eq('id', id);
+  const { error: delError } = await tenantTable(supabase, 'Attachment', { spaceId: space.id })
+    .delete()
+    .eq('id', id);
   if (delError) {
     logger.error('[ai/attachments] delete failed', { spaceId: space.id }, delError);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

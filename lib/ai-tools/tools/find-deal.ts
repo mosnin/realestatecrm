@@ -11,6 +11,8 @@
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -224,8 +226,8 @@ export const findDealTool = defineTool<typeof parameters, FindDealResult>({
     const stageIds = Array.from(new Set(rows.map((r) => r.stageId).filter(Boolean)));
     const stageNames = new Map<string, string>();
     if (stageIds.length > 0) {
-      const { data: stages } = await supabase
-        .from('DealStage')
+      const { data: stages } = await unscoped(supabase
+        .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
         .select('id, name')
         .in('id', stageIds);
       for (const s of (stages ?? []) as Array<{ id: string; name: string }>) {
