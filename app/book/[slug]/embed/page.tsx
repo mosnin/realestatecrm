@@ -3,6 +3,7 @@ import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { BookingForm } from '../booking-form';
 import { FormUnavailable } from '@/components/form-unavailable';
+import { FONT_SANS_STACK } from '@/lib/typography';
 
 /**
  * Embeddable booking page — designed to be loaded in an iframe.
@@ -33,7 +34,7 @@ export default async function EmbedBookingPage({
   if (formPaused) {
     return (
       <html>
-        <body style={{ margin: 0, padding: 16, fontFamily: 'system-ui, sans-serif', background: 'transparent' }}>
+        <body style={{ margin: 0, padding: 16, fontFamily: FONT_SANS_STACK, background: 'transparent' }}>
           <FormUnavailable agentName={businessName} />
         </body>
       </html>
@@ -42,7 +43,7 @@ export default async function EmbedBookingPage({
 
   return (
     <html>
-      <body style={{ margin: 0, padding: 16, fontFamily: 'system-ui, sans-serif', background: 'transparent' }}>
+      <body style={{ margin: 0, padding: 16, fontFamily: FONT_SANS_STACK, background: 'transparent' }}>
         <BookingForm slug={slug} duration={duration} businessName={businessName} timezone={timezone} />
       </body>
     </html>

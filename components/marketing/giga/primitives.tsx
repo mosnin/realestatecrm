@@ -5,11 +5,11 @@
  *
  * Visual language (matches the reference; copy stays Chippi/real-estate):
  *  - Near-black sections, generous air, thin hairline dividers.
- *  - Large, THIN, high-contrast SERIF display headlines (Fraunces at high
- *    optical size, via --font-serif-display set on the marketing layout). A
+ *  - Large, THIN, high-contrast SERIF display headlines (Times via
+ *    --font-serif-display, the same face as product page titles). A
  *    scoped rule in globals.css already makes the serif the default for every
  *    heading in the shell; the <Serif> helper just pins the size/weight knobs.
- *  - Eyebrow labels: UPPERCASE MONOSPACE (--font-mono-display, JetBrains Mono)
+ *  - Eyebrow labels: UPPERCASE MONOSPACE (--font-mono-display, product mono)
  *    with a small colored dot. No emoji, the dot is a styled <span>.
  *  - Rounded-full white "pill" CTAs.
  *
@@ -30,10 +30,10 @@ export const ACCENT = '#ff7a45';
 
 /**
  * The elegant thin serif headline face. The scoped CSS in globals.css already
- * resolves --font-serif-display + high optical size for every heading in the
- * shell; this component just guarantees the light weight + tracking knobs and
- * keeps the inline font as belt-and-suspenders so a headline is never left on
- * the global sans.
+ * resolves --font-serif-display (Times) for every heading in the shell; this
+ * component just guarantees the light weight + tracking knobs and keeps the
+ * inline font as belt-and-suspenders so a headline is never left on the
+ * global sans.
  */
 export function Serif({
   children,
@@ -47,8 +47,7 @@ export function Serif({
   return (
     <Tag
       style={{
-        fontFamily: 'var(--font-serif-display), Georgia, serif',
-        fontVariationSettings: '"opsz" 144',
+        fontFamily: 'var(--font-serif-display), "Times New Roman", Times, serif',
       }}
       className={cn('font-light tracking-[-0.02em]', className)}
     >

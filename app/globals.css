@@ -16,15 +16,15 @@
   --color-lead-hot: var(--lead-hot);
   --color-lead-warm: var(--lead-warm);
   --color-lead-cold: var(--lead-cold);
+  /* Three faces for the whole product. Alias every historical token to
+     one of these so marketing, auth, and the dashboard cannot drift.
+     UI / section headings: system sans. Page titles: Times. Data: mono. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
-  --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
-  /* Marketing/auth-only brand display face, used via the `.font-brand` utility
-     on the logged-out site and auth pages. Now the clean system display stack
-     (SF Pro Display) — the previous Bitcount Grid Single techno face was pulled.
-     Swap this one line to wire a different display font; nothing else changes. */
   --font-brand: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
+  --font-serif: "Times New Roman MT", "Times New Roman", Times, serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* Rainbow-button color stops (marketing CTA flourish). */
   --color-color-1: hsl(var(--color-1));
@@ -76,6 +76,14 @@
 :root {
   --radius: 0.75rem;
   --card-radius: 0.75rem;
+
+  /* Historical marketing names resolve to the same three faces.
+     Display / accent were Inter Tight + Instrument Serif via next/font,
+     which the app never loads — they share the Times title face. */
+  --font-serif-display: var(--font-title);
+  --font-mono-display: var(--font-mono);
+  --font-display: var(--font-title);
+  --font-accent: var(--font-title);
 
   /* Rainbow-button color stops (marketing CTA only). */
   --color-1: 24 100% 65%;
@@ -316,9 +324,12 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1 {
+    font-family: var(--font-title);
+  }
+  h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
   }
 }
@@ -1107,7 +1118,6 @@
 /* The studio brand display face: headings on the marketing/auth site. */
 .font-brand {
   font-family: var(--font-brand);
-  font-variation-settings: "slnt" 0, "CRSV" 0.5, "ELSH" 0, "ELXP" 0;
   letter-spacing: 0.01em;
 }
 
@@ -1117,19 +1127,13 @@
  * with `data-marketing-shell`. Two things are scoped here so the redesign can't
  * be undone by global rules elsewhere in this file:
  *
- *  1. HEADLINE FONT. The `@layer base` rule above forces every <h1>–<h6> to
- *     --font-heading (a system SANS). That is exactly what made the previous
- *     redesign render "stuck on the grotesque": inline styles fixed some
- *     headings but anything that leaned on a class or forgot the inline style
- *     fell back to the sans. We make the elegant SERIF display face
- *     (--font-serif-display, Fraunces, injected by the layout via next/font)
- *     the DEFAULT for every heading inside the shell, with a HIGH optical size
- *     and light weight so the large headlines read thin + high-contrast (the
- *     reference look) rather than the chunky low-opsz default. This selector
- *     out-specifies the bare `h1..h6` element rule, so it always wins.
+ *  1. HEADLINE FONT. Page titles in the product use Times (`--font-title`).
+ *     The shell does the same: every heading inside it uses the Times stack
+ *     (`--font-serif-display` aliases `--font-title`). This selector
+ *     out-specifies the bare `h2..h6` heading-sans rule, so it always wins.
  *
- *  2. EYEBROWS stay monospace via the .eyebrow-mono helper / inline var; the
- *     `--font-mono-display` (JetBrains Mono) is also injected by the layout.
+ *  2. EYEBROWS stay monospace via the .eyebrow-mono helper / inline var;
+ *     `--font-mono-display` aliases the product `--font-mono`. No webfonts.
  *
  * Scoped to the shell so the product (dashboard/app) is completely untouched. */
 [data-marketing-shell] {
@@ -1149,7 +1153,7 @@
 [data-marketing-shell] h5,
 [data-marketing-shell] h6,
 [data-marketing-shell] .font-serif-display {
-  font-family: var(--font-title), Georgia, "Times New Roman", serif;
+  font-family: var(--font-title), "Times New Roman", Times, serif;
   letter-spacing: -0.02em;
 }
 /* Eyebrow labels: uppercase monospace, set apart from the serif headings. */
@@ -1164,15 +1168,10 @@
   }
 }
 
-/* ── Bold-canvas marketing type (logged-out site only) ──────────────────────
- * --font-display / --font-accent are injected by app/(marketing)/layout.tsx
- * via next/font (Inter Tight + Instrument Serif). Fallbacks keep the classes
- * harmless anywhere the variables aren't mounted. */
-.font-display {
-  font-family: var(--font-display, var(--font-brand));
-}
+/* Display / accent type: same Times stack as product page titles. */
+.font-display,
 .font-accent {
-  font-family: var(--font-accent, Georgia, 'Times New Roman', serif);
+  font-family: var(--font-title);
 }
 
 /* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */

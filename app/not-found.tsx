@@ -26,7 +26,7 @@ export default function NotFound() {
         >
           404
         </p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">Page not found</h1>
+        <h1 className="font-title mt-3 text-4xl font-bold tracking-tight">Page not found</h1>
         <p className="mt-3 text-lg text-muted-foreground">
           The page you&apos;re looking for doesn&apos;t exist.
         </p>

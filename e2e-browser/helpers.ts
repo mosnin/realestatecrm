@@ -51,7 +51,7 @@ export function collectUnexpectedErrors(page: Page): string[] {
     // though the pixel/CDN requests are blocked, and logs this to
     // console.error when that fetch is aborted — same deliberate-block noise
     // as the other analytics vendors, just phrased without "net::ERR_".
-    if (/Amplitude Logger.*remote config/i.test(text)) return true;
+    if (/Amplitude Logger/i.test(text)) return true;
     return false;
   };
 

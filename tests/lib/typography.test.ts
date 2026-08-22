@@ -15,6 +15,12 @@ import {
   QUIET_LINK,
   BODY,
   BODY_COMPACT,
+  H1,
+  H2,
+  H3,
+  STAT_NUMBER,
+  FONT_SANS_STACK,
+  FONT_SERIF_STACK,
 } from '@/lib/typography';
 
 describe('typography — brand-orange exclusivity', () => {
@@ -54,5 +60,14 @@ describe('typography — pill vocabulary is shared', () => {
 describe('typography — the ladder', () => {
   it('keeps BODY_COMPACT a true alias of BODY (the 13px tier was collapsed)', () => {
     expect(BODY_COMPACT).toBe(BODY);
+  });
+
+  it('puts page titles and stats on the serif face, section heads on the UI sans', () => {
+    expect(H1).toContain('font-title');
+    expect(STAT_NUMBER).toContain('font-title');
+    expect(H2).toContain('font-heading');
+    expect(H3).toContain('font-heading');
+    expect(FONT_SERIF_STACK).toMatch(/Times New Roman/);
+    expect(FONT_SANS_STACK).toMatch(/SF Pro Text|system-ui/);
   });
 });

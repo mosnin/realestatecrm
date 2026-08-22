@@ -7,6 +7,7 @@ import 'server-only';
 import { after } from 'next/server';
 import { Resend } from 'resend';
 import { logger } from '@/lib/logger';
+import { FONT_MONO_STACK, FONT_SANS_STACK, FONT_SERIF_STACK } from '@/lib/typography';
 
 function fromAddress(): string {
   const raw = process.env.RESEND_FROM_EMAIL ?? 'notifications@alerts.usechippi.com';
@@ -29,9 +30,9 @@ function esc(s: string): string {
 }
 
 function shell(heading: string, bodyHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#fff;color:#111;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif">
+  return `<!doctype html><html><body style="margin:0;background:#fff;color:#111;font-family:${FONT_SANS_STACK}">
     <div style="max-width:480px;margin:0 auto;padding:40px 24px">
-      <h1 style="font-family:Tinos,Times,serif;font-size:22px;font-weight:600;margin:0 0 16px">${esc(heading)}</h1>
+      <h1 style="font-family:${FONT_SERIF_STACK};font-size:22px;font-weight:600;margin:0 0 16px">${esc(heading)}</h1>
       ${bodyHtml}
       <p style="color:#999;font-size:12px;margin-top:32px">Chippi · client portal</p>
     </div>
@@ -58,7 +59,7 @@ export async function sendClientCode(params: {
   const html = shell(
     copy.heading,
     `<p style="font-size:14px;color:#444;margin:0 0 20px">${esc(copy.line)}</p>
-     <div style="font-family:ui-monospace,monospace;font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;padding:16px;background:#f5f5f5;border-radius:12px">${esc(params.code)}</div>
+     <div style="font-family:${FONT_MONO_STACK};font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;padding:16px;background:#f5f5f5;border-radius:12px">${esc(params.code)}</div>
      <p style="font-size:12px;color:#999;margin-top:16px">This code expires in 15 minutes. If you didn't request it, ignore this email.</p>`,
   );
   try {

@@ -15,6 +15,7 @@ import {
   StatusPill,
 } from '@/components/ui/surface-card';
 import type { HomeValueResponse } from '@/lib/leads/home-value';
+import { TITLE_FONT } from '@/lib/typography';
 
 const ACCENT = '#F25A00';
 
@@ -109,7 +110,7 @@ export function HomeValueClient({
             >
               Free home valuation
             </span>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground" style={TITLE_FONT}>
               What&apos;s my home worth?
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">

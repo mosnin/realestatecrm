@@ -55,7 +55,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
           <p className="font-brand text-xs uppercase tracking-[0.25em] text-[#ff964f]">
             The agentic OS for real estate
           </p>
-          <h2 className="font-brand mt-4 text-4xl leading-tight tracking-tight text-white">
+          <h2 className="font-title mt-4 text-4xl leading-tight tracking-tight text-white">
             I keep your day moving, so you don&apos;t have to.
           </h2>
           <p className="mt-4 text-sm text-white/70">
@@ -122,7 +122,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
             {/* Heading: brand display face, the screen's headline. */}
             {heading && (
               <div className="mb-6 space-y-1.5">
-                <h1 className={cn(H1, 'font-brand')}>{heading}</h1>
+                <h1 className={H1}>{heading}</h1>
                 {subheading && <p className={BODY_MUTED}>{subheading}</p>}
               </div>
             )}

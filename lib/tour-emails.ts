@@ -11,6 +11,8 @@
  *   4. Agent notification — sent to space owner when a tour is booked
  */
 
+import { FONT_SANS_STACK } from '@/lib/typography';
+
 export interface TourEmailData {
   guestName: string;
   guestEmail: string;
@@ -52,7 +54,7 @@ function wrapHtml(header: string, subtitle: string, bodyContent: string, footer:
   return `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">

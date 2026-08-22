@@ -1,9 +1,12 @@
+import { FONT_SANS_STACK } from '@/lib/typography';
+
 /**
  * Theme-aware Clerk appearance config.
  * Most visual overrides are in globals.css (.cl-* selectors) — that file is
  * the source of truth for the paper-flat auth chrome. This config only sets
  * Clerk's variables (so its internal state colors line up) and layout choices.
  */
+
 export function clerkAuthAppearance(isDark: boolean) {
   // Paper-flat primary — foreground, not orange. Matches PRIMARY_PILL.
   const primary = isDark ? '#f1f3f5' : '#1c1917';
@@ -14,7 +17,7 @@ export function clerkAuthAppearance(isDark: boolean) {
       colorPrimary: primary,
       colorNeutral: foreground,
       borderRadius: '0.375rem', // rounded-md
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+      fontFamily: FONT_SANS_STACK,
       fontSize: '0.875rem',
     },
     layout: {

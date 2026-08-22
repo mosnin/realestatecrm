@@ -97,7 +97,7 @@ const STEPS: ShowcaseStep[] = [
             <span className="h-4 w-4 rounded-full bg-[#c77dff]" />
           </span>
         } />
-        <Row icon={Type} title="Headline + body fonts" meta="Times · Inter" />
+        <Row icon={Type} title="Headline + body fonts" meta="Times · system sans" />
         <Row icon={PenTool} title="Logo + watermark" meta="auto-applied to media" tone="text-[#ff9a6e]" active />
       </Frost>
     ),
