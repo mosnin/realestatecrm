@@ -61,6 +61,7 @@ import { CsvImportModal } from './csv-import-modal';
 import { DuplicatesPanel } from './duplicates-panel';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { contactEditorDefaults } from '@/lib/contact-form-state';
 import { motion } from 'framer-motion';
 import { EASE_APPLE, DURATION_FAST } from '@/lib/motion';
 import { AnimatedNumber, Reveal, SplitReveal } from '@/components/motion';
@@ -1560,26 +1561,12 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
         slug={slug}
       />
       <ContactForm
+        key={editContact?.id ?? 'edit-closed'}
         open={!!editContact}
         onOpenChange={(o) => !o && setEditContact(null)}
         onSubmit={handleEdit}
         mode="edit"
-        defaultValues={
-          editContact
-            ? {
-                name: editContact.name,
-                email: editContact.email ?? '',
-                phone: editContact.phone ?? '',
-                budget: editContact.budget?.toString() ?? '',
-                preferences: editContact.preferences ?? '',
-                properties: editContact.properties.join(', '),
-                address: editContact.address ?? '',
-                notes: editContact.notes ?? '',
-                type: editContact.type,
-                tags: editContact.tags.join(', '),
-              }
-            : undefined
-        }
+        defaultValues={editContact ? contactEditorDefaults(editContact) : undefined}
       />
 
       {importOpen && (
