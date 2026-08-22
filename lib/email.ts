@@ -438,8 +438,8 @@ export class ComplianceBlockedError extends Error {
  * emails Resend rejected — realtors were told their messages went out when
  * they didn't. That's fiduciary harm.
  *
- * Missing provider configuration remains tolerated for ordinary local-dev
- * callers. Durable callers must fail closed rather than record a false send.
+ * Missing provider configuration fails closed — a skipped send must never
+ * read as delivered.
  */
 export class EmailSendError extends Error {
   readonly cause?: unknown;
@@ -519,15 +519,14 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
     );
   }
   if (!process.env.RESEND_API_KEY) {
-    if (params.idempotencyKey) {
-      throw new EmailSendError(
-        'RESEND_API_KEY is required for durable email execution.',
-        undefined,
-        'terminal_failure',
-      );
-    }
-    logger.warn('[email] RESEND_API_KEY not set — skipping');
-    return;
+    // This helper's contract is "throw when it didn't go out". A missing
+    // provider key used to return void, so /api/contacts/[id]/email and
+    // /api/agent/send reported success:true for emails that never left.
+    throw new EmailSendError(
+      'RESEND_API_KEY is required to send email.',
+      undefined,
+      'terminal_failure',
+    );
   }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);

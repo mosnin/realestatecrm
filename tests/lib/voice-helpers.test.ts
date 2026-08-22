@@ -19,6 +19,7 @@ describe('toE164', () => {
   it('passes an already +-prefixed number through when well-formed', () => {
     expect(toE164('+14155550123')).toBe('+14155550123');
     expect(toE164('+442071234567')).toBe('+442071234567');
+    expect(toE164('14155550123')).toBe('+14155550123');
   });
 
   it('returns null for empty / too short / too long input', () => {
