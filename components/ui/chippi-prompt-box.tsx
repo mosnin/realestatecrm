@@ -390,7 +390,11 @@ export const ChippiPromptBox = React.forwardRef<HTMLTextAreaElement, ChippiPromp
     // message (the parent's send() holds it and dispatches when the turn
     // ends) — the ChatGPT-Work interaction. Attachments stay blocked while
     // uploading either way.
-    const sendDisabled = disabled || isSubmitting || !hasContent || hasUploadingAttachments;
+    // The first onSend promise stays open for the full streamed response. Once
+    // that stream is visibly active, do not let its submission lock block a
+    // second Enter press: that second instruction belongs in the durable queue.
+    // Before streaming starts, the lock still prevents accidental double-send.
+    const sendDisabled = disabled || (isSubmitting && !isLoading) || !hasContent || hasUploadingAttachments;
 
     // Slash menu — built-in commands (/goal, …) lead, then the skills. The
     // message after "/" is the live filter query.
