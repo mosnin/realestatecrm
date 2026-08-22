@@ -236,6 +236,22 @@ export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; s
   };
 }
 
+export function tourCancelledOwnerSMS(p: {
+  spaceName: string;
+  guestName: string;
+  date: string;
+  time: string;
+  property?: string | null;
+  phone: string;
+}): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    audience: 'internal',
+    to: p.phone,
+    body: `[${p.spaceName}] ${p.guestName} cancelled their tour${prop} on ${p.date} at ${p.time}.`,
+  };
+}
+
 export function tourCancelledSMS(p: { guestName: string; guestPhone: string; spaceId: string; businessName: string; date: string; property?: string | null }): SendSMSParams {
   const prop = p.property ? ` at ${p.property}` : '';
   return {

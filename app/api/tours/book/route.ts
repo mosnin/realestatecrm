@@ -11,6 +11,7 @@ import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar
 import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
 import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -237,8 +238,9 @@ export async function POST(req: NextRequest) {
   const { data: settingsFull } = await tenantTable(supabase, 'SpaceSetting', {
     spaceId: space.id,
   })
-    .select('businessName')
+    .select('businessName, timezone')
     .maybeSingle();
+  const timezone = settingsFull?.timezone ?? null;
   const emailData: TourEmailData = {
     guestName: tour.guestName,
     guestEmail: tour.guestEmail,
@@ -253,12 +255,12 @@ export async function POST(req: NextRequest) {
     // can self-serve cancel/reschedule/feedback (the page existed but was
     // never linked from any guest email).
     manageToken: tour.manageToken,
+    timezone,
   };
   try { await sendTourConfirmation(emailData); } catch (e) { console.error('[tours] confirmation email failed:', e); }
 
   // Send SMS confirmation to guest
   if (tour.guestPhone) {
-    const d = new Date(tour.startsAt);
     try {
       await sendSMS(
         tourConfirmationSMS({
@@ -266,8 +268,8 @@ export async function POST(req: NextRequest) {
           guestPhone: tour.guestPhone,
           spaceId: space.id,
           businessName: settingsFull?.businessName || space.name,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          date: formatTourShortDate(tour.startsAt, timezone),
+          time: formatTourTime(tour.startsAt, timezone),
           property: tour.propertyAddress,
         })
       );

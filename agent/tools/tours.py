@@ -14,6 +14,7 @@ Contact must belong to the space.
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -37,6 +38,16 @@ log = structlog.get_logger(__name__)
 # the TS side; the through-write is the same intent on both runtimes.
 _GCAL_CREATE_SLUG = "GOOGLECALENDAR_CREATE_EVENT"
 _CALENDAR_TOOLKITS = ("googlecalendar", "outlook_calendar")
+
+
+def _rpc_scalar(data: Any) -> Any:
+    """Pull the UUID (or NULL) out of a `SELECT * FROM book_tour_atomic(...)` row."""
+    if not data:
+        return None
+    row = data[0] if isinstance(data, list) else data
+    if not isinstance(row, dict):
+        return row
+    return row.get("book_tour_atomic") or next((v for v in row.values() if v is not None), None)
 
 
 def _parse_iso(value: str) -> datetime | None:
@@ -95,24 +106,35 @@ async def book_tour(
     guest_phone = contact.get("phone") or None
 
     tour_id = str(uuid.uuid4())
-    tour_row = {
-        "id": tour_id,
-        "spaceId": space_id,
-        "contactId": contact_id,
-        "guestName": guest_name,
-        "guestEmail": guest_email,
-        "guestPhone": guest_phone,
-        "propertyAddress": property_address,
-        "notes": notes,
-        "startsAt": starts.isoformat(),
-        "endsAt": ends.isoformat(),
-        "status": "scheduled",
-    }
+    manage_token = secrets.token_hex(32)
 
+    # Same atomic conflict-checked RPC the TS public book + schedule_tour
+    # paths use. A raw Tour insert here used to bypass the row lock, so the
+    # Modal agent could double-book a slot a guest (or the TS agent) just took.
     try:
-        result = await db.table("Tour").insert(tour_row).execute()
+        rpc = await db.rpc(
+            "book_tour_atomic",
+            {
+                "p_id": tour_id,
+                "p_space_id": space_id,
+                "p_contact_id": contact_id,
+                "p_guest_name": guest_name,
+                "p_guest_email": guest_email,
+                "p_guest_phone": guest_phone,
+                "p_property_address": property_address,
+                "p_notes": notes,
+                "p_starts_at": starts.isoformat(),
+                "p_ends_at": ends.isoformat(),
+                "p_property_profile_id": None,
+                "p_manage_token": manage_token,
+            },
+        ).execute()
     except Exception as exc:  # surface DB error to the agent
         return {"error": f"tour insert failed: {exc}"}
+
+    booked_id = _rpc_scalar(rpc.data)
+    if not booked_id:
+        return {"error": "That time overlaps an existing tour — pick a different slot."}
 
     # Best-effort through-write to the realtor's external calendar +
     # CalendarEventMirror backup row. The Tour is committed; this seam
@@ -179,10 +201,9 @@ async def book_tour(
     except Exception:
         pass
 
-    created = result.data[0] if result.data else tour_row
     return {
         "ok": True,
-        "tourId": created.get("id", tour_id),
+        "tourId": tour_id,
         "startsAt": starts.isoformat(),
         "endsAt": ends.isoformat(),
         "contactId": contact_id,

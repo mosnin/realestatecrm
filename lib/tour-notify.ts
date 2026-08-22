@@ -25,6 +25,7 @@ import {
   tourRescheduledSMS,
   tourCancelledSMS,
 } from '@/lib/sms';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
 
 export interface TourNoticeInput {
   spaceId: string;
@@ -39,28 +40,24 @@ export interface TourNoticeInput {
   tourId: string;
 }
 
-/** Resolve the space's display name + slug for the email template. Never throws. */
-async function resolveBusiness(spaceId: string): Promise<{ businessName: string; slug: string }> {
+/** Resolve the space's display name + slug + timezone for the email template. Never throws. */
+async function resolveBusiness(spaceId: string): Promise<{ businessName: string; slug: string; timezone: string | null }> {
   try {
     const [{ data: settings }, { data: space }] = await Promise.all([
-      tenantTable(supabase, 'SpaceSetting', { spaceId }).select('businessName').maybeSingle(),
+      tenantTable(supabase, 'SpaceSetting', { spaceId })
+        .select('businessName, timezone')
+        .maybeSingle(),
       supabase.from('Space').select('name, slug').eq('id', spaceId).maybeSingle(),
     ]);
     return {
       businessName: settings?.businessName || space?.name || 'Your Agent',
       slug: space?.slug ?? '',
+      timezone: (settings as { timezone?: string | null } | null)?.timezone ?? null,
     };
   } catch (err) {
     logger.warn('[tour-notify] business lookup failed', { spaceId }, err);
-    return { businessName: 'Your Agent', slug: '' };
+    return { businessName: 'Your Agent', slug: '', timezone: null };
   }
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 /**
@@ -69,7 +66,7 @@ function fmtTime(iso: string): string {
  */
 export async function notifyTourRescheduled(input: TourNoticeInput): Promise<void> {
   if (!input.guestEmail && !input.guestPhone) return;
-  const { businessName, slug } = await resolveBusiness(input.spaceId);
+  const { businessName, slug, timezone } = await resolveBusiness(input.spaceId);
 
   if (input.guestEmail) {
     const emailData: TourEmailData = {
@@ -82,6 +79,7 @@ export async function notifyTourRescheduled(input: TourNoticeInput): Promise<voi
       businessName,
       tourId: input.tourId,
       slug,
+      timezone,
     };
     try {
       await sendTourRescheduled(emailData);
@@ -98,8 +96,8 @@ export async function notifyTourRescheduled(input: TourNoticeInput): Promise<voi
           guestPhone: input.guestPhone,
           spaceId: input.spaceId,
           businessName,
-          date: fmtDate(input.startsAt),
-          time: fmtTime(input.startsAt),
+          date: formatTourShortDate(input.startsAt, timezone),
+          time: formatTourTime(input.startsAt, timezone),
           property: input.propertyAddress,
         }),
       );
@@ -115,7 +113,7 @@ export async function notifyTourRescheduled(input: TourNoticeInput): Promise<voi
  */
 export async function notifyTourCancelled(input: TourNoticeInput): Promise<void> {
   if (!input.guestEmail && !input.guestPhone) return;
-  const { businessName, slug } = await resolveBusiness(input.spaceId);
+  const { businessName, slug, timezone } = await resolveBusiness(input.spaceId);
 
   if (input.guestEmail) {
     const emailData: TourEmailData = {
@@ -128,6 +126,7 @@ export async function notifyTourCancelled(input: TourNoticeInput): Promise<void>
       businessName,
       tourId: input.tourId,
       slug,
+      timezone,
     };
     try {
       await sendTourCancelled(emailData);
@@ -144,7 +143,7 @@ export async function notifyTourCancelled(input: TourNoticeInput): Promise<void>
           guestPhone: input.guestPhone,
           spaceId: input.spaceId,
           businessName,
-          date: fmtDate(input.startsAt),
+          date: formatTourShortDate(input.startsAt, timezone),
           property: input.propertyAddress,
         }),
       );
