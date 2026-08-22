@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   CheckCircle2, XCircle, MessageSquare, Mail, StickyNote,
-  Loader2, RefreshCw, Pencil, Copy, Check, CheckSquare,
+  Loader2, RefreshCw, Pencil, Copy, CheckSquare,
   AlertTriangle, Send, TriangleAlert,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -183,7 +183,6 @@ function DraftRow({
   const [editing, setEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(draft.content);
   const [actioning, setActioning] = useState<'approved' | 'dismissed' | null>(null);
-  const [copied, setCopied] = useState(false);
   const [dismissError, setDismissError] = useState<string | null>(null);
   const [autoSendCancelled, setAutoSendCancelled] = useState(false);
   const [autoSendRemainingMs, setAutoSendRemainingMs] = useState<number | null>(null);
@@ -263,12 +262,6 @@ function DraftRow({
     }
   }
 
-  async function copyContent() {
-    await navigator.clipboard.writeText(editedContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
   // Phase D countdown — counts down once per row when eligible. Tick every
   // 250ms so the displayed seconds feel responsive without thrashing renders.
   // We start from the moment the row meets all conditions; if the realtor
@@ -307,7 +300,7 @@ function DraftRow({
   // they just resolved as the others stagger up to fill the space.
   if (celebrationKind) {
     return (
-      <article className="group/row overflow-hidden rounded-2xl border border-border/70 bg-card/50 px-4 py-4 sm:px-5">
+      <article className="group/row py-3 first:pt-0 last:pb-0">
         <div className="flex items-baseline gap-2 text-sm">
           {draft.Contact && (
             <span className="font-medium text-muted-foreground truncate">
@@ -324,7 +317,7 @@ function DraftRow({
   }
 
   return (
-    <article className="group/row overflow-hidden rounded-2xl border border-border/70 bg-card/50 px-4 py-4 sm:px-5 sm:py-5">
+    <article className="group/row py-3 first:pt-0 last:pb-0">
       {/* Meta line: checkbox · contact · channel · confidence · time */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
         {/* Quiet checkbox — invisible until row hover or selected. Matches the
@@ -334,8 +327,7 @@ function DraftRow({
           checked={selected}
           onChange={onToggleSelect}
           aria-label={`Select draft for ${draft.Contact?.name ?? 'unknown contact'}`}
-          className="rounded border-border cursor-pointer flex-shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity data-[checked=true]:opacity-100"
-          data-checked={selected}
+          className="rounded border-border cursor-pointer flex-shrink-0"
         />
         {draft.Contact ? (
           <Link
@@ -431,30 +423,12 @@ function DraftRow({
         </div>
       ) : (
         <div className="group/content relative mt-2 max-w-3xl">
-          <p className="break-words whitespace-pre-wrap pr-14 text-sm leading-relaxed text-foreground/90">
+          <p className="break-words whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
             {editedContent}
             {isEdited && (
               <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
             )}
           </p>
-          <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 focus-within:opacity-100 transition-opacity">
-            <button
-              onClick={copyContent}
-              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="Copy"
-              aria-label="Copy message"
-            >
-              {copied ? <Check size={11} /> : <Copy size={11} />}
-            </button>
-            <button
-              onClick={startEdit}
-              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              title="Edit"
-              aria-label="Edit message"
-            >
-              <Pencil size={11} />
-            </button>
-          </div>
         </div>
       )}
 
@@ -1051,7 +1025,7 @@ export function AgentDraftInbox({ slug }: Props) {
 
       {/* Draft rows */}
       {!loading && drafts.length > 0 && (
-        <StaggerList className="space-y-3 pt-4">
+        <StaggerList className="divide-y divide-border/60 pt-4">
           {drafts.map((draft) => (
             <StaggerItem key={draft.id}>
               <DraftRow

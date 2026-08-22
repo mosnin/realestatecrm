@@ -1214,6 +1214,14 @@ export function ChippiWorkspace({
     }
   }, [queuedEditId, queuedEditText, updateQueuedMessage]);
 
+  const deleteQueuedMessage = useCallback(async (turnId: string) => {
+    const removed = await removeQueuedMessage(turnId);
+    if (removed && queuedEditId === turnId) {
+      setQueuedEditId(null);
+      setQueuedEditText('');
+    }
+  }, [queuedEditId, removeQueuedMessage]);
+
   // Auto-send when arriving from the command palette via ?q= — fires once on
   // mount only. handleSendRef lets us read the latest handleSend without
   // adding it to the deps array (which would re-trigger on every send).
@@ -1649,19 +1657,11 @@ export function ChippiWorkspace({
                 <button
                   type="button"
                   onClick={() => { void steerQueuedMessage(q.id, q.text, q.mode); }}
-                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                 >
                   Steer
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => { void removeQueuedMessage(q.id); }}
-                aria-label="Remove queued message"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-              >
-                <Trash2 size={14} />
-              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -1681,6 +1681,14 @@ export function ChippiWorkspace({
                   >
                     <Pencil size={14} />
                     Edit message
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => { void deleteQueuedMessage(q.id); }}
+                  >
+                    <Trash2 size={14} />
+                    Delete message
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

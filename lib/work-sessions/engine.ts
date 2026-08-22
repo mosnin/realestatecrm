@@ -44,6 +44,13 @@ import type { PlanStep, WorkSessionRow } from './types';
 export type { PlanStep, WorkSessionRow } from './types';
 import { proposeActions } from './actions';
 import { unscoped } from '@/lib/supabase-guard';
+import {
+  MAX_PLANNER_ATTEMPTS,
+  PLANNER_RETRY_PROMPT,
+  hasUsablePlannerContent,
+  parsePlannerOutput,
+  type PlannerPayload,
+} from './planner';
 
 
 const MAX_STEPS = 6;
@@ -266,26 +273,42 @@ export async function planSession(
     return applied ? next : statusAfterLostClaim(sessionId);
   }
 
-  let raw = '';
-  try {
-    const llm = getLLMClient();
-    const completion = await llm.chat.completions.create({
-      model: resolveChatModel(),
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 700,
-      messages: [
-        { role: 'system', content: PLAN_PROMPT },
-        {
-          role: 'user',
-          content: session.answer
-            ? `Goal: ${session.goal}\n\nThe realtor clarified: ${session.answer}`
-            : `Goal: ${session.goal}`,
-        },
-      ],
-    });
-    raw = completion.choices[0]?.message?.content ?? '';
-  } catch (err) {
+  let parsed: PlannerPayload | null = null;
+  let requestError: unknown = null;
+  const userPrompt = session.answer
+    ? `Goal: ${session.goal}\n\nThe realtor clarified: ${session.answer}`
+    : `Goal: ${session.goal}`;
+
+  for (let attempt = 0; attempt < MAX_PLANNER_ATTEMPTS; attempt++) {
+    try {
+      const llm = getLLMClient();
+      const completion = await llm.chat.completions.create({
+        model: resolveChatModel(),
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+        max_tokens: 700,
+        messages: [
+          { role: 'system', content: PLAN_PROMPT },
+          { role: 'user', content: userPrompt },
+          ...(attempt > 0 ? [{ role: 'user' as const, content: PLANNER_RETRY_PROMPT }] : []),
+        ],
+      });
+      const candidate = parsePlannerOutput(completion.choices[0]?.message?.content ?? '');
+      if (candidate) {
+        parsed = candidate;
+        // A parseable object with no steps is retried once as well. This is a
+        // common "{}"/empty-array response and deserves a corrective prompt,
+        // while retaining the precise empty-plan failure if it persists.
+        if (hasUsablePlannerContent(candidate)) break;
+      }
+    } catch (err) {
+      requestError = err;
+      break;
+    }
+  }
+
+  if (requestError) {
+    const err = requestError;
     logger.error('[work-sessions] plan LLM failed', { sessionId }, err);
     const applied = await patchClaimedSession(sessionId, 'plan', 'plan', claimToken, {
       status: 'failed',
@@ -294,10 +317,7 @@ export async function planSession(
     return applied ? 'failed' : statusAfterLostClaim(sessionId);
   }
 
-  let parsed: { steps?: { title?: unknown }[]; question?: unknown };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
+  if (!parsed) {
     const applied = await patchClaimedSession(sessionId, 'plan', 'plan', claimToken, {
       status: 'failed',
       error: 'Planning returned an unreadable plan.',
@@ -319,10 +339,12 @@ export async function planSession(
     return applied ? 'awaiting_input' : statusAfterLostClaim(sessionId);
   }
 
-  const steps: PlanStep[] = (Array.isArray(parsed.steps) ? parsed.steps : [])
+  const steps: PlanStep[] = parsed.steps
     .map((s, i) => ({
       id: `s${i + 1}`,
-      title: typeof s.title === 'string' ? s.title.trim().slice(0, 120) : '',
+      title: s !== null && typeof s === 'object' && !Array.isArray(s) && typeof (s as { title?: unknown }).title === 'string'
+        ? (s as { title: string }).title.trim().slice(0, 120)
+        : '',
       status: 'pending' as const,
     }))
     .filter((s) => s.title.length > 0)

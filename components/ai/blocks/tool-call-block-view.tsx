@@ -342,16 +342,6 @@ export function ToolCallBlockView({
 
   const hasDetails = !!block.result?.summary || !!block.result?.error;
   const generatedMedia = block.name === 'generate_studio_image' || block.display === 'generated-image';
-  const copyText = hasDetails
-    ? JSON.stringify(
-        {
-          arguments: block.args,
-          result: block.result ?? null,
-        },
-        null,
-        2,
-      )
-    : undefined;
 
   return (
     <div className={cn('group relative', className)}>
@@ -371,7 +361,6 @@ export function ToolCallBlockView({
           meta={argsHint ?? undefined}
           collapseOnComplete
           maxHeight={220}
-          copyText={copyText}
         >
           {hasDetails ? (
             <div className="space-y-2.5">

@@ -3,11 +3,9 @@
 import {
   Ban,
   Braces,
-  Check,
   ChevronDown,
   CircleCheck,
   CircleX,
-  Copy,
   LoaderCircle,
   SquareTerminal,
   Wrench,
@@ -41,8 +39,6 @@ export interface AgentToolResultProps {
   onOpenChange?: (open: boolean) => void;
   collapseOnComplete?: boolean;
   maxHeight?: number;
-  copyText?: string;
-  onCopy?: () => void | Promise<void>;
   className?: string;
   contentClassName?: string;
 }
@@ -80,8 +76,6 @@ export function AgentToolResult({
   onOpenChange,
   collapseOnComplete = true,
   maxHeight = 220,
-  copyText,
-  onCopy,
   className,
   contentClassName,
 }: AgentToolResultProps) {
@@ -90,8 +84,6 @@ export function AgentToolResult({
   const controlled = open !== undefined;
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const previousStatus = useRef(status);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<number | null>(null);
   const expanded = open ?? internalOpen;
   const running = status === 'running';
   const hasDetails = children !== undefined && children !== null;
@@ -115,23 +107,6 @@ export function AgentToolResult({
     }
     previousStatus.current = status;
   }, [collapseOnComplete, setExpanded, status]);
-
-  useEffect(() => () => {
-    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-  }, []);
-
-  const copy = async () => {
-    try {
-      if (onCopy) await onCopy();
-      else if (copyText && navigator.clipboard) await navigator.clipboard.writeText(copyText);
-      else return;
-      setCopied(true);
-      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-      copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  };
 
   const StatusIcon = status === 'running'
     ? LoaderCircle
@@ -210,18 +185,6 @@ export function AgentToolResult({
               >
                 {children}
               </div>
-              {copyText || onCopy ? (
-                <div className="flex items-center border-t border-border/40 py-1">
-                  <button
-                    type="button"
-                    onClick={() => void copy()}
-                    aria-label={copied ? 'Result copied' : 'Copy result'}
-                    className="grid size-7 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  </button>
-                </div>
-              ) : null}
             </div>
           </motion.div>
         ) : null}

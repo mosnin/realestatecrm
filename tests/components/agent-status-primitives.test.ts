@@ -98,7 +98,6 @@ describe('BEUI-adapted agent surfaces', () => {
         kind: 'terminal',
         status: 'success',
         defaultOpen: true,
-        copyText: '49 pass · 0 fail',
       },
       createElement('pre', null, '49 pass · 0 fail'),
     ));
@@ -107,6 +106,7 @@ describe('BEUI-adapted agent surfaces', () => {
     expect(html).toContain('data-agent-surface-style="inline"');
     expect(html).toContain('data-state="success"');
     expect(html).toContain('49 pass · 0 fail');
+    expect(html).not.toContain('Copy result');
     expect(html).not.toContain('bg-muted/35');
     expect(html).not.toMatch(/retry/i);
   });
