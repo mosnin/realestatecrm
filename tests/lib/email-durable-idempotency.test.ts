@@ -65,6 +65,23 @@ describe('sendEmailFromCRM durable execution contract', () => {
     expect(resendSendMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when an ordinary CRM send has no provider configuration', async () => {
+    delete process.env.RESEND_API_KEY;
+    await expect(sendEmailFromCRM({
+      audience: 'consumer',
+      category: 'marketing',
+      spaceId: 'space-1',
+      toEmail: 'buyer@example.com',
+      fromName: 'Broker',
+      subject: 'Hello',
+      body: 'Body',
+    })).rejects.toMatchObject({
+      name: 'EmailSendError',
+      durableDisposition: 'terminal_failure',
+    });
+    expect(resendSendMock).not.toHaveBeenCalled();
+  });
+
   it('classifies provider payload conflicts as reconciliation and concurrency as retryable', async () => {
     const params = {
       audience: 'consumer' as const,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export async function DELETE(
   _req: NextRequest,
@@ -12,23 +14,18 @@ export async function DELETE(
   const { userId } = authResult;
   const { id } = await params;
 
-  const { data: row } = await supabase
-    .from('TourAvailabilityOverride')
-    .select('spaceId')
+  const space = await getSpaceForUser(userId);
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const { data: row } = await tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id })
+    .select('id')
     .eq('id', id)
     .maybeSingle();
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const space = await getSpaceForUser(userId);
-  if (!space || row.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const { error } = await supabase
-    .from('TourAvailabilityOverride')
+  const { error } = await tenantTable(supabase, 'TourAvailabilityOverride', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (error) throw error;
 
   return NextResponse.json({ success: true });

@@ -95,12 +95,12 @@ interface Invoice {
 // ─── Plan config ──────────────────────────────────────────────────────────────
 
 const PLAN_FEATURES = [
-  { icon: PhoneIncoming, label: 'Unlimited lead intake & AI scoring' },
-  { icon: Users,         label: 'Unlimited clients & contact management' },
+  { icon: PhoneIncoming, label: 'Lead intake. AI scoring uses credits' },
+  { icon: Users,         label: 'Contacts & clients on every plan, including Free' },
   { icon: Briefcase,     label: 'Deals pipeline & kanban board' },
-  { icon: Bot,           label: 'AI assistant with RAG knowledge base' },
+  { icon: Bot,           label: 'AI assistant (credit-metered, not unlimited)' },
   { icon: BarChart2,     label: 'Analytics & performance insights' },
-  { icon: Zap,           label: 'Automated email notifications' },
+  { icon: Zap,           label: 'Email drafts you approve before send' },
   { icon: Shield,        label: 'Secure, encrypted data storage' },
 ];
 

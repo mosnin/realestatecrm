@@ -23,6 +23,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { parseDripSteps, DripSequenceValidationError } from '@/lib/drip/schema';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -40,11 +41,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const { data, error } = await supabase
-    .from('DripSequence')
+  const { data, error } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .select(SELECT)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {
@@ -102,11 +101,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('DripSequence')
+  const { data, error } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select(SELECT)
     .maybeSingle();
 
@@ -130,11 +127,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   // Confirm the sequence belongs to this space before anything else — a
   // cross-tenant id must 404, never leak into the live-enrollment check below.
-  const { data: sequence, error: seqErr } = await supabase
-    .from('DripSequence')
+  const { data: sequence, error: seqErr } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (seqErr) {
     logger.error('[drip/sequences/id] lookup failed', { spaceId: space.id, id }, seqErr);
@@ -142,10 +137,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   }
   if (!sequence) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { count, error: liveErr } = await supabase
-    .from('DripEnrollment')
+  const { count, error: liveErr } = await tenantTable(supabase, 'DripEnrollment', { spaceId: space.id })
     .select('id', { count: 'exact', head: true })
-    .eq('spaceId', space.id)
     .eq('sequenceId', id)
     .eq('status', 'enrolled');
   if (liveErr) {
@@ -159,11 +152,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     );
   }
 
-  const { error } = await supabase
-    .from('DripSequence')
+  const { error } = await tenantTable(supabase, 'DripSequence', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (error) {
     logger.error('[drip/sequences/id] delete failed', { spaceId: space.id, id }, error);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

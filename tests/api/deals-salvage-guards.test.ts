@@ -224,6 +224,18 @@ describe('PATCH /api/deals/[id] — position validate-and-ignore', () => {
   });
 });
 
+describe('PATCH /api/deals/[id] — contactIds must be an array', () => {
+  it('rejects a string contactIds with 400 and does not replace the list', async () => {
+    const res = await PATCH(patchReq({ contactIds: 'c_1' }), { params });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(String(body.error)).toMatch(/contactIds must be an array/i);
+    // A string used to be truthy and treated as a replace-list, unlinking
+    // every DealContact when .in('id', 'c_1') matched nothing.
+    expect(dealUpdateValues).toBeNull();
+  });
+});
+
 describe('PATCH /api/deals/[id] — propertyId ownership scoping', () => {
   it('rejects a propertyId not owned by this space with 404', async () => {
     propertyOwned = false;

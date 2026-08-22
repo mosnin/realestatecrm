@@ -14,6 +14,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { decrypt, encrypt, decryptOrPassthrough } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
 import { after } from 'next/server';
@@ -71,14 +72,11 @@ export async function getValidAccessToken(
   const tokens = (await res.json()) as { access_token?: string; expires_in?: number };
   if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
 
-  await supabase
-    .from('GoogleCalendarToken')
-    .update({
-      accessToken: encrypt(tokens.access_token),
-      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('spaceId', spaceId);
+  await tenantTable(supabase, 'GoogleCalendarToken', { spaceId }).update({
+    accessToken: encrypt(tokens.access_token),
+    expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
 
   return tokens.access_token;
 }
@@ -98,10 +96,10 @@ async function performDeleteGoogleEvent(args: {
 }): Promise<boolean> {
   if (!args.googleEventId) return true;
 
-  const { data: tokenRow } = await supabase
-    .from('GoogleCalendarToken')
+  const { data: tokenRow } = await tenantTable(supabase, 'GoogleCalendarToken', {
+    spaceId: args.spaceId,
+  })
     .select('accessToken, refreshToken, expiresAt, calendarId')
-    .eq('spaceId', args.spaceId)
     .maybeSingle();
   if (!tokenRow) return true;
 
@@ -160,6 +158,70 @@ async function performDeleteGoogleEvent(args: {
 }
 
 /**
+ * Create a Google Calendar event on the space's legacy-connected calendar.
+ * Used when public /book has a GoogleCalendarToken but no Composio calendar.
+ * Returns { ok:false } instead of throwing so the book route can roll back.
+ */
+export async function createGoogleEvent(args: {
+  spaceId: string;
+  title: string;
+  description: string;
+  startsAt: string;
+  endsAt: string;
+}): Promise<{ ok: true; googleEventId: string } | { ok: false }> {
+  const { data: tokenRow } = await tenantTable(supabase, 'GoogleCalendarToken', {
+    spaceId: args.spaceId,
+  })
+    .select('accessToken, refreshToken, expiresAt, calendarId')
+    .maybeSingle();
+  if (!tokenRow) return { ok: false };
+
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(tokenRow as GoogleCalendarTokenRow, args.spaceId);
+  } catch (err) {
+    logger.warn('[gcal-helpers] could not refresh token for create', { spaceId: args.spaceId }, err);
+    return { ok: false };
+  }
+
+  const calendarId = (tokenRow as { calendarId?: string | null }).calendarId || 'primary';
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          summary: args.title,
+          description: args.description,
+          start: { dateTime: args.startsAt, timeZone: 'UTC' },
+          end: { dateTime: args.endsAt, timeZone: 'UTC' },
+        }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      logger.warn('[gcal-helpers] create event failed', {
+        spaceId: args.spaceId,
+        status: res.status,
+        errText,
+      });
+      return { ok: false };
+    }
+    const created = (await res.json()) as { id?: string };
+    if (!created.id) return { ok: false };
+    return { ok: true, googleEventId: created.id };
+  } catch (err) {
+    logger.warn('[gcal-helpers] create event threw', { spaceId: args.spaceId }, err);
+    return { ok: false };
+  }
+}
+
+/**
  * Delete a mirrored Google Calendar event while retaining the exact in-flight
  * request through the end of a Next.js serverless invocation. Callers may keep
  * this best-effort cleanup off their response path without Vercel suspending it;
@@ -170,6 +232,96 @@ export async function deleteGoogleEvent(args: {
   googleEventId: string | null | undefined;
 }): Promise<boolean> {
   const task = performDeleteGoogleEvent(args);
+  try {
+    after(() => task);
+  } catch {
+    // Workers and unit tests may run outside a Next.js request context.
+  }
+  return task;
+}
+
+async function performUpdateGoogleEvent(args: {
+  spaceId: string;
+  googleEventId: string;
+  startsAt: string;
+  endsAt: string;
+}): Promise<boolean> {
+  const { data: tokenRow } = await supabase
+    .from('GoogleCalendarToken')
+    .select('accessToken, refreshToken, expiresAt, calendarId')
+    .eq('spaceId', args.spaceId)
+    .maybeSingle();
+  if (!tokenRow) return true;
+
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken(
+      tokenRow as GoogleCalendarTokenRow,
+      args.spaceId,
+    );
+  } catch (err) {
+    logger.warn('[gcal-helpers] could not refresh token for update', { spaceId: args.spaceId }, err);
+    return false;
+  }
+
+  const calendarId =
+    (tokenRow as { calendarId?: string | null }).calendarId || 'primary';
+
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(args.googleEventId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start: { dateTime: args.startsAt, timeZone: 'UTC' },
+          end: { dateTime: args.endsAt, timeZone: 'UTC' },
+        }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+  } catch (err) {
+    logger.warn('[gcal-helpers] update event request failed (network/timeout)', {
+      spaceId: args.spaceId,
+      googleEventId: args.googleEventId,
+    }, err);
+    return false;
+  }
+
+  if (res.ok) return true;
+
+  const errText = await res.text().catch(() => '');
+  logger.warn('[gcal-helpers] update event failed', {
+    spaceId: args.spaceId,
+    googleEventId: args.googleEventId,
+    status: res.status,
+    errText,
+  });
+  return false;
+}
+
+/**
+ * Move a legacy (Tour.googleEventId) Google Calendar event to a new window.
+ * Same best-effort / after() posture as deleteGoogleEvent — a GCal hiccup
+ * must not fail the realtor's reschedule.
+ */
+export async function updateGoogleEvent(args: {
+  spaceId: string;
+  googleEventId: string | null | undefined;
+  startsAt: string;
+  endsAt: string;
+}): Promise<boolean> {
+  if (!args.googleEventId) return true;
+  const task = performUpdateGoogleEvent({
+    spaceId: args.spaceId,
+    googleEventId: args.googleEventId,
+    startsAt: args.startsAt,
+    endsAt: args.endsAt,
+  });
   try {
     after(() => task);
   } catch {

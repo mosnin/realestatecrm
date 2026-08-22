@@ -20,6 +20,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncContact } from '@/lib/vectorize';
 import { notifyNewContact } from '@/lib/notify';
 import { logger } from '@/lib/logger';
@@ -123,8 +124,7 @@ export const addPersonTool = defineTool<typeof parameters, AddPersonResult>({
     const leadType: 'buyer' | 'rental' = args.leadType ?? 'buyer';
     const tags = (args.tags ?? []).map((t) => t.trim()).filter((t) => t.length > 0);
 
-    const { data: contactRow, error: insertErr } = await supabase
-      .from('Contact')
+    const { data: contactRow, error: insertErr } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
       .insert({
         id,
         spaceId: ctx.space.id,

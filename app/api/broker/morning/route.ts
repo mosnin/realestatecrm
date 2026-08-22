@@ -43,6 +43,8 @@ import { NextResponse } from 'next/server';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface BrokerMorningResponse {
   /**
@@ -228,8 +230,8 @@ export async function GET() {
     // Unassigned brokerage leads — same predicates as
     // app/broker/leads/page.tsx and find_unassigned_leads:
     // brokerageId match, tag includes 'brokerage-lead', NOT 'assigned'.
-    supabase
-      .from('Contact')
+    unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .select('id, tags')
       .eq('brokerageId', brokerage.id)
       .contains('tags', ['brokerage-lead'])

@@ -4,6 +4,7 @@ import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { assertPublicHttpTarget } from '@/lib/net/ssrf-guard';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -26,15 +27,22 @@ export async function GET(req: NextRequest) {
   const auth = await requireSpaceOwner(slug);
   if (auth instanceof NextResponse) return auth;
 
-  const { data } = await supabase
-    .from('CustomPlugin')
+  const { data } = await tenantTable(supabase, 'CustomPlugin', { spaceId: auth.space.id })
     .select('id, name, description, url, method, authHeader, enabled, createdAt')
-    .eq('spaceId', auth.space.id)
     .order('createdAt', { ascending: false })
     .limit(MAX_PLUGINS);
 
   return NextResponse.json({
-    plugins: (data ?? []).map((p) => ({
+    plugins: ((data ?? []) as Array<{
+      id: string;
+      name: string;
+      description: string;
+      url: string;
+      method: string;
+      authHeader: { name?: string } | null;
+      enabled: boolean;
+      createdAt: string;
+    }>).map((p) => ({
       id: p.id,
       name: p.name,
       description: p.description,
@@ -94,16 +102,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Provide both the auth header name and value, or neither.' }, { status: 400 });
   }
 
-  const { count } = await supabase
-    .from('CustomPlugin')
-    .select('*', { count: 'exact', head: true })
-    .eq('spaceId', auth.space.id);
+  const { count } = await tenantTable(supabase, 'CustomPlugin', { spaceId: auth.space.id })
+    .select('*', { count: 'exact', head: true });
   if ((count ?? 0) >= MAX_PLUGINS) {
     return NextResponse.json({ error: `You've reached the limit of ${MAX_PLUGINS} plugins.` }, { status: 409 });
   }
 
-  const { data, error } = await supabase
-    .from('CustomPlugin')
+  const { data, error } = await tenantTable(supabase, 'CustomPlugin', { spaceId: auth.space.id })
     .insert({
       id: crypto.randomUUID(),
       spaceId: auth.space.id,

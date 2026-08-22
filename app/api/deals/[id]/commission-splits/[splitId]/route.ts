@@ -4,16 +4,15 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidCommissionParty } from '@/lib/commissions';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolve(userId: string, dealId: string, splitId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data } = await supabase
-    .from('CommissionSplit')
+  const { data } = await tenantTable(supabase, 'CommissionSplit', { spaceId: space.id })
     .select('*')
     .eq('id', splitId)
     .eq('dealId', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!data) return null;
   return { space, split: data };
@@ -81,12 +80,10 @@ export async function PATCH(
     patch.notes = body.notes ? String(body.notes).trim().slice(0, 500) : null;
   }
 
-  const { data, error } = await supabase
-    .from('CommissionSplit')
+  const { data, error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: ctx.space.id })
     .update(patch)
     .eq('id', splitId)
     .eq('dealId', id)
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
 
@@ -109,12 +106,10 @@ export async function DELETE(
   const ctx = await resolve(userId, id, splitId);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('CommissionSplit')
+  const { error } = await tenantTable(supabase, 'CommissionSplit', { spaceId: ctx.space.id })
     .delete()
     .eq('id', splitId)
-    .eq('dealId', id)
-    .eq('spaceId', ctx.space.id);
+    .eq('dealId', id);
 
   if (error) {
     logger.error('[commission-splits/DELETE]', { splitId }, error);

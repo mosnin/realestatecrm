@@ -14,6 +14,8 @@
 
 import { ItemCarousel } from '@/components/tool-ui/item-carousel';
 import { safeParseSerializableItemCarousel } from '@/components/tool-ui/item-carousel/schema';
+import { formatCurrency } from '@/lib/formatting';
+import { CompactResultList } from './compact-result-list';
 import { buildPropertiesCarousel, type PropertyItemInput } from './tool-ui-mappers';
 
 export function PropertiesCarouselResult({
@@ -42,12 +44,26 @@ export function PropertiesCarouselResult({
   };
 
   return (
-    <div className="mt-2">
-      <ItemCarousel
-        {...parsed}
-        onItemClick={interactive ? ask : undefined}
-        onItemAction={interactive ? (itemId) => ask(itemId) : undefined}
-      />
-    </div>
+    <CompactResultList
+      noun="property"
+      plural="properties"
+      onItemClick={interactive ? ask : undefined}
+      items={properties.map((property) => ({
+        id: property.id,
+        title: property.address,
+        subtitle:
+          typeof (property.listPrice ?? property.price) === 'number'
+            ? formatCurrency((property.listPrice ?? property.price) as number)
+            : undefined,
+      }))}
+    >
+      <div className="mt-2 md:mt-0">
+        <ItemCarousel
+          {...parsed}
+          onItemClick={interactive ? ask : undefined}
+          onItemAction={interactive ? (itemId) => ask(itemId) : undefined}
+        />
+      </div>
+    </CompactResultList>
   );
 }

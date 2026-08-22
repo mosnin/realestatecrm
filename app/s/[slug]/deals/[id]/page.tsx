@@ -216,6 +216,9 @@ export default async function DealDetailPage({
   const commissionRate = dealRow.commissionRate != null ? (dealRow.commissionRate as number) : null;
   const probability = dealRow.probability != null ? (dealRow.probability as number) : null;
   const closeDate = dealRow.closeDate != null ? (dealRow.closeDate as string) : null;
+  const contractAcceptedAt = dealRow.contractAcceptedAt != null ? (dealRow.contractAcceptedAt as string) : null;
+  const inspectionDeadline = dealRow.inspectionDeadline != null ? (dealRow.inspectionDeadline as string) : null;
+  const earnestDueAt = dealRow.earnestDueAt != null ? (dealRow.earnestDueAt as string) : null;
   const followUpAt = dealRow.followUpAt != null ? (dealRow.followUpAt as string) : null;
   const address = dealRow.address != null ? (dealRow.address as string) : null;
   const description = dealRow.description != null ? (dealRow.description as string) : null;
@@ -531,6 +534,70 @@ export default async function DealDetailPage({
               <FieldCell label="Close date">
                 <DealCloseDateField dealId={id} initial={closeDate} />
               </FieldCell>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FieldCell label="Contract accepted">
+                  <DealInlineField
+                    dealId={id}
+                    field="contractAcceptedAt"
+                    value={contractAcceptedAt ? String(contractAcceptedAt).slice(0, 10) : null}
+                    type="date"
+                    label="Contract accepted"
+                    displayValue={
+                      contractAcceptedAt
+                        ? new Date(contractAcceptedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                        : ''
+                    }
+                    placeholder="Not set"
+                  />
+                </FieldCell>
+                <FieldCell label="Inspection deadline">
+                  <DealInlineField
+                    dealId={id}
+                    field="inspectionDeadline"
+                    value={inspectionDeadline ? String(inspectionDeadline).slice(0, 10) : null}
+                    type="date"
+                    label="Inspection deadline"
+                    displayValue={
+                      inspectionDeadline
+                        ? new Date(`${String(inspectionDeadline).slice(0, 10)}T12:00:00`).toLocaleDateString(
+                            'en-US',
+                            { month: 'short', day: 'numeric', year: 'numeric' },
+                          )
+                        : ''
+                    }
+                    placeholder="Not set"
+                  />
+                </FieldCell>
+              </div>
+
+              <FieldCell label="Earnest due">
+                <DealInlineField
+                  dealId={id}
+                  field="earnestDueAt"
+                  value={earnestDueAt ? String(earnestDueAt).slice(0, 10) : null}
+                  type="date"
+                  label="Earnest due"
+                  displayValue={
+                    earnestDueAt
+                      ? new Date(`${String(earnestDueAt).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : ''
+                  }
+                  placeholder="Not set"
+                />
+              </FieldCell>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                You set these. Accepting an offer stamps the contract date. Chippi
+                does not certify signatures or pull MLS.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <FieldCell label="Stage">

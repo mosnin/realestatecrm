@@ -2,7 +2,7 @@
  * IntegrationsPage, the /integrations body on the bold-canvas system.
  *
  * One idea: connect your tools once, and Chippi works inside them. The
- * owner-provided IntegrationHero above carries the opener (50+ apps, two
+ * owner-provided IntegrationHero above carries the opener (your stack, two
  * minutes to connect), so no second hero here, just a three-step "how it
  * works" in white soft-shadow cards → the catalog rendered straight from
  * `lib/integrations/catalog.ts` (the source of truth, no invented entries)

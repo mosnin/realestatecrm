@@ -16,6 +16,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -59,11 +60,9 @@ export const updateDealProbabilityTool = defineTool<
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, probability')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -81,11 +80,9 @@ export const updateDealProbabilityTool = defineTool<
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ probability: args.probability, updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error(
         '[tools.update_deal_probability] update failed',
@@ -97,7 +94,7 @@ export const updateDealProbabilityTool = defineTool<
 
     const fromStr = oldProbability != null ? `${oldProbability}%` : '—';
     const why = args.why ? `: ${args.why}` : '';
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,

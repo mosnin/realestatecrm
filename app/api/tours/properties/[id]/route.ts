@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 async function resolveProfile(userId: string, profileId: string) {
-  const { data: row } = await supabase.from('TourPropertyProfile').select('*').eq('id', profileId).maybeSingle();
-  if (!row) return null;
   const space = await getSpaceForUser(userId);
-  if (!space || row.spaceId !== space.id) return null;
+  if (!space) return null;
+  const { data: row } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: space.id })
+    .select('*')
+    .eq('id', profileId)
+    .maybeSingle();
+  if (!row) return null;
   return { profile: row, space };
 }
 
@@ -34,11 +39,9 @@ export async function PATCH(
   if (body.bufferMinutes !== undefined) update.bufferMinutes = body.bufferMinutes;
   if (body.isActive !== undefined) update.isActive = body.isActive;
 
-  const { data, error } = await supabase
-    .from('TourPropertyProfile')
+  const { data, error } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: ctx.space.id })
     .update(update)
     .eq('id', id)
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
   if (error) throw error;
@@ -58,11 +61,9 @@ export async function DELETE(
   const ctx = await resolveProfile(userId, id);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('TourPropertyProfile')
+  const { error } = await tenantTable(supabase, 'TourPropertyProfile', { spaceId: ctx.space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', ctx.space.id);
+    .eq('id', id);
   if (error) throw error;
 
   return NextResponse.json({ success: true });

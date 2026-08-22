@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -34,11 +35,9 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .select(FULL_COLUMNS)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {
@@ -89,11 +88,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .update(update)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select(FULL_COLUMNS)
     .maybeSingle();
 
@@ -117,11 +114,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const { error } = await supabase
-    .from('CmaReport')
+  const { error } = await tenantTable(supabase, 'CmaReport', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (error) {
     logger.error('[cma] delete failed', { spaceId: space.id, id, err: error.message });

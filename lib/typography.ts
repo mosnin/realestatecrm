@@ -25,23 +25,32 @@
 
 /* ─── Display: focal numbers + page titles ─────────────────────────────── */
 
+/** Shared stacks — keep Clerk, CSS, and Tailwind on the same three faces. */
+export const FONT_SANS_STACK =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif';
+export const FONT_SERIF_STACK =
+  '"Times New Roman MT", "Times New Roman", Times, serif';
+export const FONT_MONO_STACK =
+  '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
 /** Page-level h1 — serif Times, the screen's headline. */
-export const H1 = 'text-3xl tracking-tight text-foreground';
+export const H1 = 'font-title text-3xl tracking-tight text-foreground';
 /** Inline style — apply with style={{ fontFamily: 'var(--font-title)' }} */
 export const TITLE_FONT = { fontFamily: 'var(--font-title)' } as const;
 
 /** Focal stat number — same scale as H1 but treated as data. Use serif. */
-export const STAT_NUMBER = 'text-3xl tracking-tight text-foreground tabular-nums';
+export const STAT_NUMBER = 'font-title text-3xl tracking-tight text-foreground tabular-nums';
 /** Compact stat (when 4+ are in a row). 25px = H1 × 1/1.2. */
-export const STAT_NUMBER_COMPACT = 'text-[25px] leading-tight tracking-tight text-foreground tabular-nums';
+export const STAT_NUMBER_COMPACT =
+  'font-title text-[25px] leading-tight tracking-tight text-foreground tabular-nums';
 
 /* ─── Section headings ─────────────────────────────────────────────────── */
 
 /** Section h2 — sub-page heading. 21px = STAT_COMPACT × 1/1.2. */
-export const H2 = 'text-[21px] leading-snug tracking-tight font-semibold text-foreground';
+export const H2 = 'font-heading text-[21px] leading-snug tracking-tight font-semibold text-foreground';
 
 /** Card / panel heading. 17px = H2 × 1/1.2. */
-export const H3 = 'text-[17px] leading-snug font-semibold text-foreground';
+export const H3 = 'font-heading text-[17px] leading-snug font-semibold text-foreground';
 
 /** Quiet small-caps section label (above a group of fields or rows). */
 export const SECTION_LABEL =

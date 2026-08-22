@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 
@@ -55,8 +56,7 @@ export const blockTimeTool = defineTool<typeof parameters, BlockTimeResult>({
     const title = `Blocked: ${args.reason.trim()}`;
     const description = `Through ${new Date(args.to).toISOString()}`;
 
-    const { data: inserted, error } = await supabase
-      .from('CalendarEvent')
+    const { data: inserted, error } = await tenantTable(supabase, 'CalendarEvent', { spaceId: ctx.space.id })
       .insert({
         spaceId: ctx.space.id,
         title,

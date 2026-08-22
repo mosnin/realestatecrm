@@ -20,6 +20,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import {
@@ -83,11 +84,9 @@ export const draftCounterOfferTool = defineTool<typeof parameters, DraftCounterO
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, value, address')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -131,7 +130,7 @@ export const draftCounterOfferTool = defineTool<typeof parameters, DraftCounterO
 
     const draftId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + DRAFT_EXPIRY_DAYS * 86_400_000).toISOString();
-    const { error: insertErr } = await supabase.from('AgentDraft').insert({
+    const { error: insertErr } = await tenantTable(supabase, 'AgentDraft', { spaceId: ctx.space.id }).insert({
       id: draftId,
       spaceId: ctx.space.id,
       contactId,

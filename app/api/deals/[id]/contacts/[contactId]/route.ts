@@ -4,6 +4,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidRole } from '@/lib/deals/roles';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * Update the role on a DealContact row without touching the contact list
@@ -23,22 +24,18 @@ export async function PATCH(
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Verify the deal belongs to the caller's space before mutating.
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // DealContact has no spaceId column, so also verify the target contact
   // belongs to the caller's space — otherwise a cross-space contactId on a
   // shared deal link could have its role mutated.
-  const { data: contactInSpace } = await supabase
-    .from('Contact')
+  const { data: contactInSpace } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!contactInSpace) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

@@ -37,6 +37,8 @@ import {
 } from '@/lib/voice';
 import { getLLMClient } from '@/lib/llm';
 import OpenAI from 'openai';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -174,8 +176,8 @@ async function updateByCallId(
   fields: Record<string, unknown>,
 ): Promise<void> {
   if (!callControlId) return;
-  const { error } = await supabase
-    .from('CallLog')
+  const { error } = await unscoped(supabase
+    .from('CallLog'), 'webhook: lookup by provider id then verify')
     .update({ ...fields, updatedAt: new Date().toISOString() })
     .eq('telnyxCallId', callControlId);
   if (error) {

@@ -8,9 +8,12 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -40,11 +43,9 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: lookupErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: lookupErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, status')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (lookupErr) {
       return { summary: `Deal lookup failed: ${lookupErr.message}`, display: 'error' };
@@ -56,16 +57,14 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
       };
     }
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({
         status: 'lost',
         wonLostReason: args.reason,
         closedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error(
         '[tools.mark_deal_lost] update failed',
@@ -75,7 +74,7 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
       return { summary: `Update failed: ${updateErr.message}`, display: 'error' };
     }
 
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,
@@ -91,8 +90,8 @@ export const markDealLostTool = defineTool<typeof parameters, MarkDealLostResult
       );
     }
 
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

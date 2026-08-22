@@ -267,21 +267,22 @@ describe('POST /api/agent/approvals — approve', () => {
     expect(body.error).toMatch(/not found/i);
   });
 
-  it('prevents approval of task belonging to a different space (403)', async () => {
+  it('prevents approval of task belonging to a different space (404)', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID });
     // User's space is different from the task's spaceId
     mockGetSpaceForUser.mockResolvedValue({ ...fakeSpace, id: 'space-other-999' } as never);
 
-    // Task belongs to SPACE_ID, but the user's space is space-other-999
-    queue({ data: fakePausedTask, error: null });
+    // Scoped `.eq('spaceId', caller)` returns no row — do not seed the
+    // foreign task (that would reintroduce the old existence-oracle 403).
+    queue({ data: null, error: null });
 
     const res = await POST(
       makePostRequest({ taskId: 'task-paused-001', action: 'approve' }),
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error).toBe('Forbidden');
+    expect(body.error).toMatch(/not found/i);
   });
 
   it('returns 409 when task is not in paused status', async () => {
@@ -383,20 +384,20 @@ describe('POST /api/agent/approvals — reject', () => {
     expect(body.task.metadata.rejectionReason).toBeUndefined();
   });
 
-  it('prevents rejection of task belonging to a different space (403)', async () => {
+  it('prevents rejection of task belonging to a different space (404)', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID });
     mockGetSpaceForUser.mockResolvedValue({ ...fakeSpace, id: 'space-other-999' } as never);
 
-    // Task belongs to SPACE_ID; user's space is space-other-999
-    queue({ data: fakePausedTask, error: null });
+    // Scoped `.eq('spaceId', caller)` returns no row — 404, not a 403 oracle.
+    queue({ data: null, error: null });
 
     const res = await POST(
       makePostRequest({ taskId: 'task-paused-001', action: 'reject' }),
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error).toBe('Forbidden');
+    expect(body.error).toMatch(/not found/i);
   });
 
   it('returns 401 when unauthenticated', async () => {

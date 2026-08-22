@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { buildKey, uploadObject } from '@/lib/storage';
 import { validateWorkspaceCompletionManifest } from '@/lib/workspace-runs/typed-plan';
 
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   let body: any; try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const taskId = typeof body.task_id === 'string' ? body.task_id : ''; const spaceId = typeof body.space_id === 'string' ? body.space_id : ''; const launchToken = typeof body.launch_token === 'string' ? body.launch_token : ''; const sequence = Number(body.sequence); const type = typeof body.type === 'string' ? body.type : '';
   if (!taskId || !spaceId || !launchToken || !Number.isInteger(sequence) || sequence < 1 || !allowedTypes.has(type)) return NextResponse.json({ error: 'Invalid callback' }, { status: 400 });
-  const { data: task, error: taskError } = await supabase.from('WorkspaceRunTask').select('id,runId,sequence,status,launchToken,modalAcceptedAt,cancellationRequestedAt,executionPlan').eq('id', taskId).eq('spaceId', spaceId).maybeSingle();
+  const { data: task, error: taskError } = await tenantTable(supabase, 'WorkspaceRunTask', { spaceId }).select('id,runId,sequence,status,launchToken,modalAcceptedAt,cancellationRequestedAt,executionPlan').eq('id', taskId).maybeSingle();
   if (taskError) return NextResponse.json({ error: 'Could not verify task launch' }, { status: 500 });
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (task.launchToken !== launchToken) return NextResponse.json({ ok: true, ignored: 'stale_launch', cancellationRequested: true });
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
   // Re-read immediately before object persistence so cancellation wins even
   // when it arrived while the isolated VM was finishing its program.
   const currentResult = type === 'completed'
-    ? await supabase.from('WorkspaceRunTask').select('launchToken,modalAcceptedAt,cancellationRequestedAt,status').eq('id', taskId).eq('spaceId', spaceId).maybeSingle()
+    ? await tenantTable(supabase, 'WorkspaceRunTask', { spaceId }).select('launchToken,modalAcceptedAt,cancellationRequestedAt,status').eq('id', taskId).maybeSingle()
     : { data: task, error: null };
   if (currentResult.error) return NextResponse.json({ error: 'Could not verify publication state' }, { status: 500 });
   const current = currentResult.data;

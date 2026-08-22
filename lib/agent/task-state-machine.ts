@@ -1,4 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // ── Status types ──────────────────────────────────────────────────────────────
 
@@ -46,8 +49,8 @@ export async function transitionTask(
   },
 ): Promise<{ ok: boolean; error?: string }> {
   // 1. Read current status.
-  const { data: row, error: fetchError } = await supabase
-    .from('AgentTask')
+  const { data: row, error: fetchError } = await unscoped(supabase
+    .from('AgentTask'), 'post-fetch: caller verified parent scope before this id query')
     .select('status')
     .eq('id', taskId)
     .single();
@@ -83,8 +86,8 @@ export async function transitionTask(
   // 4. Write to AgentTask — compare-and-swap on the status read in step 1.
   // If a concurrent transition already moved the task, the status filter
   // matches no rows and we report the lost race instead of overwriting it.
-  const { data: updated, error: updateError } = await supabase
-    .from('AgentTask')
+  const { data: updated, error: updateError } = await unscoped(supabase
+    .from('AgentTask'), 'post-fetch: caller verified parent scope before this id query')
     .update(update)
     .eq('id', taskId)
     .eq('status', current)
@@ -119,8 +122,7 @@ export async function enqueueTask(
 ): Promise<string> {
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
-    .from('AgentTask')
+  const { data, error } = await tenantTable(supabase, 'AgentTask', { spaceId })
     .insert({
       spaceId,
       title:           input.title,

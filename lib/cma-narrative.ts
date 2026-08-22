@@ -29,6 +29,7 @@ import {
 import { recordChatUsage } from '@/lib/usage/record-chat-usage';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { DATA_SOURCE_LABEL, type CmaPayload } from '@/lib/cma-types';
 
 /** Raised only for real failures (no key, empty/errored completion) — never
@@ -205,11 +206,9 @@ export async function persistCmaNarrative(
   opts: PersistCmaNarrativeOpts,
 ): Promise<boolean> {
   const { spaceId, id, narrative } = opts;
-  const { data, error } = await supabase
-    .from('CmaReport')
+  const { data, error } = await tenantTable(supabase, 'CmaReport', { spaceId })
     .update({ narrative, narrativeUpdatedAt: new Date().toISOString() })
     .eq('id', id)
-    .eq('spaceId', spaceId)
     .select('id')
     .maybeSingle();
 

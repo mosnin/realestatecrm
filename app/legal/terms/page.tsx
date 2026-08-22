@@ -23,7 +23,7 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">1. Definitions</h2>
         <ul className="mt-3 list-disc pl-5 text-sm text-muted-foreground space-y-2 leading-6">
-          <li><strong className="text-foreground">&quot;Service&quot;</strong> means the Chippi platform, including the web application at www.usechippi.com, all related APIs, integrations, AI features (including lead scoring, voice AI assistant, and MCP server integration), deal pipelines, tour scheduling, and documentation.</li>
+          <li><strong className="text-foreground">&quot;Service&quot;</strong> means the Chippi platform, including the web application at www.usechippi.com, all related APIs, integrations, AI features (including lead scoring, optional voice assistant when configured, and MCP server integration), deal pipelines, tour scheduling, and documentation.</li>
           <li><strong className="text-foreground">&quot;User&quot;</strong> means any individual or entity that accesses or uses the Service, including Subscribers and Applicants.</li>
           <li><strong className="text-foreground">&quot;Subscriber&quot;</strong> means a real estate agent, brokerage, or other entity that creates an account and subscribes to the Service to manage real estate operations, including intake forms, lead management, deal pipelines, and brokerage team management.</li>
           <li><strong className="text-foreground">&quot;Applicant&quot;</strong> means any individual who submits information through a Subscriber&apos;s intake forms or interacts with the Service on behalf of or at the direction of a Subscriber.</li>
@@ -48,7 +48,7 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">3. Subscription Terms</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>3.1. <strong className="text-foreground">Free Trial.</strong> New Subscribers are eligible for a 7-day free trial. During the trial period, you will have access to the full features of the Service, including AI lead scoring, deal pipelines, tour scheduling, voice AI assistant, and MCP server integration. No payment is required during the trial.</p>
+          <p>3.1. <strong className="text-foreground">Free Trial.</strong> New Subscribers are eligible for a 7-day free trial. During the trial period, you will have access to the CRM and credit-metered AI tools on your plan, including AI lead scoring, deal pipelines, tour scheduling, and MCP server integration. Voice calling is available only when Telnyx is configured for your deployment. No payment is required during the trial.</p>
           <p>3.2. <strong className="text-foreground">Paid Subscription.</strong> Following the trial period, continued access to the Service requires a paid subscription at $97 per month (or such other pricing as may be displayed at the time of purchase).</p>
           <p>3.3. <strong className="text-foreground">Auto-Renewal.</strong> Subscriptions automatically renew on a monthly basis. You will be charged at the beginning of each billing cycle unless you cancel before the renewal date.</p>
           <p>3.4. <strong className="text-foreground">Cancellation.</strong> You may cancel your subscription at any time through your account settings. Cancellation takes effect at the end of the current billing period. No refunds are provided for partial billing periods.</p>
@@ -116,11 +116,11 @@ export default function TermsPage() {
           <p>8.1. The Service integrates with the following third-party services:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong className="text-foreground">Stripe</strong> &mdash; payment processing and subscription billing.</li>
-            <li><strong className="text-foreground">OpenAI</strong> &mdash; AI-powered lead scoring and voice AI assistant features.</li>
+            <li><strong className="text-foreground">OpenAI</strong> &mdash; AI-powered lead scoring and optional voice assistant features when enabled.</li>
             <li><strong className="text-foreground">Clerk</strong> &mdash; authentication and user session management.</li>
             <li><strong className="text-foreground">Supabase</strong> &mdash; data hosting and database infrastructure.</li>
             <li><strong className="text-foreground">Resend</strong> &mdash; transactional email delivery.</li>
-            <li><strong className="text-foreground">Telnyx</strong> &mdash; SMS delivery and voice communications.</li>
+            <li><strong className="text-foreground">Telnyx</strong> &mdash; SMS delivery and voice communications (when configured).</li>
           </ul>
           <p>8.2. Your use of these third-party services is subject to their respective terms of service and privacy policies.</p>
           <p>8.3. Chippi is not responsible for the practices or availability of third-party services.</p>
@@ -132,7 +132,7 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">9. AI Features Disclaimer</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>9.1. The Service includes AI-powered features such as lead scoring, voice AI assistance, MCP server integration, and other analytical tools. These features are provided for <strong className="text-foreground">informational and advisory purposes only</strong>.</p>
+          <p>9.1. The Service includes AI-powered features such as lead scoring, optional voice assistance when configured, MCP server integration, and other analytical tools. These features are provided for <strong className="text-foreground">informational and advisory purposes only</strong>.</p>
           <p>9.2. AI-generated scores, recommendations, and outputs <strong className="text-foreground">do not constitute automated legal decision-making</strong>. They are tools to assist Subscribers in their professional judgment and do not replace human decision-making. No legal, housing, or financial decisions should be made solely on the basis of AI outputs.</p>
           <p>9.3. Chippi does not guarantee the accuracy, completeness, or reliability of any AI-generated output. Subscribers are solely responsible for any decisions they make based on AI features.</p>
           <p>9.4. Applicant data processed by AI features is used solely for the purpose of providing the Service to the Subscriber. It is <strong className="text-foreground">not used to train AI models</strong>.</p>

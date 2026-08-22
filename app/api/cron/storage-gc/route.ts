@@ -32,6 +32,8 @@ import {
 } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -81,8 +83,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.files,
     label: 'files',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('File')
+      const { data } = await unscoped(supabase
+        .from('File'), 'cron: cross-tenant discovery then per-row work')
         .select('storageKey')
         .in('storageKey', candidates);
       return new Set(
@@ -98,8 +100,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.studio,
     label: 'studio',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('File')
+      const { data } = await unscoped(supabase
+        .from('File'), 'cron: cross-tenant discovery then per-row work')
         .select('storageKey')
         .in('storageKey', candidates);
       return new Set(
@@ -117,8 +119,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.chatAttachments,
     label: 'chat-attachments',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('Attachment')
+      const { data } = await unscoped(supabase
+        .from('Attachment'), 'cron: cross-tenant discovery then per-row work')
         .select('storagePath')
         .in('storagePath', candidates);
       return new Set(
@@ -132,8 +134,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.contactDocuments,
     label: 'contact-documents',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('ContactDocument')
+      const { data } = await unscoped(supabase
+        .from('ContactDocument'), 'cron: cross-tenant discovery then per-row work')
         .select('storageKey')
         .in('storageKey', candidates);
       return new Set(
@@ -147,8 +149,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.dealDocuments,
     label: 'deal-documents',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('DealDocument')
+      const { data } = await unscoped(supabase
+        .from('DealDocument'), 'cron: cross-tenant discovery then per-row work')
         .select('storagePath')
         .in('storagePath', candidates);
       return new Set(
@@ -168,7 +170,7 @@ const PREFIX_SPECS: PrefixSpec[] = [
       // row's photos array for any space that has at least one row
       // (Supabase doesn't have a clean "URL contains key" predicate),
       // build the reverse map, then check membership.
-      const { data } = await supabase.from('Property').select('photos').limit(5000);
+      const { data } = await unscoped(supabase.from('Property'), 'cron: cross-tenant discovery then per-row work').select('photos').limit(5000);
       const referenced = new Set<string>();
       for (const row of (data ?? []) as { photos: unknown }[]) {
         const urls = Array.isArray(row.photos)
@@ -197,8 +199,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.profileCover,
     label: 'profile-cover',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('ProfilePage')
+      const { data } = await unscoped(supabase
+        .from('ProfilePage'), 'cron: cross-tenant discovery then per-row work')
         .select('coverPhotoUrl')
         .in('coverPhotoUrl', candidates);
       return new Set(
@@ -212,8 +214,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.profilePhoto,
     label: 'profile-photo',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('ProfilePage')
+      const { data } = await unscoped(supabase
+        .from('ProfilePage'), 'cron: cross-tenant discovery then per-row work')
         .select('profilePhotoUrl')
         .in('profilePhotoUrl', candidates);
       return new Set(
@@ -237,8 +239,8 @@ const PREFIX_SPECS: PrefixSpec[] = [
     prefix: STORAGE_PREFIXES.onboarding,
     label: 'onboarding',
     referencedKeys: async (candidates) => {
-      const { data } = await supabase
-        .from('SpaceSetting')
+      const { data } = await unscoped(supabase
+        .from('SpaceSetting'), 'cron: cross-tenant discovery then per-row work')
         .select('logoUrl, realtorPhotoUrl, intakeFaviconUrl')
         .limit(5000);
       const referenced = new Set<string>();

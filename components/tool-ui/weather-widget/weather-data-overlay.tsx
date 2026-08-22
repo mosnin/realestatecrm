@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FONT_SANS_STACK } from "@/lib/typography";
 import type {
   ForecastDay,
   TemperatureUnit,
@@ -371,8 +372,7 @@ export function WeatherDataOverlay({
   const temperatureFontSize = "clamp(48px, 32cqmin, 72px)";
   const degreeFontSize = "clamp(18px, 12cqmin, 28px)";
   const hiLoFontSize = "clamp(11px, 6.5cqmin, 15px)";
-  const forecastFontFamily =
-    '"SF Pro Text", Inter, "Noto Sans", system-ui, sans-serif';
+  const forecastFontFamily = FONT_SANS_STACK;
 
   return (
     <div

@@ -3,6 +3,9 @@ import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 type ContactNoteRow = {
   id: string;
@@ -38,11 +41,11 @@ async function resolveBrokerContactAccess(params: {
   const brokerSpaceId = ownerSpace?.id ?? null;
 
   if (brokerSpaceId) {
-    const { data: brokerSpaceContact, error: brokerSpaceError } = await supabase
-      .from('Contact')
+    const { data: brokerSpaceContact, error: brokerSpaceError } = await tenantTable(supabase, 'Contact', {
+      spaceId: brokerSpaceId,
+    })
       .select(select)
       .eq('id', contactId)
-      .eq('spaceId', brokerSpaceId)
       .maybeSingle();
     if (brokerSpaceError) throw brokerSpaceError;
     if (brokerSpaceContact) {
@@ -54,8 +57,8 @@ async function resolveBrokerContactAccess(params: {
     }
   }
 
-  const { data: brokerageContact, error: brokerageContactError } = await supabase
-    .from('Contact')
+  const { data: brokerageContact, error: brokerageContactError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .select(select)
     .eq('id', contactId)
     .eq('brokerageId', brokerage.id)
@@ -69,8 +72,8 @@ async function resolveBrokerContactAccess(params: {
     };
   }
 
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'broker: membership-proved cross-space access')
     .select(select)
     .eq('id', contactId)
     .maybeSingle();
@@ -171,8 +174,8 @@ export async function POST(req: NextRequest) {
       ? `${newNote}\n\n${existingNotes}`
       : newNote;
 
-    const { error: updateError } = await supabase
-      .from('Contact')
+    const { error: updateError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .update({
         notes: updatedNotes,
         updatedAt: now.toISOString(),
@@ -192,11 +195,11 @@ export async function POST(req: NextRequest) {
           assignedSpaceId?: string;
         };
         if (meta.assignedContactId && meta.assignedSpaceId) {
-          const { data: realtorContact } = await supabase
-            .from('Contact')
+          const { data: realtorContact } = await tenantTable(supabase, 'Contact', {
+            spaceId: meta.assignedSpaceId,
+          })
             .select('id, notes')
             .eq('id', meta.assignedContactId)
-            .eq('spaceId', meta.assignedSpaceId)
             .maybeSingle();
 
           if (realtorContact) {
@@ -205,14 +208,12 @@ export async function POST(req: NextRequest) {
               ? `${newNote}\n\n${realtorExisting}`
               : newNote;
 
-            await supabase
-              .from('Contact')
+            await tenantTable(supabase, 'Contact', { spaceId: meta.assignedSpaceId })
               .update({
                 notes: realtorUpdated,
                 updatedAt: now.toISOString(),
               })
-              .eq('id', meta.assignedContactId)
-              .eq('spaceId', meta.assignedSpaceId);
+              .eq('id', meta.assignedContactId);
           }
         }
       } catch {

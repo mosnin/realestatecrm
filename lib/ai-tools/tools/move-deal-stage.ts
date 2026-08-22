@@ -20,9 +20,12 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { syncDeal } from '@/lib/vectorize';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const parameters = z
   .object({
@@ -53,11 +56,9 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
   async handler(args, ctx) {
     // Deal must exist in this space.
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title, stageId, status')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -81,11 +82,9 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Stage must belong to the same space. A stale id from another workspace
     // should never satisfy this check.
-    const { data: newStage, error: stageErr } = await supabase
-      .from('DealStage')
+    const { data: newStage, error: stageErr } = await tenantTable(supabase, 'DealStage', { spaceId: ctx.space.id })
       .select('id, name')
       .eq('id', args.stageId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (stageErr) {
       return { summary: `Stage lookup failed: ${stageErr.message}`, display: 'error' };
@@ -96,17 +95,15 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Fetch the old stage's name for the activity log. Non-fatal if we can't
     // find it — the move still works; we just log "Unknown" as the origin.
-    const { data: oldStage } = await supabase
-      .from('DealStage')
+    const { data: oldStage } = await unscoped(supabase
+      .from('DealStage'), 'post-fetch: caller verified parent scope before this id query')
       .select('name')
       .eq('id', deal.stageId)
       .maybeSingle();
 
-    const { error: updateErr } = await supabase
-      .from('Deal')
+    const { error: updateErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .update({ stageId: args.stageId, stageChangedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-      .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.dealId);
     if (updateErr) {
       logger.error('[tools.move_deal_stage] update failed', { dealId: args.dealId }, updateErr);
       return { summary: `Stage update failed: ${updateErr.message}`, display: 'error' };
@@ -114,7 +111,7 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
 
     // Activity log — non-fatal. PostgREST returns { error } rather than
     // throwing on RLS/constraint failures, so we check the error field.
-    const { error: activityErr } = await supabase.from('DealActivity').insert({
+    const { error: activityErr } = await tenantTable(supabase, 'DealActivity', { spaceId: ctx.space.id }).insert({
       id: crypto.randomUUID(),
       dealId: args.dealId,
       spaceId: ctx.space.id,
@@ -131,8 +128,8 @@ export const moveDealStageTool = defineTool<typeof parameters, MoveDealStageResu
     }
 
     // Search reindex — best effort. We load the minimum the indexer needs.
-    const { data: refreshed } = await supabase
-      .from('Deal')
+    const { data: refreshed } = await unscoped(supabase
+      .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
       .select('*')
       .eq('id', args.dealId)
       .maybeSingle();

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { refreshEnvelopeStatus } from '@/lib/esign';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -26,11 +27,9 @@ export async function GET(
   const { userId, space } = auth;
 
   // Scope the request to this space before any DocuSign work.
-  const { data: row } = await supabase
-    .from('SignatureRequest')
+  const { data: row } = await tenantTable(supabase, 'SignatureRequest', { spaceId: space.id })
     .select('id, spaceId')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -50,13 +49,11 @@ export async function GET(
   }
   // no_envelope / refresh_failed — return the stored row's status unchanged so
   // the UI still renders a pill rather than erroring.
-  const { data: stored } = await supabase
-    .from('SignatureRequest')
+  const { data: stored } = await tenantTable(supabase, 'SignatureRequest', { spaceId: space.id })
     .select(
       'id, spaceId, dealId, contactId, documentId, envelopeId, subject, signerEmail, signerName, status, signedDocumentUrl, completedAt, createdAt, updatedAt',
     )
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   return NextResponse.json({ request: stored ?? null });
 }

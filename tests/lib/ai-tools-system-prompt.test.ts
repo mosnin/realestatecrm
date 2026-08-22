@@ -154,6 +154,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/Never guess which record the user meant/i);
   });
 
+  it('tells the model not to advertise internal tool failures to the realtor', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/Never mention tool names, JSON, schemas/i);
+    expect(prompt).toMatch(/Do not loop on the same failed call/i);
+    expect(prompt).not.toMatch(/On tool error, surface briefly/i);
+  });
+
   it('stays compact — enough for tone guidance, not a manifesto', () => {
     const prompt = buildSystemPrompt(makeCtx());
     // Sanity upper bound. The cap was raised to 8000 chars when the prompt

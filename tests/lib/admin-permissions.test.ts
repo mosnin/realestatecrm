@@ -34,13 +34,33 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: () => chain() } };
 });
 
-import { getAdminRole, requireAdminCapability, ADMIN_CAPABILITIES } from '@/lib/permissions';
+import {
+  getAdminRole,
+  requireAdminCapability,
+  ADMIN_CAPABILITIES,
+  isUserPlatformAdmin,
+} from '@/lib/permissions';
 
 beforeEach(() => {
   vi.clearAllMocks();
   authMock.mockResolvedValue({ userId: 'admin_clerk' } as any);
   dbState.row = null;
   dbState.error = null;
+});
+
+describe('isUserPlatformAdmin', () => {
+  it('is true for a live admin clerk user', async () => {
+    dbState.row = { platformRole: 'admin', status: 'active' };
+    expect(await isUserPlatformAdmin('admin_clerk')).toBe(true);
+  });
+
+  it('is false for a regular user, offboarded admin, or missing id', async () => {
+    dbState.row = { platformRole: 'user', status: 'active' };
+    expect(await isUserPlatformAdmin('u_clerk')).toBe(false);
+    dbState.row = { platformRole: 'admin', status: 'offboarded' };
+    expect(await isUserPlatformAdmin('admin_clerk')).toBe(false);
+    expect(await isUserPlatformAdmin(null)).toBe(false);
+  });
 });
 
 describe('getAdminRole', () => {

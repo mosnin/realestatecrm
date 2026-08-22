@@ -16,6 +16,9 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const parameters = z
   .object({
@@ -52,11 +55,9 @@ export const requestDealReviewTool = defineTool<typeof parameters, RequestDealRe
   },
 
   async handler(args, ctx) {
-    const { data: deal, error: dealErr } = await supabase
-      .from('Deal')
+    const { data: deal, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId: ctx.space.id })
       .select('id, title')
       .eq('id', args.dealId)
-      .eq('spaceId', ctx.space.id)
       .maybeSingle();
     if (dealErr) {
       return { summary: `Deal lookup failed: ${dealErr.message}`, display: 'error' };
@@ -83,8 +84,8 @@ export const requestDealReviewTool = defineTool<typeof parameters, RequestDealRe
 
     // Check for an existing open review on this deal (the partial unique
     // index would block the insert anyway; surface the duplicate cleanly).
-    const { data: existing } = await supabase
-      .from('DealReviewRequest')
+    const { data: existing } = await unscoped(supabase
+      .from('DealReviewRequest'), 'post-fetch: caller verified parent scope before this id query')
       .select('id')
       .eq('dealId', args.dealId)
       .eq('status', 'open')
@@ -103,7 +104,7 @@ export const requestDealReviewTool = defineTool<typeof parameters, RequestDealRe
 
     const reviewId = crypto.randomUUID();
     const ownerId = (space as { ownerId: string }).ownerId;
-    const { error: insertErr } = await supabase.from('DealReviewRequest').insert({
+    const { error: insertErr } = await tenantTable(supabase, 'DealReviewRequest', { brokerageId }).insert({
       id: reviewId,
       dealId: args.dealId,
       requestingUserId: ownerId,

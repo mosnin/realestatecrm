@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(
   _req: NextRequest,
@@ -23,45 +24,37 @@ export async function GET(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id: contactId } = await params;
 
   // Verify contact belongs to this space
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id, name')
     .eq('id', contactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (contactError) throw contactError;
   if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
 
   const [memoriesResult, draftsResult, activityResult] = await Promise.all([
-    supabase
-      .from('AgentMemory')
+    tenantTable(supabase, 'AgentMemory', { spaceId: space.id })
       .select('id, memoryType, content, importance, createdAt')
-      .eq('spaceId', space.id)
       .eq('entityType', 'contact')
       .eq('entityId', contactId)
       .order('importance', { ascending: false })
       .order('createdAt', { ascending: false })
       .limit(20),
 
-    supabase
-      .from('AgentDraft')
+    tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
       .select('id, channel, subject, content, reasoning, priority, status, createdAt')
-      .eq('spaceId', space.id)
       .eq('contactId', contactId)
       .in('status', ['pending', 'approved'])
       .order('createdAt', { ascending: false })
       .limit(10),
 
-    supabase
-      .from('AgentActivityLog')
+    tenantTable(supabase, 'AgentActivityLog', { spaceId: space.id })
       .select('id, agentType, action, outcome, summary, contactId, createdAt')
-      .eq('spaceId', space.id)
       .eq('contactId', contactId)
       .order('createdAt', { ascending: false })
       .limit(15),

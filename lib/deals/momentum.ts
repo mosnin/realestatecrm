@@ -21,11 +21,12 @@
  * its verdict — health is a point-in-time attention flag, momentum is a
  * trend explanation over the deal's own history.
  *
- * Every read is spaceId-scoped — the `.eq('spaceId', spaceId)` IS the
+ * Every read is spaceId-scoped — `tenantTable()` IS the
  * tenant boundary (CLAUDE.md).
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -164,10 +165,8 @@ async function computeStageBaselines(
   spaceId: string,
   excludeDealId: string,
 ): Promise<Map<string, number>> {
-  const { data: wonDeals, error: wonErr } = await supabase
-    .from('Deal')
+  const { data: wonDeals, error: wonErr } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, stageId, createdAt, closedAt')
-    .eq('spaceId', spaceId)
     .eq('status', 'won')
     .neq('id', excludeDealId)
     .not('closedAt', 'is', null)
@@ -188,10 +187,8 @@ async function computeStageBaselines(
   if (rows.length === 0) return new Map();
 
   const dealIds = rows.map((r) => r.id);
-  const { data: changeRows, error: changeErr } = await supabase
-    .from('DealActivity')
+  const { data: changeRows, error: changeErr } = await tenantTable(supabase, 'DealActivity', { spaceId })
     .select('dealId, createdAt, metadata')
-    .eq('spaceId', spaceId)
     .eq('type', 'stage_change')
     .in('dealId', dealIds)
     .order('createdAt', { ascending: true });
@@ -304,7 +301,7 @@ function deriveVerdict(input: {
  * Compute the momentum timeline for one deal.
  *
  * Returns null when the deal doesn't exist in this space — tenant scoping,
- * the .eq('spaceId', spaceId) IS the security boundary.
+ * tenantTable() IS the security boundary.
  */
 export async function computeMomentum(
   spaceId: string,
@@ -314,11 +311,9 @@ export async function computeMomentum(
   const now = opts.now ?? new Date();
   const nowMs = now.getTime();
 
-  const { data: dealRow, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: dealRow, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, status, stageId, createdAt, closedAt')
     .eq('id', dealId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (dealErr) {
     logger.warn('[momentum] deal load failed', { dealId, err: dealErr.message });
@@ -338,13 +333,11 @@ export async function computeMomentum(
   const endMs = toMs(deal.closedAt) ?? nowMs;
 
   const [activityResult, stagesResult] = await Promise.all([
-    supabase
-      .from('DealActivity')
+    tenantTable(supabase, 'DealActivity', { spaceId })
       .select('type, createdAt, metadata')
       .eq('dealId', dealId)
-      .eq('spaceId', spaceId)
       .order('createdAt', { ascending: true }),
-    supabase.from('DealStage').select('id, name').eq('spaceId', spaceId),
+    tenantTable(supabase, 'DealStage', { spaceId }).select('id, name'),
   ]);
 
   if (activityResult.error) {

@@ -86,7 +86,7 @@ export default async function StudioPage({
         >
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-background/60">Start here</p>
-            <h2 className="mt-4 max-w-lg text-3xl leading-tight tracking-[-0.04em]">Create the lead image people stop scrolling for.</h2>
+            <h2 className="font-title mt-4 max-w-lg text-3xl leading-tight tracking-[-0.04em]">Create the lead image people stop scrolling for.</h2>
           </div>
           <div className="flex items-end justify-between gap-6">
             <p className="max-w-sm text-sm leading-6 text-background/70">Describe the listing, neighborhood, or moment. Chippi creates a saved asset you can carry into the rest of Studio.</p>

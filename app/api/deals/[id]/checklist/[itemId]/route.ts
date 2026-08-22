@@ -3,15 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveSpace(userId: string, dealId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('id')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!deal) return null;
   return space;
@@ -56,12 +55,10 @@ export async function PATCH(
     }
   }
 
-  const { data, error } = await supabase
-    .from('DealChecklistItem')
+  const { data, error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
     .update(patch)
     .eq('id', itemId)
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
 
@@ -85,12 +82,10 @@ export async function DELETE(
   const space = await resolveSpace(userId, id);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('DealChecklistItem')
+  const { error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
     .delete()
     .eq('id', itemId)
-    .eq('dealId', id)
-    .eq('spaceId', space.id);
+    .eq('dealId', id);
 
   if (error) {
     logger.error('[deals/checklist] delete failed', { dealId: id, itemId }, error);

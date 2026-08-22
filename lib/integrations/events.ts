@@ -17,9 +17,12 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { normalizeTriggerEvent } from './triggers';
 import type { IntegrationEvent, IntegrationEventStatus } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export interface CaptureEventArgs {
   spaceId: string;
@@ -52,8 +55,7 @@ export async function captureEvent(args: CaptureEventArgs): Promise<boolean> {
       args.slug,
       args.payload,
     );
-    const { error } = await supabase
-      .from('IntegrationEvent')
+    const { error } = await tenantTable(supabase, 'IntegrationEvent', { spaceId: args.spaceId })
       .upsert(
         {
           spaceId: args.spaceId,
@@ -138,10 +140,8 @@ export interface ListEventsArgs {
  * renders an empty feed instead of throwing.
  */
 export async function listEvents(args: ListEventsArgs): Promise<ActivityFeedEvent[]> {
-  let query = supabase
-    .from('IntegrationEvent')
+  let query = tenantTable(supabase, 'IntegrationEvent', { spaceId: args.spaceId })
     .select(FEED_COLUMNS)
-    .eq('spaceId', args.spaceId)
     .order('occurredAt', { ascending: false })
     .limit(args.limit);
 
@@ -171,8 +171,8 @@ export async function setEventStatus(
   status: IntegrationEventStatus,
 ): Promise<void> {
   try {
-    const { error } = await supabase
-      .from('IntegrationEvent')
+    const { error } = await unscoped(supabase
+      .from('IntegrationEvent'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status, updatedAt: new Date().toISOString() })
       .eq('deliveryId', deliveryId);
     if (error) {

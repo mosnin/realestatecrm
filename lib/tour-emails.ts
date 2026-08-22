@@ -11,6 +11,9 @@
  *   4. Agent notification — sent to space owner when a tour is booked
  */
 
+import { FONT_SANS_STACK } from '@/lib/typography';
+import { formatTourDate, formatTourTime } from '@/lib/tours/format-wallclock';
+
 export interface TourEmailData {
   guestName: string;
   guestEmail: string;
@@ -25,6 +28,9 @@ export interface TourEmailData {
    *  (cancel / rebook / post-tour feedback). When present, the guest
    *  emails link there instead of only saying "reply to this email". */
   manageToken?: string | null;
+  /** IANA timezone for the workspace (e.g. America/New_York). Used so
+   *  confirmation / reminder / cancel copy matches the slot the guest picked. */
+  timezone?: string | null;
 }
 
 /** Escape HTML special characters to prevent XSS in email templates. */
@@ -38,13 +44,12 @@ function esc(value: string | null | undefined): string {
     .replace(/'/g, '&#x27;');
 }
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+function formatDate(iso: string, timezone?: string | null): string {
+  return formatTourDate(iso, timezone);
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+function formatTime(iso: string, timezone?: string | null): string {
+  return formatTourTime(iso, timezone);
 }
 
 /** Shared email wrapper matching the design from lib/email.ts */
@@ -52,7 +57,7 @@ function wrapHtml(header: string, subtitle: string, bodyContent: string, footer:
   return `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -123,8 +128,8 @@ async function sendEmail(to: string, subject: string, html: string) {
 }
 
 export async function sendTourConfirmation(data: TourEmailData) {
-  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
-  const subject = `Tour Confirmed — ${formatDate(startsAt)}`;
+  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress, timezone } = data;
+  const subject = `Tour Confirmed — ${formatDate(startsAt, timezone)}`;
 
   const url = manageUrl(data.manageToken);
   const manageOrReply = url
@@ -135,8 +140,8 @@ export async function sendTourConfirmation(data: TourEmailData) {
     <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
     <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been confirmed:</p>
     ${detailBox([
-      { label: 'Date', value: formatDate(startsAt) },
-      { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Date', value: formatDate(startsAt, timezone) },
+      { label: 'Time', value: `${formatTime(startsAt, timezone)} – ${formatTime(endsAt, timezone)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
     ${manageOrReply}
@@ -147,15 +152,15 @@ export async function sendTourConfirmation(data: TourEmailData) {
 }
 
 export async function sendTourReminder(data: TourEmailData) {
-  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
-  const subject = `Reminder: Tour Tomorrow — ${formatTime(startsAt)}`;
+  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress, timezone } = data;
+  const subject = `Reminder: Tour Tomorrow — ${formatTime(startsAt, timezone)}`;
 
   const body = `
     <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
     <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Friendly reminder — you have a tour scheduled tomorrow with <strong>${esc(businessName)}</strong>:</p>
     ${detailBox([
-      { label: 'Date', value: formatDate(startsAt) },
-      { label: 'Time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'Date', value: formatDate(startsAt, timezone) },
+      { label: 'Time', value: `${formatTime(startsAt, timezone)} – ${formatTime(endsAt, timezone)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
     <p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5">We look forward to seeing you!</p>
@@ -167,15 +172,15 @@ export async function sendTourReminder(data: TourEmailData) {
 }
 
 export async function sendTourRescheduled(data: TourEmailData) {
-  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress } = data;
-  const subject = `Tour Rescheduled — ${formatDate(startsAt)}`;
+  const { guestName, guestEmail, businessName, startsAt, endsAt, propertyAddress, timezone } = data;
+  const subject = `Tour Rescheduled — ${formatDate(startsAt, timezone)}`;
 
   const body = `
     <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
     <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been moved to a new time:</p>
     ${detailBox([
-      { label: 'New date', value: formatDate(startsAt) },
-      { label: 'New time', value: `${formatTime(startsAt)} – ${formatTime(endsAt)}` },
+      { label: 'New date', value: formatDate(startsAt, timezone) },
+      { label: 'New time', value: `${formatTime(startsAt, timezone)} – ${formatTime(endsAt, timezone)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
     <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">If this new time doesn't work, just reply to this email and we'll sort it out.</p>
@@ -186,14 +191,14 @@ export async function sendTourRescheduled(data: TourEmailData) {
 }
 
 export async function sendTourCancelled(data: TourEmailData) {
-  const { guestName, guestEmail, businessName, startsAt, propertyAddress } = data;
-  const subject = `Tour Cancelled — ${formatDate(startsAt)}`;
+  const { guestName, guestEmail, businessName, startsAt, propertyAddress, timezone } = data;
+  const subject = `Tour Cancelled — ${formatDate(startsAt, timezone)}`;
 
   const body = `
     <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">Hi ${esc(guestName)},</p>
     <p style="margin:0 0 4px;font-size:15px;color:#111827;line-height:1.6">Your tour with <strong>${esc(businessName)}</strong> has been cancelled:</p>
     ${detailBox([
-      { label: 'Was scheduled for', value: `${formatDate(startsAt)} at ${formatTime(startsAt)}` },
+      { label: 'Was scheduled for', value: `${formatDate(startsAt, timezone)} at ${formatTime(startsAt, timezone)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
     <p style="margin:0;font-size:14px;color:#374151;line-height:1.5">Would you like to rebook? Reply to this email and we'll find a new time that works for you.</p>
@@ -223,8 +228,8 @@ export async function sendTourFollowUp(data: TourEmailData) {
 }
 
 export async function sendAgentNotification(agentEmail: string, data: TourEmailData) {
-  const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress, businessName, slug } = data;
-  const subject = `New Tour Booked — ${guestName} on ${formatDate(startsAt)}`;
+  const { guestName, guestEmail, guestPhone = null, startsAt, propertyAddress, businessName, slug, timezone } = data;
+  const subject = `New Tour Booked — ${guestName} on ${formatDate(startsAt, timezone)}`;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
   const toursUrl = `${appUrl}/s/${slug}/calendar`;
 
@@ -233,7 +238,7 @@ export async function sendAgentNotification(agentEmail: string, data: TourEmailD
       { label: 'Guest', value: guestName },
       { label: 'Email', value: guestEmail },
       { label: 'Phone', value: guestPhone ?? '' },
-      { label: 'Date', value: `${formatDate(startsAt)} at ${formatTime(startsAt)}` },
+      { label: 'Date', value: `${formatDate(startsAt, timezone)} at ${formatTime(startsAt, timezone)}` },
       { label: 'Property', value: propertyAddress ?? '' },
     ])}
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
@@ -244,5 +249,32 @@ export async function sendAgentNotification(agentEmail: string, data: TourEmailD
   `;
 
   const html = wrapHtml(businessName || 'Tour', 'New tour booking', body, `You're receiving this because a guest booked a tour on your workspace.`);
+  await sendEmail(agentEmail, subject, html);
+}
+
+export async function sendAgentTourCancelled(agentEmail: string, data: TourEmailData) {
+  const { guestName, guestEmail, startsAt, propertyAddress, businessName, slug, timezone } = data;
+  const subject = `Tour cancelled — ${guestName} on ${formatDate(startsAt, timezone)}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
+  const toursUrl = `${appUrl}/s/${slug}/calendar`;
+
+  const body = `
+    <p style="margin:0 0 12px;font-size:15px;color:#111827;line-height:1.6">
+      ${esc(guestName)} cancelled their tour.
+    </p>
+    ${detailBox([
+      { label: 'Guest', value: guestName },
+      { label: 'Email', value: guestEmail },
+      { label: 'Was scheduled for', value: `${formatDate(startsAt, timezone)} at ${formatTime(startsAt, timezone)}` },
+      { label: 'Property', value: propertyAddress ?? '' },
+    ])}
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px">
+      <tr><td>
+        <a href="${toursUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">View tours →</a>
+      </td></tr>
+    </table>
+  `;
+
+  const html = wrapHtml(businessName || 'Tour', 'Tour cancelled', body, `You're receiving this because a guest cancelled a tour on your workspace.`);
   await sendEmail(agentEmail, subject, html);
 }

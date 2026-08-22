@@ -5,6 +5,9 @@ import { clientOwnsContact } from '@/lib/client-portal-data';
 import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export const runtime = 'nodejs';
 
@@ -24,8 +27,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data } = await supabase
-    .from('ClientInfoRequest')
+  const { data } = await unscoped(supabase
+    .from('ClientInfoRequest'), 'post-fetch: client portal ownership proof')
     .select('id, message, status, response, createdAt, fulfilledAt')
     .eq('contactId', contactId)
     .neq('status', 'dismissed')
@@ -56,8 +59,8 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
   // Load the request + verify ownership via its contact.
-  const { data: reqRow } = await supabase
-    .from('ClientInfoRequest')
+  const { data: reqRow } = await unscoped(supabase
+    .from('ClientInfoRequest'), 'post-fetch: client portal ownership proof')
     .select('id, contactId, status, spaceId')
     .eq('id', id)
     .maybeSingle();
@@ -71,8 +74,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Already answered.' }, { status: 409 });
   }
 
-  const { error } = await supabase
-    .from('ClientInfoRequest')
+  const { error } = await tenantTable(supabase, 'ClientInfoRequest', { spaceId: row.spaceId })
     .update({ response, status: 'fulfilled', fulfilledAt: new Date().toISOString() })
     .eq('id', id);
   if (error) {

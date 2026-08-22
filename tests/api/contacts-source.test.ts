@@ -111,4 +111,16 @@ describe('POST /api/contacts — lead-source attribution', () => {
     expect(lastInsertValues!.source).toBe('referral');
     expect(lastInsertValues!.sourceDetail).toBe('Bob Smith');
   });
+
+  it('400s on malformed JSON instead of throwing 500', async () => {
+    const res = await POST(
+      new NextRequest('http://localhost/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{not-json',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(lastInsertValues).toBeNull();
+  });
 });

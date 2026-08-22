@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   FIRST_TOUCH_TRIGGER_KIND,
   firstTouchSourceLabel,
@@ -49,17 +50,15 @@ export async function GET() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('AgentDraft')
+  const { data, error } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
     .select(
       `
       id, channel, subject, content, createdAt,
       Contact:contactId ( id, name, createdAt, leadType, budget, preferences, source, sourceLabel )
     `,
     )
-    .eq('spaceId', space.id)
     .eq('status', 'pending')
     .eq('triggerSource->>kind', FIRST_TOUCH_TRIGGER_KIND)
     .order('createdAt', { ascending: false })

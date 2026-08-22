@@ -7,8 +7,10 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl } from '@/lib/storage';
+
 
 export const runtime = 'nodejs';
 
@@ -18,15 +20,13 @@ export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const url = new URL(req.url);
   const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0', 10) || 0);
 
-  const { data: gens, error } = await supabase
-    .from('StudioGeneration')
+  const { data: gens, error } = await tenantTable(supabase, 'StudioGeneration', { spaceId: space.id })
     .select('id, kind, model, prompt, fileId, createdAt')
-    .eq('spaceId', space.id)
     .eq('status', 'completed')
     .not('fileId', 'is', null)
     .order('createdAt', { ascending: false })
@@ -47,8 +47,7 @@ export async function GET(req: Request) {
 
   // Resolve a signed URL per asset. S3 presigning is local (no network call),
   // so signing the whole page is cheap.
-  const { data: files, error: filesErr } = await supabase
-    .from('File')
+  const { data: files, error: filesErr } = await tenantTable(supabase, 'File', { spaceId: space.id })
     .select('id, storageKey')
     .in('id', rows.map((r) => r.fileId));
   if (filesErr) {

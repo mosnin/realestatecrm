@@ -7,6 +7,7 @@
  */
 
 import { logger } from '@/lib/logger';
+import { toE164 } from '@/lib/phone';
 import type { Audience, MessageCategory } from '@/lib/messaging/compliance';
 
 // Log a clear warning at module load time if Telnyx env vars are missing
@@ -128,19 +129,9 @@ async function sendSMSUnchecked(params: SendSMSParams): Promise<boolean> {
     return false;
   }
 
-  // Basic phone validation — must look like a phone number
-  const cleaned = params.to.replace(/[^\d+]/g, '');
-  if (cleaned.length < 10) {
-    logger.warn('[sms] invalid phone number (too short)', { to: params.to });
-    return false;
-  }
-
-  // Ensure E.164 format
-  const toNumber = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
-
-  // Validate E.164 format: + followed by 10-15 digits
-  if (!/^\+\d{10,15}$/.test(toNumber)) {
-    logger.warn('[sms] phone number not valid E.164', { to: toNumber });
+  const toNumber = toE164(params.to);
+  if (!toNumber) {
+    logger.warn('[sms] invalid phone number', { to: params.to });
     return false;
   }
 
@@ -242,6 +233,22 @@ export function tourRescheduledSMS(p: { guestName: string; guestPhone: string; s
     spaceId: p.spaceId,
     to: p.guestPhone,
     body: `Hi ${p.guestName}, your tour with ${p.businessName}${prop} has been moved to ${p.date} at ${p.time}. Reply if that doesn't work.`,
+  };
+}
+
+export function tourCancelledOwnerSMS(p: {
+  spaceName: string;
+  guestName: string;
+  date: string;
+  time: string;
+  property?: string | null;
+  phone: string;
+}): SendSMSParams {
+  const prop = p.property ? ` at ${p.property}` : '';
+  return {
+    audience: 'internal',
+    to: p.phone,
+    body: `[${p.spaceName}] ${p.guestName} cancelled their tour${prop} on ${p.date} at ${p.time}.`,
   };
 }
 

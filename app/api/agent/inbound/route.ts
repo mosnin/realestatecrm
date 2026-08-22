@@ -26,6 +26,7 @@ import {
 } from '@/lib/messaging/compliance';
 import { recordInboundMessage } from '@/lib/inbox';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
 
@@ -66,11 +67,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate contact belongs to the stated space
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, leadScore, phone, email')
     .eq('id', contactId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (!contact) {
@@ -107,7 +106,7 @@ export async function POST(req: NextRequest) {
             { status: 500 },
           );
         }
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
           id: crypto.randomUUID(),
           contactId,
           spaceId,
@@ -119,7 +118,7 @@ export async function POST(req: NextRequest) {
       }
       if (isStartKeyword(content)) {
         await unsuppressAddress({ spaceId, channel, address });
-        await supabase.from('ContactActivity').insert({
+        await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
           id: crypto.randomUUID(),
           contactId,
           spaceId,
@@ -133,7 +132,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Record as ContactActivity
-  const { error: activityError } = await supabase.from('ContactActivity').insert({
+  const { error: activityError } = await tenantTable(supabase, 'ContactActivity', { spaceId }).insert({
     id: crypto.randomUUID(),
     contactId,
     spaceId,
@@ -169,19 +168,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Update lastContactedAt
-  await supabase
-    .from('Contact')
+  await tenantTable(supabase, 'Contact', { spaceId })
     .update({ lastContactedAt: now, updatedAt: now })
-    .eq('id', contactId)
-    .eq('spaceId', spaceId);
+    .eq('id', contactId);
 
   // Mark draft as responded
   if (draftId) {
-    await supabase
-      .from('AgentDraft')
+    await tenantTable(supabase, 'AgentDraft', { spaceId })
       .update({ outcome: 'responded', outcomeDetectedAt: now })
-      .eq('id', draftId)
-      .eq('spaceId', spaceId);
+      .eq('id', draftId);
   }
 
   // Fire the inbound_message trigger through the helper so it gets rate-
@@ -217,11 +212,9 @@ export async function POST(req: NextRequest) {
   // address the sender by name.
   after(async () => {
     try {
-      const { data: contactRow } = await supabase
-        .from('Contact')
+      const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId })
         .select('id, name, email, phone')
         .eq('id', contactId)
-        .eq('spaceId', spaceId)
         .maybeSingle();
       const contactCtx = contactRow ?? { id: contactId };
       await runWorkflowsForEvent({

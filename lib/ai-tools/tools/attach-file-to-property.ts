@@ -14,6 +14,7 @@
 
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { defineTool } from '../types';
 import { copyObject, getPublicUrl, buildKey } from '@/lib/storage';
 
@@ -44,17 +45,13 @@ export const attachFileToPropertyTool = defineTool<typeof parameters, AttachResu
   async handler(args, ctx) {
     // Both rows must belong to this space — defensive against id-guessing.
     const [fileRes, propRes] = await Promise.all([
-      supabase
-        .from('File')
+      tenantTable(supabase, 'File', { spaceId: ctx.space.id })
         .select('id, name, mimeType, category, storageKey')
         .eq('id', args.fileId)
-        .eq('spaceId', ctx.space.id)
         .maybeSingle(),
-      supabase
-        .from('Property')
+      tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
         .select('id, address, photos')
         .eq('id', args.propertyId)
-        .eq('spaceId', ctx.space.id)
         .maybeSingle(),
     ]);
 
@@ -118,11 +115,9 @@ export const attachFileToPropertyTool = defineTool<typeof parameters, AttachResu
     const photoUrl = getPublicUrl(destKey);
     const nextPhotos = [...(property.photos ?? []), photoUrl];
 
-    const { error: updateErr } = await supabase
-      .from('Property')
+    const { error: updateErr } = await tenantTable(supabase, 'Property', { spaceId: ctx.space.id })
       .update({ photos: nextPhotos })
-      .eq('id', args.propertyId)
-      .eq('spaceId', ctx.space.id);
+      .eq('id', args.propertyId);
 
     if (updateErr) {
       return {

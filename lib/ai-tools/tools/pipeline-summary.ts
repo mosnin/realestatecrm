@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { classifyForStrips } from '@/lib/deals/health';
 import type { Deal } from '@/lib/types';
+import { coerceBooleanValue } from '../coerce-tool-args';
 import { defineTool } from '../types';
 
 const parameters = z
@@ -60,7 +61,7 @@ export const pipelineSummaryTool = defineTool<typeof parameters, { summary: Summ
   requiresApproval: false,
 
   async handler(args, ctx) {
-    const includeLostWon = args.includeLostWon ?? false;
+    const includeLostWon = coerceBooleanValue(args.includeLostWon) ?? false;
     let query = supabase
       .from('Deal')
       .select(

@@ -25,12 +25,14 @@
 import { supabase } from '@/lib/supabase';
 import { sendNewLeadNotification } from '@/lib/email';
 import { sendNewDealNotification } from '@/lib/email';
-import { sendAgentNotification, type TourEmailData } from '@/lib/tour-emails';
-import { sendSMS, newLeadSMS, newTourSMS, newDealSMS } from '@/lib/sms';
+import { sendAgentNotification, sendAgentTourCancelled, type TourEmailData } from '@/lib/tour-emails';
+import { sendSMS, newLeadSMS, newTourSMS, newDealSMS, tourCancelledOwnerSMS } from '@/lib/sms';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
 import { sendPushToSpace } from '@/lib/push';
 import { createAppNotification } from '@/lib/notifications';
 import { formatCompact } from '@/lib/formatting';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   resolveEffectivePrefs,
   isEmailDigestSuppressed,
@@ -73,10 +75,8 @@ async function getSpaceOwnerInfo(spaceId: string): Promise<SpaceOwnerInfo | null
   try {
     const [{ data: space }, { data: settings }] = await Promise.all([
       supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-      supabase
-        .from('SpaceSetting')
+      tenantTable(supabase, 'SpaceSetting', { spaceId })
         .select('phoneNumber')
-        .eq('spaceId', spaceId)
         .maybeSingle(),
     ]);
 
@@ -230,14 +230,14 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
 
   // SMS notification to agent
   if (info.smsEnabled && info.ownerPhone) {
-    const d = new Date(params.tourData.startsAt);
+    const tz = params.tourData.timezone;
     promises.push(
       sendSMS(
         newTourSMS({
           spaceName: info.spaceName,
           guestName: params.tourData.guestName,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          date: formatTourShortDate(params.tourData.startsAt, tz),
+          time: formatTourTime(params.tourData.startsAt, tz),
           property: params.tourData.propertyAddress,
           phone: info.ownerPhone,
         })
@@ -247,8 +247,8 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
 
   // Push notification
   if (info.pushEnabled) {
-    const d = new Date(params.tourData.startsAt);
-    const when = `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    const tz = params.tourData.timezone;
+    const when = `${formatTourShortDate(params.tourData.startsAt, tz)} at ${formatTourTime(params.tourData.startsAt, tz)}`;
     const prop = params.tourData.propertyAddress ? ` at ${params.tourData.propertyAddress}` : '';
     promises.push(
       sendPushToSpace(params.spaceId, {
@@ -256,6 +256,61 @@ export async function notifyNewTour(params: NotifyNewTourParams): Promise<void> 
         body: `${when}${prop}.`,
         url: `/s/${info.spaceSlug}/calendar`,
       }).catch((err) => logger.error('[notify] tour push failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  await Promise.allSettled(promises);
+}
+
+export interface NotifyTourCancelledOwnerParams {
+  spaceId: string;
+  tourData: TourEmailData;
+}
+
+/**
+ * Tell the realtor a guest cancelled. Immediate — never digest-suppressed.
+ * A cancellation in an hour-later digest leaves the realtor showing up to
+ * an empty appointment. Still respects the tour-booking event toggle and
+ * channel prefs so an opted-out owner stays opted out.
+ */
+export async function notifyTourCancelledOwner(params: NotifyTourCancelledOwnerParams): Promise<void> {
+  const info = await getSpaceOwnerInfo(params.spaceId);
+  if (!info || !info.notifyTourBookings) return;
+
+  const tz = params.tourData.timezone;
+  const promises: Promise<unknown>[] = [];
+
+  if (info.emailEnabled) {
+    promises.push(
+      sendAgentTourCancelled(info.ownerEmail, params.tourData)
+        .catch((err) => logger.error('[notify] tour-cancel email failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  if (info.smsEnabled && info.ownerPhone) {
+    promises.push(
+      sendSMS(
+        tourCancelledOwnerSMS({
+          spaceName: info.spaceName,
+          guestName: params.tourData.guestName,
+          date: formatTourShortDate(params.tourData.startsAt, tz),
+          time: formatTourTime(params.tourData.startsAt, tz),
+          property: params.tourData.propertyAddress,
+          phone: info.ownerPhone,
+        })
+      ).catch((err) => logger.error('[notify] tour-cancel SMS failed', { spaceId: params.spaceId }, err))
+    );
+  }
+
+  if (info.pushEnabled) {
+    const when = `${formatTourShortDate(params.tourData.startsAt, tz)} at ${formatTourTime(params.tourData.startsAt, tz)}`;
+    const prop = params.tourData.propertyAddress ? ` at ${params.tourData.propertyAddress}` : '';
+    promises.push(
+      sendPushToSpace(params.spaceId, {
+        title: `Tour cancelled: ${params.tourData.guestName}`,
+        body: `${when}${prop}.`,
+        url: `/s/${info.spaceSlug}/calendar`,
+      }).catch((err) => logger.error('[notify] tour-cancel push failed', { spaceId: params.spaceId }, err))
     );
   }
 
@@ -336,6 +391,8 @@ export interface NotifyWorkflowDispatchParams {
   channel: string;
   /** Best-effort recipient display (name or id), for the notification body. */
   recipient?: string | null;
+  /** Honest sender line from describeDelivery, when we actually sent. */
+  via?: string | null;
 }
 
 /**
@@ -399,6 +456,8 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
   if (!info) return;
 
   const who = params.recipient ? ` to ${params.recipient}` : '';
+  const via = params.via ? ` ${params.via}` : ' on your behalf';
+  const body = `An automatic ${params.channel}${who} was just sent${via}.`;
   const promises: Promise<unknown>[] = [];
 
   // Durable in-app record — NOT channel-gated: every autonomous send must
@@ -408,7 +467,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
       spaceId: params.spaceId,
       type: 'agent_send',
       title: 'Chippi sent a message',
-      body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+      body,
       href: `/s/${info.spaceSlug}`,
     }),
   );
@@ -417,7 +476,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
     promises.push(
       sendPushToSpace(params.spaceId, {
         title: 'Chippi sent a message',
-        body: `An automatic ${params.channel}${who} was just sent on your behalf.`,
+        body,
         url: `/s/${info.spaceSlug}`,
       }).catch((err) => logger.error('[notify] auto-send push failed', { spaceId: params.spaceId }, err)),
     );
@@ -429,7 +488,7 @@ export async function notifyAutoSend(params: NotifyWorkflowDispatchParams): Prom
         // The realtor's own notification phone — internal, not consumer outreach.
         audience: 'internal',
         to: info.ownerPhone,
-        body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}.`,
+        body: `${info.spaceName}: Chippi auto-sent a ${params.channel}${who}${params.via ? ` ${params.via}` : ''}.`,
       }).catch((err) => logger.error('[notify] auto-send SMS failed', { spaceId: params.spaceId }, err)),
     );
   }

@@ -7,7 +7,15 @@ import { fireAgentTrigger } from '@/lib/agent/fire-trigger';
 import { fireFirstTouch } from '@/lib/leads/first-touch';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import { normalizeLeadSource } from '@/lib/lead-source';
+import {
+  applyLeadOrgFilters,
+  mergeSavedViewFilters,
+  parseLeadOrgFilters,
+  LEAD_ORG_EMPTY_ID,
+  type LeadOrgFilters,
+} from '@/lib/leads/org-filters';
 import type { Contact } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get('slug');
@@ -17,25 +25,28 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
-  const search = req.nextUrl.searchParams.get('search') ?? '';
-  const type = req.nextUrl.searchParams.get('type');
+  let search = req.nextUrl.searchParams.get('search') ?? '';
   // Snooze hygiene: by default hide currently-snoozed contacts from the main
   // People view. Callers that need them (e.g. a "Snoozed" tab, or the
-  // command palette fuzzy search) can pass ?includeSnoozed=1.
+  // command palette fuzzy search) can pass ?includeSnoozed=1. First-class
+  // `status=` wins when present.
   const includeSnoozed = req.nextUrl.searchParams.get('includeSnoozed') === '1';
   const onlySnoozed = req.nextUrl.searchParams.get('onlySnoozed') === '1';
 
-  let query = supabase
-    .from('Contact')
+  const hydrated = await hydrateListFilters(parseLeadOrgFilters(req.nextUrl.searchParams), space.id);
+  let org = hydrated.filters;
+  if (!search && hydrated.search) search = hydrated.search;
+  if (org.status == null) {
+    if (onlySnoozed) org = { ...org, status: 'snoozed' };
+    else if (includeSnoozed) org = { ...org, status: 'all' };
+    else org = { ...org, status: 'active' };
+  }
+
+  let query = tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('spaceId', space.id)
     .is('brokerageId', null); // Exclude brokerage leads — those show on /broker/leads
 
-  if (!includeSnoozed && !onlySnoozed) {
-    query = query.or(`snoozedUntil.is.null,snoozedUntil.lte.${new Date().toISOString()}`);
-  } else if (onlySnoozed) {
-    query = query.gt('snoozedUntil', new Date().toISOString());
-  }
+  query = applyLeadOrgFilters(query, org, { spaceId: space.id, ownerId: space.ownerId });
 
   if (search) {
     // Cap length to prevent expensive full-table-scan patterns
@@ -66,10 +77,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (type && type !== 'ALL') {
-    query = query.eq('type', type);
-  }
-
   // Pagination: default 500, max 1000
   const limitParam = parseInt(req.nextUrl.searchParams.get('limit') ?? '500', 10);
   const offsetParam = parseInt(req.nextUrl.searchParams.get('offset') ?? '0', 10);
@@ -91,10 +98,43 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(contacts as Contact[]);
 }
 
+/**
+ * Load a space-scoped SavedView when `list=` is set and fold its filters in.
+ * A list id from another workspace matches zero rows here — we force the
+ * contact query empty rather than silently ignore the cut or leak the view.
+ */
+async function hydrateListFilters(
+  filters: LeadOrgFilters,
+  spaceId: string,
+): Promise<{ filters: LeadOrgFilters; search: string | null }> {
+  if (!filters.list) return { filters, search: null };
+
+  const { data, error } = await tenantTable(supabase, 'SavedView', { spaceId })
+    .select('filters')
+    .eq('id', filters.list)
+    .maybeSingle();
+  if (error || !data) {
+    return { filters: { ...filters, owner: LEAD_ORG_EMPTY_ID }, search: null };
+  }
+  const viewFilters = (data as { filters?: Record<string, unknown> }).filters;
+  const merged = mergeSavedViewFilters(filters, viewFilters);
+  const viewSearch =
+    viewFilters && typeof viewFilters.search === 'string' ? viewFilters.search : null;
+  return { filters: merged, search: viewSearch };
+}
+
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags, source, sourceDetail } = body;
 
+  if (typeof slug !== 'string' || !slug) {
+    return NextResponse.json({ error: 'slug required' }, { status: 400 });
+  }
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
@@ -126,10 +166,8 @@ export async function POST(req: NextRequest) {
   // No new DB constraint: case-mismatched emails would be rejected by a
   // unique index, which may not be desired across all data.
   if (emailVal) {
-    const { data: existing, error: dupErr } = await supabase
-      .from('Contact')
+    const { data: existing, error: dupErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id')
-      .eq('spaceId', space.id)
       .ilike('email', emailVal)
       .limit(1)
       .maybeSingle();
@@ -164,7 +202,7 @@ export async function POST(req: NextRequest) {
   const sourceVal = normalizeLeadSource(source) ?? 'manual';
   const sourceDetailVal = sourceDetail ? String(sourceDetail).trim().slice(0, 500) : null;
 
-  const { data: contact, error } = await supabase.from('Contact').insert({
+  const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
     id,
     spaceId: space.id,
     name: name.trim().slice(0, 200),
@@ -211,7 +249,7 @@ export async function POST(req: NextRequest) {
   // route that deliberately does NOT get this). fireFirstTouch never throws
   // and registers its own after() keep-alive, so it adds zero latency here.
   try {
-    void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+    void fireFirstTouch({ spaceId: space.id, contactId: contact.id, origin: 'manual' });
   } catch (e) { console.error('[contacts] first-touch dispatch failed:', e); }
 
   // Also dispatch the lead_created WORKFLOW trigger for manually-created leads.

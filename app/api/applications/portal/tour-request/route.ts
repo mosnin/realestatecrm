@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * POST /api/applications/portal/tour-request
@@ -81,8 +84,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify token + application
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'capability token: application portal')
     .select('id, spaceId, name, email')
     .eq('applicationRef', applicationRef)
     .eq('statusPortalToken', token)
@@ -117,8 +120,7 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .join('\n');
 
-  const messageInsert = supabase
-    .from('ApplicationMessage')
+  const messageInsert = tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,
@@ -132,8 +134,7 @@ export async function POST(req: NextRequest) {
   // card. The question itself is action-oriented; the context carries the
   // structured fields. agentType=applicant_portal flags the source so the
   // UI can render the right action set in a future pass.
-  const questionInsert = supabase
-    .from('AgentQuestion')
+  const questionInsert = tenantTable(supabase, 'AgentQuestion', { spaceId: contact.spaceId })
     .insert({
       spaceId: contact.spaceId,
       runId: 'applicant-portal',
@@ -196,10 +197,8 @@ async function notifyRealtorOfTourRequest(
 
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('notifications, businessName')
-      .eq('spaceId', spaceId)
       .maybeSingle(),
   ]);
   if (!space) return;

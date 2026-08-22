@@ -17,6 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 
@@ -34,8 +36,8 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data: campaign, error } = await supabase
-    .from('ReviewCampaign')
+  const { data: campaign, error } = await unscoped(supabase
+    .from('ReviewCampaign'), 'post-fetch: review request scoped by brokerage then child by id')
     .select('id, reviewUrl, clickedAt')
     .eq('id', campaignId)
     .maybeSingle();
@@ -56,8 +58,8 @@ export async function GET(
   // Best-effort — a failed stamp must never break the client's redirect.
   if (!row.clickedAt) {
     const nowIso = new Date().toISOString();
-    const { error: stampErr } = await supabase
-      .from('ReviewCampaign')
+    const { error: stampErr } = await unscoped(supabase
+      .from('ReviewCampaign'), 'post-fetch: review request scoped by brokerage then child by id')
       .update({ status: 'clicked', clickedAt: nowIso, updatedAt: nowIso })
       .eq('id', campaignId);
     if (stampErr) {

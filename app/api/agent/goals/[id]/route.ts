@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_STATUSES = ['active', 'completed', 'cancelled', 'paused'] as const;
 
@@ -14,7 +15,7 @@ export async function PATCH(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
   const body = await req.json();
@@ -27,11 +28,9 @@ export async function PATCH(
   }
 
   // Verify the goal belongs to this space
-  const { data: existing } = await supabase
-    .from('AgentGoal')
+  const { data: existing } = await tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .select('id, status')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!existing) {
@@ -52,11 +51,9 @@ export async function PATCH(
     patch.metadata = { completionNotes: body.completionNotes };
   }
 
-  const { data, error } = await supabase
-    .from('AgentGoal')
+  const { data, error } = await tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
     .single();
 
@@ -73,16 +70,14 @@ export async function DELETE(
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
 
   // Verify the goal belongs to this space
-  const { data: existing } = await supabase
-    .from('AgentGoal')
+  const { data: existing } = await tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .select('id, status')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (!existing) {
@@ -92,11 +87,9 @@ export async function DELETE(
     return NextResponse.json({ cancelled: true });
   }
 
-  const { error } = await supabase
-    .from('AgentGoal')
+  const { error } = await tenantTable(supabase, 'AgentGoal', { spaceId: space.id })
     .update({ status: 'cancelled', updatedAt: new Date().toISOString() })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (error) throw error;
   return NextResponse.json({ cancelled: true });

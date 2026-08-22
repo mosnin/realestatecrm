@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 import {
   fireRoutineRun,
   ROUTINE_CADENCES,
@@ -65,7 +66,7 @@ export async function PATCH(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
@@ -111,11 +112,9 @@ export async function PATCH(
   }
 
   // updatedAt + nextRunAt are recomputed by the table trigger.
-  const { data, error } = await supabase
-    .from('Routine')
+  const { data, error } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select(SELECT)
     .maybeSingle();
 
@@ -138,18 +137,18 @@ export async function DELETE(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('Routine')
+  const { data, error } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .delete()
     .eq('id', id)
-    .eq('spaceId', space.id);
+    .select('id');
 
   if (error) {
     logger.error('[routines] delete failed', { spaceId: space.id, id }, error);
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
   }
+  if (!data || data.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   return NextResponse.json({ ok: true });
 }
@@ -164,24 +163,20 @@ export async function POST(
   if (authResult instanceof NextResponse) return authResult;
 
   const space = await getSpaceForUser(authResult.userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: routine } = await supabase
-    .from('Routine')
+  const { data: routine } = await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .select('id, instruction')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!routine) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Optimistically stamp the run so the UI updates instantly. after() corrects
   // the status to 'error' if the dispatch never landed. The Modal endpoint
   // doesn't return until the run finishes, so we don't block the response on it.
-  await supabase
-    .from('Routine')
+  await tenantTable(supabase, 'Routine', { spaceId: space.id })
     .update({ lastRunAt: new Date().toISOString(), lastRunStatus: 'ok' })
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   // Pass the caller's own Clerk userId — this is "Run now" from the realtor's
   // own session, so they're the entity whose Composio connections we use.
@@ -189,11 +184,9 @@ export async function POST(
   after(async () => {
     const status = await fireRoutineRun(space.id, routine.instruction, authResult.userId);
     if (status === 'error') {
-      await supabase
-        .from('Routine')
+      await tenantTable(supabase, 'Routine', { spaceId: space.id })
         .update({ lastRunStatus: 'error' })
-        .eq('id', id)
-        .eq('spaceId', space.id);
+        .eq('id', id);
     }
   });
 

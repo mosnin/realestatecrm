@@ -34,6 +34,7 @@
 
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { embed } from '@/lib/agent-memory/embed';
 import { searchVectors } from '@/lib/zilliz';
@@ -156,10 +157,8 @@ async function matchContactsByName(
   // Build an `ilike.*tok*` OR filter — supabase-js's `.or()` takes a
   // comma-separated PostgREST filter spec.
   const orSpec = tokens.map((t) => `name.ilike.%${escapeIlike(t)}%`).join(',');
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select(CONTACT_COLS)
-    .eq('spaceId', spaceId)
     .or(orSpec)
     .limit(MAX_NAME_MATCHES);
   if (error) {
@@ -175,10 +174,8 @@ async function matchDealsByTitle(
 ): Promise<ContextEntity[]> {
   if (tokens.length === 0) return [];
   const orSpec = tokens.map((t) => `title.ilike.%${escapeIlike(t)}%`).join(',');
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(DEAL_COLS)
-    .eq('spaceId', spaceId)
     .or(orSpec)
     .limit(MAX_NAME_MATCHES);
   if (error) {
@@ -244,10 +241,8 @@ function orderByIds(entities: ContextEntity[], ids: string[]): ContextEntity[] {
 
 async function resolveContactsByIds(spaceId: string, ids: string[]): Promise<ContextEntity[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select(CONTACT_COLS)
-    .eq('spaceId', spaceId)
     .in('id', ids)
     .limit(MAX_NAME_MATCHES);
   if (error) {
@@ -259,10 +254,8 @@ async function resolveContactsByIds(spaceId: string, ids: string[]): Promise<Con
 
 async function resolveDealsByIds(spaceId: string, ids: string[]): Promise<ContextEntity[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await supabase
-    .from('Deal')
+  const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(DEAL_COLS)
-    .eq('spaceId', spaceId)
     .in('id', ids)
     .limit(MAX_NAME_MATCHES);
   if (error) {
@@ -299,10 +292,8 @@ async function matchPropertiesByAddress(
 ): Promise<ContextEntity[]> {
   if (tokens.length === 0) return [];
   const orSpec = tokens.map((t) => `address.ilike.%${escapeIlike(t)}%`).join(',');
-  const { data, error } = await supabase
-    .from('Property')
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId })
     .select('id, address, city, "listingStatus", "listPrice"')
-    .eq('spaceId', spaceId)
     .or(orSpec)
     .limit(MAX_NAME_MATCHES);
   if (error) {

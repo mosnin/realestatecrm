@@ -8,6 +8,7 @@ import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import { runWorkflowsForEvent } from '@/lib/workflows/executor';
 import type { Contact } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(
   _req: NextRequest,
@@ -22,14 +23,12 @@ export async function GET(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: contactRows, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contactRows, error: contactError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (contactError) throw contactError;
 
-  if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!contactRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0] as Contact & { dealContacts?: any[] };
 
@@ -96,16 +95,14 @@ export async function PATCH(
     const space = await getSpaceForUser(userId);
     if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from('Contact')
+    const { data: existingRows, error: existingError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('*')
-      .eq('id', id)
-      .eq('spaceId', space.id);
+      .eq('id', id);
     if (existingError) {
       console.error('[contacts/PATCH] fetch error:', existingError);
       return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
     }
-    if (!existingRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!existingRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const existing = existingRows[0];
 
@@ -201,16 +198,9 @@ export async function PATCH(
       }
     }
 
-    const { data: contact, error: updateError } = await supabase
-      .from('Contact')
+    const { data: contact, error: updateError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .update(updates)
       .eq('id', id)
-      // Scope by spaceId too — the existence check above proved the row
-      // is in this space NOW, but between check and write the row could
-      // theoretically be reassigned (admin tool, future cross-space
-      // merge). Adding the scope makes the write a CAS on space ownership
-      // — TOCTOU-safe.
-      .eq('spaceId', space.id)
       .select()
       .single();
     if (updateError) {
@@ -255,16 +245,14 @@ export async function DELETE(
   const space = await getSpaceForUser(userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: contactRows, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contactRows, error: contactError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('*')
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (contactError) {
     console.error('[contacts/DELETE] fetch error:', contactError);
     return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
   }
-  if (!contactRows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!contactRows?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const contact = contactRows[0];
 
@@ -273,20 +261,16 @@ export async function DELETE(
   // Contact row is gone, and we can't look them up afterwards. Wasabi
   // objects don't cascade, so we orphan PII (signed buyer applications,
   // bank statements, ID scans) forever unless we drop them here.
-  const { data: docRows } = await supabase
-    .from('ContactDocument')
+  const { data: docRows } = await tenantTable(supabase, 'ContactDocument', { spaceId: space.id })
     .select('storageKey')
-    .eq('contactId', id)
-    .eq('spaceId', space.id);
-  const docKeys = (docRows ?? [])
-    .map((r) => (r as { storageKey: string }).storageKey)
+    .eq('contactId', id);
+  const docKeys = ((docRows ?? []) as { storageKey: string | null }[])
+    .map((r) => r.storageKey)
     .filter((k): k is string => Boolean(k));
 
-  const { error: deleteError } = await supabase
-    .from('Contact')
+  const { error: deleteError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
   if (deleteError) {
     console.error('[contacts/DELETE] delete error:', deleteError);
     return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });

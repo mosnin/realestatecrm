@@ -20,6 +20,8 @@
  */
 
 import { logger } from '@/lib/logger';
+import { toE164 } from '@/lib/phone';
+export { toE164 };
 
 const TELNYX_API_BASE = 'https://api.telnyx.com/v2';
 
@@ -52,15 +54,6 @@ if (!isVoiceConfigured()) {
   logger.warn(
     '[voice] Telnyx Voice not configured — calls will no-op. Set TELNYX_API_KEY, TELNYX_VOICE_CONNECTION_ID and TELNYX_FROM_NUMBER.',
   );
-}
-
-/** Normalize a loose phone string to E.164, or null if it can't be one. */
-export function toE164(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const cleaned = raw.replace(/[^\d+]/g, '');
-  if (cleaned.length < 10) return null;
-  const e164 = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
-  return /^\+\d{10,15}$/.test(e164) ? e164 : null;
 }
 
 // Premium-rate prefixes blocked to prevent toll fraud (mirrors lib/sms.ts).

@@ -21,6 +21,8 @@ import { formConfigSchema, type IntakeFormConfig, type FormQuestion } from '@/li
 import { getFormConfigs, getDefaultFormConfig } from '@/lib/form-builder';
 import { logger } from '@/lib/logger';
 import { recordConsent } from '@/lib/messaging/compliance';
+import { unscoped } from '@/lib/supabase-guard';
+import { escapeLike } from '@/lib/escape-like';
 
 /** Parse budget/rent range strings like 'under_1500', '1500_2000', '1m_plus' to a midpoint number. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -441,7 +443,7 @@ export async function POST(req: NextRequest) {
         .from('Contact')
         .select('id, name, applicationRef')
         .eq('spaceId', space.id)
-        .ilike('email', contactEmail)
+        .ilike('email', escapeLike(contactEmail))
         .contains('tags', ['application-link'])
         .order('createdAt', { ascending: false })
         .limit(1);
@@ -663,8 +665,8 @@ export async function POST(req: NextRequest) {
         leadType: contactLeadType,
       });
 
-      const { error: scoreUpdateError } = await supabase
-        .from('Contact')
+      const { error: scoreUpdateError } = await unscoped(supabase
+        .from('Contact'), 'public intake: slug/token then scoped write')
         .update({
           scoringStatus: scoring.scoringStatus,
           leadScore: scoring.leadScore,
@@ -686,8 +688,8 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       logger.error('[apply] scoring failed', { contactId: contact.id }, error);
       try {
-        await supabase
-          .from('Contact')
+        await unscoped(supabase
+          .from('Contact'), 'public intake: slug/token then scoped write')
           .update({
             scoringStatus: 'failed',
             leadScore: null,
@@ -751,14 +753,14 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Instant First Touch (fire-and-forget) ──────────────────────────────
-    // Compose a grounded intro draft + "first touch ready" push while the
-    // lead is still warm. Placed after scoring so the draft grounds on the
-    // scored contact. fireFirstTouch never throws and registers its own
-    // after() keep-alive — zero latency added to the applicant's response.
+    // Compose a grounded intro and (by default) send it while the lead is
+    // still warm. Placed after scoring so the draft grounds on the scored
+    // contact. fireFirstTouch never throws and registers its own after()
+    // keep-alive — zero latency added to the applicant's response.
     // The try/catch is belt-and-suspenders: a bug in that module must never
     // fail the submission.
     try {
-      void fireFirstTouch({ spaceId: space.id, contactId: contact.id });
+      void fireFirstTouch({ spaceId: space.id, contactId: contact.id, origin: 'inbound' });
     } catch (e) {
       logger.error('[apply] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
     }

@@ -17,6 +17,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { uploadObject, buildKey, getSignedDownloadUrl, deleteObject } from '@/lib/storage';
 import { validateUpload } from '@/lib/storage/limits';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   let formData: FormData;
   try {
@@ -120,10 +121,8 @@ export async function POST(req: NextRequest) {
   // revert; replacement is the explicit "I'm done with that photo"
   // signal, so we clean up. Without this, every cover-photo change
   // leaked the prior object into permanent storage with no DB pointer.
-  const { data: existing } = await supabase
-    .from('ProfilePage')
+  const { data: existing } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .select('coverPhotoUrl')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const previousKey = (existing as { coverPhotoUrl?: string | null } | null)?.coverPhotoUrl ?? null;
 
@@ -132,8 +131,7 @@ export async function POST(req: NextRequest) {
   // historical shape — what changes is the value contract: keys that don't
   // start with `http` are signed on read; any legacy `http(s)://...` value
   // is rendered verbatim.
-  const { error: dbErr } = await supabase
-    .from('ProfilePage')
+  const { error: dbErr } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .upsert(
       {
         spaceId: space.id,
@@ -187,13 +185,12 @@ export async function DELETE() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // We don't delete the underlying object — the realtor may want to revert,
   // and the row is the source of truth for what's "live." Lifecycle cleanup
   // for orphaned cover images is a separate concern (Wasabi lifecycle rule).
-  const { error: dbErr } = await supabase
-    .from('ProfilePage')
+  const { error: dbErr } = await tenantTable(supabase, 'ProfilePage', { spaceId: space.id })
     .upsert(
       {
         spaceId: space.id,

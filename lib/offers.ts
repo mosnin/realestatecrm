@@ -2,14 +2,9 @@
  * Offer lifecycle tracker — CRUD + the legal status state machine for
  * `Offer` rows (supabase/migrations/20260831000000_offers.sql).
  *
- * Tenant scoping: every query below chains `.eq('spaceId', spaceId)` on the
- * service-role client — that `.eq` IS the security boundary (CLAUDE.md). Note
- * `tenantTable()` (lib/tenant-db.ts) isn't used here: its returned builder
- * only exposes a bare `.eq` after `update()`/`select()`, which can't chain
- * `.order()`/`.select()`/a second `.eq()` without unsound `as any` casts, so
- * this file follows the same explicit `.eq('spaceId', …)` pattern already
- * used throughout the neighboring deal routes/libs (e.g.
- * app/api/deals/[id]/checklist/route.ts, app/api/deals/[id]/commission-splits/route.ts).
+ * Tenant scoping: every query below goes through `tenantTable()` so the
+ * spaceId filter cannot be dropped. That `.eq` IS the security boundary
+ * (CLAUDE.md).
  *
  * Callers always derive `spaceId` from the authenticated request context
  * (`requireAuth` + `getSpaceForUser`); never accept it from a request body.
@@ -22,6 +17,9 @@
 import 'server-only';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -124,10 +122,8 @@ export class IllegalOfferTransitionError extends Error {
 // ── CRUD ─────────────────────────────────────────────────────────────────
 
 export async function listOffers(spaceId: string): Promise<Offer[]> {
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as Offer[];
@@ -142,10 +138,8 @@ export async function listOffers(spaceId: string): Promise<Offer[]> {
  * them, the dealId filter just narrows within the caller's own space.
  */
 export async function listOffersForDeal(spaceId: string, dealId: string): Promise<Offer[]> {
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .eq('dealId', dealId)
     .order('createdAt', { ascending: false });
   if (error) throw error;
@@ -153,22 +147,18 @@ export async function listOffersForDeal(spaceId: string, dealId: string): Promis
 }
 
 export async function getOffer(spaceId: string, offerId: string): Promise<Offer | null> {
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .select('*')
     .eq('id', offerId)
-    .eq('spaceId', spaceId)
     .maybeSingle();
   if (error) throw error;
   return (data as unknown as Offer) ?? null;
 }
 
 export async function listOfferEvents(spaceId: string, offerId: string): Promise<OfferEvent[]> {
-  const { data, error } = await supabase
-    .from('OfferEvent')
+  const { data, error } = await tenantTable(supabase, 'OfferEvent', { spaceId })
     .select('*')
     .eq('offerId', offerId)
-    .eq('spaceId', spaceId)
     .order('at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as unknown as OfferEvent[];
@@ -184,17 +174,14 @@ export async function createOffer(spaceId: string, input: CreateOfferInput): Pro
   // data-integrity leak). Unknown/foreign dealId → drop the link, don't throw.
   let dealId: string | null = null;
   if (input.dealId) {
-    const { data: deal } = await supabase
-      .from('Deal')
+    const { data: deal } = await tenantTable(supabase, 'Deal', { spaceId })
       .select('id')
       .eq('id', input.dealId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     dealId = deal ? input.dealId : null;
   }
 
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .insert({
       id,
       spaceId,
@@ -213,7 +200,7 @@ export async function createOffer(spaceId: string, input: CreateOfferInput): Pro
 
   // Record the creation itself as the first history row (fromStatus null),
   // so the board's timeline always starts at the true beginning.
-  const { error: eventError } = await supabase.from('OfferEvent').insert({
+  const { error: eventError } = await tenantTable(supabase, 'OfferEvent', { spaceId }).insert({
     id: crypto.randomUUID(),
     spaceId,
     offerId: id,
@@ -243,11 +230,9 @@ export async function updateOffer(
   if ('terms' in input) patch.terms = input.terms ?? {};
   if ('notes' in input) patch.notes = input.notes ?? null;
 
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .update(patch)
     .eq('id', offerId)
-    .eq('spaceId', spaceId)
     .select('*')
     .single();
   if (error) throw error;
@@ -266,11 +251,9 @@ export async function deleteDraftOffer(spaceId: string, offerId: string): Promis
   if (!existing) return false;
   if (existing.status !== 'draft') return false;
 
-  const { error } = await supabase
-    .from('Offer')
+  const { error } = await tenantTable(supabase, 'Offer', { spaceId })
     .delete()
-    .eq('id', offerId)
-    .eq('spaceId', spaceId);
+    .eq('id', offerId);
   if (error) throw error;
   return true;
 }
@@ -295,16 +278,14 @@ export async function transition(
     throw new IllegalOfferTransitionError(existing.status, to);
   }
 
-  const { data, error } = await supabase
-    .from('Offer')
+  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
     .update({ status: to, updatedAt: new Date().toISOString() })
     .eq('id', offerId)
-    .eq('spaceId', spaceId)
     .select('*')
     .single();
   if (error) throw error;
 
-  const { error: eventError } = await supabase.from('OfferEvent').insert({
+  const { error: eventError } = await tenantTable(supabase, 'OfferEvent', { spaceId }).insert({
     id: crypto.randomUUID(),
     spaceId,
     offerId,
@@ -313,6 +294,20 @@ export async function transition(
     note: note ?? null,
   });
   if (eventError) throw eventError;
+
+  if (to === 'accepted' && existing.dealId) {
+    try {
+      await advanceDealFromEvent({
+        spaceId,
+        dealId: existing.dealId,
+        event: 'offer_accepted',
+        title: existing.buyerName,
+        address: existing.propertyAddress,
+      });
+    } catch (err) {
+      logger.warn('[offers] pipeline advance failed', { spaceId, offerId, dealId: existing.dealId }, err);
+    }
+  }
 
   return data as unknown as Offer;
 }

@@ -17,6 +17,16 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { advanceDealFromEventMock } = vi.hoisted(() => ({
+  advanceDealFromEventMock: vi.fn(async () => ({ ok: true, dealId: 'deal-1', created: false, moved: true })),
+}));
+vi.mock('@/lib/deals/advance-from-event', () => ({
+  advanceDealFromEvent: advanceDealFromEventMock,
+}));
+vi.mock('@/lib/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
 type Terminal = { data?: unknown; error?: unknown };
 type Call = { table: string; chain: Array<[string, unknown[]]> };
 
@@ -108,6 +118,7 @@ function offerRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   queues = {};
   calls = [];
+  advanceDealFromEventMock.mockClear();
 });
 
 // ── Pure state-machine tests ────────────────────────────────────────────
@@ -204,6 +215,31 @@ describe('transition', () => {
       (c) => c.table === 'Offer' && c.chain.some(([m]) => m === 'update'),
     );
     expect(offerUpdateCalls).toHaveLength(0);
+  });
+
+  it('moves the linked deal to Under Contract when an offer is accepted', async () => {
+    queue('Offer', { data: offerRow({ status: 'submitted', dealId: 'deal-1' }), error: null });
+    queue('Offer', { data: offerRow({ status: 'accepted', dealId: 'deal-1' }), error: null });
+    queue('OfferEvent', { data: [{ id: 'evt-1' }], error: null });
+
+    await transition('space-1', 'offer-1', 'accepted');
+
+    expect(advanceDealFromEventMock).toHaveBeenCalledWith({
+      spaceId: 'space-1',
+      dealId: 'deal-1',
+      event: 'offer_accepted',
+      title: 'Dana Whitfield',
+      address: '123 Elm St',
+    });
+  });
+
+  it('does not move the pipeline when the offer is rejected', async () => {
+    queue('Offer', { data: offerRow({ status: 'submitted', dealId: 'deal-1' }), error: null });
+    queue('Offer', { data: offerRow({ status: 'rejected', dealId: 'deal-1' }), error: null });
+    queue('OfferEvent', { data: [{ id: 'evt-1' }], error: null });
+
+    await transition('space-1', 'offer-1', 'rejected');
+    expect(advanceDealFromEventMock).not.toHaveBeenCalled();
   });
 
   it('allows re-countering (countered -> countered)', async () => {

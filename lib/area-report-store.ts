@@ -15,6 +15,7 @@
 import 'server-only';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import type { AreaReport, AreaIntelligence } from '@/lib/types';
 import type { NormalizedArea } from '@/lib/areas';
@@ -45,10 +46,8 @@ export async function getAreaReport(
   spaceId: string,
   areaKey: string,
 ): Promise<AreaReport | null> {
-  const { data, error } = await supabase
-    .from('AreaReport')
+  const { data, error } = await tenantTable(supabase, 'AreaReport', { spaceId })
     .select(SELECT)
-    .eq('spaceId', spaceId)
     .eq('areaKey', areaKey)
     .maybeSingle();
   if (error) {
@@ -129,8 +128,7 @@ async function upsertReport(
     updatedAt: nowIso,
   };
 
-  const { data, error } = await supabase
-    .from('AreaReport')
+  const { data, error } = await tenantTable(supabase, 'AreaReport', { spaceId })
     .upsert(row, { onConflict: 'spaceId,areaKey' })
     .select(SELECT)
     .single();

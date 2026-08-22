@@ -7,6 +7,12 @@ import { sendSMS, tourConfirmationSMS } from '@/lib/sms';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { bookTourAtomic, generateManageToken } from '@/lib/tour-booking';
 import { validateTourSlot } from '@/lib/tours/validate-slot';
+import { mirrorTourBookingToCalendar, rollbackTourBooking } from '@/lib/calendar/mirror-tour';
+import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
+import { tenantTable } from '@/lib/tenant-db';
+import { logger } from '@/lib/logger';
+import { formatTourShortDate, formatTourTime } from '@/lib/tours/format-wallclock';
+import { escapeLike } from '@/lib/escape-like';
 
 /** Public endpoint — guests book a tour without authentication. */
 export async function POST(req: NextRequest) {
@@ -55,10 +61,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Get duration from settings
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('tourDuration')
-    .eq('spaceId', space.id)
     .maybeSingle();
   let duration = settings?.tourDuration ?? 30;
 
@@ -66,11 +70,11 @@ export async function POST(req: NextRequest) {
   // and use its tour duration if available
   let validPropertyProfileId: string | null = null;
   if (propertyProfileId) {
-    const { data: profileRow } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profileRow } = await tenantTable(supabase, 'TourPropertyProfile', {
+      spaceId: space.id,
+    })
       .select('id, tourDuration')
       .eq('id', propertyProfileId)
-      .eq('spaceId', space.id)
       .eq('isActive', true)
       .maybeSingle();
     if (profileRow) {
@@ -107,11 +111,9 @@ export async function POST(req: NextRequest) {
 
   // Try to match to existing contact by email, or create one
   let contactId: string | null = null;
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id')
-    .eq('spaceId', space.id)
-    .ilike('email', guestEmail.trim())
+    .ilike('email', escapeLike(guestEmail.trim()))
     .maybeSingle();
 
   if (contactRow) {
@@ -121,17 +123,15 @@ export async function POST(req: NextRequest) {
     // before the update committed, so first-touch attribution was missed
     // intermittently. Cost is one extra serial query; the route already
     // does several.
-    const { error: srcErr } = await supabase
-      .from('Contact')
+    const { error: srcErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .update({ sourceLabel: 'tour-booking' })
       .eq('id', contactId)
-      .eq('spaceId', space.id)
       .is('sourceLabel', null);
     if (srcErr) console.error('[book] Source update failed:', srcErr);
   } else {
     // Auto-create a contact for this tour guest
     const newContactId = crypto.randomUUID();
-    const { error: createErr } = await supabase.from('Contact').insert({
+    const { error: createErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id }).insert({
       id: newContactId,
       spaceId: space.id,
       name: guestName.trim(),
@@ -185,20 +185,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'This time slot is no longer available' }, { status: 409 });
   }
 
+  // Same calendar availability used. If a calendar is connected, the tour
+  // must land there — a confirmed booking that never reached the realtor's
+  // calendar is a lie. No connection → CRM-only (unchanged).
+  const calendar = await mirrorTourBookingToCalendar({
+    spaceId: space.id,
+    tourId,
+    guestName: guestName.trim(),
+    guestEmail: guestEmail.trim().toLowerCase(),
+    guestPhone: guestPhone?.trim() || null,
+    propertyAddress: propertyAddress?.trim() || null,
+    notes: notes?.trim() || null,
+    startsAt: start.toISOString(),
+    endsAt: end.toISOString(),
+    createdBy: 'realtor',
+  });
+  if (calendar.attempted && !calendar.externalOk) {
+    await rollbackTourBooking(space.id, tourId);
+    logger.warn('[tours/book] calendar write failed — tour rolled back', {
+      spaceId: space.id,
+      tourId,
+      via: calendar.via,
+    });
+    return NextResponse.json(
+      { error: 'Could not add this tour to the calendar. Please try another time.' },
+      { status: 502 },
+    );
+  }
+
+  try {
+    await advanceDealFromEvent({
+      spaceId: space.id,
+      contactId,
+      event: 'tour_booked',
+      sourceTourId: tourId,
+      title: guestName.trim(),
+      address: propertyAddress?.trim() || null,
+    });
+  } catch (err) {
+    logger.warn('[tours/book] pipeline advance failed', { spaceId: space.id, tourId }, err);
+  }
+
   // Fetch the created tour for the response
-  const { data: tour, error: fetchError } = await supabase
-    .from('Tour')
+  const { data: tour, error: fetchError } = await tenantTable(supabase, 'Tour', {
+    spaceId: space.id,
+  })
     .select('*')
     .eq('id', tourId)
     .single();
   if (fetchError) throw fetchError;
 
   // Send confirmation email (non-blocking)
-  const { data: settingsFull } = await supabase
-    .from('SpaceSetting')
-    .select('businessName')
-    .eq('spaceId', space.id)
+  const { data: settingsFull } = await tenantTable(supabase, 'SpaceSetting', {
+    spaceId: space.id,
+  })
+    .select('businessName, timezone')
     .maybeSingle();
+  const timezone = settingsFull?.timezone ?? null;
   const emailData: TourEmailData = {
     guestName: tour.guestName,
     guestEmail: tour.guestEmail,
@@ -213,12 +256,12 @@ export async function POST(req: NextRequest) {
     // can self-serve cancel/reschedule/feedback (the page existed but was
     // never linked from any guest email).
     manageToken: tour.manageToken,
+    timezone,
   };
   try { await sendTourConfirmation(emailData); } catch (e) { console.error('[tours] confirmation email failed:', e); }
 
   // Send SMS confirmation to guest
   if (tour.guestPhone) {
-    const d = new Date(tour.startsAt);
     try {
       await sendSMS(
         tourConfirmationSMS({
@@ -226,8 +269,8 @@ export async function POST(req: NextRequest) {
           guestPhone: tour.guestPhone,
           spaceId: space.id,
           businessName: settingsFull?.businessName || space.name,
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          date: formatTourShortDate(tour.startsAt, timezone),
+          time: formatTourTime(tour.startsAt, timezone),
           property: tour.propertyAddress,
         })
       );

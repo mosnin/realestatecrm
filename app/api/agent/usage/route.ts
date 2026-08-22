@@ -18,6 +18,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getTodayTokenUsage } from '@/lib/usage/today-token-usage';
 
 interface ProviderRollup {
@@ -34,14 +35,12 @@ export async function GET() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { total: used } = await getTodayTokenUsage(space.id);
 
-  const { data: agentSettings } = await supabase
-    .from('AgentSettings')
+  const { data: agentSettings } = await tenantTable(supabase, 'AgentSettings', { spaceId: space.id })
     .select('dailyTokenBudget')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   const limit = (agentSettings?.dailyTokenBudget as number | null) ?? 50_000;
@@ -57,10 +56,8 @@ export async function GET() {
   // The overall hit rate sums cached and input across rows the provider
   // could have served from cache.
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: usageRows } = await supabase
-    .from('ChatUsage')
+  const { data: usageRows } = await tenantTable(supabase, 'ChatUsage', { spaceId: space.id })
     .select('provider, promptTokens, completionTokens, cachedTokens')
-    .eq('spaceId', space.id)
     .gte('createdAt', sevenDaysAgo);
 
   const providerMap = new Map<string, ProviderRollup>();

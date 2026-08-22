@@ -213,6 +213,7 @@ describe('address normalization + opt-out footer', () => {
   it('normalizes phones to E.164 and emails to lowercase', () => {
     expect(normalizeAddress('sms', '(555) 111-2222')).toBe('+15551112222');
     expect(normalizeAddress('sms', '+15551112222')).toBe('+15551112222');
+    expect(normalizeAddress('sms', '15551112222')).toBe('+15551112222');
     expect(normalizeAddress('email', '  Bob@Example.COM ')).toBe('bob@example.com');
     expect(normalizeAddress('sms', '123')).toBeNull();
     expect(normalizeAddress('email', 'notanemail')).toBeNull();

@@ -18,6 +18,7 @@
 import crypto from 'crypto';
 import { after } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { extractConversationMemories } from '@/lib/agent-memory/extract';
 import {
@@ -53,11 +54,9 @@ async function attachmentBlocks(
 ): Promise<MessageBlock[]> {
   if (!ids || ids.length === 0) return [];
   try {
-    const { data, error } = await supabase
-      .from('Attachment')
+    const { data, error } = await tenantTable(supabase, 'Attachment', { spaceId })
       .select('id, filename, "mimeType", "sizeBytes"')
-      .in('id', ids)
-      .eq('spaceId', spaceId);
+      .in('id', ids);
     if (error) {
       logger.warn('[tools.persistence] attachment block resolve failed', { spaceId }, error);
       return [];
@@ -94,7 +93,7 @@ async function attachmentBlocks(
 export async function saveUserMessage(input: SaveUserMessageInput): Promise<{ messageId: string }> {
   const id = crypto.randomUUID();
   const blocks = await attachmentBlocks(input.spaceId, input.attachmentIds);
-  const { error } = await supabase.from('Message').insert({
+  const { error } = await tenantTable(supabase, 'Message', { spaceId: input.spaceId }).insert({
     id,
     spaceId: input.spaceId,
     conversationId: input.conversationId,
@@ -162,7 +161,7 @@ export async function saveAssistantMessage(
   const prepared = prepareAssistantMessage(input.blocks);
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('Message').insert({
+  const { error } = await tenantTable(supabase, 'Message', { spaceId: input.spaceId }).insert({
     id,
     spaceId: input.spaceId,
     conversationId: input.conversationId,

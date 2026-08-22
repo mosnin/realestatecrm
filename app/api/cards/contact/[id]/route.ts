@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { normalizeSlug } from '@/lib/intake';
+import { tenantTable } from '@/lib/tenant-db';
 
 /**
  * GET /api/cards/contact/[id]?slug=<workspace-slug>
@@ -46,13 +47,11 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select(
       'id, name, email, phone, tags, leadType, leadScore, scoreLabel, budget, followUpAt, notes, updatedAt, createdAt',
     )
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (contactError) {
@@ -62,11 +61,9 @@ export async function GET(
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Fetch the last 3 activity records for this contact
-  const { data: activityRows } = await supabase
-    .from('ContactActivity')
+  const { data: activityRows } = await tenantTable(supabase, 'ContactActivity', { spaceId: space.id })
     .select('id, type, content, createdAt')
     .eq('contactId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false })
     .limit(5);
 

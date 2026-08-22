@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 import { parseStoredWorkbook, workbookToXlsxBytes } from '@/lib/chippi/workbench-store';
 import { assertSpaceEnabled } from '@/lib/agent/kill-switch';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
@@ -44,11 +45,9 @@ export async function GET(
 
   // Scope the id lookup to the caller's tenant so a foreign id is never
   // resolved before authorization.
-  const { data: artifact, error: artifactError } = await supabase
-    .from('Artifact')
+  const { data: artifact, error: artifactError } = await tenantTable(supabase, 'Artifact', { spaceId: space.id })
     .select('id, title, artifactType, spaceId, currentVersionId')
     .eq('id', artifactId)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (artifactError) {
@@ -63,11 +62,9 @@ export async function GET(
   try { await assertSpaceEnabled(artifact.spaceId); } catch { return NextResponse.json({ error: 'Space is disabled' }, { status: 403 }); }
 
   // 3. Fetch the target ArtifactVersion
-  let versionQuery = supabase
-    .from('ArtifactVersion')
+  let versionQuery = tenantTable(supabase, 'ArtifactVersion', { spaceId: artifact.spaceId })
     .select('id, versionNumber, content')
-    .eq('artifactId', artifactId)
-    .eq('spaceId', artifact.spaceId);
+    .eq('artifactId', artifactId);
 
   if (versionParam !== null) {
     const versionNumber = parseInt(versionParam, 10);

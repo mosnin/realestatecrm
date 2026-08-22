@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { audit } from '@/lib/audit';
 import { isValidSlug, normalizeSlug } from '@/lib/intake';
 import type { SpaceSetting } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
   const { userId } = await auth();
@@ -20,10 +21,9 @@ export async function GET(req: NextRequest) {
   }
 
   const [settingsRes, ownerRes] = await Promise.all([
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: userSpace.id })
       .select(
-        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, digestCadence, phoneNumber, timezone,' +
+        'notifications, smsNotifications, notifyNewLeads, notifyTourBookings, notifyNewDeals, notifyFollowUps, autoFirstTouchSend, digestCadence, phoneNumber, timezone,' +
         'briefEnabled, briefHour, briefEmail, briefSms,' +
         'bio, socialLinks, businessName, realtorPhotoUrl, privacyPolicyHtml,' +
         'intakeAccentColor, intakeBorderRadius, intakeFont, intakeDarkMode,' +
@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
         'intakeDisclaimerText, intakeFooterLinks,' +
         'myConnections'
       )
-      .eq('spaceId', userSpace.id)
       .maybeSingle(),
     supabase
       .from('User')
@@ -59,6 +58,7 @@ export async function GET(req: NextRequest) {
       notifyTourBookings: settings?.notifyTourBookings ?? true,
       notifyNewDeals: settings?.notifyNewDeals ?? true,
       notifyFollowUps: settings?.notifyFollowUps ?? true,
+      autoFirstTouchSend: settings?.autoFirstTouchSend !== false,
       digestCadence: (settings as { digestCadence?: string } | null)?.digestCadence ?? 'off',
       phoneNumber: settings?.phoneNumber ?? '',
       timezone: settings?.timezone ?? 'America/New_York',
@@ -117,6 +117,7 @@ export async function PATCH(req: NextRequest) {
     notifyTourBookings,
     notifyNewDeals,
     notifyFollowUps,
+    autoFirstTouchSend,
     digestCadence,
     briefEnabled,
     briefHour,
@@ -267,6 +268,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof notifyTourBookings === 'boolean') settingsPayload.notifyTourBookings = notifyTourBookings;
   if (typeof notifyNewDeals === 'boolean') settingsPayload.notifyNewDeals = notifyNewDeals;
   if (typeof notifyFollowUps === 'boolean') settingsPayload.notifyFollowUps = notifyFollowUps;
+  if (typeof autoFirstTouchSend === 'boolean') settingsPayload.autoFirstTouchSend = autoFirstTouchSend;
   // Digest cadence (space default): only the three legal values are accepted;
   // anything else is ignored so a malformed payload can't write garbage.
   if (digestCadence === 'off' || digestCadence === 'daily' || digestCadence === 'weekly') {
@@ -336,8 +338,7 @@ export async function PATCH(req: NextRequest) {
     settingsPayload.tourBlockedDates = validDates;
   }
 
-  const { error: settingsError } = await supabase
-    .from('SpaceSetting')
+  const { error: settingsError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .upsert(settingsPayload, { onConflict: 'spaceId' })
     .select();
   if (settingsError) {

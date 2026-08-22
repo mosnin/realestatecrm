@@ -24,6 +24,7 @@ import { activeToolkits } from '@/lib/integrations/connections';
 import { composioConfigured, executeToolForEntity } from '@/lib/integrations/composio';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { allowed } = await checkRateLimit(`chippi:post-tour-exec:${userId}`, 30, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
@@ -241,7 +242,7 @@ async function logCalendarMirrorBestEffort(args: {
     const data = (args.resp.data as { id?: string; eventId?: string } | undefined) ?? undefined;
     const externalEventId = data?.id ?? data?.eventId ?? null;
 
-    await supabase.from('CalendarEventMirror').insert({
+    await tenantTable(supabase, 'CalendarEventMirror', { spaceId: args.spaceId }).insert({
       spaceId: args.spaceId,
       externalProvider: args.provider,
       externalEventId,

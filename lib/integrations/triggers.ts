@@ -32,7 +32,9 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
+import { escapeLike } from '@/lib/escape-like';
 import { createTrigger, deleteTrigger } from './composio';
 import { fireRoutineRun } from '@/lib/routines';
 import { syncCalendarEventToTour } from '@/lib/calendar/tour-sync';
@@ -1114,15 +1116,6 @@ function normalizeSenderEmail(raw: string | null): string {
 }
 
 /**
- * Escape LIKE/ILIKE metacharacters so a full email is matched literally (still
- * case-insensitively). Mirrors the cross-client guard in lib/client-portal-data.ts
- * — `%`/`_` are legal in email local-parts and would otherwise be wildcards.
- */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
-/**
  * Resolve a Contact by email WITHIN a single space (case-insensitive). Mirrors
  * the email-match guard used by the client portal / dedup: lower+trim, then an
  * `ilike` on the escaped literal so it stays an exact (not pattern) match.
@@ -1133,10 +1126,8 @@ async function resolveContactByEmail(
   normalizedEmail: string,
 ): Promise<string | null> {
   if (!normalizedEmail) return null;
-  const { data, error } = await supabase
-    .from('Contact')
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id')
-    .eq('spaceId', spaceId)
     .ilike('email', escapeLike(normalizedEmail))
     .maybeSingle();
   if (error) throw error;

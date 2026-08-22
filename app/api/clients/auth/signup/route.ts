@@ -3,6 +3,7 @@ import {
   createClientUser,
   findClientByEmail,
   issueCode,
+  setClientPassword,
 } from '@/lib/client-auth';
 import { sendClientCode } from '@/lib/client-email';
 import { logger } from '@/lib/logger';
@@ -15,8 +16,13 @@ export const runtime = 'nodejs';
  *
  * Never leaks whether an email already exists: if it does we respond with the
  * same { ok, next:'verify' } shape and re-issue a verify code, so an attacker
- * can't enumerate accounts here. The verified user simply gets a code they
- * can't use to take over (login still needs the password).
+ * can't enumerate accounts here.
+ *
+ * Unverified rows are last-signup-wins: the password is rotated to this
+ * request's password. Otherwise an attacker who pre-registers the address
+ * keeps the password after the real owner verifies and can log into every
+ * realtor workspace tied to that email. A verified account is never rotated
+ * here — login still needs the existing password (or a reset).
  */
 export async function POST(req: NextRequest) {
   const body = await readJson(req);
@@ -41,6 +47,10 @@ export async function POST(req: NextRequest) {
       // don't leak existence and don't 500 on a duplicate.
       logger.warn('[clients/signup] createClientUser returned null');
     }
+  } else if (!existing.emailVerifiedAt) {
+    // Pre-registration takeover: first writer used to keep the password
+    // forever. Rotate until the inbox is proven.
+    await setClientPassword(email, password);
   }
 
   const code = await issueCode(email, 'verify');

@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, X } from 'lucide-react';
 import { CONTACT_STAGES } from '@/lib/constants';
+import { contactFormResetValues, type ContactFormDefaults } from '@/lib/contact-form-state';
 import { cn } from '@/lib/utils';
 import { H2, PRIMARY_PILL, GHOST_PILL, SECTION_LABEL } from '@/lib/typography';
 
@@ -50,7 +51,7 @@ interface ContactFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: SubmitData) => Promise<void>;
-  defaultValues?: Partial<FormData & { properties?: string }>;
+  defaultValues?: ContactFormDefaults;
   /** When set, overrides the default "Add a person" / "Edit person" title. */
   title?: string;
   /** Distinguishes add vs. edit so we can label the submit button correctly. */
@@ -221,16 +222,15 @@ export function ContactForm({
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { type: CONTACT_STAGES[0].key, ...defaultValues },
+    defaultValues: contactFormResetValues(defaultValues).values,
   });
 
   // Properties live outside react-hook-form so the chip input owns them.
-  const initialProperties = (() => {
-    const raw = defaultValues?.properties;
-    if (!raw) return [];
-    return raw.split(',').map((p) => p.trim()).filter(Boolean);
-  })();
-  const [properties, setProperties] = useState<string[]>(initialProperties);
+  const [properties, setProperties] = useState<string[]>(
+    () => contactFormResetValues(defaultValues).properties,
+  );
+  const defaultsRef = useRef(defaultValues);
+  defaultsRef.current = defaultValues;
 
   // ── Type it mode state ────────────────────────────────────────────────────
   // Default to "type" for add; edit mode is always the form (no parsing needed).
@@ -241,15 +241,20 @@ export function ContactForm({
   const [parseError, setParseError] = useState<string | null>(null);
   const [pendingPreview, setPendingPreview] = useState<ParsedContact | null>(null);
 
-  // Reset every time the modal opens so the realtor chooses fresh each time.
+  // Reset every time the modal opens. defaultValues are only applied on
+  // mount by RHF — the edit dialog stays mounted with empty defaults until
+  // a contact is chosen, so we must reset on open or Save writes blanks.
   useEffect(() => {
     if (!open) return;
+    const next = contactFormResetValues(defaultsRef.current);
+    reset(next.values);
+    setProperties(next.properties);
     setTab(canType ? 'type' : 'fill');
     setTypedText('');
     setParsing(false);
     setParseError(null);
     setPendingPreview(null);
-  }, [open, canType]);
+  }, [open, canType, reset]);
 
   const type = watch('type');
   const displayTitle = title ?? (mode === 'edit' ? 'Edit person' : 'Add a person');

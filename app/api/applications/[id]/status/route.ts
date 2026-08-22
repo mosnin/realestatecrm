@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireContactAccess } from '@/lib/api-auth';
 import { sendStatusUpdateEmail } from '@/lib/email';
+import { tenantTable } from '@/lib/tenant-db';
 
 const VALID_STATUSES = [
   'received',
@@ -48,9 +49,11 @@ export async function PATCH(
     );
   }
 
-  // Get current status for audit trail
-  const { data: contact, error: fetchError } = await supabase
-    .from('Contact')
+  // Get current status for audit trail — scoped to the caller's space so a
+  // later auth refactor cannot turn this into a cross-tenant write.
+  const { data: contact, error: fetchError } = await tenantTable(supabase, 'Contact', {
+    spaceId: auth.space.id,
+  })
     .select('applicationStatus, email, name, spaceId, applicationRef')
     .eq('id', contactId)
     .single();
@@ -70,8 +73,7 @@ export async function PATCH(
     update.applicationStatusNote = note?.trim() || null;
   }
 
-  const { error: updateError } = await supabase
-    .from('Contact')
+  const { error: updateError } = await tenantTable(supabase, 'Contact', { spaceId: auth.space.id })
     .update(update)
     .eq('id', contactId);
 
@@ -81,9 +83,11 @@ export async function PATCH(
   }
 
   // Create audit trail record
-  const { error: auditError } = await supabase.from('ApplicationStatusUpdate').insert({
+  const { error: auditError } = await tenantTable(supabase, 'ApplicationStatusUpdate', {
+    spaceId: auth.space.id,
+  }).insert({
     contactId,
-    spaceId: contact.spaceId,
+    spaceId: auth.space.id,
     fromStatus,
     toStatus: status,
     note: note?.trim() || null,
@@ -117,18 +121,14 @@ async function sendStatusNotification(
   // Fetch business name and slug for the email
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('slug, name').eq('id', contact.spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId: contact.spaceId })
       .select('businessName')
-      .eq('spaceId', contact.spaceId)
       .maybeSingle(),
   ]);
 
   // Look up the portal token so we can include it in the email link
-  const { data: contactRow } = await supabase
-    .from('Contact')
+  const { data: contactRow } = await tenantTable(supabase, 'Contact', { spaceId: contact.spaceId })
     .select('statusPortalToken')
-    .eq('spaceId', contact.spaceId)
     .eq('applicationRef', contact.applicationRef)
     .maybeSingle();
 

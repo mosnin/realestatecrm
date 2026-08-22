@@ -24,6 +24,8 @@ import { supabase } from '@/lib/supabase';
 import { computeNextMove } from '@/lib/deals/next-move';
 import { monitorCron } from '@/lib/cron-monitor';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 export const runtime = 'nodejs';
 // 100 deals at concurrency 4 with a 15s per-call LLM budget stays comfortably
@@ -63,8 +65,8 @@ async function handler(req: NextRequest) {
   const cutoffIso = new Date(Date.now() - REFRESH_AFTER_HOURS * 3_600_000).toISOString();
 
   // ── 1. Due deals: open, never computed or computed before the cutoff ────
-  const { data: dueRows, error: dueErr } = await supabase
-    .from('Deal')
+  const { data: dueRows, error: dueErr } = await unscoped(supabase
+    .from('Deal'), 'cron: cross-tenant discovery then per-row work')
     .select('id, spaceId')
     .eq('status', 'active')
     .or(`nextMoveComputedAt.is.null,nextMoveComputedAt.lt.${cutoffIso}`)
@@ -151,8 +153,8 @@ async function handler(req: NextRequest) {
       dealIds: skippedDeals.map((d) => d.id),
     });
     const nowIso = new Date().toISOString();
-    const { error: stampErr } = await supabase
-      .from('Deal')
+    const { error: stampErr } = await unscoped(supabase
+      .from('Deal'), 'cron: cross-tenant discovery then per-row work')
       .update({ nextMoveComputedAt: nowIso })
       .in('id', skippedDeals.map((d) => d.id));
     if (stampErr) {

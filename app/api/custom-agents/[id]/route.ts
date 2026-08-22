@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 type Params = { params: Promise<{ id: string }> };
 
 // ── GET /api/custom-agents/[id] ───────────────────────────────────────────────
-// Fetch a single custom agent. Verifies the agent belongs to the caller's space.
+// Fetch a single custom agent. Scoped by spaceId so a foreign id 404s
+// (no existence oracle) and cannot leak systemPrompt.
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const authResult = await requireAuth();
@@ -14,12 +17,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
 
-  const { data: agent, error } = await supabase
-    .from('CustomAgent')
+  const { data: agent, error } = await tenantTable(supabase, 'CustomAgent', { spaceId: space.id })
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -30,9 +32,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
   if (!agent) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  if (agent.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   return NextResponse.json({ agent });
@@ -48,14 +47,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
 
-  // Fetch the agent and verify ownership before mutating.
-  const { data: existing, error: fetchError } = await supabase
-    .from('CustomAgent')
-    .select('id, spaceId')
+  const { data: existing, error: fetchError } = await tenantTable(supabase, 'CustomAgent', { spaceId: space.id })
+    .select('id')
     .eq('id', id)
     .maybeSingle();
 
@@ -65,9 +62,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
   if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-  if (existing.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   let body: {
@@ -121,8 +115,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (capabilities !== undefined) updates.capabilities = capabilities;
   updates.updatedAt = new Date().toISOString();
 
-  const { data: agent, error: updateError } = await supabase
-    .from('CustomAgent')
+  const { data: agent, error: updateError } = await tenantTable(supabase, 'CustomAgent', { spaceId: space.id })
     .update(updates)
     .eq('id', id)
     .select('*')
@@ -145,14 +138,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { id } = await params;
 
-  // Fetch the agent and verify ownership before mutating.
-  const { data: existing, error: fetchError } = await supabase
-    .from('CustomAgent')
-    .select('id, spaceId')
+  const { data: existing, error: fetchError } = await tenantTable(supabase, 'CustomAgent', { spaceId: space.id })
+    .select('id')
     .eq('id', id)
     .maybeSingle();
 
@@ -163,12 +154,8 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  if (existing.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
-  const { error: updateError } = await supabase
-    .from('CustomAgent')
+  const { error: updateError } = await tenantTable(supabase, 'CustomAgent', { spaceId: space.id })
     .update({ isActive: false, updatedAt: new Date().toISOString() })
     .eq('id', id);
 

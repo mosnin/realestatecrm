@@ -32,7 +32,9 @@ import 'server-only';
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
+import { toE164 } from '@/lib/phone';
 
 export type Channel = 'sms' | 'email';
 /** Who the message is for. Required at every send site — never defaulted. */
@@ -83,10 +85,7 @@ export function normalizeAddress(channel: Channel, raw: string): string | null {
     const lower = v.toLowerCase();
     return lower.includes('@') ? lower : null;
   }
-  const cleaned = v.replace(/[^\d+]/g, '');
-  if (cleaned.length < 10) return null;
-  const e164 = cleaned.startsWith('+') ? cleaned : `+1${cleaned}`;
-  return /^\+\d{10,15}$/.test(e164) ? e164 : null;
+  return toE164(v);
 }
 
 /** STOP-family keywords per carrier/CTIA convention. */
@@ -136,7 +135,7 @@ export async function suppressAddress(input: {
 }): Promise<boolean> {
   const address = normalizeAddress(input.channel, input.address);
   if (!address) return false;
-  const { error } = await supabase.from('MessagingSuppression').upsert(
+  const { error } = await tenantTable(supabase, 'MessagingSuppression', { spaceId: input.spaceId }).upsert(
     {
       spaceId: input.spaceId,
       channel: input.channel,
@@ -167,10 +166,8 @@ export async function unsuppressAddress(input: {
 }): Promise<boolean> {
   const address = normalizeAddress(input.channel, input.address);
   if (!address) return false;
-  const { error } = await supabase
-    .from('MessagingSuppression')
+  const { error } = await tenantTable(supabase, 'MessagingSuppression', { spaceId: input.spaceId })
     .delete()
-    .eq('spaceId', input.spaceId)
     .eq('channel', input.channel)
     .eq('address', address);
   if (error) {
@@ -193,7 +190,7 @@ export async function recordConsent(input: {
 }): Promise<boolean> {
   const address = normalizeAddress(input.channel, input.address);
   if (!address) return false;
-  const { error } = await supabase.from('MessagingConsent').insert({
+  const { error } = await tenantTable(supabase, 'MessagingConsent', { spaceId: input.spaceId }).insert({
     spaceId: input.spaceId,
     channel: input.channel,
     address,
@@ -236,12 +233,10 @@ export function isWithinQuietHours(now: Date, timeZone: string): boolean {
  */
 async function resolveTimeZone(spaceId: string): Promise<string> {
   try {
-    const { data } = await supabase
-      .from('SpaceSetting')
+    const { data } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('timezone')
-      .eq('spaceId', spaceId)
-      .maybeSingle<{ timezone: string | null }>();
-    const tz = data?.timezone;
+      .maybeSingle();
+    const tz = (data as { timezone: string | null } | null)?.timezone;
     if (tz && typeof tz === 'string') return tz;
   } catch {
     /* fall through to the default */
@@ -266,10 +261,8 @@ export async function checkSendAllowed(req: ComplianceRequest): Promise<Complian
 
   // 1. Suppression — absolute, all categories.
   try {
-    const { data, error } = await supabase
-      .from('MessagingSuppression')
+    const { data, error } = await tenantTable(supabase, 'MessagingSuppression', { spaceId: req.spaceId })
       .select('id')
-      .eq('spaceId', req.spaceId)
       .eq('channel', req.channel)
       .eq('address', address)
       .maybeSingle();
@@ -296,10 +289,8 @@ export async function checkSendAllowed(req: ComplianceRequest): Promise<Complian
   const category: MessageCategory = req.category ?? 'marketing';
   if (category === 'marketing') {
     try {
-      const { data, error } = await supabase
-        .from('MessagingConsent')
+      const { data, error } = await tenantTable(supabase, 'MessagingConsent', { spaceId: req.spaceId })
         .select('id')
-        .eq('spaceId', req.spaceId)
         .eq('channel', req.channel)
         .eq('address', address)
         .eq('consentType', 'express_written')

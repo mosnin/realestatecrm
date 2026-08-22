@@ -13,13 +13,14 @@
  *
  * Shape mirrors lib/deals/next-move.ts: a pure-ish compute function that takes
  * a spaceId, fans out a few small SCOPED reads, and returns a typed, ranked
- * list. Every Supabase query is scoped with `.eq('spaceId', spaceId)` — the
+ * list. Every tenant query goes through `tenantTable()` — the
  * service-role key bypasses RLS, so that filter IS the tenant boundary. The
  * result is honest: an empty array when nothing qualifies. No number here is
  * fabricated — every field is computed from a real stored row.
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 const MS_PER_DAY = 86_400_000;
@@ -128,10 +129,8 @@ export async function computeReactivations(
   const quietSince = new Date(now.getTime() - quietDays * MS_PER_DAY).toISOString();
 
   // ── Won deals closed long enough ago to warrant a check-in ──────────────
-  const { data: dealData, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: dealData, error: dealErr } = await tenantTable(supabase, 'Deal', { spaceId })
     .select('id, contactId, value, closedAt')
-    .eq('spaceId', spaceId)
     .eq('status', 'won')
     .not('contactId', 'is', null)
     .not('closedAt', 'is', null)
@@ -163,11 +162,9 @@ export async function computeReactivations(
   if (contactIds.length === 0) return [];
 
   // ── Contacts, re-scoped to the tenant; drop brokerage-routed rows ───────
-  const { data: contactData, error: contactErr } = await supabase
-    .from('Contact')
+  const { data: contactData, error: contactErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, lastContactedAt, brokerageId')
     .in('id', contactIds)
-    .eq('spaceId', spaceId)
     .is('brokerageId', null);
   if (contactErr) {
     logger.warn('[reactivation] contact load failed', { spaceId, err: contactErr.message });
@@ -179,10 +176,8 @@ export async function computeReactivations(
   // ── Recent touches — any contact with activity in the quiet window is NOT
   //    dormant (the realtor is already on them). One scoped read for all. ──
   const touched = new Set<string>();
-  const { data: actData } = await supabase
-    .from('ContactActivity')
+  const { data: actData } = await tenantTable(supabase, 'ContactActivity', { spaceId })
     .select('contactId')
-    .eq('spaceId', spaceId)
     .in('contactId', contactIds)
     .gte('createdAt', quietSince);
   for (const a of (actData ?? []) as Array<{ contactId: string | null }>) {
@@ -238,7 +233,7 @@ export async function computeReactivations(
  * until the referral_tracking migration is applied, the column read fails and
  * the caller's `.catch` yields []. Honest either way: no referrals, no list.
  *
- * Tenant scoping: both reads carry `.eq('spaceId', spaceId)`.
+ * Tenant scoping: both reads go through `tenantTable()`.
  */
 export async function topReferrers(
   spaceId: string,
@@ -246,10 +241,8 @@ export async function topReferrers(
 ): Promise<Referrer[]> {
   const limit = opts.limit ?? TOP_REFERRERS_LIMIT;
 
-  const { data: refData, error } = await supabase
-    .from('Contact')
+  const { data: refData, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('referredByContactId')
-    .eq('spaceId', spaceId)
     .not('referredByContactId', 'is', null);
   if (error) {
     logger.warn('[reactivation] referral scan failed', { spaceId, err: error.message });
@@ -265,11 +258,9 @@ export async function topReferrers(
   if (counts.size === 0) return [];
 
   const referrerIds = [...counts.keys()];
-  const { data: nameData, error: nameErr } = await supabase
-    .from('Contact')
+  const { data: nameData, error: nameErr } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name')
-    .in('id', referrerIds)
-    .eq('spaceId', spaceId);
+    .in('id', referrerIds);
   if (nameErr) {
     logger.warn('[reactivation] referrer name load failed', { spaceId, err: nameErr.message });
     return [];

@@ -30,6 +30,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { chippiErrorMessage } from '@/lib/ai-tools/chippi-voice';
@@ -61,6 +62,8 @@ import {
   type ChildStoredApproval,
 } from '@/lib/ai-tools/delegate-child-pause';
 import { continueDelegatedChildAfterDecision } from '@/lib/ai-tools/delegate-run';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const resumeBodySchema = z.object({
   approved: z.boolean(),
@@ -113,18 +116,14 @@ async function restoreApprovedWorkbookContext(
   const args = approvedArguments as Record<string, unknown>;
   if (args.artifactId !== persisted.artifactId || args.sourceVersionNumber !== persisted.versionNumber || args.workbookTitle !== persisted.title) return null;
   try {
-    const { data: artifact } = await supabase
-      .from('Artifact')
+    const { data: artifact } = await tenantTable(supabase, 'Artifact', { spaceId })
       .select('id, title, artifactType, currentVersionId')
       .eq('id', persisted.artifactId)
-      .eq('spaceId', spaceId)
       .maybeSingle();
     if (!artifact || artifact.artifactType !== 'workbook' || artifact.title !== persisted.title) return null;
-    const { data: version } = await supabase
-      .from('ArtifactVersion')
+    const { data: version } = await tenantTable(supabase, 'ArtifactVersion', { spaceId })
       .select('id, versionNumber')
       .eq('artifactId', persisted.artifactId)
-      .eq('spaceId', spaceId)
       .eq('versionNumber', persisted.versionNumber)
       .maybeSingle();
     if (!version || version.versionNumber !== persisted.versionNumber) return null;
@@ -166,8 +165,8 @@ export async function POST(
   const pausedColumns = isWorkbenchEnabled()
     ? 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, activeWorkbookContext, status, expiresAt, updatedAt'
     : 'id, spaceId, userId, conversationId, turnId, runState, approvals, attachmentManifest, status, expiresAt, updatedAt';
-  const { data: row, error } = await supabase
-    .from('AgentPausedRun')
+  const { data: row, error } = await unscoped(supabase
+    .from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query')
     .select(pausedColumns)
     .eq('id', pausedRunId)
     .eq('userId', auth.userId)
@@ -183,7 +182,7 @@ export async function POST(
   }
   if (paused.expiresAt && new Date(paused.expiresAt).getTime() < Date.now()) {
     // Best-effort flip; ignore failures — the request is over either way.
-    await supabase.from('AgentPausedRun').update({ status: 'expired' }).eq('id', paused.id);
+    await unscoped(supabase.from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query').update({ status: 'expired' }).eq('id', paused.id);
     return NextResponse.json({ error: 'Run expired' }, { status: 410 });
   }
 
@@ -221,11 +220,9 @@ export async function POST(
   let workMode = false;
   let workExecutionMode = DEFAULT_WORK_EXECUTION_MODE;
   if (paused.conversationId) {
-    const { data: conversation, error: conversationError } = await supabase
-      .from('Conversation')
+    const { data: conversation, error: conversationError } = await tenantTable(supabase, 'Conversation', { spaceId: paused.spaceId })
       .select('title, mode, executionMode')
       .eq('id', paused.conversationId)
-      .eq('spaceId', paused.spaceId)
       .maybeSingle();
     if (conversationError || !conversation || isReservedConversationTitle(conversation.title)) {
       return NextResponse.json(
@@ -354,8 +351,8 @@ export async function POST(
   } else {
     // Rolling-deploy compatibility for approval rows created before the turn
     // ledger migration. These cannot hold a ConversationTurn queue.
-    const { data: marked, error: markErr } = await supabase
-      .from('AgentPausedRun')
+    const { data: marked, error: markErr } = await unscoped(supabase
+      .from('AgentPausedRun'), 'post-fetch: caller verified parent scope before this id query')
       .update({ status: 'resumed', updatedAt: new Date().toISOString() })
       .eq('id', paused.id)
       .eq('status', 'pending')

@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { clerkAuthAppearance } from '@/components/auth/clerk-appearance';
+import { FONT_SANS_STACK } from '@/lib/typography';
 
 describe('clerkAuthAppearance', () => {
   it('uses foreground (not orange) as primary, flipped by theme', () => {
@@ -28,6 +29,7 @@ describe('clerkAuthAppearance', () => {
     expect(dark.variables.borderRadius).toBe(light.variables.borderRadius);
     expect(dark.variables.fontSize).toBe(light.variables.fontSize);
     expect(dark.variables.fontFamily).toBe(light.variables.fontFamily);
+    expect(light.variables.fontFamily).toBe(FONT_SANS_STACK);
   });
 
   it('strips Clerk chrome the same way regardless of theme', () => {

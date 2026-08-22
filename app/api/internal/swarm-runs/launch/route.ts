@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import { enqueueWorkerTask } from '@/lib/queue';
 import { supabase } from '@/lib/supabase';
 import { swarmModalRuntimeConfig } from '@/lib/swarm-launch';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -96,11 +97,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, action: 'ignored', claimState });
   }
 
-  const { data: rawRun, error: runError } = await supabase
-    .from('SwarmRun')
+  const { data: rawRun, error: runError } = await tenantTable(supabase, 'SwarmRun', { spaceId })
     .select('id,spaceId,goal,status,launchToken,customAgentIds')
     .eq('id', runId)
-    .eq('spaceId', spaceId)
     .eq('launchToken', launchToken)
     .maybeSingle();
   if (runError || !rawRun) {
@@ -116,10 +115,8 @@ export async function POST(req: NextRequest) {
   const requestedIds = Array.isArray(run.customAgentIds) ? run.customAgentIds : [];
   let customAgents: CustomAgentRow[] = [];
   if (requestedIds.length > 0) {
-    const { data, error } = await supabase
-      .from('CustomAgent')
+    const { data, error } = await tenantTable(supabase, 'CustomAgent', { spaceId })
       .select('id,name,systemPrompt')
-      .eq('spaceId', spaceId)
       .eq('isActive', true)
       .in('id', requestedIds);
     if (error) {

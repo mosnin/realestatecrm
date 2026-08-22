@@ -24,6 +24,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 export type DigestCadence = 'off' | 'daily' | 'weekly';
@@ -158,16 +159,12 @@ export async function resolveEffectivePrefs(
 
   try {
     const [{ data: setting }, overrideRes] = await Promise.all([
-      supabase
-        .from('SpaceSetting')
+      tenantTable(supabase, 'SpaceSetting', { spaceId })
         .select(SPACE_SETTING_PREFS_COLUMNS)
-        .eq('spaceId', spaceId)
         .maybeSingle(),
       userId
-        ? supabase
-            .from('NotificationPreference')
+        ? tenantTable(supabase, 'NotificationPreference', { spaceId })
             .select('channels, eventTypes, digestCadence')
-            .eq('spaceId', spaceId)
             .eq('userId', userId)
             .maybeSingle()
         : Promise.resolve({ data: null }),

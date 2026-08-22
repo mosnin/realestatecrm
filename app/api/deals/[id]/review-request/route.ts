@@ -5,6 +5,9 @@ import { audit } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { notifyBroker } from '@/lib/broker-notify';
 import { notificationForReviewRequested } from '@/lib/notification-voice';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -58,8 +61,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Resolve the deal (and its Space) by id. We use the service-role client,
   // so we need an independent access check after the fetch. The access check
   // is then routed through requireSpaceOwner(slug) to mirror the spec.
-  const { data: dealRow, error: dealErr } = await supabase
-    .from('Deal')
+  const { data: dealRow, error: dealErr } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, title, spaceId, Space(id, slug, brokerageId)')
     .eq('id', dealId)
     .maybeSingle<DealLookupRow>();
@@ -78,8 +81,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     // requireSpaceOwner returns 404 for missing space, 403 for non-owner. Map
     // 404-on-space to 404-on-deal so we never leak that the deal exists when
     // the caller can't access it.
-    if (authResult.status === 404) {
-      return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+    if (authResult.status === 404 || authResult.status === 403) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return authResult;
   }
@@ -109,8 +112,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const nowIso = new Date().toISOString();
   const reviewId = crypto.randomUUID();
 
-  const { data: inserted, error: insertErr } = await supabase
-    .from('DealReviewRequest')
+  const { data: inserted, error: insertErr } = await tenantTable(supabase, 'DealReviewRequest', { brokerageId: dealRow.Space.brokerageId })
     .insert({
       id: reviewId,
       dealId,
@@ -121,13 +123,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       createdAt: nowIso,
     })
     .select('id, dealId, status, reason, createdAt')
-    .single<{
-      id: string;
-      dealId: string;
-      status: 'open' | 'approved' | 'closed';
-      reason: string;
-      createdAt: string;
-    }>();
+    .single();
 
   if (insertErr) {
     // Duplicate-open case. Postgres unique constraint violation = 23505.

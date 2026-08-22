@@ -3,31 +3,29 @@
  * PATCH  /api/integrations/[id]   — toggle the connection's triggers
  *                                   between paused and active.
  *
- * Both routes scope by the caller's space — id-guess across realtors
- * is rejected with 403.
+ * Both routes resolve the caller's space first, then look up the row
+ * scoped by spaceId. A foreign id 404s (no existence oracle).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
-import { getById, revoke } from '@/lib/integrations/connections';
+import { getByIdForSpace, revoke } from '@/lib/integrations/connections';
 import { setPausedForConnection } from '@/lib/integrations/triggers';
 
 async function resolveOwned(
   paramsP: Promise<{ id: string }>,
-): Promise<{ ok: true; row: NonNullable<Awaited<ReturnType<typeof getById>>> } | { ok: false; res: NextResponse }> {
+): Promise<{ ok: true; row: NonNullable<Awaited<ReturnType<typeof getByIdForSpace>>> } | { ok: false; res: NextResponse }> {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return { ok: false, res: auth };
   const { userId } = auth;
 
-  const { id } = await paramsP;
-  const row = await getById(id);
-  if (!row) return { ok: false, res: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
-
   const space = await getSpaceForUser(userId);
-  if (!space || row.spaceId !== space.id) {
-    return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  }
+  if (!space) return { ok: false, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+
+  const { id } = await paramsP;
+  const row = await getByIdForSpace(id, space.id);
+  if (!row) return { ok: false, res: NextResponse.json({ error: 'Not found' }, { status: 404 }) };
   return { ok: true, row };
 }
 

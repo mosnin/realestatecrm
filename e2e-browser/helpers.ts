@@ -47,11 +47,11 @@ export function collectUnexpectedErrors(page: Page): string[] {
     if (/net::ERR_|ERR_BLOCKED_BY_CLIENT|Failed to load resource/i.test(text)) return true;
     if (/Failed to fetch|NetworkError|Load failed/i.test(text)) return true;
     if (/clerk/i.test(text)) return true;
-    // Amplitude's local snippet still tries to fetch its remote config even
-    // though the pixel/CDN requests are blocked, and logs this to
-    // console.error when that fetch is aborted — same deliberate-block noise
-    // as the other analytics vendors, just phrased without "net::ERR_".
-    if (/Amplitude Logger.*remote config/i.test(text)) return true;
+    // Amplitude's local snippet still tries to fetch remote config / flush
+    // events even though the pixel/CDN requests are blocked. Those retries
+    // log console.error ("remote config", "exceeded retry count") — same
+    // deliberate-block noise as the other analytics vendors.
+    if (/Amplitude Logger/i.test(text)) return true;
     return false;
   };
 

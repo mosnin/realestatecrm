@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export interface MemoryRow {
   id: string;
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const sp = req.nextUrl.searchParams;
   const entityType = sp.get('entityType');
@@ -46,10 +47,8 @@ export async function GET(req: NextRequest) {
   const search = (sp.get('search') ?? '').trim();
   const limit = Math.min(parseInt(sp.get('limit') ?? '100'), 200);
 
-  let query = supabase
-    .from('AgentMemory')
+  let query = tenantTable(supabase, 'AgentMemory', { spaceId: space.id })
     .select('id, memoryType, content, importance, entityType, entityId, expiresAt, createdAt, updatedAt')
-    .eq('spaceId', space.id)
     // Exclude coordinator scratch state (priority list, etc.)
     .not('content', 'like', 'PRIORITY_LIST:%')
     .order('importance', { ascending: false })
@@ -71,25 +70,26 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: 'Failed to load memory' }, { status: 500 });
-  if (!data || data.length === 0) return NextResponse.json([]);
+  const memoryRows = (data ?? []) as Array<Record<string, unknown>>;
+  if (memoryRows.length === 0) return NextResponse.json([]);
 
   // Resolve entity names in two batched queries
-  const contactIds = [...new Set(data.filter((m) => m.entityType === 'contact' && m.entityId).map((m) => m.entityId as string))];
-  const dealIds = [...new Set(data.filter((m) => m.entityType === 'deal' && m.entityId).map((m) => m.entityId as string))];
+  const contactIds = [...new Set(memoryRows.filter((m) => m.entityType === 'contact' && m.entityId).map((m) => m.entityId as string))];
+  const dealIds = [...new Set(memoryRows.filter((m) => m.entityType === 'deal' && m.entityId).map((m) => m.entityId as string))];
 
   const [contactsRes, dealsRes] = await Promise.all([
     contactIds.length
-      ? supabase.from('Contact').select('id, name').in('id', contactIds).eq('spaceId', space.id)
+      ? tenantTable(supabase, 'Contact', { spaceId: space.id }).select('id, name').in('id', contactIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     dealIds.length
-      ? supabase.from('Deal').select('id, title').in('id', dealIds).eq('spaceId', space.id)
+      ? tenantTable(supabase, 'Deal', { spaceId: space.id }).select('id, title').in('id', dealIds)
       : Promise.resolve({ data: [] as { id: string; title: string }[] }),
   ]);
 
-  const contactNames = new Map((contactsRes.data ?? []).map((c) => [c.id, c.name]));
-  const dealNames = new Map((dealsRes.data ?? []).map((d) => [d.id, d.title]));
+  const contactNames = new Map(((contactsRes.data ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
+  const dealNames = new Map(((dealsRes.data ?? []) as Array<{ id: string; title: string }>).map((d) => [d.id, d.title]));
 
-  const rows: MemoryRow[] = data.map((m) => ({
+  const rows: MemoryRow[] = memoryRows.map((m) => ({
     id: m.id as string,
     memoryType: m.memoryType as MemoryRow['memoryType'],
     content: m.content as string,

@@ -25,11 +25,21 @@ function source(file: string) {
 const files = SCOPES.flatMap(walk);
 const realtorSharedTableFiles = files.filter((file) => {
   const body = source(file);
-  return body.includes(".from('Conversation')") || body.includes(".from('Message')");
+  return (
+    body.includes(".from('Conversation')") ||
+    body.includes(".from('Message')") ||
+    body.includes("tenantTable(supabase, 'Conversation'") ||
+    body.includes("tenantTable(supabase, 'Message'")
+  );
 });
 const brokerTableFiles = files.filter((file) => {
   const body = source(file);
-  return body.includes(".from('BrokerConversation')") || body.includes(".from('BrokerMessage')");
+  return (
+    body.includes(".from('BrokerConversation')") ||
+    body.includes(".from('BrokerMessage')") ||
+    body.includes("tenantTable(supabase, 'BrokerConversation'") ||
+    body.includes("tenantTable(supabase, 'BrokerMessage'")
+  );
 });
 
 describe('chat data-boundary contract', () => {
@@ -50,7 +60,11 @@ describe('chat data-boundary contract', () => {
   it('scopes every realtor Message read by spaceId', () => {
     const unscopedMessageReads = realtorSharedTableFiles.filter((file) => {
       const body = source(file);
-      return body.includes(".from('Message')") && !body.includes(".eq('spaceId'");
+      return (
+        (body.includes(".from('Message')") || body.includes("tenantTable(supabase, 'Message'")) &&
+        !body.includes(".eq('spaceId'") &&
+        !body.includes("tenantTable(supabase, 'Message'")
+      );
     });
 
     expect(unscopedMessageReads).toEqual([]);
@@ -72,9 +86,9 @@ describe('chat data-boundary contract', () => {
   it('scopes every BrokerMessage read chain by brokerageId', () => {
     const unscopedBrokerMessageReads = brokerTableFiles.flatMap((file) => {
       const body = source(file);
-      const reads = body.match(/\.from\('BrokerMessage'\)[\s\S]*?;/g) ?? [];
+      const reads = body.match(/(?:\.from\('BrokerMessage'\)|tenantTable\(supabase, 'BrokerMessage'[\s\S]*?\))[\s\S]*?;/g) ?? [];
       return reads
-        .filter((read) => !read.includes(".eq('brokerageId'"))
+        .filter((read) => !read.includes(".eq('brokerageId'") && !read.includes('tenantTable(supabase, \'BrokerMessage\''))
         .map((read) => ({ file, read }));
     });
 
@@ -104,9 +118,8 @@ describe('chat data-boundary contract', () => {
     expect(realtorTask).toContain(".eq('spaceId', spaceId)");
 
     const brokerTask = source('app/api/ai/broker-task/route.ts');
-    expect(brokerTask).toContain(".from('BrokerConversation')");
+    expect(brokerTask).toContain("tenantTable(supabase, 'BrokerConversation', { brokerageId })");
     expect(brokerTask).toContain(".eq('id', conversationId)");
-    expect(brokerTask).toContain(".eq('brokerageId', brokerageId)");
   });
 
   it('scopes server-rendered broker URL conversation hydration by brokerageId', () => {

@@ -5,8 +5,8 @@
  *
  * The page is a tinted canvas; content lives in big rounded color-blocked
  * cards that alternate and build rhythm (white paper, soft tint, signal
- * vermillion, true black). Display type is Inter Tight (--font-display),
- * the accent flourish is Instrument Serif italic (--font-accent), and the
+ * vermillion, true black). Display type is Times (--font-display / --font-title),
+ * the accent flourish is Times italic (--font-accent), and the
  * signal color does real brand work, eyebrow glyphs, kickers, stats, CTAs.
  *
  * Exports (API stable so every page rides the system):

@@ -27,6 +27,7 @@ import { monitorCron } from '@/lib/cron-monitor';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { composeQuickDraft } from '@/lib/agent/quick-draft';
 import { createAppNotification } from '@/lib/notifications';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   REVIEW_NUDGE_REASONING,
   REVIEW_ASK_TRIGGER_KIND,
@@ -72,8 +73,8 @@ async function handler(req: NextRequest) {
   const cutoffIso = new Date(Date.now() - NUDGE_AFTER_DAYS * 86_400_000).toISOString();
 
   // ── 1. Due campaigns: sent, un-clicked, un-nudged, stale ────────────────
-  const { data: dueRows, error: dueErr } = await supabase
-    .from('ReviewCampaign')
+  const { data: dueRows, error: dueErr } = await unscoped(supabase
+    .from('ReviewCampaign'), 'cron: cross-tenant discovery then per-row work')
     .select('id, spaceId, dealId, contactId, channel')
     .eq('status', 'sent')
     .is('clickedAt', null)
@@ -121,8 +122,8 @@ async function handler(req: NextRequest) {
   // time-sensitive, best-effort touch; a lapsed space forfeits it.
   if (skippedCampaigns.length > 0) {
     const nowIso = new Date().toISOString();
-    const { error: stampErr } = await supabase
-      .from('ReviewCampaign')
+    const { error: stampErr } = await unscoped(supabase
+      .from('ReviewCampaign'), 'cron: cross-tenant discovery then per-row work')
       .update({ nudgedAt: nowIso, updatedAt: nowIso })
       .in('id', skippedCampaigns.map((c) => c.id));
     if (stampErr) {

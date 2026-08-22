@@ -25,7 +25,13 @@ vi.hoisted(() => {
   process.env.AGENT_INTERNAL_SECRET = 'test-secret';
 });
 
-vi.mock('@/lib/email', () => ({ sendEmailFromCRM: vi.fn(async () => undefined) }));
+vi.mock('@/lib/delivery', () => ({
+  sendDraft: vi.fn(async () => ({ sent: true, method: 'gmail' })),
+  describeDelivery: () => 'from your Gmail',
+}));
+vi.mock('@/lib/messaging/compliance', () => ({
+  checkSendAllowed: vi.fn(async () => ({ allowed: true })),
+}));
 vi.mock('@/lib/sms', () => ({ sendSMS: vi.fn(async () => true) }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true })),
@@ -54,6 +60,7 @@ vi.mock('@/lib/supabase', () => {
     chain.select = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
     chain.upsert = vi.fn(() => chain);
+    chain.update = vi.fn(() => chain);
     chain.insert = vi.fn((values: unknown) => {
       isInsert = true;
       inserts.push({ table, values });
@@ -77,10 +84,10 @@ vi.mock('@/lib/supabase', () => {
 // Import AFTER mocks. The secret is set in the vi.hoisted() block above so the
 // route module sees it at load time.
 import { POST } from '@/app/api/agent/send/route';
-import { sendEmailFromCRM } from '@/lib/email';
+import { sendDraft } from '@/lib/delivery';
 import { sendSMS } from '@/lib/sms';
 
-const mockSendEmail = vi.mocked(sendEmailFromCRM);
+const mockSendDraft = vi.mocked(sendDraft);
 const mockSendSMS = vi.mocked(sendSMS);
 
 function makeReq(body: unknown, auth = 'Bearer test-secret'): NextRequest {
@@ -115,7 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(queues)) delete queues[k];
   inserts.length = 0;
-  mockSendEmail.mockResolvedValue(undefined);
+  mockSendDraft.mockResolvedValue({ sent: true, method: 'gmail' });
   mockSendSMS.mockResolvedValue(true);
 });
 
@@ -193,7 +200,7 @@ describe('POST /api/agent/send — Phase 2 inbox wire-in', () => {
     const json = (await res.json()) as { success: boolean };
     expect(json.success).toBe(true);
     // The send still happened.
-    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendDraft).toHaveBeenCalledTimes(1);
   });
 
   it('does not record when the send itself failed (e.g. SMS delivery failure)', async () => {

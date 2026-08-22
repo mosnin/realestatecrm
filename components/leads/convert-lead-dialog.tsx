@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { UserCheck } from 'lucide-react';
+import { convertLeadTagPatch } from '@/lib/contact-form-state';
 
 interface ConvertLeadDialogProps {
   open: boolean;
@@ -34,35 +35,13 @@ export function ConvertLeadDialog({
   async function handleConvert() {
     setLoading(true);
     try {
-      // Fetch the full contact first so we can send all fields back intact.
-      // Sending only { tags } would wipe every other field to null because
-      // the PATCH handler does a full-row update.
-      const getRes = await fetch(`/api/contacts/${leadId}`);
-      if (!getRes.ok) {
-        toast.error("Couldn't pull this contact. Try again.");
-        return;
-      }
-      const contact = await getRes.json();
-
-      const newTags = (contact.tags ?? []).filter(
-        (t: string) => t !== 'application-link' && t !== 'new-lead',
-      );
-
+      // PATCH is partial — send only tags. Re-GETting the row and writing
+      // every field back raced concurrent edits and used to wipe blanks
+      // when a caller treated PATCH as a full-row replace.
       const res = await fetch(`/api/contacts/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: contact.name,
-          email: contact.email ?? '',
-          phone: contact.phone ?? '',
-          budget: contact.budget ?? '',
-          preferences: contact.preferences ?? '',
-          properties: contact.properties ?? [],
-          address: contact.address ?? '',
-          notes: contact.notes ?? '',
-          type: contact.type ?? 'QUALIFICATION',
-          tags: newTags,
-        }),
+        body: JSON.stringify(convertLeadTagPatch(currentTags)),
       });
       if (res.ok) {
         toast.success('Converted to client.');

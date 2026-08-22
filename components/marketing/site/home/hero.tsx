@@ -137,7 +137,7 @@ function ArcadeSlot() {
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29] text-white">
               <Play className="ml-0.5 h-4 w-4" />
             </span>
-            <span className="font-display text-[15px] font-semibold tracking-tight text-[#15131a]">
+            <span className="font-sans text-[15px] font-semibold tracking-tight text-[#15131a]">
               Watch the tour
             </span>
           </span>

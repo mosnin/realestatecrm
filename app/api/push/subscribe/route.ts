@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -51,8 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from('PushSubscription')
+  const { error } = await tenantTable(supabase, 'PushSubscription', { spaceId: space.id })
     .upsert(
       {
         spaceId: space.id,
@@ -94,10 +94,8 @@ export async function DELETE(req: NextRequest) {
   const endpoint = payload.endpoint?.trim();
   if (!endpoint) return NextResponse.json({ error: 'endpoint is required' }, { status: 400 });
 
-  const { error } = await supabase
-    .from('PushSubscription')
+  const { error } = await tenantTable(supabase, 'PushSubscription', { spaceId: space.id })
     .delete()
-    .eq('spaceId', space.id)
     .eq('endpoint', endpoint);
 
   if (error) {

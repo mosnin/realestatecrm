@@ -11,7 +11,7 @@ describe('Chippi BEUI and OpenUI integration', () => {
     const workspace = read('components/chippi/chippi-workspace.tsx');
 
     expect(workspace).not.toContain('key="thinking-indicator"');
-    expect(workspace).toContain('<WorkActivityTimeline events={workActivities} />');
+    expect(workspace).toContain('shouldShowInlineWorkActivity');
     expect(workspace).toContain('<ThinkingIndicator');
     expect(workspace).toContain('<Transcript');
     expect(workspace).not.toMatch(

@@ -4,6 +4,8 @@ import { requireContactAccess } from '@/lib/api-auth';
 import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export const runtime = 'nodejs';
 
@@ -35,8 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { allowed } = await checkRateLimit(`contacts:inforeq:${userId}`, 30, 60);
   if (!allowed) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
 
-  const { data: inserted, error } = await supabase
-    .from('ClientInfoRequest')
+  const { data: inserted, error } = await tenantTable(supabase, 'ClientInfoRequest', { spaceId: space.id })
     .insert({ contactId, spaceId: space.id, message, status: 'pending' })
     .select('id, message, status, response, createdAt, fulfilledAt')
     .single();
@@ -46,8 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Notify the client by their contact email (best-effort).
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('email')
     .eq('id', contactId)
     .maybeSingle();

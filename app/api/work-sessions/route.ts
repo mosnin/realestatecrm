@@ -6,6 +6,7 @@ import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { startWorkSession } from '@/lib/work-sessions/start';
 import { isWorkspaceRunsEnabledForSpace } from '@/lib/chippi/workspace-run-flag';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -25,10 +26,8 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const conversationId = req.nextUrl.searchParams.get('conversationId');
-  let query = supabase
-    .from('WorkSession')
-    .select('*')
-    .eq('spaceId', auth.space.id);
+  let query = tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
+    .select('*');
   if (conversationId) query = query.eq('conversationId', conversationId);
   const { data, error } = await query
     .order('createdAt', { ascending: false })
@@ -62,10 +61,8 @@ export async function POST(req: NextRequest) {
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too many sessions this hour.' }, { status: 429 });
   }
-  const { count: active, error: activeError } = await supabase
-    .from('WorkSession')
+  const { count: active, error: activeError } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
     .select('*', { count: 'exact', head: true })
-    .eq('spaceId', auth.space.id)
     .in('status', ['planning', 'awaiting_approval', 'awaiting_input', 'running']);
   if (activeError) {
     return NextResponse.json({ error: 'Could not verify active sessions.' }, { status: 500 });

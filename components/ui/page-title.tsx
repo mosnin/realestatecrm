@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { H1, TITLE_FONT } from '@/lib/typography';
 
 interface PageTitleProps {
   /** Muted greeting line above the h1 — e.g. "Activity." with period. */
@@ -17,10 +18,7 @@ export function PageTitle({ label, children, subtitle, actions, className }: Pag
     <header className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="space-y-1.5 min-w-0">
         {label && <p className="text-sm text-muted-foreground">{label}</p>}
-        <h1
-          className="text-3xl tracking-tight text-foreground"
-          style={{ fontFamily: 'var(--font-title)' }}
-        >
+        <h1 className={H1} style={TITLE_FONT}>
           {children}
         </h1>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}

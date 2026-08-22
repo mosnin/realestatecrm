@@ -20,6 +20,8 @@
 
 import { redis, isRedisConfigured } from '@/lib/redis';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const STOP_TTL_SECONDS = 600;
 /** Minimum interval between Redis polls from a streaming loop. */
@@ -73,8 +75,8 @@ export async function consumeChatStop(turnId: string): Promise<boolean> {
     }
     // PostgreSQL is authoritative. Redis is only a low-latency wake-up; a
     // restart, eviction, or cross-instance request must not erase Stop.
-    const { data } = await supabase
-      .from('ConversationTurn')
+    const { data } = await unscoped(supabase
+      .from('ConversationTurn'), 'post-fetch: caller verified parent scope before this id query')
       .select('id')
       .eq('id', turnId)
       .eq('status', 'running')

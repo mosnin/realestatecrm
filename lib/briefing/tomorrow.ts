@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -73,23 +74,17 @@ export async function composeTomorrow(spaceId: string): Promise<string | null> {
   const { start, end, dateOnly } = tomorrowBounds();
 
   const [closingRes, toursRes, followUpsRes] = await Promise.all([
-    supabase
-      .from('Deal')
+    tenantTable(supabase, 'Deal', { spaceId })
       .select('id, title')
-      .eq('spaceId', spaceId)
       .eq('status', 'active')
       .eq('closeDate', dateOnly),
-    supabase
-      .from('Tour')
+    tenantTable(supabase, 'Tour', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .gte('startsAt', start)
       .lt('startsAt', end)
       .neq('status', 'cancelled'),
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId })
       .select('id', { count: 'exact', head: true })
-      .eq('spaceId', spaceId)
       .is('brokerageId', null)
       .gte('followUpAt', start)
       .lt('followUpAt', end),

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Send, Square, Loader2, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
+import { Send, Square, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
@@ -242,12 +242,12 @@ export function ChippiBar({ slug }: Props) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       const text = draft.trim();
-      if (!text || isStreaming || pendingApproval) return;
+      if (!text) return;
       setDraft('');
       setExpanded(true);
       await send(text);
     },
-    [draft, isStreaming, pendingApproval, send],
+    [draft, send],
   );
 
   // The trailing assistant message — used to detect the "thinking" state.
@@ -435,7 +435,6 @@ export function ChippiBar({ slug }: Props) {
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setExpanded(true)}
           placeholder={dictation.listening ? 'Listening…' : contextPlaceholder}
-          disabled={!!pendingApproval}
           aria-label="Message Chippi"
           className="flex-1 min-w-0 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground/70 disabled:opacity-50"
         />
@@ -449,7 +448,6 @@ export function ChippiBar({ slug }: Props) {
             onPointerUp={(e) => { e.preventDefault(); stopDictation(); }}
             onPointerLeave={() => { if (dictation.listening) stopDictation(); }}
             onPointerCancel={() => { if (dictation.listening) stopDictation(); }}
-            disabled={!!pendingApproval}
             aria-label={dictation.listening ? 'Listening. Release to send' : 'Hold to talk'}
             title="Hold to talk"
             className={cn(
@@ -475,11 +473,11 @@ export function ChippiBar({ slug }: Props) {
         ) : (
           <button
             type="submit"
-            disabled={!draft.trim() || !!pendingApproval}
+            disabled={!draft.trim()}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Send"
           >
-            {pendingApproval ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+            <Send size={11} />
           </button>
         )}
       </form>

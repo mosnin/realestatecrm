@@ -28,10 +28,12 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { getBrokerContext, canManageLeads } from '@/lib/permissions';
 import { assignLeadToRealtor } from '@/lib/broker-assign-lead';
+import { tenantTable } from '@/lib/tenant-db';
 import { audit } from '@/lib/audit';
 import { syncContact } from '@/lib/vectorize';
 import type { Contact } from '@/lib/types';
 import { MAX_CONTACT_BULK as MAX_BULK } from '@/lib/api-limits';
+import { CONTACT_ARCHIVE_UNTIL } from '@/lib/leads/org-filters';
 
 const TAG_MAX_LEN = 100;
 const VALID_STAGES = ['QUALIFICATION', 'TOUR', 'APPLICATION'] as const;
@@ -40,10 +42,8 @@ type ContactStage = (typeof VALID_STAGES)[number];
 /**
  * "Archive" for a contact is a far-future snooze — Contact has no status
  * column, and snoozedUntil already drives the "hide from People" behaviour the
- * PATCH route exposes. A fixed sentinel year keeps archived rows out of the
- * default list until explicitly un-archived.
+ * PATCH route exposes. CONTACT_ARCHIVE_UNTIL is the single sentinel.
  */
-const ARCHIVE_UNTIL = '2999-12-31T00:00:00.000Z';
 
 type BulkAction =
   | 'tag-add'
@@ -152,17 +152,15 @@ export async function POST(req: NextRequest) {
 
   // ── Load only the rows that are actually in this space ────────────────────
   // Anything missing from this set is a cross-space / deleted id → not_found.
-  const { data: rows, error: loadErr } = await supabase
-    .from('Contact')
+  const { data: rows, error: loadErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
     .select('id, type, tags')
-    .eq('spaceId', space.id)
     .in('id', ids);
   if (loadErr) {
     console.error('[contacts/bulk] load error:', loadErr);
     return NextResponse.json({ error: 'Failed to load contacts' }, { status: 500 });
   }
   const byId = new Map(
-    (rows ?? []).map((r) => [r.id as string, r as { id: string; type: string; tags: string[] | null }]),
+    ((rows ?? []) as Array<{ id: string; type: string; tags: string[] | null }>).map((r) => [r.id, r]),
   );
 
   const results: PerIdResult[] = [];
@@ -196,17 +194,15 @@ export async function POST(req: NextRequest) {
       updates.type = stageVal;
       if (row.type !== stageVal) updates.stageChangedAt = nowIso;
     } else if (act === 'archive') {
-      updates.snoozedUntil = ARCHIVE_UNTIL;
+      updates.snoozedUntil = CONTACT_ARCHIVE_UNTIL;
     } else if (act === 'unarchive') {
       updates.snoozedUntil = null;
     }
 
-    const { data: updated, error: updErr } = await supabase
-      .from('Contact')
+    const { data: updated, error: updErr } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
       .update(updates)
       // CAS on space ownership — TOCTOU-safe even though we re-read above.
       .eq('id', id)
-      .eq('spaceId', space.id)
       .select()
       .maybeSingle();
     if (updErr || !updated) {

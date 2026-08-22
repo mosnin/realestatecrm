@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { coerceToolArguments } from './coerce-tool-args';
 import { getTool } from './registry';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
@@ -86,7 +87,9 @@ export async function executeTool(
 
   // 3. Validate args. Prefer structured zod issues so the model can
   //    self-correct precisely ("expected number, got string at .limit").
-  const parsed = tool.parameters.safeParse(rawArgs);
+  const parsed = tool.parameters.safeParse(
+    coerceToolArguments(rawArgs, tool.parameters),
+  );
   if (!parsed.success) {
     const issueSummary = parsed.error.issues
       .slice(0, 6)

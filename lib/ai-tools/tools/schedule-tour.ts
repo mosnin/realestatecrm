@@ -27,6 +27,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { defineTool } from '../types';
 import { assertCanSpend, chargeWorkflow, CreditsExhaustedError, SubscriptionDelinquentError } from '@/lib/billing/meter';
@@ -125,11 +126,9 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     let guestPhone: string | null = args.guestPhone?.trim() || null;
 
     if (args.contactId) {
-      const { data: contact, error } = await supabase
-        .from('Contact')
+      const { data: contact, error } = await tenantTable(supabase, 'Contact', { spaceId: ctx.space.id })
         .select('id, name, email, phone')
         .eq('id', args.contactId)
-        .eq('spaceId', ctx.space.id)
         .is('brokerageId', null)
         .maybeSingle();
       if (error) {
@@ -197,7 +196,7 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
 
     // Audit the tour on the Contact's activity feed when linked.
     if (contactId) {
-      const { error: activityErr } = await supabase.from('ContactActivity').insert({
+      const { error: activityErr } = await tenantTable(supabase, 'ContactActivity', { spaceId: ctx.space.id }).insert({
         id: crypto.randomUUID(),
         spaceId: ctx.space.id,
         contactId,

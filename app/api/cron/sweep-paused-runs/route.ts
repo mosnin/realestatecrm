@@ -20,6 +20,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 const HARD_DELETE_DAYS = 30;
 
@@ -42,8 +44,8 @@ async function handler(req: NextRequest) {
   const cutoffIso = new Date(Date.now() - HARD_DELETE_DAYS * 86_400_000).toISOString();
 
   // (1) Mark expired anything still pending past its expiresAt.
-  const { data: expiredData, error: expireErr } = await supabase
-    .from('AgentPausedRun')
+  const { data: expiredData, error: expireErr } = await unscoped(supabase
+    .from('AgentPausedRun'), 'cron: cross-tenant discovery then per-row work')
     .update({ status: 'expired', updatedAt: nowIso })
     .eq('status', 'pending')
     .lt('expiresAt', nowIso)
@@ -56,8 +58,8 @@ async function handler(req: NextRequest) {
   const expiredCount = (expiredData ?? []).length;
 
   // (2) Hard-delete anything older than HARD_DELETE_DAYS.
-  const { data: deletedData, error: deleteErr } = await supabase
-    .from('AgentPausedRun')
+  const { data: deletedData, error: deleteErr } = await unscoped(supabase
+    .from('AgentPausedRun'), 'cron: cross-tenant discovery then per-row work')
     .delete()
     .lt('createdAt', cutoffIso)
     .select('id');

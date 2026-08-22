@@ -26,6 +26,9 @@ import webpush from 'web-push';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { after } from 'next/server';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -87,10 +90,8 @@ async function performPushToSpace(spaceId: string, payload: PushPayload): Promis
 
   let rows: SubscriptionRow[] = [];
   try {
-    const { data, error } = await supabase
-      .from('PushSubscription')
-      .select('id, endpoint, p256dh, auth')
-      .eq('spaceId', spaceId);
+    const { data, error } = await tenantTable(supabase, 'PushSubscription', { spaceId })
+      .select('id, endpoint, p256dh, auth');
     if (error) {
       logger.error('[push] failed to load subscriptions', { spaceId, err: error.message });
       return 0;
@@ -137,7 +138,7 @@ async function performPushToSpace(spaceId: string, payload: PushPayload): Promis
 
   if (dead.length > 0) {
     try {
-      await supabase.from('PushSubscription').delete().in('id', dead);
+      await unscoped(supabase.from('PushSubscription'), 'post-fetch: caller verified parent scope before this id query').delete().in('id', dead);
       logger.info('[push] pruned dead subscriptions', { spaceId, count: dead.length });
     } catch (err) {
       logger.error('[push] failed to prune dead subscriptions', { spaceId }, err);

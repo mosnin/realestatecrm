@@ -3,16 +3,15 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolve(userId: string, propertyId: string, packetId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data } = await supabase
-    .from('PropertyPacket')
+  const { data } = await tenantTable(supabase, 'PropertyPacket', { spaceId: space.id })
     .select('*')
     .eq('id', packetId)
     .eq('propertyId', propertyId)
-    .eq('spaceId', space.id)
     .maybeSingle();
   if (!data) return null;
   return { space, packet: data };
@@ -55,11 +54,9 @@ export async function PATCH(
 
   if (Object.keys(patch).length === 0) return NextResponse.json(ctx.packet);
 
-  const { data, error } = await supabase
-    .from('PropertyPacket')
+  const { data, error } = await tenantTable(supabase, 'PropertyPacket', { spaceId: ctx.space.id })
     .update(patch)
     .eq('id', packetId)
-    .eq('spaceId', ctx.space.id)
     .select()
     .single();
 
@@ -82,11 +79,9 @@ export async function DELETE(
   const ctx = await resolve(userId, id, packetId);
   if (!ctx) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('PropertyPacket')
+  const { error } = await tenantTable(supabase, 'PropertyPacket', { spaceId: ctx.space.id })
     .delete()
-    .eq('id', packetId)
-    .eq('spaceId', ctx.space.id);
+    .eq('id', packetId);
   if (error) {
     logger.error('[packets/DELETE]', { packetId }, error);
     return NextResponse.json({ error: 'Failed to delete packet' }, { status: 500 });

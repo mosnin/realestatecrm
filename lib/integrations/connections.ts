@@ -10,6 +10,9 @@ import { logger } from '@/lib/logger';
 import { after } from 'next/server';
 import { deleteConnection as composioDelete, listConnectedAccountsForEntity } from './composio';
 import { findIntegration } from './catalog';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export type IntegrationStatus = 'active' | 'pending' | 'expired' | 'revoked' | 'failed';
 
@@ -157,10 +160,8 @@ async function ensureTriggersRegistered(connection: IntegrationConnectionRow): P
 
 /** All connections for a space, regardless of status. UI filters as needed. */
 export async function listConnections(spaceId: string): Promise<IntegrationConnectionRow[]> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('*')
-    .eq('spaceId', spaceId)
     .order('createdAt', { ascending: false });
   if (error) {
     logger.warn('[integrations.connections] list failed', { spaceId, err: error.message });
@@ -175,10 +176,8 @@ export async function activeToolkits(args: {
   spaceId: string;
   userId: string;
 }): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('toolkit')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('status', 'active');
   if (error) {
@@ -193,8 +192,8 @@ export async function activeToolkits(args: {
 
 /** Look up by composio connection id — used by the OAuth callback. */
 export async function findByComposioId(composioConnectionId: string) {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     .eq('composioConnectionId', composioConnectionId)
     .maybeSingle();
@@ -203,8 +202,17 @@ export async function findByComposioId(composioConnectionId: string) {
 
 /** Look up by our own row id. */
 export async function getById(id: string) {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  return (data ?? null) as IntegrationConnectionRow | null;
+}
+
+/** Space-first lookup — a foreign id is indistinguishable from missing. */
+export async function getByIdForSpace(id: string, spaceId: string) {
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('*')
     .eq('id', id)
     .maybeSingle();
@@ -234,8 +242,8 @@ export async function upsertByComposioId(args: {
   const targetStatus = args.status ?? 'active';
   const existing = await findByComposioId(args.composioConnectionId);
   if (existing) {
-    const { error } = await supabase
-      .from('IntegrationConnection')
+    const { error } = await unscoped(supabase
+      .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
       .update({
         label: args.label ?? existing.label ?? null,
         status: targetStatus,
@@ -277,8 +285,7 @@ export async function insertConnection(args: {
    *  API key). Omit for Composio-backed connections. */
   secretCiphertext?: string;
 }): Promise<IntegrationConnectionRow | null> {
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .insert({
       spaceId: args.spaceId,
       userId: args.userId,
@@ -318,8 +325,8 @@ export async function setStatus(args: {
   status: IntegrationStatus;
   lastError?: string;
 }): Promise<void> {
-  const { error } = await supabase
-    .from('IntegrationConnection')
+  const { error } = await unscoped(supabase
+    .from('IntegrationConnection'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: args.status,
       lastError: args.lastError ?? null,
@@ -434,10 +441,8 @@ export async function findActive(args: {
   userId: string;
   toolkit: string;
 }): Promise<IntegrationConnectionRow | null> {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('*')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('toolkit', args.toolkit)
     .eq('status', 'active')
@@ -453,10 +458,8 @@ export async function findPending(args: {
   userId: string;
   toolkit: string;
 }): Promise<IntegrationConnectionRow[]> {
-  const { data } = await supabase
-    .from('IntegrationConnection')
+  const { data } = await tenantTable(supabase, 'IntegrationConnection', { spaceId: args.spaceId })
     .select('*')
-    .eq('spaceId', args.spaceId)
     .eq('userId', args.userId)
     .eq('toolkit', args.toolkit)
     .eq('status', 'pending');

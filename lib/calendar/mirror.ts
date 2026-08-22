@@ -27,7 +27,9 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -82,10 +84,8 @@ export async function findCalendarConnection(
 ): Promise<CalendarConnection | null> {
   if (!composioConfigured()) return null;
 
-  const { data, error } = await supabase
-    .from('IntegrationConnection')
+  const { data, error } = await tenantTable(supabase, 'IntegrationConnection', { spaceId })
     .select('id, userId, toolkit')
-    .eq('spaceId', spaceId)
     .in('toolkit', CALENDAR_TOOLKITS as readonly string[])
     .eq('status', 'active')
     .order('toolkit', { ascending: true }) // 'googlecalendar' < 'outlook_calendar'
@@ -207,8 +207,7 @@ export async function writeEventThrough(
   // 2. Always log the mirror row, even when the external write failed.
   //    Intent is the unit of forensics: if Chippi tried to put a tour on
   //    the calendar at 3pm and Google was down, we still want to know.
-  const { data: mirrorRow, error: mirrorErr } = await supabase
-    .from('CalendarEventMirror')
+  const { data: mirrorRow, error: mirrorErr } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId: input.spaceId })
     .insert({
       spaceId: input.spaceId,
       externalProvider: input.connection.toolkit,
@@ -253,10 +252,8 @@ async function findTourMirror(
   spaceId: string,
   sourceTourId: string,
 ): Promise<{ id: string; externalEventId: string; externalProvider: CalendarProvider } | null> {
-  const { data, error } = await supabase
-    .from('CalendarEventMirror')
+  const { data, error } = await tenantTable(supabase, 'CalendarEventMirror', { spaceId })
     .select('id, externalEventId, externalProvider')
-    .eq('spaceId', spaceId)
     .eq('sourceTourId', sourceTourId)
     .not('externalEventId', 'is', null)
     .order('createdAt', { ascending: false })
@@ -333,8 +330,8 @@ export async function updateEventThrough(
 
   // Keep the mirror row's window in sync regardless of the external result —
   // it's our forensic record of where the event should be.
-  const { error: updErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: updErr } = await unscoped(supabase
+    .from('CalendarEventMirror'), 'post-fetch: caller verified parent scope before this id query')
     .update({ start: input.startsAt, end: input.endsAt })
     .eq('id', mirror.id);
   if (updErr) {
@@ -388,8 +385,8 @@ export async function deleteEventThrough(input: {
 
   // Drop the mirror row — the event is gone (or we tried). Leaving a stale
   // row would resurface a deleted slot in the on-demand calendar surface.
-  const { error: delErr } = await supabase
-    .from('CalendarEventMirror')
+  const { error: delErr } = await unscoped(supabase
+    .from('CalendarEventMirror'), 'post-fetch: caller verified parent scope before this id query')
     .delete()
     .eq('id', mirror.id);
   if (delErr) {

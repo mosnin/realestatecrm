@@ -5,6 +5,8 @@ import { sendSMS, followUpReminderSMS } from '@/lib/sms';
 import { sendPushToSpace } from '@/lib/push';
 import { redis } from '@/lib/redis';
 import { monitorCron } from '@/lib/cron-monitor';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /**
  * GET /api/cron/follow-up-reminders
@@ -41,8 +43,8 @@ async function handler(req: NextRequest) {
   // Get contacts with follow-ups that are overdue or due today (within last 24h)
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const { data: contacts, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contacts, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'cron: cross-tenant discovery then per-row work')
     .select('id, name, phone, followUpAt, spaceId')
     .lte('followUpAt', now.toISOString())
     .gte('followUpAt', yesterday.toISOString());

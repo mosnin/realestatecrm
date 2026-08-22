@@ -21,6 +21,8 @@ import { supabase } from '@/lib/supabase';
 import { sendTourReminder, type TourEmailData } from '@/lib/tour-emails';
 import { sendSMS, tourReminderSMS } from '@/lib/sms';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+import { formatTourTime } from '@/lib/tours/format-wallclock';
 
 export interface ReminderRow {
   tourId: string;
@@ -39,8 +41,8 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
   const in1h = new Date(now.getTime() + 60 * 60 * 1000);
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-  const { data: tours, error } = await supabase
-    .from('Tour')
+  const { data: tours, error } = await unscoped(supabase
+    .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
     .select(
       'id, guestName, guestEmail, guestPhone, propertyAddress, startsAt, endsAt, status, spaceId, manageToken, contactId, reminder24SentAt, reminder1hSentAt',
     )
@@ -59,10 +61,11 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
   // Resolve business names once per space for the templates.
   const spaceIds = [...new Set(tours.map((t: any) => t.spaceId))];
   const [{ data: settings }, { data: spaces }] = await Promise.all([
-    supabase.from('SpaceSetting').select('spaceId, businessName').in('spaceId', spaceIds),
+    supabase.from('SpaceSetting').select('spaceId, businessName, timezone').in('spaceId', spaceIds),
     supabase.from('Space').select('id, name, slug').in('id', spaceIds),
   ]);
   const nameMap = new Map((settings ?? []).map((s: any) => [s.spaceId, s.businessName]));
+  const tzMap = new Map((settings ?? []).map((s: any) => [s.spaceId, s.timezone as string | null | undefined]));
   const spaceMap = new Map((spaces ?? []).map((s: any) => [s.id, s]));
 
   const reminders: ReminderRow[] = [];
@@ -80,8 +83,8 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
     // CLAIM the send: stamp the column only if still null. If another cron
     // tick already claimed it, this updates zero rows and we skip — no
     // double-send.
-    const { data: claimed, error: claimErr } = await supabase
-      .from('Tour')
+    const { data: claimed, error: claimErr } = await unscoped(supabase
+      .from('Tour'), 'post-fetch: caller verified parent scope before this id query')
       .update({ [column]: new Date().toISOString() })
       .eq('id', tour.id)
       .is(column, null)
@@ -96,6 +99,7 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
     const businessName =
       nameMap.get(tour.spaceId) || spaceMap.get(tour.spaceId)?.name || 'Your Agent';
     const slug = spaceMap.get(tour.spaceId)?.slug ?? '';
+    const timezone = tzMap.get(tour.spaceId) ?? null;
 
     const emailData: TourEmailData = {
       guestName: tour.guestName,
@@ -108,6 +112,7 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
       tourId: tour.id,
       slug,
       manageToken: tour.manageToken,
+      timezone,
     };
 
     const delivered = { email: false, sms: false };
@@ -129,7 +134,7 @@ export async function runTourReminders(): Promise<{ processed: number; reminders
             guestPhone: tour.guestPhone,
             spaceId: tour.spaceId,
             businessName,
-            time: new Date(tour.startsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+            time: formatTourTime(tour.startsAt, timezone),
             property: tour.propertyAddress,
           }),
         );

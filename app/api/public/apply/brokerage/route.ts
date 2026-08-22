@@ -19,6 +19,8 @@ import { formConfigSchema, type FormQuestion } from '@/lib/form-config-schema';
 import { logger } from '@/lib/logger';
 import { routeBrokerageLead } from '@/lib/brokerage-routing';
 import { fireFirstTouch } from '@/lib/leads/first-touch';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /** Parse budget/rent range strings to a midpoint number for the DB. */
 function parseBudgetToNumber(val: unknown): number | null {
@@ -598,8 +600,8 @@ export async function POST(req: NextRequest) {
         leadType: contactLeadType,
       });
 
-      const { error: scoreUpdateError } = await supabase
-        .from('Contact')
+      const { error: scoreUpdateError } = await unscoped(supabase
+        .from('Contact'), 'public intake: slug/token then scoped write')
         .update({
           scoringStatus: scoring.scoringStatus,
           leadScore: scoring.leadScore,
@@ -623,8 +625,8 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       logger.error('[apply/brokerage] scoring failed', { contactId: contact.id }, error);
       try {
-        await supabase
-          .from('Contact')
+        await unscoped(supabase
+          .from('Contact'), 'public intake: slug/token then scoped write')
           .update({
             scoringStatus: 'failed',
             leadScore: null,
@@ -685,7 +687,7 @@ export async function POST(req: NextRequest) {
     // and registers its own after() keep-alive — zero latency added to the
     // applicant's response. try/catch is belt-and-suspenders.
     try {
-      void fireFirstTouch({ spaceId: spaceIdForInsert, contactId: contact.id });
+      void fireFirstTouch({ spaceId: spaceIdForInsert, contactId: contact.id, origin: 'inbound' });
     } catch (e) {
       logger.error('[apply/brokerage] first-touch dispatch failed (non-fatal)', { contactId: contact.id }, e);
     }

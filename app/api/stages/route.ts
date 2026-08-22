@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import type { DealStage } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,7 +18,7 @@ export async function GET(req: NextRequest) {
   const pipelineId = req.nextUrl.searchParams.get('pipelineId');
   const pipelineType = req.nextUrl.searchParams.get('pipelineType');
 
-  let stageQuery = supabase.from('DealStage').select('*').eq('spaceId', space.id);
+  let stageQuery = tenantTable(supabase, 'DealStage', { spaceId: space.id }).select('*');
 
   if (pipelineId) {
     stageQuery = stageQuery.eq('pipelineId', pipelineId);
@@ -35,10 +37,8 @@ export async function GET(req: NextRequest) {
   const stageIds = stageRows.map((r: any) => r.id);
   let dealRows: any[] = [];
   if (stageIds.length > 0) {
-    const { data, error: dealError } = await supabase
-      .from('Deal')
+    const { data, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
       .select('*')
-      .eq('spaceId', space.id)
       .in('stageId', stageIds)
       .order('position', { ascending: true });
     if (dealError) throw dealError;
@@ -63,8 +63,7 @@ export async function GET(req: NextRequest) {
   // label) so the payload doesn't balloon with long custom labels.
   let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
   if (dealIds.length > 0) {
-    const { data, error: clError } = await supabase
-      .from('DealChecklistItem')
+    const { data, error: clError } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
       .select('dealId, completedAt, dueAt, label')
       .in('dealId', dealIds);
     if (clError) throw clError;
@@ -163,11 +162,9 @@ export async function POST(req: NextRequest) {
   // id (corrupting grouping / surfacing a foreign id). Mirrors the deals POST
   // ownership checks.
   if (safePipelineId) {
-    const { data: ownPipeline } = await supabase
-      .from('Pipeline')
+    const { data: ownPipeline } = await tenantTable(supabase, 'Pipeline', { spaceId: space.id })
       .select('id')
       .eq('id', safePipelineId)
-      .eq('spaceId', space.id)
       .maybeSingle();
     if (!ownPipeline) {
       return NextResponse.json({ error: 'Pipeline not found' }, { status: 400 });
@@ -181,10 +178,8 @@ export async function POST(req: NextRequest) {
         : 'rental');
 
   // Get the last position within the same pipeline
-  let lastQuery = supabase
-    .from('DealStage')
+  let lastQuery = tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .select('position')
-    .eq('spaceId', space.id)
     .order('position', { ascending: false })
     .limit(1);
 
@@ -215,8 +210,7 @@ export async function POST(req: NextRequest) {
   if (safePipelineType) insertData.pipelineType = safePipelineType;
   if (safeKind) insertData.kind = safeKind;
 
-  const { data: stage, error: insertError } = await supabase
-    .from('DealStage')
+  const { data: stage, error: insertError } = await tenantTable(supabase, 'DealStage', { spaceId: space.id })
     .insert(insertData)
     .select()
     .single();

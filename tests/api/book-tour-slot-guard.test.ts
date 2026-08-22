@@ -42,6 +42,15 @@ vi.mock('@/lib/tour-booking', () => ({
 vi.mock('@/lib/tour-emails', () => ({ sendTourConfirmation: vi.fn(async () => {}) }));
 vi.mock('@/lib/notify', () => ({ notifyNewTour: vi.fn(async () => {}) }));
 vi.mock('@/lib/sms', () => ({ sendSMS: vi.fn(async () => true), tourConfirmationSMS: (p: unknown) => p }));
+// Calendar write is Phase 3; this file only pins slot-guard wiring. No
+// connection → CRM-only book, same as the public route's honest fallback.
+vi.mock('@/lib/calendar/mirror-tour', () => ({
+  mirrorTourBookingToCalendar: vi.fn(async () => ({ attempted: false, reason: 'no_connection' })),
+  rollbackTourBooking: vi.fn(async () => undefined),
+}));
+vi.mock('@/lib/deals/advance-from-event', () => ({
+  advanceDealFromEvent: vi.fn(async () => ({ ok: true, dealId: 'deal_1', created: true, moved: false })),
+}));
 
 vi.mock('@/lib/supabase', () => {
   // The route touches several tables. We only need:

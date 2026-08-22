@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 type Params = { params: Promise<{ slug: string; id: string }> };
 
@@ -63,8 +65,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  const { data: row, error } = await supabase
-    .from('DealReviewRequest')
+  const { data: row, error } = await unscoped(supabase
+    .from('DealReviewRequest'), 'post-fetch: review request scoped by brokerage then child by id')
     .select(
       'id, dealId, status, reason, createdAt, resolvedAt, resolvedByUserId, resolvedNote, requestingUserId, brokerageId',
     )
@@ -87,13 +89,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 
   const [dealRes, commentsRes, resolvedByRes] = await Promise.all([
-    supabase
-      .from('Deal')
+    unscoped(supabase
+      .from('Deal'), 'post-fetch: review request scoped by brokerage then child by id')
       .select('id, title, value')
       .eq('id', row.dealId)
       .maybeSingle<DealLite>(),
-    supabase
-      .from('DealReviewComment')
+    unscoped(supabase
+      .from('DealReviewComment'), 'post-fetch: review request scoped by brokerage then child by id')
       .select('id, reviewRequestId, authorUserId, body, createdAt')
       .eq('reviewRequestId', row.id)
       .order('createdAt', { ascending: true }),

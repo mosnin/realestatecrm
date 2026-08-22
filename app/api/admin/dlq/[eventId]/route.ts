@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { inngest } from '@/lib/inngest/client';
 import { logAdminAction } from '@/lib/admin';
+import { unscoped } from '@/lib/supabase-guard';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RETRY_THRESHOLD = 3;
@@ -28,8 +29,10 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const { data: event, error } = await supabase
-    .from('DeadLetterEvent')
+  const { data: event, error } = await unscoped(
+    supabase.from('DeadLetterEvent'),
+    'admin: platform-admin DLQ lookup by event id',
+  )
     .select('*')
     .eq('id', eventId)
     .maybeSingle();
@@ -75,8 +78,10 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   // Fetch the current event first to get retryCount
-  const { data: existing, error: fetchError } = await supabase
-    .from('DeadLetterEvent')
+  const { data: existing, error: fetchError } = await unscoped(
+    supabase.from('DeadLetterEvent'),
+    'admin: platform-admin DLQ lookup by event id',
+  )
     .select('*')
     .eq('id', eventId)
     .maybeSingle();
@@ -126,8 +131,10 @@ export async function PATCH(req: Request, { params }: Params) {
     };
   }
 
-  const { data: event, error: updateError } = await supabase
-    .from('DeadLetterEvent')
+  const { data: event, error: updateError } = await unscoped(
+    supabase.from('DeadLetterEvent'),
+    'admin: platform-admin DLQ update by event id',
+  )
     .update(updatePayload)
     .eq('id', eventId)
     .select()

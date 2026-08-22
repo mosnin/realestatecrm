@@ -180,7 +180,12 @@ export function CallsView({ slug }: { slug: string }) {
           <h1 className="text-[3rem] leading-[.96] tracking-[-0.045em] sm:text-[4.5rem]" style={TITLE_FONT}>
             Call once. Remember every detail.
           </h1>
-          <p className={cn(BODY_MUTED)}>{statusSentence(calls)} Chippi keeps the summary and transcript attached to the relationship.</p>
+          <p className={cn(BODY_MUTED)}>
+            {statusSentence(calls)}{' '}
+            {voiceConfigured === false
+              ? 'Phone setup is still pending — summaries and transcripts attach here once calling is configured.'
+              : 'Chippi keeps the summary and transcript attached to the relationship.'}
+          </p>
         </div>
         <div className="flex items-end gap-3 lg:justify-end">
           <span className="text-[5rem] leading-[.78] tracking-[-0.06em] tabular-nums" style={TITLE_FONT}>{calls.length}</span>
@@ -192,7 +197,9 @@ export function CallsView({ slug }: { slug: string }) {
       <section className="chippi-dashboard-panel grid gap-5 rounded-[1.75rem] p-6 sm:grid-cols-[minmax(0,1fr)_minmax(18rem,.85fr)] sm:items-end sm:p-8">
         <div>
           <p className={cn(SECTION_LABEL)}>Start a call</p>
-          <p className="mt-2 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>Make the next conversation count.</p>
+          <p className="mt-2 text-2xl tracking-tight text-foreground" style={TITLE_FONT}>
+            {voiceConfigured === false ? 'Calling waits on phone setup.' : 'Make the next conversation count.'}
+          </p>
         </div>
         <div className="space-y-3">
           <div className="flex items-center gap-2">

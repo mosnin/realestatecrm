@@ -1,23 +1,15 @@
 'use client';
 
 /**
- * ToolGroupBlockView — renders a sequence of consecutive ToolCallBlocks as a
- * single collapsible group (chevron + shimmer-header + nested rows). Mirrors
- * Claude and ChatGPT's compact tool-count disclosure pattern.
- *
- * Decision: groups of 2+ tools collapse here. A single tool keeps the
- * existing per-block rich view (`ToolCallBlockView`) — that's where the
- * inline contacts / deals / tours / properties cards live, and we don't want
- * to bury them inside a collapsed header for the common one-tool turn.
- *
- * Rich result cards from the grouped tools render BELOW the group header so
- * the realtor still sees the answer without expanding. The group itself is
- * the meta-line; the data cards are the substance.
+ * ToolGroupBlockView — one collapsed dropdown for every non-subagent tool
+ * in a turn. Retries of the same tool collapse to a single nested row.
+ * Successful rich cards still render below the header; failed lookups do
+ * not advertise JSON / schema errors in the transcript.
  */
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { countLabel } from '@/lib/formatting';
-import { ToolGroup, type NestedTool, type NestedToolCategory } from '@/components/ui/tool-group';
+import { ToolGroup, type NestedTool, type NestedToolCategory, type ToolGroupState } from '@/components/ui/tool-group';
 import { Steps } from '@/components/ai/prompt-kit';
 import type { ToolCallBlock } from '@/lib/ai-tools/blocks';
 import { ToursResult } from './tool-results/tours-result';
@@ -27,11 +19,15 @@ import { DealsTableResult } from './tool-results/deals-table-result';
 import { PropertiesCarouselResult } from './tool-results/properties-carousel-result';
 import { StatsResult } from './tool-results/stats-result';
 import { WeatherResult } from './tool-results/weather-result';
+import { AreaResult } from './tool-results/area-result';
 import { OptionListResult } from './tool-results/option-list-result';
 import { QuestionFlowResult } from './tool-results/question-flow-result';
 import { MessageDraftResult, type MessageDraftData } from './tool-results/message-draft-result';
+import { GeneratedImageResult } from './tool-results/generated-image-result';
+import { ChippiOpenUiRenderer } from '@/components/ai/openui/chippi-openui-renderer';
 import type { OptionListInput, QuestionFlowInput } from './tool-results/tool-ui-mappers';
 import { normalizeDealRows, normalizePropertyRows } from './tool-results/normalize';
+import { Table2 } from 'lucide-react';
 
 /** snake_case → "Search contacts". Repeated from tool-call-block-view to keep
  *  these two surfaces independent — the inline view may diverge later. */
@@ -93,25 +89,39 @@ function toNestedTool(block: ToolCallBlock): NestedTool {
   };
 }
 
-export function toolGroupOutcomeLabel(blocks: ToolCallBlock[]): string {
+/** Latest attempt per tool name — retries of the same lookup collapse. */
+export function uniqueToolBlocks(blocks: ToolCallBlock[]): ToolCallBlock[] {
+  const latest = new Map<string, ToolCallBlock>();
+  for (const block of blocks) {
+    latest.set(block.name, block);
+  }
+  return [...latest.values()];
+}
+
+export function toolGroupViewState(
+  blocks: ToolCallBlock[],
+  anyLive: boolean,
+): ToolGroupState {
+  if (anyLive) return 'pending';
   const completed = blocks.filter((block) => block.status === 'complete');
-  const failures = blocks.filter((block) => block.status === 'error');
-  const skipped = blocks.filter(
+  if (completed.length === 0) return 'interrupted';
+  return 'completed';
+}
+
+export function toolGroupOutcomeLabel(blocks: ToolCallBlock[]): string {
+  const unique = uniqueToolBlocks(blocks);
+  const completed = unique.filter((block) => block.status === 'complete');
+  const skipped = unique.filter(
     (block) => block.status === 'denied' || block.status === 'skipped',
   );
-  const parts: string[] = [];
 
   if (completed.length > 0) {
-    parts.push(`${countLabel(completed.length, 'call')} completed`);
-  }
-  if (failures.length > 0) {
-    parts.push(`${failures.length} failed`);
+    return countLabel(completed.length, 'call');
   }
   if (skipped.length > 0) {
-    parts.push(`${skipped.length} skipped`);
+    return `${countLabel(skipped.length, 'call')} skipped`;
   }
-
-  return parts.join(' · ') || 'No tool calls completed';
+  return countLabel(unique.length || blocks.length, 'call');
 }
 
 /** Inline rich card for completed tools that returned a known data shape.
@@ -120,16 +130,38 @@ export function toolGroupOutcomeLabel(blocks: ToolCallBlock[]): string {
 function richResultFor(
   block: ToolCallBlock,
   onUserIntent?: (text: string) => void,
-): React.ReactNode {
+  onOpenWorkbench?: (artifactId: string) => void,
+): ReactNode {
   if (block.status !== 'complete' || !block.result?.ok) return null;
   const data = block.result.data as Record<string, unknown> | undefined;
   if (!data) return null;
+  if (block.display === 'openui' && typeof data.program === 'string') {
+    return <ChippiOpenUiRenderer program={data.program} />;
+  }
+  if (
+    block.display === 'workbench'
+    && typeof data.artifactId === 'string'
+    && onOpenWorkbench
+  ) {
+    return (
+      <div className="mt-2 flex items-center justify-between gap-3 border-y border-border/40 bg-transparent py-2.5">
+        <span className="inline-flex items-center gap-2 text-xs text-foreground"><Table2 className="size-3.5" /> Workbook ready</span>
+        <button
+          type="button"
+          onClick={() => onOpenWorkbench(data.artifactId as string)}
+          className="text-xs font-medium underline underline-offset-4"
+        >
+          Open in Workbench
+        </button>
+      </div>
+    );
+  }
   if (block.display === 'contacts' && Array.isArray((data as { contacts?: unknown[] }).contacts)) {
-    return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} />;
+    return <ContactsTableResult contacts={(data as { contacts: never[] }).contacts} onUserIntent={onUserIntent} />;
   }
   if (block.display === 'deals') {
     const deals = normalizeDealRows(data);
-    return deals.length > 0 ? <DealsTableResult deals={deals} /> : null;
+    return deals.length > 0 ? <DealsTableResult deals={deals} onUserIntent={onUserIntent} /> : null;
   }
   if (block.display === 'tours' && Array.isArray((data as { tours?: unknown[] }).tours)) {
     return <ToursResult data={data as { tours: never[] }} />;
@@ -145,6 +177,9 @@ function richResultFor(
   }
   if (block.display === 'weather') {
     return <WeatherResult data={data} />;
+  }
+  if (block.display === 'area') {
+    return <AreaResult data={data} />;
   }
   if (
     block.display === 'availability-picker' &&
@@ -177,6 +212,15 @@ function richResultFor(
   if (block.display === 'message-draft' && typeof (data as { body?: unknown }).body === 'string') {
     return <MessageDraftResult data={data as unknown as MessageDraftData} onUserIntent={onUserIntent} />;
   }
+  if (block.name === 'generate_studio_image' || block.display === 'generated-image') {
+    return (
+      <GeneratedImageResult
+        data={data}
+        prompt={typeof block.args?.prompt === 'string' ? block.args.prompt : undefined}
+        status="complete"
+      />
+    );
+  }
   return null;
 }
 
@@ -187,78 +231,52 @@ export interface ToolGroupBlockViewProps {
   liveCallIds?: Set<string>;
   /** Forwarded to interactive rich cards (availability picker). */
   onUserIntent?: (text: string) => void;
+  onOpenWorkbench?: (artifactId: string) => void;
 }
 
-export function ToolGroupBlockView({ blocks, liveCallIds, onUserIntent }: ToolGroupBlockViewProps) {
-  const nestedTools = useMemo(() => blocks.map(toNestedTool), [blocks]);
+export function ToolGroupBlockView({
+  blocks,
+  liveCallIds,
+  onUserIntent,
+  onOpenWorkbench,
+}: ToolGroupBlockViewProps) {
+  const unique = useMemo(() => uniqueToolBlocks(blocks), [blocks]);
+  const nestedTools = useMemo(() => unique.map(toNestedTool), [unique]);
 
   const anyLive = blocks.some((b) => liveCallIds?.has(b.callId));
+  const state = toolGroupViewState(unique, anyLive);
+  const shimmerLabel = inferShimmerLabel(unique);
 
-  // Honest outcome accounting: a group only "completed" if every member
-  // tool actually reported ok. A failed tool is not a finished task —
-  // claiming otherwise is the bug we're fixing. Denied / skipped members
-  // don't count as failures (the user opted out), so they ride the
-  // success path with the same calm copy.
-  const failures = blocks.filter((b) => b.status === 'error');
-  const anyFailed = failures.length > 0;
+  // Quiet count only — never "failed" or "Completed" in the same header.
+  const completeLabel = toolGroupOutcomeLabel(unique);
 
-  const state = anyLive ? 'pending' : 'completed';
-  const shimmerLabel = inferShimmerLabel(blocks);
-
-  // This label describes only the grouped tool calls. It must never imply
-  // that the enclosing Work turn succeeded: the assistant may still fail
-  // after several commands or searches completed successfully.
-  const completeLabel = toolGroupOutcomeLabel(blocks);
-
-  // First failure's error string is the most useful breadcrumb — surface it
-  // truncated so the realtor sees WHY without expanding. Empty result.error
-  // falls back to the summary (handlers sometimes put the reason there).
-  const firstFailure = failures[0];
-  const failureMessage = firstFailure
-    ? truncate(firstFailure.result?.error ?? firstFailure.result?.summary ?? 'No error message was returned.', 160)
-    : null;
-
-  // Rich result cards — only OK-completed tools with a known display shape.
-  // Failed tools never render rich data even if `data` is present, because
-  // the data is by definition stale/wrong when ok=false.
-  const richCards = blocks
-    .map((b) => {
-      const node = richResultFor(b, onUserIntent);
-      return node ? <div key={`rich-${b.callId}`}>{node}</div> : null;
-    })
-    .filter(Boolean);
+  // One successful card per display/name. Walk newest-first so a later
+  // retry that succeeded wins over earlier failures of the same tool.
+  const richCards: ReactNode[] = [];
+  const seen = new Set<string>();
+  for (const block of [...unique].reverse()) {
+    const key = block.display ?? block.name;
+    if (seen.has(key)) continue;
+    const node = richResultFor(block, onUserIntent, onOpenWorkbench);
+    if (!node) continue;
+    seen.add(key);
+    richCards.unshift(<div key={`rich-${block.callId}`}>{node}</div>);
+  }
 
   return (
-    <Steps state={state} count={blocks.length}>
+    <Steps state={state} count={unique.length}>
       <ToolGroup
         state={state}
         nestedTools={nestedTools}
         completeLabel={completeLabel}
         shimmerLabel={shimmerLabel}
-        interruptedLabel="Stopped"
-        // Elapsed time tracking isn't on ToolCallBlock yet — hide the metric
-        // rather than show a fabricated one.
+        interruptedLabel="Couldn't finish"
         showElapsed={false}
         maxVisibleTools={5}
       />
-      {!anyLive && anyFailed && failureMessage && (
-        <p
-          role="status"
-          className="pl-5 text-[12px] leading-snug text-rose-700 dark:text-rose-400"
-        >
-          {failureMessage}
-        </p>
-      )}
       {richCards.length > 0 && <div className="space-y-2">{richCards}</div>}
     </Steps>
   );
-}
-
-/** Inline truncate — keeps the failure line short enough to fit the
- *  transcript column without horizontal scroll. */
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 /** Pick a shimmer label that matches what the group is actually doing.

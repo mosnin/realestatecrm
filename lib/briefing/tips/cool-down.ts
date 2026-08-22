@@ -16,6 +16,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -53,10 +54,8 @@ export async function canFireTip(
   tipCategory: string,
   subjectId: string | null,
 ): Promise<boolean> {
-  const query = supabase
-    .from('BriefTipHistory')
+  const query = tenantTable(supabase, 'BriefTipHistory', { spaceId })
     .select('firedAt, outcome')
-    .eq('spaceId', spaceId)
     .eq('tipCategory', tipCategory)
     .order('firedAt', { ascending: false })
     .limit(1);
@@ -88,7 +87,7 @@ export async function recordTipFired(
   tipCategory: string,
   subjectId: string | null,
 ): Promise<void> {
-  await supabase.from('BriefTipHistory').insert({
+  await tenantTable(supabase, 'BriefTipHistory', { spaceId }).insert({
     spaceId,
     tipCategory,
     subjectId,

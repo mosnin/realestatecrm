@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import crypto from 'crypto';
 import { jwtVerify } from 'jose';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 // JWT_SECRET is resolved per-request; see authenticateKey() below.
 
@@ -43,8 +45,8 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
   // 20260607000012_mcp_key_expiry migration. NULL expiresAt = legacy key,
   // never expires (preserves backward compat for existing integrations).
   const keyHash = crypto.createHash('sha256').update(token).digest('hex');
-  const { data } = await supabase
-    .from('McpApiKey')
+  const { data } = await unscoped(supabase
+    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
     .select('spaceId, expiresAt')
     .eq('keyHash', keyHash)
     .maybeSingle();
@@ -54,8 +56,8 @@ async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip:
     return null;
   }
 
-  supabase
-    .from('McpApiKey')
+  unscoped(supabase
+    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
     .update({ lastUsedAt: new Date().toISOString() })
     .eq('keyHash', keyHash)
     .then(({ error }) => { if (error) console.error('[mcp] lastUsedAt update failed:', error.message); });

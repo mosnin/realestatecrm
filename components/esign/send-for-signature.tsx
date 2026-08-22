@@ -254,8 +254,8 @@ export function SendForSignature({
           <DialogHeader>
             <DialogTitle>Send for signature</DialogTitle>
             <DialogDescription>
-              We&apos;ll send it from your connected DocuSign. You&apos;ll see the status here as
-              they sign.
+              Sent from your DocuSign account. Chippi does not certify the
+              signature or move the deal — accept the offer when you are ready.
             </DialogDescription>
           </DialogHeader>
 

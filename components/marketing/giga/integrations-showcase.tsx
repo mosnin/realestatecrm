@@ -3,7 +3,7 @@
 /**
  * IntegrationsShowcase, the integrations feature section (image on the RIGHT).
  * Same animated/frosted pattern, grounded in the real apps Chippi connects to
- * through Composio: inbox, calendar, CRM, messaging, and e-sign.
+ * through Composio: inbox, calendar, CRM, and messaging.
  */
 
 import {
@@ -21,7 +21,7 @@ import {
 import { FeatureShowcase, Frost, Row, type ShowcaseStep } from './feature-showcase';
 
 const TOP_FEATURES = [
-  { icon: Boxes, title: '50+ apps', desc: 'The tools you already pay for, connected through Composio.' },
+  { icon: Boxes, title: 'Your stack', desc: 'The tools you already pay for, connected through Composio.' },
   { icon: ArrowLeftRight, title: 'Two-way sync', desc: 'Chippi reads from and writes back to each tool as it works.' },
   { icon: Gauge, title: 'Two-minute setup', desc: 'Connect with a click; no engineering, no spreadsheets.' },
 ];
@@ -82,14 +82,14 @@ const STEPS: ShowcaseStep[] = [
     ),
   },
   {
-    key: 'esign',
-    title: 'Docs and e-sign',
-    desc: 'Send the right document for signature without leaving the deal, and Chippi tracks it through to signed.',
+    key: 'docs',
+    title: 'Documents on the deal',
+    desc: 'Store the paperwork on the deal. If you connect your own DocuSign, you can send from that account — Chippi does not certify the signature or move the pipeline.',
     mockup: (
-      <Frost title="Documents" badge="Connected">
-        <Row icon={FileSignature} title="DocuSign" meta="send for signature" tone="text-[#ff9a6e]" right={ON} active />
-        <Row icon={Check} title="Buyer rep agreement sent" meta="awaiting signature" tone="text-emerald-300/80" />
-        <Row icon={Check} title="Disclosures, tracked to signed" meta="logged on the deal" tone="text-emerald-300/80" />
+      <Frost title="Documents" badge="On the deal">
+        <Row icon={FileSignature} title="Purchase agreement" meta="stored on the deal" tone="text-[#ff9a6e]" right={ON} active />
+        <Row icon={Check} title="Your DocuSign, if you use it" meta="optional — you own the signature" tone="text-emerald-300/80" />
+        <Row icon={Check} title="Accept the offer when you are ready" meta="realtor-owned contract date" tone="text-emerald-300/80" />
       </Frost>
     ),
   },
@@ -108,7 +108,7 @@ export function IntegrationsShowcase() {
       product={{
         name: 'Connected',
         icon: Blocks,
-        desc: 'Chippi plugs into your inbox, calendar, CRM, messaging, and e-sign through Composio, then works inside them, no rip and replace.',
+        desc: 'Chippi plugs into your inbox, calendar, CRM, and messaging through Composio, then works inside them, no rip and replace.',
         cta: { label: 'Browse integrations', href: '/integrations' },
       }}
       topFeatures={TOP_FEATURES}

@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { getSpaceByOwnerId } from '@/lib/space';
 import { z } from 'zod';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const unassignLeadSchema = z.object({
   contactId: z.string().uuid('Invalid contact ID'),
@@ -70,11 +73,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Verify the contact exists in the broker's space ──────────────────
-    const { data: contact, error: contactError } = await supabase
-      .from('Contact')
+    const { data: contact, error: contactError } = await tenantTable(supabase, 'Contact', {
+      spaceId: brokerSpace.id,
+    })
       .select('*')
       .eq('id', contactId)
-      .eq('spaceId', brokerSpace.id)
       .maybeSingle();
 
     // Check the primary-space error before branching to the secondary lookup
@@ -87,8 +90,8 @@ export async function POST(req: NextRequest) {
       value: brokerSpace.id,
     };
     if (!brokerContact) {
-      const { data: brokerageContact, error: brokerageContactError } = await supabase
-        .from('Contact')
+      const { data: brokerageContact, error: brokerageContactError } = await unscoped(supabase
+        .from('Contact'), 'broker: membership-proved cross-space access')
         .select('*')
         .eq('id', contactId)
         .eq('brokerageId', brokerage.id)
@@ -186,11 +189,11 @@ export async function POST(req: NextRequest) {
     // different realtor's space. An unscoped DELETE would then whack the
     // wrong contact. Verify the binding explicitly before any deletion.
     if (assignedSpaceId) {
-      const { data: clonedContactRow } = await supabase
-        .from('Contact')
+      const { data: clonedContactRow } = await tenantTable(supabase, 'Contact', {
+        spaceId: assignedSpaceId,
+      })
         .select('id')
         .eq('id', assignedContactId)
-        .eq('spaceId', assignedSpaceId)
         .maybeSingle();
       if (!clonedContactRow) {
         // Either the realtor already deleted their copy (benign) or the
@@ -237,21 +240,19 @@ export async function POST(req: NextRequest) {
                 .limit(1);
 
               if (!remainingLinks || remainingLinks.length === 0) {
-                await supabase
-                  .from('Deal')
+                await tenantTable(supabase, 'Deal', { spaceId: assignedSpaceId })
                   .delete()
-                  .eq('id', dealId)
-                  .eq('spaceId', assignedSpaceId);
+                  .eq('id', dealId);
               }
             }
           }
 
           // Delete the cloned contact itself, scoped by spaceId.
-          const { error: deleteError } = await supabase
-            .from('Contact')
+          const { error: deleteError } = await tenantTable(supabase, 'Contact', {
+            spaceId: assignedSpaceId,
+          })
             .delete()
-            .eq('id', assignedContactId)
-            .eq('spaceId', assignedSpaceId);
+            .eq('id', assignedContactId);
 
           // If the realtor already deleted the contact, that's fine.
           if (deleteError) {
@@ -300,8 +301,8 @@ export async function POST(req: NextRequest) {
       'unassigned',
     ];
 
-    const { error: updateError } = await supabase
-      .from('Contact')
+    const { error: updateError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .update({
         tags: updatedTags,
         notes: unassignmentNote,

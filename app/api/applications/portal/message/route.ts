@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * POST /api/applications/portal/message
@@ -65,8 +68,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate token + ref match
-  const { data: contact, error: contactError } = await supabase
-    .from('Contact')
+  const { data: contact, error: contactError } = await unscoped(supabase
+    .from('Contact'), 'capability token: application portal')
     .select('id, spaceId, name, email')
     .eq('applicationRef', applicationRef)
     .eq('statusPortalToken', token)
@@ -92,8 +95,7 @@ export async function POST(req: NextRequest) {
     .replace(/[^\w\s.,!?;:'"@#$%&*()\-/+=\[\]{}~`^\n\r\t]/g, '');
 
   // Create the message
-  const { data: message, error: insertError } = await supabase
-    .from('ApplicationMessage')
+  const { data: message, error: insertError } = await tenantTable(supabase, 'ApplicationMessage', { spaceId: contact.spaceId })
     .insert({
       contactId: contact.id,
       spaceId: contact.spaceId,
@@ -130,10 +132,8 @@ async function notifyRealtorOfMessage(
 
   const [{ data: space }, { data: settings }] = await Promise.all([
     supabase.from('Space').select('ownerId, name, slug').eq('id', spaceId).maybeSingle(),
-    supabase
-      .from('SpaceSetting')
+    tenantTable(supabase, 'SpaceSetting', { spaceId })
       .select('notifications, businessName')
-      .eq('spaceId', spaceId)
       .maybeSingle(),
   ]);
 

@@ -19,6 +19,8 @@ import { localDateIn } from '@/lib/briefing/timing';
 import { deliverBrief, loadDeliveryContext, getAppOrigin } from '@/lib/briefing/delivery';
 import type { Brief } from '@/lib/briefing/types';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const DAILY_LIMIT = 3;
 const DEFAULT_TIMEZONE = 'America/New_York';
@@ -33,7 +35,7 @@ export async function POST() {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const { allowed } = await checkRateLimit(
     `brief:test:${space.id}:${dayKey()}`,
@@ -59,8 +61,7 @@ export async function POST() {
   const realToday = localDateIn(new Date(), tz);
   const syntheticDate = `TEST-${realToday}-${Date.now()}`;
 
-  const { data: row, error } = await supabase
-    .from('Brief')
+  const { data: row, error } = await tenantTable(supabase, 'Brief', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       forDate: syntheticDate,
@@ -88,16 +89,14 @@ export async function POST() {
 
   // Clean up the synthetic row — we never want it in the analytics
   // aggregations or in tomorrow's "yesterday" link.
-  await supabase.from('Brief').delete().eq('id', row.id);
+  await tenantTable(supabase, 'Brief', { spaceId: space.id }).delete().eq('id', row.id);
 
   return NextResponse.json({ ok: true, result });
 }
 
 async function getSpaceTimezone(spaceId: string): Promise<string> {
-  const { data } = await supabase
-    .from('SpaceSetting')
+  const { data } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('timezone')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   return (data?.timezone as string | undefined) ?? DEFAULT_TIMEZONE;
 }

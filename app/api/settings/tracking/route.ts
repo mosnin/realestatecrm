@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { TrackingPixels } from '@/lib/types';
+import { tenantTable } from '@/lib/tenant-db';
 
 // Pixel ID fields must be alphanumeric + hyphens only (prevent XSS via ID injection)
 const PIXEL_ID_REGEX = /^[a-zA-Z0-9\-_]+$/;
@@ -173,10 +174,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { data: settings, error } = await supabase
-    .from('SpaceSetting')
+  const { data: settings, error } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('trackingPixels')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error) {
@@ -261,10 +260,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Validation failed', details: validationErrors }, { status: 400 });
   }
 
-  const { error: updateError } = await supabase
-    .from('SpaceSetting')
-    .update({ trackingPixels: sanitized })
-    .eq('spaceId', space.id);
+  const { error: updateError } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
+    .update({ trackingPixels: sanitized });
 
   if (updateError) {
     console.error('[api/settings/tracking] PUT error:', updateError);

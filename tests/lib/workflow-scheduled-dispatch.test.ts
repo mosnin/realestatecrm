@@ -9,7 +9,7 @@
  *
  *  2. dispatchDueScheduledMessages — the SAFETY core. Asserts per autonomy:
  *       'draft'  → drafts (runAutonomousInstruction called), status 'drafted',
- *                  NO send (sendSMS/sendEmailFromCRM never called), NO notify.
+ *                  NO send (sendSMS/sendDraft never called), NO notify.
  *       'notify' → drafts + notifyDraftReady called, status 'drafted', NO send.
  *       'auto'   → REAL send (sendSMS called), status 'sent', notifyAutoSend
  *                  called, audit row written. [We wired the real send — this
@@ -98,7 +98,14 @@ vi.mock('@/lib/supabase', () => {
           limit: () => chain,
           maybeSingle: () =>
             Promise.resolve({
-              data: table === 'Contact' ? contactRow.value : spaceSettingRow.value,
+              data:
+                table === 'Contact'
+                  ? contactRow.value
+                  : table === 'Space'
+                    ? { ownerId: 'user-1' }
+                    : table === 'User'
+                      ? { clerkId: 'clerk_1' }
+                      : spaceSettingRow.value,
               error: null,
             }),
           then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
@@ -123,17 +130,36 @@ vi.mock('@/lib/agent/run-instruction', () => ({
 }));
 
 // ── transports + helpers ─────────────────────────────────────────────────────
-const { sendSMSMock, sendEmailFromCRMMock, recordOutboundMock, notifyDraftReadyMock, notifyAutoSendMock } =
+const {
+  sendSMSMock,
+  sendDraftMock,
+  checkSendAllowedMock,
+  recordOutboundMock,
+  notifyDraftReadyMock,
+  notifyAutoSendMock,
+} =
   vi.hoisted(() => ({
     sendSMSMock: vi.fn(),
-    sendEmailFromCRMMock: vi.fn(),
+    sendDraftMock: vi.fn(),
+    checkSendAllowedMock: vi.fn(),
     recordOutboundMock: vi.fn(),
     notifyDraftReadyMock: vi.fn(),
     notifyAutoSendMock: vi.fn(),
   }));
 
 vi.mock('@/lib/sms', () => ({ sendSMS: sendSMSMock }));
-vi.mock('@/lib/email', () => ({ sendEmailFromCRM: sendEmailFromCRMMock }));
+vi.mock('@/lib/delivery', () => ({
+  sendDraft: sendDraftMock,
+  describeDelivery: (r: { method?: string; fallback?: boolean }) =>
+    r.method === 'gmail'
+      ? 'from your Gmail'
+      : r.fallback
+        ? "from Chippi's sender (your inbox failed — reconnect to send as yourself)"
+        : "from Chippi's sender (connect Gmail or Outlook to send as yourself)",
+}));
+vi.mock('@/lib/messaging/compliance', () => ({
+  checkSendAllowed: checkSendAllowedMock,
+}));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMock }));
 vi.mock('@/lib/notify', () => ({
   notifyDraftReady: notifyDraftReadyMock,
@@ -155,8 +181,10 @@ beforeEach(() => {
   runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, summary: 'drafted' });
   sendSMSMock.mockReset();
   sendSMSMock.mockResolvedValue(true);
-  sendEmailFromCRMMock.mockReset();
-  sendEmailFromCRMMock.mockResolvedValue(undefined);
+  sendDraftMock.mockReset();
+  sendDraftMock.mockResolvedValue({ sent: true, method: 'gmail' });
+  checkSendAllowedMock.mockReset();
+  checkSendAllowedMock.mockResolvedValue({ allowed: true });
   recordOutboundMock.mockReset();
   recordOutboundMock.mockResolvedValue(null);
   notifyDraftReadyMock.mockReset();
@@ -253,7 +281,7 @@ describe('executeAction: schedule_message', () => {
 
     // No send at action time.
     expect(sendSMSMock).not.toHaveBeenCalled();
-    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
   });
 
   it('falls back to lead.id when no contact is present', async () => {
@@ -284,7 +312,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
 
     expect(runAutonomousInstructionMock).toHaveBeenCalledTimes(1);
     expect(sendSMSMock).not.toHaveBeenCalled();
-    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
     expect(notifyDraftReadyMock).not.toHaveBeenCalled();
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
 
@@ -307,7 +335,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
       expect.objectContaining({ spaceId: 'space-1', channel: 'email' }),
     );
     expect(sendSMSMock).not.toHaveBeenCalled();
-    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
 
     expect(statusUpdates()[0].status).toBe('drafted');
@@ -422,7 +450,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     expect(countQueries()).toHaveLength(0);
     // No real send, no audit, no notify.
     expect(sendSMSMock).not.toHaveBeenCalled();
-    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
     expect(recordOutboundMock).not.toHaveBeenCalled();
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
     // Status is NOT overwritten — only the claim update exists (the 'sending'
@@ -466,6 +494,104 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     // The row was claimed ('sending') then the send threw → terminal 'failed'.
     const updates = statusUpdates();
     expect(updates.map((u) => u.status)).toEqual(['sending', 'failed']);
+    expect(notifyAutoSendMock).not.toHaveBeenCalled();
+  });
+
+  it("'auto' email sends as the realtor via sendDraft", async () => {
+    spaceSettingRow.value = { businessName: 'Jane Realty' };
+    contactRow.value = CONTACT;
+    dueRows.value = [
+      {
+        id: 'sm-email',
+        spaceId: 'space-1',
+        channel: 'email',
+        recipientContactId: 'contact-1',
+        instruction: 'Checking in after the tour',
+        autonomy: 'auto',
+      },
+    ];
+
+    const summary = await dispatchDueScheduledMessages();
+
+    expect(summary).toMatchObject({ sent: 1, failed: 0 });
+    expect(checkSendAllowedMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        channel: 'email',
+        address: 'jane@example.com',
+        audience: 'consumer',
+        category: 'marketing',
+        contactId: 'contact-1',
+      }),
+    );
+    expect(sendDraftMock).toHaveBeenCalledWith(
+      { channel: 'email', subject: 'Message from Jane Realty', content: 'Checking in after the tour' },
+      { name: 'Jane', email: 'jane@example.com', phone: '+15551234567' },
+      'Jane Realty',
+      { spaceId: 'space-1', userId: 'clerk_1' },
+    );
+    expect(sendSMSMock).not.toHaveBeenCalled();
+    expect(notifyAutoSendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space-1',
+        channel: 'email',
+        via: 'from your Gmail',
+      }),
+    );
+    expect(
+      statusUpdates().some(
+        (u) => u.status === 'sent' && (u.detail as { via?: string } | undefined)?.via === 'from your Gmail',
+      ),
+    ).toBe(true);
+  });
+
+  it("'auto' email blocked by compliance stays unsent", async () => {
+    contactRow.value = CONTACT;
+    checkSendAllowedMock.mockResolvedValueOnce({
+      allowed: false,
+      reason: 'no_consent',
+      detail: 'no express written consent on file',
+    });
+    dueRows.value = [
+      {
+        id: 'sm-block',
+        spaceId: 'space-1',
+        channel: 'email',
+        recipientContactId: 'contact-1',
+        instruction: 'hi',
+        autonomy: 'auto',
+      },
+    ];
+
+    const summary = await dispatchDueScheduledMessages();
+
+    expect(summary).toMatchObject({ failed: 1, sent: 0 });
+    expect(sendDraftMock).not.toHaveBeenCalled();
+    expect(claimUpdates()).toHaveLength(0);
+    expect(
+      statusUpdates().some((u) =>
+        String((u.detail as { error?: string } | undefined)?.error ?? '').startsWith('Blocked because'),
+      ),
+    ).toBe(true);
+  });
+
+  it("'auto' email labels a failed inbox and does not pretend it sent", async () => {
+    contactRow.value = CONTACT;
+    sendDraftMock.mockResolvedValueOnce({ sent: false, method: 'email', error: 'not_configured' });
+    dueRows.value = [
+      {
+        id: 'sm-fail',
+        spaceId: 'space-1',
+        channel: 'email',
+        recipientContactId: 'contact-1',
+        instruction: 'hi',
+        autonomy: 'auto',
+      },
+    ];
+
+    const summary = await dispatchDueScheduledMessages();
+
+    expect(summary).toMatchObject({ failed: 1, sent: 0 });
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
   });
 });

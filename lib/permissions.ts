@@ -13,28 +13,40 @@
 import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
 
 // ── Platform admin ────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the current Clerk user is a platform admin.
+ * True when this Clerk user id is a live platform admin.
  * Only check: User.platformRole = 'admin' in DB (single source of truth).
+ * Offboarded users lose admin immediately. Fail-closed when unauthenticated
+ * or the row is missing. Used by session gates and by requireActiveSubscription
+ * (which already has the clerk id in hand and should not re-read auth()).
  */
-export async function isPlatformAdmin(): Promise<boolean> {
-  const session = await auth();
-  if (!session.userId) return false;
+export async function isUserPlatformAdmin(
+  clerkUserId: string | null | undefined,
+): Promise<boolean> {
+  if (!clerkUserId) return false;
 
-  // Authoritative check in DB — the single source of truth for admin role
   const { data } = await supabase
     .from('User')
     .select('platformRole, status')
-    .eq('clerkId', session.userId)
+    .eq('clerkId', clerkUserId)
     .maybeSingle();
   // Same offboarding gate as getBrokerContext()/requireAuth(): an offboarded
   // user loses admin access immediately, not when their Clerk session expires.
   // Resilient to a missing `status` column (pre-BP1a): undefined !== 'offboarded'.
   if ((data as { status?: string } | null)?.status === 'offboarded') return false;
   return data?.platformRole === 'admin';
+}
+
+/**
+ * Returns true if the current Clerk user is a platform admin.
+ */
+export async function isPlatformAdmin(): Promise<boolean> {
+  const session = await auth();
+  return isUserPlatformAdmin(session.userId);
 }
 
 /**
@@ -189,8 +201,10 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
 
   // Fetch all broker-level memberships. A user may own one brokerage and
   // manage another — prefer broker_owner so they always land on their own brokerage.
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
+  const { data: memberships } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'membership lookup by userId to resolve broker context',
+  )
     .select('*')
     .eq('userId', user.id)
     .in('role', ['broker_owner', 'broker_admin'])
@@ -248,8 +262,10 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
   // Offboarding gate — see getBrokerContext above for rationale.
   if ((user as { status?: string }).status === 'offboarded') return null;
 
-  const { data: memberships } = await supabase
-    .from('BrokerageMembership')
+  const { data: memberships } = await unscoped(
+    supabase.from('BrokerageMembership'),
+    'membership lookup by userId to resolve broker member context',
+  )
     .select('*')
     .eq('userId', user.id)
     .in('role', ['broker_owner', 'broker_admin', 'realtor_member'])

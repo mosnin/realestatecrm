@@ -18,7 +18,6 @@ describe('TENANT_TABLES registry completeness', () => {
     for (const t of [
       'CmaReport',
       'PropertyPacket',
-      'DealContact',
       'ClientMessage',
       'ApplicationMessage',
       'ApplicationStatusUpdate',
@@ -33,6 +32,79 @@ describe('TENANT_TABLES registry completeness', () => {
     for (const t of ['MessagingSuppression', 'MessagingConsent', 'WorkSessionAction']) {
       expect(isTenantTable(t), `${t} must be registered`).toBe(true);
     }
+  });
+
+  it('covers chat, artifacts, tokens, and billing tables the guard was blind to', () => {
+    for (const t of [
+      'Message',
+      'Artifact',
+      'ArtifactVersion',
+      'ContactDocument',
+      'GoogleCalendarToken',
+      'McpApiKey',
+      'ChatUsage',
+      'Offer',
+      'OfferEvent',
+      'TourPropertyProfile',
+      'TourAvailabilityOverride',
+      'WorkspaceRun',
+      'WorkspaceRunFile',
+      'AgentPausedRun',
+      'SavedView',
+      'IntegrationEvent',
+      'PushSubscription',
+    ]) {
+      expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
+      expect(scopeColumnFor(t)).toBe('spaceId');
+    }
+    expect(scopeColumnFor('BrokerMessage')).toBe('brokerageId');
+  });
+
+  it('covers cycle-2 request-path tables with a verified scope column', () => {
+    for (const t of [
+      'WorkflowRun',
+      'ConversationTurn',
+      'ChannelMessage',
+      'MessageTemplate',
+      'NotificationPreference',
+      'TourWaitlist',
+      'TourFeedback',
+      'StudioGeneration',
+      'StudioBrand',
+      'DripEnrollment',
+      'DripSequence',
+      'ClientDocument',
+      'ClientInfoRequest',
+      'CommissionSplit',
+      'McpAuthCode',
+      'CalendarEvent',
+      'AIUserProfile',
+      'NotificationState',
+      'CalendarNote',
+      'DeadLetterEvent',
+    ]) {
+      expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
+    }
+    expect(scopeColumnFor('ChannelMessage')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageIntegrationConnection')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageMembership')).toBe('brokerageId');
+    expect(scopeColumnFor('Invitation')).toBe('brokerageId');
+    expect(scopeColumnFor('CommissionLedger')).toBe('brokerageId');
+    expect(scopeColumnFor('BrokerageRemoval')).toBe('brokerageId');
+  });
+
+  it('does not register nullable-spaceId tables (wrong-column / optional-tenant hazard)', () => {
+    for (const t of ['SupportTicket', 'TelemetryEvent', 'AuditLog', 'CreditTxn', 'AgentEventInbox']) {
+      expect(isTenantTable(t), `${t} has nullable spaceId and must stay unregistered`).toBe(false);
+    }
+  });
+
+  it('does not register DealContact as space-scoped (junction has no spaceId)', () => {
+    expect(isTenantTable('DealContact')).toBe(false);
+  });
+
+  it('does not register ChannelMember as brokerage-scoped (junction has no brokerageId)', () => {
+    expect(isTenantTable('ChannelMember')).toBe(false);
   });
 
   it('every registered table scopes by a real tenant column', () => {

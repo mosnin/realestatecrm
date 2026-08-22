@@ -4,6 +4,7 @@ import { requirePlatformAdmin } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logAdminAction } from '@/lib/admin';
+import { unscoped } from '@/lib/supabase-guard';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -35,8 +36,10 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'status must be cancelled or expired' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('Invitation')
+  const { data, error } = await unscoped(
+    supabase.from('Invitation'),
+    'admin: platform-admin invitation update by id',
+  )
     .update({ status })
     .eq('id', id)
     .select()

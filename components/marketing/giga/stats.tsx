@@ -11,9 +11,9 @@
 import { BlurRise, Mono, Band } from './primitives';
 
 const STATS = [
-  { value: '94%', label: 'Follow-ups drafted for you' },
-  { value: '< 5 min', label: 'Average first response' },
-  { value: '24/7', label: 'Working your pipeline' },
+  { value: 'Sent', label: 'First intro when they apply' },
+  { value: 'You', label: 'From your inbox when connected' },
+  { value: '24/7', label: 'Later follow-ups drafted' },
 ];
 
 export function Stats() {

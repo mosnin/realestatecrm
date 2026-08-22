@@ -43,11 +43,9 @@
  *                   that Chippi sent without a tap.
  *              status → 'sent' (transitioning 'sending'→'sent').
  *
- * The 'auto' send path is wired to the SAME transports the audited
- * /api/agent/send route uses — sendSMS (lib/sms) and sendEmailFromCRM
- * (lib/email) — resolving the recipient Contact by id within the space, exactly
- * as that route does. No new/guessed transport: this is the existing, tested
- * autonomous-send path, run in-process here.
+ * The 'auto' send path matches /api/agent/send: SMS via sendSMS, email via
+ * sendDraft (connected Gmail/Outlook first; Resend fallback is labeled).
+ * Compliance runs before the claim. A block is "Blocked because X".
  *
  * Each row is processed in isolation: one failing row can't abort the batch (its
  * status becomes 'failed' with the error in detail). Nothing here throws to its
@@ -60,11 +58,15 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction } from '@/lib/agent/run-instruction';
 import { sendSMS } from '@/lib/sms';
-import { sendEmailFromCRM } from '@/lib/email';
+import { describeDelivery, sendDraft } from '@/lib/delivery';
+import { checkSendAllowed } from '@/lib/messaging/compliance';
 import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { notifyDraftReady, notifyAutoSend } from '@/lib/notify';
 import type { InboxChannel } from '@/lib/types';
 import type { WorkflowAutonomy } from './schema';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /** Don't let one tick process an unbounded number of rows — the overflow is
  *  picked up on the next tick. */
@@ -90,6 +92,22 @@ export interface DueScheduledMessage {
   autonomy: WorkflowAutonomy;
 }
 
+async function spaceOwnerClerkId(spaceId: string): Promise<string | undefined> {
+  const { data: space } = await supabase
+    .from('Space')
+    .select('ownerId')
+    .eq('id', spaceId)
+    .maybeSingle();
+  const ownerId = (space as { ownerId?: string } | null)?.ownerId;
+  if (!ownerId) return undefined;
+  const { data: owner } = await supabase
+    .from('User')
+    .select('clerkId')
+    .eq('id', ownerId)
+    .maybeSingle();
+  return (owner as { clerkId?: string } | null)?.clerkId ?? undefined;
+}
+
 export interface DispatchSummary {
   due: number;
   drafted: number;
@@ -110,8 +128,8 @@ async function setStatus(
   status: 'drafted' | 'sent' | 'failed',
   detail: Record<string, unknown>,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('ScheduledMessage')
+  const { error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status, detail, updatedAt: new Date().toISOString() })
     .eq('id', id);
   if (error) {
@@ -132,8 +150,8 @@ async function setStatus(
  * safe failure; risking a double-send to a real client is not.
  */
 async function claimForSend(id: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('ScheduledMessage')
+  const { data, error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status: 'sending', updatedAt: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'pending')
@@ -153,8 +171,8 @@ async function claimForSend(id: string): Promise<boolean> {
  * follow-up), which is the safe direction — never a send.
  */
 async function releaseClaim(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('ScheduledMessage')
+  const { error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({ status: 'pending', updatedAt: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'sending');
@@ -264,6 +282,30 @@ async function processAuto(
   // 'draft'/'notify' posture; 'auto' is the deliberate no-tap path.)
   const body = row.instruction;
   let deliveredTo: string | null = null;
+  let deliveryVia: string | null = null;
+
+  if (row.channel === 'email') {
+    if (!contact.email) {
+      await setStatus(row.id, 'failed', { stage: 'auto', error: `${contact.name} has no email on file` });
+      return 'failed';
+    }
+    const decision = await checkSendAllowed({
+      spaceId: row.spaceId,
+      channel: 'email',
+      address: contact.email,
+      audience: 'consumer',
+      category: 'marketing',
+      contactId: contact.id,
+    });
+    if (!decision.allowed) {
+      const why = decision.reason ?? 'messaging rules';
+      await setStatus(row.id, 'failed', {
+        stage: 'auto',
+        error: `Blocked because ${why}: ${decision.detail ?? 'this message was not sent.'}`,
+      });
+      return 'failed';
+    }
+  }
 
   // RAIL 0 — CLAIM, IMMEDIATELY before the irreversible send. Atomically flip
   // 'pending'→'sending' guarded on the prior status. If we lose (zero rows: another
@@ -300,37 +342,28 @@ async function processAuto(
   }
 
   if (row.channel === 'email') {
-    if (!contact.email) {
-      await setStatus(row.id, 'failed', { stage: 'auto', error: `${contact.name} has no email on file` });
-      return 'failed';
-    }
-    // Resolve the sender display name, same as /api/agent/send.
     const { data: spaceSetting } = await supabase
       .from('SpaceSetting')
       .select('businessName')
       .eq('spaceId', row.spaceId)
       .maybeSingle();
     const fromName = (spaceSetting?.businessName as string | undefined) ?? row.spaceId;
-    try {
-      await sendEmailFromCRM({
-        // AUTONOMOUS consumer outreach — highest TCPA/CAN-SPAM risk path.
-        audience: 'consumer',
-        category: 'marketing',
-        spaceId: row.spaceId,
-        contactId: contact.id,
-        toEmail: contact.email,
-        fromName,
-        subject: `Message from ${fromName}`,
-        body,
-      });
-      deliveredTo = contact.email;
-    } catch (err) {
+    const clerkId = await spaceOwnerClerkId(row.spaceId);
+    const delivery = await sendDraft(
+      { channel: 'email', subject: `Message from ${fromName}`, content: body },
+      { name: (contact.name ?? '').trim() || 'there', email: contact.email, phone: contact.phone },
+      fromName,
+      { spaceId: row.spaceId, userId: clerkId },
+    );
+    if (!delivery.sent) {
       await setStatus(row.id, 'failed', {
         stage: 'auto',
-        error: `email delivery failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: delivery.error ?? 'email delivery failed',
       });
       return 'failed';
     }
+    deliveredTo = contact.email;
+    deliveryVia = describeDelivery(delivery);
   } else {
     if (!contact.phone) {
       await setStatus(row.id, 'failed', { stage: 'auto', error: `${contact.name} has no phone on file` });
@@ -360,7 +393,7 @@ async function processAuto(
   // failure must not flip a real send into a 'failed' (which could re-send).
   const sentAt = new Date().toISOString();
   try {
-    await supabase.from('ContactActivity').insert({
+    await tenantTable(supabase, 'ContactActivity', { spaceId: row.spaceId }).insert({
       id: crypto.randomUUID(),
       spaceId: row.spaceId,
       contactId: contact.id,
@@ -392,9 +425,14 @@ async function processAuto(
   );
 
   // RAIL 3 — NOTIFY. Tell the realtor, after the fact, that Chippi sent.
-  await notifyAutoSend({ spaceId: row.spaceId, channel: row.channel, recipient: contact.name ?? contact.id });
+  await notifyAutoSend({
+    spaceId: row.spaceId,
+    channel: row.channel,
+    recipient: contact.name ?? contact.id,
+    via: deliveryVia,
+  });
 
-  await setStatus(row.id, 'sent', { stage: 'auto', deliveredTo, sentAt });
+  await setStatus(row.id, 'sent', { stage: 'auto', deliveredTo, sentAt, via: deliveryVia });
   return 'sent';
 }
 
@@ -434,8 +472,8 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
   // (surfaced for review) rather than back in 'pending'. 30 minutes is far
   // beyond any legitimate single-row send.
   const staleBefore = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const { data: reclaimed, error: reclaimErr } = await supabase
-    .from('ScheduledMessage')
+  const { data: reclaimed, error: reclaimErr } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .update({
       status: 'failed',
       detail: { error: 'stale sending claim reclaimed — delivery state unknown; review before rescheduling' },
@@ -451,8 +489,8 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
     });
   }
 
-  const { data: rows, error } = await supabase
-    .from('ScheduledMessage')
+  const { data: rows, error } = await unscoped(supabase
+    .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
     .select('id, spaceId, channel, recipientContactId, instruction, autonomy')
     .eq('status', 'pending')
     .lte('sendAt', now.toISOString())

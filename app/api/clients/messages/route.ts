@@ -5,6 +5,9 @@ import { clientOwnsContact } from '@/lib/client-portal-data';
 import { sendClientNotification } from '@/lib/client-email';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 export const runtime = 'nodejs';
 
@@ -25,15 +28,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const { data } = await supabase
-    .from('ClientMessage')
+  const { data: owned } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
+    .select('spaceId')
+    .eq('id', contactId)
+    .maybeSingle();
+  if (!owned?.spaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const { data } = await tenantTable(supabase, 'ClientMessage', { spaceId: owned.spaceId })
     .select('id, senderType, body, createdAt')
     .eq('contactId', contactId)
     .order('createdAt', { ascending: true });
 
   // Mark realtor → client messages read now that the client has loaded them.
-  await supabase
-    .from('ClientMessage')
+  await tenantTable(supabase, 'ClientMessage', { spaceId: owned.spaceId })
     .update({ readAt: new Date().toISOString() })
     .eq('contactId', contactId)
     .eq('senderType', 'realtor')
@@ -68,15 +76,14 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: 'Too many messages. Slow down.' }, { status: 429 });
 
   // Resolve the contact's space (needed for the row + realtor lookup).
-  const { data: contact } = await supabase
-    .from('Contact')
+  const { data: contact } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
     .select('spaceId, Space(ownerId)')
     .eq('id', contactId)
     .maybeSingle();
   if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data: inserted, error } = await supabase
-    .from('ClientMessage')
+  const { data: inserted, error } = await tenantTable(supabase, 'ClientMessage', { spaceId: contact.spaceId })
     .insert({
       contactId,
       spaceId: contact.spaceId,

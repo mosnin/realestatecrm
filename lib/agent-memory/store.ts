@@ -23,6 +23,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { embed } from './embed';
 import type { MemoryEntry, MemoryEntityType, MemoryKind } from './types';
 
@@ -85,8 +86,7 @@ export async function storeMemory(input: StoreMemoryInput): Promise<{ id: string
   // we're stricter so callers don't silently lose recall capability.
   const vec = await embed(cleaned);
 
-  const { data, error } = await supabase
-    .from('AgentMemory')
+  const { data, error } = await tenantTable(supabase, 'AgentMemory', { spaceId: input.spaceId })
     .insert({
       spaceId: input.spaceId,
       entityType,

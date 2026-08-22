@@ -4,7 +4,7 @@
  * showcases in a forced-dark wrapper, then a light/dark-adaptive closing CTA.
  *
  * Grounded in the real apps Chippi connects to through Composio (inbox,
- * calendar, CRM, messaging, e-sign); no invented integrations.
+ * calendar, CRM, messaging). We do not list on MLS or certify e-sign.
  */
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
@@ -20,7 +20,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'Plugins · Chippi',
   description:
-    'Connect the tools you already pay for. Chippi plugs into your inbox, calendar, CRM, messaging, and e-sign through Composio, then works inside them, no rip and replace.',
+    'Connect the tools you already pay for. Chippi plugs into your inbox, calendar, CRM, and messaging through Composio, then works inside them, no rip and replace.',
 };
 
 export default function IntegrationsPage() {
@@ -36,11 +36,11 @@ export default function IntegrationsPage() {
               <br className="hidden sm:block" /> you already work.
             </>
           }
-          description="Connect your inbox, calendar, CRM, messaging, and e-sign in a couple of clicks. Chippi reads from and writes back to each one as it works, so nothing falls out of date."
+          description="Connect your inbox, calendar, CRM, and messaging in a couple of clicks. Chippi reads from and writes back to each one as it works, so nothing falls out of date."
           features={[
             { icon: 'Mail', title: 'Email and calendar', desc: 'Gmail, Outlook, Google Calendar, and Calendly.' },
             { icon: 'Users', title: 'Your CRM', desc: 'HubSpot, Salesforce, and Follow Up Boss, two-way.' },
-            { icon: 'MessagesSquare', title: 'Messaging and e-sign', desc: 'WhatsApp, Slack, and DocuSign.' },
+            { icon: 'MessagesSquare', title: 'Messaging', desc: 'WhatsApp and Slack. Documents live on the deal.' },
           ]}
           image="/marketing/integrations-hero.jpg"
           variant="integrations"

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { getSpaceFromSlug } from '@/lib/space';
-import { decrypt, decryptOrPassthrough, encrypt } from '@/lib/crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { fetchCalendarBusySlots } from '@/lib/calendar/busy-times';
 
 /** Public endpoint — returns available time slots for the next 14 days. */
 export async function GET(req: NextRequest) {
@@ -34,10 +35,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Load space settings
-  const { data: settings } = await supabase
-    .from('SpaceSetting')
+  const { data: settings } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('tourDuration, tourStartHour, tourEndHour, tourDaysAvailable, timezone, tourBufferMinutes, tourBlockedDates')
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   // If a property profile is specified, use its settings instead of defaults
@@ -51,11 +50,11 @@ export async function GET(req: NextRequest) {
 
   let propertyProfile: any = null;
   if (propertyId) {
-    const { data: profile } = await supabase
-      .from('TourPropertyProfile')
+    const { data: profile } = await tenantTable(supabase, 'TourPropertyProfile', {
+      spaceId: space.id,
+    })
       .select('*')
       .eq('id', propertyId)
-      .eq('spaceId', space.id)
       .eq('isActive', true)
       .maybeSingle();
     if (profile) {
@@ -76,10 +75,8 @@ export async function GET(req: NextRequest) {
   endDate.setDate(endDate.getDate() + 14);
 
   // Fetch existing tours in range (filter by property if specified)
-  let toursQuery = supabase
-    .from('Tour')
+  let toursQuery = tenantTable(supabase, 'Tour', { spaceId: space.id })
     .select('startsAt, endsAt')
-    .eq('spaceId', space.id)
     .in('status', ['scheduled', 'confirmed'])
     .gte('startsAt', startDate.toISOString())
     .lte('startsAt', endDate.toISOString());
@@ -93,17 +90,17 @@ export async function GET(req: NextRequest) {
     end: new Date(t.endsAt).getTime() + bufferMinutes * 60_000,
   }));
 
-  // Fetch Google Calendar busy times if connected
-  const gcalBusySlots = await fetchGoogleCalendarBusy(space.id, startDate, endDate);
+  // Busy times from the same calendar the write path uses (Composio
+  // connection, else legacy GoogleCalendarToken).
+  const gcalBusySlots = await fetchCalendarBusySlots(space.id, startDate, endDate);
   const allBusySlots = [...bookedSlots, ...gcalBusySlots];
 
   const blockedSet = new Set(blockedDates);
 
   // Fetch overrides (single-date and recurring) scoped to this property or global
-  let overridesQuery = supabase
-    .from('TourAvailabilityOverride')
-    .select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId')
-    .eq('spaceId', space.id);
+  let overridesQuery = tenantTable(supabase, 'TourAvailabilityOverride', {
+    spaceId: space.id,
+  }).select('date, isBlocked, startHour, endHour, recurrence, endDate, propertyProfileId');
   const { data: overridesRaw } = await overridesQuery;
 
   // Build effective overrides for each date in range, expanding recurring ones
@@ -229,10 +226,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Also fetch all active property profiles for this space (so the booking page can show them)
-  const { data: profiles } = await supabase
-    .from('TourPropertyProfile')
+  const { data: profiles } = await tenantTable(supabase, 'TourPropertyProfile', {
+    spaceId: space.id,
+  })
     .select('id, name, address, tourDuration, isActive')
-    .eq('spaceId', space.id)
     .eq('isActive', true)
     .order('createdAt', { ascending: true });
 
@@ -243,96 +240,4 @@ export async function GET(req: NextRequest) {
     propertyProfileId: propertyId ?? null,
     propertyProfiles: profiles ?? [],
   });
-}
-
-// ── Google Calendar helpers ──────────────────────────────────────────────────
-
-async function fetchGoogleCalendarBusy(
-  spaceId: string,
-  timeMin: Date,
-  timeMax: Date
-): Promise<Array<{ start: number; end: number }>> {
-  const { data: tokenRow } = await supabase
-    .from('GoogleCalendarToken')
-    .select('*')
-    .eq('spaceId', spaceId)
-    .maybeSingle();
-
-  if (!tokenRow) return [];
-
-  try {
-    const accessToken = await getValidGCalToken(tokenRow, spaceId);
-    const calendarId = tokenRow.calendarId || 'primary';
-
-    const res = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        timeMin: timeMin.toISOString(),
-        timeMax: timeMax.toISOString(),
-        items: [{ id: calendarId }],
-      }),
-    });
-
-    if (!res.ok) {
-      console.error('[availability] GCal freeBusy failed:', res.status);
-      return [];
-    }
-
-    const data = await res.json();
-    const busyPeriods = data.calendars?.[calendarId]?.busy ?? [];
-
-    return busyPeriods.map((b: { start: string; end: string }) => ({
-      start: new Date(b.start).getTime(),
-      end: new Date(b.end).getTime(),
-    }));
-  } catch (err) {
-    console.error('[availability] GCal busy check error:', err);
-    return [];
-  }
-}
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? '';
-
-async function getValidGCalToken(tokenRow: any, spaceId: string): Promise<string> {
-  const expiresAt = new Date(tokenRow.expiresAt).getTime();
-  if (Date.now() < expiresAt - 60_000) {
-    // Tokens are encrypted at rest; soft-migration passthrough for legacy rows.
-    return decryptOrPassthrough(tokenRow.accessToken);
-  }
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
-      refresh_token: decrypt(tokenRow.refreshToken),
-      grant_type: 'refresh_token',
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    console.error('[availability] GCal token refresh failed:', res.status, errText);
-    throw new Error('Failed to refresh Google token');
-  }
-  const tokens = await res.json();
-  if (!tokens.access_token) throw new Error('No access_token in Google refresh response');
-
-  await supabase
-    .from('GoogleCalendarToken')
-    .update({
-      // Encrypt at rest — must match the read path and every other writer.
-      accessToken: encrypt(tokens.access_token),
-      expiresAt: new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
-    .eq('spaceId', spaceId);
-
-  return tokens.access_token;
 }

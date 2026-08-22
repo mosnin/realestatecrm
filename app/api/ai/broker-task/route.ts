@@ -38,6 +38,7 @@ import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
@@ -149,11 +150,9 @@ async function resolveConversation(
   conversationId: string | null | undefined,
 ): Promise<string> {
   if (conversationId) {
-    const { data } = await supabase
-      .from('BrokerConversation')
+    const { data } = await tenantTable(supabase, 'BrokerConversation', { brokerageId })
       .select('id, brokerageId')
       .eq('id', conversationId)
-      .eq('brokerageId', brokerageId)
       .maybeSingle();
     if (data && data.brokerageId === brokerageId) {
       return conversationId;
@@ -161,7 +160,7 @@ async function resolveConversation(
   }
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('BrokerConversation').insert({
+  const { error } = await tenantTable(supabase, 'BrokerConversation', { brokerageId }).insert({
     id,
     brokerageId,
     title: 'New conversation',
@@ -171,10 +170,8 @@ async function resolveConversation(
 }
 
 async function loadHistory(brokerageId: string, conversationId: string): Promise<HistoryRow[]> {
-  const { data } = await supabase
-    .from('BrokerMessage')
+  const { data } = await tenantTable(supabase, 'BrokerMessage', { brokerageId })
     .select('role, content, createdAt')
-    .eq('brokerageId', brokerageId)
     .eq('conversationId', conversationId)
     .order('createdAt', { ascending: false })
     .limit(HISTORY_LIMIT);

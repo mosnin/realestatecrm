@@ -156,7 +156,8 @@ describe('Workspace Run continuation contract', () => {
   it('keeps model and voice run selection server-side and opens the existing panel only from structured results', () => {
     const continuation = read('lib/workspace-runs/conversation-continuation.ts');
     expect(continuation).toContain(".eq('conversationId', conversationId)");
-    expect(continuation).toContain(".eq('spaceId', spaceId)");
+    expect(continuation).toContain("tenantTable(supabase, 'WorkSession', { spaceId })");
+    expect(continuation).toContain("tenantTable(supabase, 'WorkspaceRun', { spaceId })");
     expect(read('lib/ai-tools/tools/continue-workspace-run.ts')).not.toContain('runId:');
     expect(read('app/api/ai/realtime-delegate/route.ts')).toContain("z.literal('continue_workspace_run')");
     expect(read('components/chippi/chippi-workspace.tsx')).toContain("input.name === 'continue_workspace_run'");

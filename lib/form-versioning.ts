@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import type {
   IntakeFormConfig,
   FormSection,
@@ -46,10 +47,8 @@ export interface ResolvedFormConfig {
 export async function resolveFormConfig(
   spaceId: string,
 ): Promise<ResolvedFormConfig> {
-  const { data: setting, error: settingErr } = await supabase
-    .from('SpaceSetting')
+  const { data: setting, error: settingErr } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('formConfig, formConfigSource')
-    .eq('spaceId', spaceId)
     .maybeSingle();
 
   if (settingErr) {

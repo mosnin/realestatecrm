@@ -2,6 +2,7 @@ import type { ApplicationData, IntakeFormConfig } from '@/lib/types';
 import { getSubmissionDisplay, formatAnswerValue } from '@/lib/form-versioning';
 import { logger } from '@/lib/logger';
 import type { Audience, MessageCategory } from '@/lib/messaging/compliance';
+import { FONT_SANS_STACK } from '@/lib/typography';
 
 /**
  * Redact an email address to its first character + masked local part +
@@ -131,7 +132,7 @@ export async function sendNewLeadNotification(params: NewLeadEmailParams): Promi
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -222,7 +223,7 @@ export async function sendFollowUpDigest(params: FollowUpDigestParams): Promise<
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -339,7 +340,7 @@ export async function sendNotificationDigest(params: NotificationDigestParams): 
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -437,8 +438,8 @@ export class ComplianceBlockedError extends Error {
  * emails Resend rejected — realtors were told their messages went out when
  * they didn't. That's fiduciary harm.
  *
- * Missing provider configuration remains tolerated for ordinary local-dev
- * callers. Durable callers must fail closed rather than record a false send.
+ * Missing provider configuration fails closed — a skipped send must never
+ * read as delivered.
  */
 export class EmailSendError extends Error {
   readonly cause?: unknown;
@@ -518,15 +519,14 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
     );
   }
   if (!process.env.RESEND_API_KEY) {
-    if (params.idempotencyKey) {
-      throw new EmailSendError(
-        'RESEND_API_KEY is required for durable email execution.',
-        undefined,
-        'terminal_failure',
-      );
-    }
-    logger.warn('[email] RESEND_API_KEY not set — skipping');
-    return;
+    // This helper's contract is "throw when it didn't go out". A missing
+    // provider key used to return void, so /api/contacts/[id]/email and
+    // /api/agent/send reported success:true for emails that never left.
+    throw new EmailSendError(
+      'RESEND_API_KEY is required to send email.',
+      undefined,
+      'terminal_failure',
+    );
   }
   const { Resend } = await import('resend');
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -537,7 +537,7 @@ export async function sendEmailFromCRM(params: SendEmailFromCRMParams): Promise<
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -629,7 +629,7 @@ export async function sendNewDealNotification(params: NewDealEmailParams): Promi
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -697,7 +697,7 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -789,7 +789,7 @@ export async function sendApplicationConfirmation(params: ApplicationConfirmatio
   const html = `
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -856,7 +856,7 @@ export async function sendWelcomeEmail(params: {
   const dashboardUrl = spaceSlug ? `https://${domain}/s/${spaceSlug}` : `https://${domain}/setup`;
 
   const html = `
-<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:32px 0">
+<div style="font-family:${FONT_SANS_STACK};max-width:520px;margin:0 auto;padding:32px 0">
   <div style="text-align:center;margin-bottom:28px">
     <span style="font-size:28px;font-weight:700;color:#111827">Welcome to Chippi</span>
   </div>
@@ -941,7 +941,7 @@ export async function sendDraftResumeEmail(params: DraftResumeEmailParams): Prom
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <!-- Preheader text (visible in inbox preview, hidden in body) -->
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all">
     Your application progress has been saved. Click to pick up where you left off &#8199;&#65279;&#847;
@@ -1045,7 +1045,7 @@ export async function sendMfaEnrollmentPrompt(params: MfaEnrollmentPromptParams)
   const html = `
 <!DOCTYPE html>
 <html lang="en">
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -1158,7 +1158,7 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
   const html = `
 <!DOCTYPE html>
 <html lang="en">
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f9fafb;padding:32px 16px">
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
@@ -1186,7 +1186,7 @@ export async function sendStatusUpdateEmail(params: StatusUpdateEmailParams): Pr
               <!--[if mso]>
               <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${portalUrl}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="18%" strokecolor="#0f172a" fillcolor="#0f172a">
                 <w:anchorlock/>
-                <center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:600;">View your application &rarr;</center>
+                <center style="color:#ffffff;font-family:${FONT_SANS_STACK};font-size:14px;font-weight:600;">View your application &rarr;</center>
               </v:roundrect>
               <![endif]-->
               <!--[if !mso]><!-->

@@ -180,7 +180,7 @@ export async function POST(
     // registers its own after() keep-alive, so zero latency is added and the
     // work survives the response returning. The try/catch is belt-and-braces.
     try {
-      void fireFirstTouch({ spaceId: space.id, contactId: savedId });
+      void fireFirstTouch({ spaceId: space.id, contactId: savedId, origin: 'inbound' });
     } catch (e) {
       logger.error('[home-value] first-touch dispatch failed (non-fatal)', { contactId: savedId }, e);
     }

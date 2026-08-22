@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import { ApplicationStatusClient } from './application-status-client';
 import { IntakeChatShell } from '@/components/intake-chat/intake-chat-shell';
 import { hasCurrentSubscription } from '@/lib/api-auth';
+import type { IntakeFormConfig } from '@/lib/types';
 
 // Disable caching so status updates show immediately
 export const dynamic = 'force-dynamic';
@@ -238,8 +239,16 @@ export default async function ApplicationStatusPage({
           status: contact.applicationStatus ?? 'received',
           statusNote: contact.applicationStatusNote,
           applicationRef: contact.applicationRef ?? ref,
-          applicationData: contact.applicationData,
-          formConfigSnapshot: contact.formConfigSnapshot,
+          // Ref-only status must not serialize form PII into RSC props.
+          // Portal APIs already require statusPortalToken for this payload.
+          applicationData: portalMode
+            ? ((contact as { applicationData?: Record<string, unknown> | null }).applicationData ??
+              null)
+            : null,
+          formConfigSnapshot: portalMode
+            ? ((contact as { formConfigSnapshot?: IntakeFormConfig | null }).formConfigSnapshot ??
+              null)
+            : null,
           createdAt: contact.createdAt,
         }}
         businessName={businessName}

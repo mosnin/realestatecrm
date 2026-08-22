@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 export interface FollowUpDue {
   id: string;
@@ -39,24 +40,20 @@ export async function GET(_req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const nowIso = new Date().toISOString();
 
   const [followUpsRes, toursRes] = await Promise.all([
-    supabase
-      .from('Contact')
+    tenantTable(supabase, 'Contact', { spaceId: space.id })
       .select('id, name, phone, email, type, followUpAt, leadScore, scoreLabel')
-      .eq('spaceId', space.id)
       .is('brokerageId', null)
       .not('followUpAt', 'is', null)
       .lte('followUpAt', nowIso)
       .order('followUpAt', { ascending: true })
       .limit(10),
-    supabase
-      .from('Tour')
+    tenantTable(supabase, 'Tour', { spaceId: space.id })
       .select('id, guestName, startsAt, endsAt, propertyAddress, status')
-      .eq('spaceId', space.id)
       .gte('startsAt', nowIso)
       .in('status', ['scheduled', 'confirmed'])
       .order('startsAt', { ascending: true })

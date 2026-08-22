@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -19,20 +20,16 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
-  const { data: session } = await supabase
-    .from('WorkSession')
+  const { data: session } = await tenantTable(supabase, 'WorkSession', { spaceId: auth.space.id })
     .select('artifactFileId')
     .eq('id', id)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   const fileId = (session as { artifactFileId: string | null } | null)?.artifactFileId;
   if (!fileId) return NextResponse.json({ error: 'No artifact yet.' }, { status: 404 });
 
-  const { data: file } = await supabase
-    .from('File')
+  const { data: file } = await tenantTable(supabase, 'File', { spaceId: auth.space.id })
     .select('storageKey')
     .eq('id', fileId)
-    .eq('spaceId', auth.space.id)
     .maybeSingle();
   const key = (file as { storageKey: string } | null)?.storageKey;
   if (!key) return NextResponse.json({ error: 'Artifact file missing.' }, { status: 404 });

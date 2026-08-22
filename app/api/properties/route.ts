@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import { isValidListingStatus, isValidPropertyType } from '@/lib/properties';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * Shared input sanitiser. Accepts a loose body and returns an object safe to
@@ -91,8 +94,8 @@ export async function GET(req: NextRequest) {
 
   const search = (req.nextUrl.searchParams.get('search') ?? '').trim().slice(0, 200);
 
-  let query = supabase
-    .from('Property')
+  let query = unscoped(supabase
+    .from('Property'), 'post-fetch: caller verified parent scope before this id query')
     .select('*')
     // The realtor's own properties PLUS any brokerage-pool property assigned
     // to their space. space.id is a controlled UUID, safe in the or-filter.
@@ -138,7 +141,7 @@ export async function POST(req: NextRequest) {
     ...out,
   };
 
-  const { data, error } = await supabase.from('Property').insert(insert).select().single();
+  const { data, error } = await tenantTable(supabase, 'Property', { spaceId: space.id }).insert(insert).select().single();
   if (error) {
     // 23505 = unique_violation (e.g. duplicate MLS #).
     if ((error as { code?: string }).code === '23505') {

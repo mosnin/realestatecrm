@@ -21,6 +21,8 @@ import { getSpaceForUser } from '@/lib/space';
 import { composeBrief } from '@/lib/briefing/compose';
 import { localDateIn } from '@/lib/briefing/timing';
 import type { Brief, BriefCardTap, SignalKind, SignalSource } from '@/lib/briefing/types';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 const DEFAULT_TIMEZONE = 'America/New_York';
 
@@ -31,10 +33,8 @@ const DEFAULT_TIMEZONE = 'America/New_York';
  * would already see "tomorrow's brief" because UTC has rolled over.
  */
 async function todayLocalDate(spaceId: string): Promise<string> {
-  const { data } = await supabase
-    .from('SpaceSetting')
+  const { data } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
     .select('timezone')
-    .eq('spaceId', spaceId)
     .maybeSingle();
   return localDateIn(new Date(), (data?.timezone as string | undefined) ?? DEFAULT_TIMEZONE);
 }
@@ -56,26 +56,22 @@ export async function GET(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // ?day=yesterday returns yesterday's brief as a READ-ONLY echo —
   // never composes on demand, never PATCHes, never stamps showIntro.
   // The one-day backward window is hard: there is no ?day=2-days-ago.
   const dayParam = req.nextUrl.searchParams.get('day');
   if (dayParam === 'yesterday') {
-    const { data: tz } = await supabase
-      .from('SpaceSetting')
+    const { data: tz } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .select('timezone')
-      .eq('spaceId', space.id)
       .maybeSingle();
     const yForDate = localDateOffset(
       (tz?.timezone as string | undefined) ?? DEFAULT_TIMEZONE,
       -1,
     );
-    const { data: yRow } = await supabase
-      .from('Brief')
+    const { data: yRow } = await tenantTable(supabase, 'Brief', { spaceId: space.id })
       .select('id, status, payload, createdAt, seenAt, actedAt')
-      .eq('spaceId', space.id)
       .eq('forDate', yForDate)
       .maybeSingle();
 
@@ -95,17 +91,13 @@ export async function GET(req: NextRequest) {
   // Whether to show the one-line intro on this brief. Null means the
   // realtor has never seen a brief — the intro renders. Once 'seen'
   // PATCH fires the column gets stamped and the intro never returns.
-  const { data: setting } = await supabase
-    .from('SpaceSetting')
+  const { data: setting } = await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
     .select('briefIntroSeenAt')
-    .eq('spaceId', space.id)
     .maybeSingle();
   const showIntro = setting?.briefIntroSeenAt == null;
 
-  const { data: existing } = await supabase
-    .from('Brief')
+  const { data: existing } = await tenantTable(supabase, 'Brief', { spaceId: space.id })
     .select('id, status, payload, createdAt, seenAt, actedAt')
-    .eq('spaceId', space.id)
     .eq('forDate', forDate)
     .maybeSingle();
 
@@ -124,8 +116,7 @@ export async function GET(req: NextRequest) {
   // No row yet — compose on demand and persist. The realtor sees their
   // brief; tomorrow's cron tick fills the gap for everyone systematically.
   const { brief, cardMeta } = await composeBrief(space.id);
-  const { data: created, error } = await supabase
-    .from('Brief')
+  const { data: created, error } = await tenantTable(supabase, 'Brief', { spaceId: space.id })
     .insert({
       spaceId: space.id,
       forDate,
@@ -184,7 +175,7 @@ export async function PATCH(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = (await req.json()) as {
     event?: 'seen' | 'acted';
@@ -198,10 +189,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   const forDate = await todayLocalDate(space.id);
-  const { data: existing } = await supabase
-    .from('Brief')
+  const { data: existing } = await tenantTable(supabase, 'Brief', { spaceId: space.id })
     .select('id, seenAt, actedAt, status, cardTaps')
-    .eq('spaceId', space.id)
     .eq('forDate', forDate)
     .maybeSingle();
 
@@ -246,17 +235,15 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (Object.keys(update).length > 0) {
-    await supabase.from('Brief').update(update).eq('id', existing.id);
+    await tenantTable(supabase, 'Brief', { spaceId: space.id }).update(update).eq('id', existing.id);
   }
 
   // The first ever 'seen' PATCH stamps briefIntroSeenAt so the one-line
   // intro never reappears. Only on 'seen' (not 'acted') because the
   // intro lives on the live brief surface, not on acted-then-collapsed.
   if (body.event === 'seen') {
-    await supabase
-      .from('SpaceSetting')
+    await tenantTable(supabase, 'SpaceSetting', { spaceId: space.id })
       .update({ briefIntroSeenAt: nowIso })
-      .eq('spaceId', space.id)
       .is('briefIntroSeenAt', null);
   }
 

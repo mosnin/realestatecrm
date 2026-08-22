@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
+import { tenantTable } from '@/lib/tenant-db';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -13,13 +14,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('Note')
+  const { data, error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .select('*')
     .eq('id', id)
-    .eq('spaceId', space.id)
     .maybeSingle();
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -34,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const body = await req.json();
   const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -44,15 +43,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.icon !== undefined) updates.icon = body.icon ? String(body.icon).slice(0, 10) : null;
   if (body.sortOrder !== undefined) updates.sortOrder = Number(body.sortOrder);
 
-  const { data, error } = await supabase
-    .from('Note')
+  const { data, error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .update(updates)
     .eq('id', id)
-    .eq('spaceId', space.id)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+  if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(data);
 }
 
@@ -64,13 +62,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { error } = await supabase
-    .from('Note')
+  const { error } = await tenantTable(supabase, 'Note', { spaceId: space.id })
     .delete()
-    .eq('id', id)
-    .eq('spaceId', space.id);
+    .eq('id', id);
 
   if (error) return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
   return NextResponse.json({ success: true });

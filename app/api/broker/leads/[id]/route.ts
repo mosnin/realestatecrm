@@ -5,6 +5,9 @@ import { getSpaceByOwnerId } from '@/lib/space';
 import { deleteContactVector } from '@/lib/vectorize';
 import { deleteObjectsBestEffort } from '@/lib/storage';
 import { logger } from '@/lib/logger';
+import { unscoped } from '@/lib/supabase-guard';
+import { tenantTable } from '@/lib/tenant-db';
+
 
 /**
  * DELETE /api/broker/leads/[id]
@@ -56,11 +59,9 @@ export async function DELETE(
     // ── Identify the lead exactly the way unassign-lead does ─────────────
     // First in the broker owner's space, then by brokerageId. The lead must
     // match one of these to belong to THIS brokerage.
-    const { data: spaceContact, error: spaceContactError } = await supabase
-      .from('Contact')
+    const { data: spaceContact, error: spaceContactError } = await tenantTable(supabase, 'Contact', { spaceId: brokerSpace.id })
       .select('*')
       .eq('id', id)
-      .eq('spaceId', brokerSpace.id)
       .maybeSingle();
     if (spaceContactError) throw spaceContactError;
 
@@ -73,8 +74,8 @@ export async function DELETE(
     };
 
     if (!contact) {
-      const { data: brokerageContact, error: brokerageContactError } = await supabase
-        .from('Contact')
+      const { data: brokerageContact, error: brokerageContactError } = await unscoped(supabase
+        .from('Contact'), 'broker: membership-proved cross-space access')
         .select('*')
         .eq('id', id)
         .eq('brokerageId', brokerage.id)
@@ -104,8 +105,8 @@ export async function DELETE(
     // ── Capture document storage keys BEFORE deleting the Contact ────────
     // The FK cascade removes ContactDocument rows the moment the Contact is
     // gone; Wasabi objects don't cascade, so grab the keys now or orphan PII.
-    const { data: docRows } = await supabase
-      .from('ContactDocument')
+    const { data: docRows } = await unscoped(supabase
+      .from('ContactDocument'), 'broker: membership-proved cross-space access')
       .select('storageKey')
       .eq('contactId', id);
     const docKeys = (docRows ?? [])
@@ -133,18 +134,16 @@ export async function DELETE(
           .limit(1);
 
         if (!remainingLinks || remainingLinks.length === 0) {
-          await supabase
-            .from('Deal')
+          await tenantTable(supabase, 'Deal', { spaceId: brokerSpace.id })
             .delete()
-            .eq('id', dealId)
-            .eq('spaceId', brokerSpace.id);
+            .eq('id', dealId);
         }
       }
     }
 
     // ── Delete the lead, scoped to the binding it actually matched ───────
-    const { error: deleteError } = await supabase
-      .from('Contact')
+    const { error: deleteError } = await unscoped(supabase
+      .from('Contact'), 'broker: membership-proved cross-space access')
       .delete()
       .eq('id', id)
       .eq(deleteScope.column, deleteScope.value);

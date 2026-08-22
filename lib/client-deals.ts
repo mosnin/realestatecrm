@@ -43,7 +43,10 @@
  */
 import 'server-only';
 import { supabase } from '@/lib/supabase';
+import { escapeLike } from '@/lib/escape-like';
 import type { DealStageKind } from '@/lib/types';
+import { unscoped } from '@/lib/supabase-guard';
+
 
 /* ─── Public, client-safe shapes ────────────────────────────────────────────
  * These are the ONLY shapes that cross the wire to a client. If a field isn't
@@ -101,14 +104,6 @@ export interface ClientDealDetail extends ClientDealSummary {
 
 /* ─── Internal helpers ──────────────────────────────────────────────────────*/
 
-/** Escape LIKE/ILIKE metacharacters so a full email matches literally (still
- *  case-insensitively). `%` and `_` are legal in email local parts; without
- *  this a client registered as `%@gmail.com` would match every gmail Contact.
- *  Mirrors the guard in lib/client-portal-data.ts. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
 /** Canonical pipeline order. Used only as a tiebreaker when stages share a
  *  position (shouldn't happen) and to map a stage kind → client progress. The
  *  PRIMARY ordering of the timeline is always DealStage.position. */
@@ -154,8 +149,8 @@ function deriveProgress(
 async function ownedContactIds(email: string): Promise<string[]> {
   const lower = email.trim().toLowerCase();
   if (!lower) return [];
-  const { data } = await supabase
-    .from('Contact')
+  const { data } = await unscoped(supabase
+    .from('Contact'), 'post-fetch: client portal ownership proof')
     .select('id')
     .ilike('email', escapeLike(lower));
   return (data ?? []).map((c) => c.id as string);
@@ -230,8 +225,8 @@ export async function getClientDeals(email: string): Promise<ClientDealSummary[]
 
   // Safe-fields-only select. value/commission/probability/priority/nextAction/
   // wonLost*/closeReason*/description are NOT selected — they never load.
-  const { data: deals } = await supabase
-    .from('Deal')
+  const { data: deals } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: client portal ownership proof')
     .select('id, title, address, status, stageId, closeDate, updatedAt')
     .in('id', dealIds)
     .order('updatedAt', { ascending: false });
@@ -240,8 +235,8 @@ export async function getClientDeals(email: string): Promise<ClientDealSummary[]
 
   // Resolve the current stage (name + kind) for each deal. One batched read.
   const stageIds = Array.from(new Set(deals.map((d) => d.stageId as string)));
-  const { data: stages } = await supabase
-    .from('DealStage')
+  const { data: stages } = await unscoped(supabase
+    .from('DealStage'), 'post-fetch: client portal ownership proof')
     .select('id, name, kind')
     .in('id', stageIds);
   const stageById = new Map(
@@ -294,8 +289,8 @@ export async function getClientDeal(
 
   // Safe-fields-only select, additionally scoped by id (defense in depth; the
   // link already proved ownership).
-  const { data: deal } = await supabase
-    .from('Deal')
+  const { data: deal } = await unscoped(supabase
+    .from('Deal'), 'post-fetch: client portal ownership proof')
     .select('id, spaceId, title, address, status, stageId, closeDate, updatedAt')
     .eq('id', dealId)
     .maybeSingle();
@@ -312,8 +307,8 @@ export async function getClientDeal(
       .select('id, name, position, kind')
       .eq('spaceId', spaceId)
       .order('position', { ascending: true }),
-    supabase
-      .from('DealChecklistItem')
+    unscoped(supabase
+      .from('DealChecklistItem'), 'post-fetch: client portal ownership proof')
       .select('id, label, dueAt, completedAt, position')
       .eq('dealId', dealId)
       .order('position', { ascending: true }),

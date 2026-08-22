@@ -114,6 +114,7 @@ import { isResearchWorkspaceEnabledForSpace } from '@/lib/chippi/research-worksp
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import { chatContinuationIdempotencySeed, isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
+import { tenantTable } from '@/lib/tenant-db';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -281,7 +282,7 @@ async function resolveConversation(
   }
 
   const id = crypto.randomUUID();
-  const { error } = await supabase.from('Conversation').insert({
+  const { error } = await tenantTable(supabase, 'Conversation', { spaceId }).insert({
     id,
     spaceId,
     title: 'New conversation',

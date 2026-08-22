@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { supabase } from '@/lib/supabase';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
+import { tenantTable } from '@/lib/tenant-db';
 
 export const runtime = 'nodejs';
 
@@ -29,11 +30,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (typeof body.prompt === 'string' && body.prompt.trim().length >= 10) patch.prompt = body.prompt.trim().slice(0, 4000);
   if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
 
-  const { data, error } = await supabase
-    .from('UserSkill')
+  const { data, error } = await tenantTable(supabase, 'UserSkill', { spaceId: auth.space.id })
     .update(patch)
     .eq('id', id)
-    .eq('spaceId', auth.space.id)
     .select('id')
     .maybeSingle();
   if (error) return NextResponse.json({ error: 'Update failed.' }, { status: 500 });
@@ -48,11 +47,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (auth instanceof NextResponse) return auth;
   const { id } = await params;
 
-  const { error } = await supabase
-    .from('UserSkill')
+  const { data, error } = await tenantTable(supabase, 'UserSkill', { spaceId: auth.space.id })
     .delete()
     .eq('id', id)
-    .eq('spaceId', auth.space.id);
+    .select('id');
   if (error) return NextResponse.json({ error: 'Delete failed.' }, { status: 500 });
+  if (!data || data.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

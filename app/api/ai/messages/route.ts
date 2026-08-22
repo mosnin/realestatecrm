@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { getAuthorizedRealtorConversation } from '@/lib/chat/realtor-conversation-auth';
 
@@ -33,14 +34,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const { data, error } = await supabase
-      .from('Message')
+    const { data, error } = await tenantTable(supabase, 'Message', {
+      spaceId: authorized.space.id,
+    })
       .select('id, role, content, blocks, createdAt')
       .eq('conversationId', conversationId)
-      // Defense-in-depth: the parent conversation was authorized above, but
-      // Message also carries spaceId. Keep the child fetch scoped to the same
-      // space so malformed legacy rows cannot appear in the transcript.
-      .eq('spaceId', authorized.space.id)
       .order('createdAt', { ascending: true })
       .limit(MESSAGE_LIMIT);
     if (error) {

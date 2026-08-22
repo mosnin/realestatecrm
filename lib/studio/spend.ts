@@ -20,6 +20,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 
 const DEFAULT_CAP_USD = 50;
@@ -40,10 +41,8 @@ function getCapUsd(): number {
  */
 export async function getStudioSpendToday(spaceId: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('StudioGeneration')
+  const { data, error } = await tenantTable(supabase, 'StudioGeneration', { spaceId })
     .select('costUsd')
-    .eq('spaceId', spaceId)
     .gte('createdAt', since);
   if (error) {
     logger.warn('[studio.spend] today-spend query failed — allowing', { spaceId }, error);

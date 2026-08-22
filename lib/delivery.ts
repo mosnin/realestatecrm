@@ -38,6 +38,7 @@
 
 import { Resend } from 'resend';
 import { supabase } from '@/lib/supabase';
+import { toE164 } from '@/lib/phone';
 import {
   composioConfigured,
   executeToolForEntity,
@@ -264,6 +265,13 @@ async function deliverSms(
     return { sent: false, method: 'sms', error: 'Contact has no phone number' };
   }
 
+  // Contact.phone is stored as the realtor typed it. Telnyx requires E.164;
+  // sending "(415) 555-0123" or "14155550123" is a hard provider rejection.
+  const toNumber = toE164(contact.phone);
+  if (!toNumber) {
+    return { sent: false, method: 'sms', error: 'Contact phone is not a valid number' };
+  }
+
   try {
     const res = await fetch('https://api.telnyx.com/v2/messages', {
       method: 'POST',
@@ -273,7 +281,7 @@ async function deliverSms(
       },
       body: JSON.stringify({
         from: fromNumber,
-        to: contact.phone,
+        to: toNumber,
         text: draft.content,
       }),
     });
@@ -304,6 +312,18 @@ async function deliverSms(
  *                 Both spaceId and userId required; if either is missing,
  *                 we skip the inbox lookup and use the shared sender.
  */
+/** Honest one-liner for the realtor: who actually sent this. */
+export function describeDelivery(result: DeliveryResult): string {
+  if (result.method === 'gmail') return 'from your Gmail';
+  if (result.method === 'outlook') return 'from your Outlook';
+  if (result.method === 'sms') return 'by text';
+  if (result.method === 'note') return 'as an internal note';
+  if (result.fallback) {
+    return "from Chippi's sender (your inbox failed — reconnect to send as yourself)";
+  }
+  return "from Chippi's sender (connect Gmail or Outlook to send as yourself)";
+}
+
 export async function sendDraft(
   draft: DraftPayload,
   contact: ContactPayload,

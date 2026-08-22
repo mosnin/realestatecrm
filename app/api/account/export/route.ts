@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   // Scope is derived from the session, never from the request body.
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // The account/profile row for the owner — controller-held data about them.
   const { data: ownerRow } = await supabase

@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getSpaceForUser } from '@/lib/space';
 import { requireAuth } from '@/lib/api-auth';
+import { tenantTable } from '@/lib/tenant-db';
 
 async function resolveDealSpace(dealId: string, userId: string) {
   const space = await getSpaceForUser(userId);
   if (!space) return null;
-  const { data: dealRows, error } = await supabase
-    .from('Deal')
+  const { data: dealRows, error } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
     .select('spaceId')
     .eq('id', dealId)
-    .eq('spaceId', space.id)
     .limit(1);
   if (error) throw error;
   if (!dealRows?.length) return null;
@@ -29,11 +28,9 @@ export async function GET(
   const space = await resolveDealSpace(id, userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await supabase
-    .from('DealActivity')
+  const { data, error } = await tenantTable(supabase, 'DealActivity', { spaceId: space.id })
     .select('*')
     .eq('dealId', id)
-    .eq('spaceId', space.id)
     .order('createdAt', { ascending: false });
   if (error) throw error;
 
@@ -77,8 +74,7 @@ export async function POST(
     }
   }
 
-  const { data, error } = await supabase
-    .from('DealActivity')
+  const { data, error } = await tenantTable(supabase, 'DealActivity', { spaceId: space.id })
     .insert({
       id: crypto.randomUUID(),
       dealId: id,
