@@ -23,5 +23,19 @@
         { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/workspace-run-recovery",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/work-session-action-recovery",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/conversation-turn-recovery",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }
