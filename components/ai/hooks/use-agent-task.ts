@@ -1094,7 +1094,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     if (!response.ok) throw new Error('Could not load queued work.');
     const payload = (await response.json()) as { turns?: ConversationTurnRecord[] };
     const turns = Array.isArray(payload.turns) ? payload.turns : [];
-    const visible = queuedMessagesFromTurns(turns);
+    // The accepted turn can still read as `pending` for a moment while its
+    // stream is claiming the lease. It is already rendered in the transcript,
+    // so never duplicate that exact active id in the queued-message rail.
+    const visible = queuedMessagesFromTurns(turns)
+      .filter((turn) => turn.id !== activeTurnIdRef.current);
     queuedRef.current = visible;
     setQueuedMessages(visible);
     const active = turns.find((turn) => turn.status === 'running' || turn.status === 'paused');

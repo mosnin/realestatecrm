@@ -15,6 +15,11 @@ export type TranscriptRenderItem =
       groupId: string;
     };
 
+function isToolProcessNarration(content: string): boolean {
+  const text = content.trim();
+  return /^(?:let me\s+(?:try|retry|check|call|look|pull|find|get|use|see)\b|i\s+(?:need to|see the issue)\b|i(?:'ll| will)\s+(?:try|retry|check|call|look|pull|find|get|use)\b)/i.test(text);
+}
+
 /**
  * Fold every non-subagent tool call in a turn into one dropdown, even when
  * the model typed between retries. Subagents stay on their own row.
@@ -92,6 +97,10 @@ export function groupTranscriptItems(
     }
     if (block.type === 'text') {
       if (finalOrdinaryToolIndex >= 0 && i < finalOrdinaryToolIndex) continue;
+      // A provider can exhaust its tool budget immediately after emitting a
+      // retry preamble. That preamble is not an answer and must not become the
+      // last thing the user sees ("let me try again", "I need to check...").
+      if (finalOrdinaryToolIndex >= 0 && isToolProcessNarration(block.content)) continue;
       items.push({ kind: 'text', block, originalIndex: i });
     } else if (block.type === 'permission') {
       items.push({ kind: 'permission', block });
