@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from security.context import AgentContext  # noqa: E402
 from tests._helpers import disable_tool_error_wrapper, make_tool_context  # noqa: E402
+from tools import base as tools_base  # noqa: E402
 from tools import tours as tours_mod  # noqa: E402
 
 
@@ -84,9 +85,11 @@ class _FakeDb:
 
 @pytest.fixture(autouse=True)
 def _disable_failure() -> Any:
+    tools_base._IDEM.clear()
     undo = disable_tool_error_wrapper(tours_mod.book_tour)
     yield
     undo()
+    tools_base._IDEM.clear()
 
 
 @pytest.fixture
