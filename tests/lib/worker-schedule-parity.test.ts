@@ -1,8 +1,9 @@
 /**
  * Worker schedule ↔ app manifest parity.
  *
- * The always-on worker (worker/src/schedule.ts) is the production scheduler:
- * it keeps one BullMQ repeatable job per recurring background job. The app's
+ * The always-on worker (worker/src/schedule.ts) is the primary production scheduler.
+ * Vercel independently invokes only the three idempotent recovery routes so a
+ * stale worker deployment cannot strand user work. The app's
  * CRON_MANIFEST (lib/inngest/cron-functions.ts) remains the app-side record
  * of those jobs (ids, routes, cadences, Sentry monitor expectations). This
  * test pins the two lists together so a job added, dropped, or re-scheduled
@@ -40,8 +41,19 @@ describe('worker recurring jobs', () => {
     }
   });
 
-  it('vercel.json no longer declares crons (the worker owns scheduling)', () => {
+  it('keeps an exact Vercel safety rail for the three idempotent recovery routes', () => {
     const vercelJson = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8'));
-    expect(vercelJson.crons).toBeUndefined();
+    const recoveryIds = [
+      'cron-workspace-run-recovery',
+      'cron-work-session-action-recovery',
+      'cron-conversation-turn-recovery',
+    ];
+    const expected = recoveryIds.map((id) => {
+      const job = RECURRING_JOBS.find((entry) => entry.id === id);
+      expect(job, `worker schedule is missing recovery job ${id}`).toBeDefined();
+      return { path: job!.path, schedule: job!.pattern };
+    });
+
+    expect(vercelJson.crons).toEqual(expected);
   });
 });
