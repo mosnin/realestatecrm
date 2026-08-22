@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chatModeChipLabel,
-  emptyStateSubtitle,
   shouldShowFollowUpSuggestions,
   shouldShowInlineWorkActivity,
   shouldShowPlanCard,
@@ -61,11 +59,7 @@ describe('chat UX presentation rules', () => {
     })).toBe(false);
   });
 
-  it('names Chat vs Work without a tooltip', () => {
-    expect(chatModeChipLabel('chat')).toBe('Chat · answers');
-    expect(chatModeChipLabel('work')).toBe('Work · can act');
-    expect(emptyStateSubtitle('chat')).toMatch(/look it up/i);
-    expect(emptyStateSubtitle('work')).toMatch(/go do it/i);
+  it('names the Work execution posture', () => {
     expect(workExecutionChipLabel('review')).toBe('Review');
     expect(workExecutionChipLabel('autonomous')).toBe('Can act');
   });

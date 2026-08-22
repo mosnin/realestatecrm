@@ -574,9 +574,9 @@ export function queuedTurnOrder(
     .sort((a, b) => b.priority - a.priority || a.enqueueSeq - b.enqueueSeq);
 }
 
-/** Failed and approval-paused turns deliberately stop automatic queue drain. */
+/** Only an approval-paused turn deliberately stops automatic queue drain. */
 export function queueIsHeld(turns: readonly ConversationTurnRecord[]): boolean {
-  return turns.some((turn) => turn.status === 'paused' || turn.status === 'failed');
+  return turns.some((turn) => turn.status === 'paused');
 }
 
 export function nextDispatchableTurn(

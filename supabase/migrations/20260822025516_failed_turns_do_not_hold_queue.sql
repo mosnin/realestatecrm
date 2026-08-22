@@ -1,0 +1,3 @@
+-- Production migration receipt. Applied through the Supabase management API
+-- on 2026-08-22. The forward definition lives at 20260915000028 so a clean
+-- database applies it after the v2 queue function introduced in 20260915000027.

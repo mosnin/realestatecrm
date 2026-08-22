@@ -307,7 +307,7 @@ function DraftRow({
   // they just resolved as the others stagger up to fill the space.
   if (celebrationKind) {
     return (
-      <article className="group/row py-3 first:pt-0 last:pb-0">
+      <article className="group/row overflow-hidden rounded-2xl border border-border/70 bg-card/50 px-4 py-4 sm:px-5">
         <div className="flex items-baseline gap-2 text-sm">
           {draft.Contact && (
             <span className="font-medium text-muted-foreground truncate">
@@ -324,9 +324,9 @@ function DraftRow({
   }
 
   return (
-    <article className="group/row py-3 first:pt-0 last:pb-0">
+    <article className="group/row overflow-hidden rounded-2xl border border-border/70 bg-card/50 px-4 py-4 sm:px-5 sm:py-5">
       {/* Meta line: checkbox · contact · channel · confidence · time */}
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
         {/* Quiet checkbox — invisible until row hover or selected. Matches the
             contact-table pattern: shouldn't shout, but stays put when active. */}
         <input
@@ -372,7 +372,7 @@ function DraftRow({
           </span>
         )}
 
-        <span className="ml-auto flex items-center gap-2 flex-shrink-0">
+        <span className="ml-auto flex shrink-0 items-center gap-2">
           {draft.confidence !== null && draft.confidence !== undefined && (
             <span
               className={cn(
@@ -406,7 +406,7 @@ function DraftRow({
 
       {/* Subject (email only) */}
       {draft.subject && (
-        <p className="mt-2 text-sm font-medium text-foreground">{draft.subject}</p>
+        <p className="mt-3 max-w-3xl break-words text-sm font-medium text-foreground">{draft.subject}</p>
       )}
 
       {/* Body */}
@@ -430,8 +430,8 @@ function DraftRow({
           </span>
         </div>
       ) : (
-        <div className="group/content relative mt-2">
-          <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap pr-14">
+        <div className="group/content relative mt-2 max-w-3xl">
+          <p className="break-words whitespace-pre-wrap pr-14 text-sm leading-relaxed text-foreground/90">
             {editedContent}
             {isEdited && (
               <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
@@ -518,7 +518,7 @@ function DraftRow({
       )}
 
       {/* Actions */}
-      <div className="mt-3.5 flex items-center gap-1.5">
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
         {draft.channel === 'sms' || draft.channel === 'email' ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -1051,7 +1051,7 @@ export function AgentDraftInbox({ slug }: Props) {
 
       {/* Draft rows */}
       {!loading && drafts.length > 0 && (
-        <StaggerList className="divide-y divide-border/60">
+        <StaggerList className="space-y-3 pt-4">
           {drafts.map((draft) => (
             <StaggerItem key={draft.id}>
               <DraftRow

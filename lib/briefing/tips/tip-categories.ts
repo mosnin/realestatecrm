@@ -33,6 +33,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
+import { unscoped } from '@/lib/supabase-guard';
 import { HOT_LEAD_THRESHOLD } from '@/lib/constants';
 import type { Signal } from '../types';
 
@@ -575,11 +576,27 @@ export async function tipTourConversionDrop(spaceId: string): Promise<Signal[]> 
     /application|offer/i.test(`${d.channel} ${d.subject ?? ''}`),
   );
 
-  const { data: deals } = await tenantTable(supabase, 'Deal', { spaceId })
-    .select('id, contactId, stageChangedAt')
+  // Deal no longer owns a contactId column; contacts are linked through the
+  // DealContact junction. Resolve the junction first, then re-assert tenancy
+  // on Deal before reading stage movement.
+  const { data: dealLinks } = await unscoped(
+    supabase.from('DealContact'),
+    'junction lookup by space-scoped contact ids; Deal is re-scoped below',
+  )
+    .select('dealId, contactId')
     .in('contactId', allContactIds);
+  const links = (dealLinks ?? []) as Array<{ dealId: string; contactId: string }>;
+  const contactByDeal = new Map(links.map((link) => [link.dealId, link.contactId]));
+  const dealIds = Array.from(contactByDeal.keys());
+  const { data: deals } = dealIds.length > 0
+    ? await tenantTable(supabase, 'Deal', { spaceId })
+        .select('id, stageChangedAt')
+        .in('id', dealIds)
+    : { data: [] };
   type DealRow = { id: string; contactId: string; stageChangedAt: string | null };
-  const dealRows = (deals ?? []) as DealRow[];
+  const dealRows = ((deals ?? []) as Array<{ id: string; stageChangedAt: string | null }>).map(
+    (deal) => ({ ...deal, contactId: contactByDeal.get(deal.id) ?? '' }),
+  ).filter((deal): deal is DealRow => Boolean(deal.contactId));
 
   const converted = (tour: TourRow): boolean => {
     const tourEnd = new Date(tour.endsAt).getTime();

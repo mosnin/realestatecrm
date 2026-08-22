@@ -59,7 +59,7 @@ table.
 - Dark mode and `prefers-reduced-motion` must remain first-class; the shared
   field owns its reduced-motion behavior.
 
-## Row lists (the default for any list of records)
+## Lists and actionable records
 
 Match Today&apos;s ranked-move rhythm and People&apos;s record behavior:
 
@@ -81,9 +81,10 @@ Match Today&apos;s ranked-move rhythm and People&apos;s record behavior:
 ```
 
 - Row rhythm: `py-3`. Loading skeleton mirrors the same `divide-y` rows.
-- Never a grid of heavy bordered cards for a records list — People/Deals are rows.
-  (Cards are fine only for a genuine *gallery of choices*, e.g. a template
-  picker, and even then they are plain bordered `bg-card` with **no** icon header.)
+- People and Deals use compact divided rows. Long-form actionable records such
+  as Inbox drafts may use one quiet bordered row per record so multiline text,
+  metadata, and actions remain contained and cannot overlap adjacent records.
+  Do not turn either form into a dense multi-column card grid.
 
 ## Page frame (match Today)
 
@@ -119,9 +120,6 @@ and `CHIPPI_PILL` only for direct-Chippi actions.
 
 ---
 
-Applying this file: sweep every content surface (automations, activity, inbox,
-property/deal/contact detail panels, brokerage dashboard) and strip decorative
-icons + gradients + category colors, converting them to the Today
-panel/row/pill/text vocabulary above. Sidebar and navigation keep their icons;
-the desktop sidebar collapses into the shared 56px nav strip defined in
-`DESIGN.md`.
+Apply these rules when a surface is changed. Preserve working information
+architecture and interaction placement; do not perform repository-wide visual
+sweeps as a side effect of an unrelated repair.

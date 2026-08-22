@@ -51,7 +51,6 @@ export function TextBlockView({
         {role === 'assistant' ? (
           <StreamingResponse
             status={streaming ? 'streaming' : 'complete'}
-            copyText={block.content}
             sources={sources}
             collapse={collapse}
             announce={announce}
