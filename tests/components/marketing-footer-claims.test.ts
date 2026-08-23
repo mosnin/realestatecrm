@@ -3,13 +3,15 @@ import { describe, expect, it } from 'vitest';
 
 describe('marketing claims', () => {
   it('does not present unverified compliance certifications', () => {
-    const source = readFileSync('components/marketing/giga/footer.tsx', 'utf8');
+    const footer = readFileSync('components/marketing/giga/footer.tsx', 'utf8');
+    const chromeCopy = readFileSync('lib/i18n/dictionaries/chrome.ts', 'utf8');
+    const source = `${footer}\n${chromeCopy}`;
 
     expect(source).not.toContain("'SOC 2'");
     expect(source).not.toContain("'ISO 27001'");
     expect(source).not.toContain("'GDPR'");
     expect(source).not.toMatch(/>\s*Compliant\s*</);
-    expect(source).toContain('Security controls');
+    expect(source).toContain('Built for control');
   });
 
   it('does not publish sample testimonials as customer quotes', () => {
@@ -20,11 +22,13 @@ describe('marketing claims', () => {
 
   it('does not imply unapproved customer relationships', () => {
     const hero = readFileSync('components/marketing/giga/hero.tsx', 'utf8');
+    const homeCopy = readFileSync('lib/i18n/dictionaries/home.ts', 'utf8');
+    const source = `${hero}\n${homeCopy}`;
 
-    expect(hero).not.toContain('Trusted across modern brokerages');
-    expect(hero).not.toContain("'Compass'");
-    expect(hero).not.toContain("'RE/MAX'");
-    expect(hero).toContain('Built for modern brokerages');
+    expect(source).not.toContain('Trusted across modern brokerages');
+    expect(source).not.toContain("'Compass'");
+    expect(source).not.toContain("'RE/MAX'");
+    expect(source).toContain('Your AI lead conversion teammate');
   });
 
   it('does not publish illustrative job openings', () => {
