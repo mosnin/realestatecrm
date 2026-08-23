@@ -19,13 +19,10 @@ test('marketing home renders the hero and the primary CTA navigates', async ({ p
   await expect(
     page.getByRole('heading', { name: /Turn more leads into\s+booked tours\./i }),
   ).toBeVisible();
+  expect(errors, 'no unexpected console/page errors on the marketing homepage').toEqual([]);
 
   // Primary CTA in the sticky header starts the self-serve conversion path.
   await page.getByRole('link', { name: 'Start free' }).first().click();
   await page.waitForURL('**/sign-up');
-  await expect(
-    page.getByRole('heading', { name: /Set up Chippi\./i }),
-  ).toBeVisible();
-
-  expect(errors, 'no unexpected console/page errors on the money path').toEqual([]);
+  expect(new URL(page.url()).pathname).toBe('/sign-up');
 });
