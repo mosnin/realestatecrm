@@ -90,7 +90,7 @@ vi.mock('@/lib/ai-tools/tools', () => ({ ALL_TOOLS: [] }));
 vi.mock('@openai/agents', () => ({ run: vi.fn(), Agent: class {} }));
 vi.mock('@/lib/workspace-runs/server', () => ({ dispatchWorkspaceRun }));
 
-import { executeSession, planSession } from '@/lib/work-sessions/engine';
+import { advanceSession, executeSession, planSession } from '@/lib/work-sessions/engine';
 
 function baseSession(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -241,5 +241,42 @@ describe('planSession', () => {
     expect(dispatchWorkspaceRun).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'run-current', workSessionId: 'ws1' }),
     );
+  });
+});
+
+describe('advanceSession — workspace durable link', () => {
+  it('fails closed when a workspace session has no workspaceRunId', async () => {
+    sessionRow = baseSession({
+      status: 'running',
+      kind: 'workspace',
+      workspaceRunId: null,
+    });
+
+    expect(await advanceSession('ws1')).toBe('stopped');
+    expect(dispatchWorkspaceRun).not.toHaveBeenCalled();
+    expect(patches.at(-1)).toMatchObject({
+      status: 'failed',
+      error: 'Workspace Run is missing its durable link.',
+    });
+  });
+
+  it('dispatches exactly once through the durable launch fence when the link is present', async () => {
+    sessionRow = baseSession({
+      status: 'running',
+      kind: 'workspace',
+      workspaceRunId: 'run-current',
+      answer: 'Use the Henderson listing packet.',
+    });
+
+    expect(await advanceSession('ws1')).toBe('done');
+    expect(dispatchWorkspaceRun).toHaveBeenCalledTimes(1);
+    expect(dispatchWorkspaceRun).toHaveBeenCalledWith({
+      runId: 'run-current',
+      spaceId: 'sp1',
+      workSessionId: 'ws1',
+      goal: 'Prep the Henderson listing appointment',
+      answer: 'Use the Henderson listing packet.',
+    });
+    expect(patches.some((patch) => patch.status === 'failed')).toBe(false);
   });
 });
