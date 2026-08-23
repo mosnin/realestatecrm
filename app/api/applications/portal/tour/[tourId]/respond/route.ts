@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { unscoped } from '@/lib/supabase-guard';
 import { tenantTable } from '@/lib/tenant-db';
+import { dropTourCalendarArtifacts } from '@/lib/tours/calendar-propagate';
+import { logger } from '@/lib/logger';
 
 
 /**
@@ -18,6 +20,9 @@ import { tenantTable } from '@/lib/tenant-db';
  *     (action='decline')
  *   - ApplicationMessage row added so the realtor sees the response in the
  *     existing thread + so the applicant has receipt in their own thread
+ *   - Decline also drops both calendar systems (legacy googleEventId +
+ *     Composio mirror). Guest manage-token cancel already did this; leaving
+ *     it out here kept a live calendar slot after the CRM row was cancelled.
  *
  * Idempotent: confirming an already-confirmed tour is a no-op success.
  */
@@ -92,7 +97,7 @@ export async function POST(
   // Validate tour belongs to this contact + space (defense in depth)
   const { data: tour, error: tourError } = await unscoped(supabase
     .from('Tour'), 'capability token: application portal')
-    .select('id, spaceId, contactId, status, startsAt, propertyAddress')
+    .select('id, spaceId, contactId, status, startsAt, propertyAddress, googleEventId')
     .eq('id', tourId)
     .maybeSingle();
 
@@ -179,6 +184,28 @@ export async function POST(
       senderType: 'applicant',
       content: messageBody,
     });
+
+  if (action === 'decline') {
+    const spaceId = contact.spaceId as string;
+    const declinedTourId = tour.id as string;
+    const googleEventId = (tour as { googleEventId?: string | null }).googleEventId;
+    const sideEffects = (async () => {
+      try {
+        await dropTourCalendarArtifacts({
+          spaceId,
+          tourId: declinedTourId,
+          googleEventId,
+        });
+      } catch (err) {
+        logger.warn('[portal/tour-respond] calendar drop failed', { tourId: declinedTourId }, err);
+      }
+    })();
+    try {
+      after(() => sideEffects);
+    } catch {
+      // Tests / non-Next runtimes have no request context.
+    }
+  }
 
   return NextResponse.json({
     ok: true,

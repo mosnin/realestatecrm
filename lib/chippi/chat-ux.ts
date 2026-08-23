@@ -42,3 +42,18 @@ export function shouldShowInlineWorkActivity(opts: {
 export function workExecutionChipLabel(mode: 'review' | 'autonomous'): string {
   return mode === 'review' ? 'Review' : 'Can act';
 }
+
+/**
+ * Promote a queued instruction to Steer without deleting it first.
+ * Delete-then-steer permanently drops the text when the steer POST fails
+ * (active turn already finished, approval pause, or a network error).
+ */
+export async function steerQueuedInstruction(input: {
+  steer: () => Promise<boolean>;
+  remove: () => Promise<boolean>;
+}): Promise<boolean> {
+  const steered = await input.steer();
+  if (!steered) return false;
+  await input.remove();
+  return true;
+}
