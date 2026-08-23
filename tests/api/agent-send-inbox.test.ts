@@ -85,10 +85,14 @@ vi.mock('@/lib/supabase', () => {
 // route module sees it at load time.
 import { POST } from '@/app/api/agent/send/route';
 import { sendDraft } from '@/lib/delivery';
+import { checkSendAllowed } from '@/lib/messaging/compliance';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { sendSMS } from '@/lib/sms';
 
 const mockSendDraft = vi.mocked(sendDraft);
 const mockSendSMS = vi.mocked(sendSMS);
+const mockCheckSendAllowed = vi.mocked(checkSendAllowed);
+const mockCheckRateLimit = vi.mocked(checkRateLimit);
 
 function makeReq(body: unknown, auth = 'Bearer test-secret'): NextRequest {
   return new NextRequest('http://localhost/api/agent/send', {
@@ -124,6 +128,8 @@ beforeEach(() => {
   inserts.length = 0;
   mockSendDraft.mockResolvedValue({ sent: true, method: 'gmail' });
   mockSendSMS.mockResolvedValue(true);
+  mockCheckSendAllowed.mockResolvedValue({ allowed: true });
+  mockCheckRateLimit.mockResolvedValue({ allowed: true });
 });
 
 describe('POST /api/agent/send — Phase 2 inbox wire-in', () => {
@@ -212,6 +218,112 @@ describe('POST /api/agent/send — Phase 2 inbox wire-in', () => {
     );
     expect(res.status).toBe(502);
     // The route returns before reaching either write.
+    expect(inserts.find((i) => i.table === 'InboxMessage')).toBeUndefined();
+    expect(inserts.find((i) => i.table === 'ContactActivity')).toBeUndefined();
+  });
+});
+
+describe('POST /api/agent/send — security and send-as-realtor', () => {
+  it('rejects a missing or wrong bearer secret before any lookup', async () => {
+    const missing = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hi', subject: 'S',
+    }, ''));
+    const wrong = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hi', subject: 'S',
+    }, 'Bearer other-secret'));
+
+    expect(missing.status).toBe(401);
+    expect(wrong.status).toBe(401);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid channel or an email without a subject', async () => {
+    const channel = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'carrier-pigeon', content: 'hi',
+    }));
+    const subject = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hi',
+    }));
+
+    expect(channel.status).toBe(400);
+    expect(subject.status).toBe(400);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits a runaway agent before looking up the contact', async () => {
+    mockCheckRateLimit.mockResolvedValueOnce({ allowed: false });
+
+    const res = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hi', subject: 'S',
+    }));
+
+    expect(res.status).toBe(429);
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('agent-send:space_1', 30, 300);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(0);
+  });
+
+  it('404s a contact that does not belong to the requested space', async () => {
+    queueFor('Contact').push({ data: null, error: null });
+
+    const res = await POST(makeReq({
+      contactId: 'other-space-contact', spaceId: 'space_1', channel: 'email', content: 'hi', subject: 'S',
+    }));
+
+    expect(res.status).toBe(404);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(0);
+  });
+
+  it('holds a compliance block before delivery', async () => {
+    queueContactAndSetting({ id: 'c1', name: 'Alice', email: 'a@x.test', phone: null });
+    mockCheckSendAllowed.mockResolvedValueOnce({
+      allowed: false,
+      reason: 'suppressed',
+      detail: 'the recipient opted out',
+    });
+
+    const res = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hi', subject: 'S',
+    }));
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { reason?: string };
+    expect(body.reason).toBe('suppressed');
+    expect(mockSendDraft).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(0);
+  });
+
+  it('passes the space owner clerkId into sendDraft so autonomous mail goes as the realtor', async () => {
+    queueContactAndSetting({ id: 'c1', name: 'Alice', email: 'a@x.test', phone: null });
+    queueFor('Space').push({ data: { ownerId: 'user_db_1' }, error: null });
+    queueFor('User').push({ data: { clerkId: 'clerk_owner_1' }, error: null });
+    queueFor('ContactActivity').push({ data: null, error: null });
+    queueInboxWriteSuccess();
+
+    const res = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hello there', subject: 'A note',
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockSendDraft).toHaveBeenCalledWith(
+      { channel: 'email', subject: 'A note', content: 'hello there' },
+      { name: 'Alice', email: 'a@x.test', phone: null },
+      'Test Realty',
+      { spaceId: 'space_1', userId: 'clerk_owner_1' },
+    );
+  });
+
+  it('returns 502 and writes nothing when email delivery reports sent:false', async () => {
+    queueContactAndSetting({ id: 'c1', name: 'Alice', email: 'a@x.test', phone: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: false, method: 'email', error: 'inbox disconnected' });
+
+    const res = await POST(makeReq({
+      contactId: 'c1', spaceId: 'space_1', channel: 'email', content: 'hello', subject: 'S',
+    }));
+
+    expect(res.status).toBe(502);
     expect(inserts.find((i) => i.table === 'InboxMessage')).toBeUndefined();
     expect(inserts.find((i) => i.table === 'ContactActivity')).toBeUndefined();
   });

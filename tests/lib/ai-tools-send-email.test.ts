@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mock supabase chain + email delivery + logger ──────────────────────────
 let mockByTable: Record<
@@ -19,6 +19,7 @@ vi.mock('@/lib/supabase', () => {
     const chain: Record<string, unknown> = {
       select: vi.fn(() => chain),
       eq: vi.fn(() => chain),
+      in: vi.fn(() => chain),
       is: vi.fn(() => chain),
       insert: vi.fn(() => ({
         ...chain,
@@ -71,9 +72,17 @@ vi.mock('@/lib/delivery', () => ({
 }));
 vi.mock('@/lib/messaging/compliance', () => ({ checkSendAllowed: checkSendAllowedMock }));
 vi.mock('@/lib/inbox', () => ({ recordOutboundMessageSafe: recordOutboundMock }));
+const { getSignedDownloadUrlMock } = vi.hoisted(() => ({
+  getSignedDownloadUrlMock: vi.fn(async () => 'https://signed.example/file'),
+}));
+vi.mock('@/lib/storage', () => ({
+  getSignedDownloadUrl: getSignedDownloadUrlMock,
+}));
 
 import { sendEmailTool } from '@/lib/ai-tools/tools/send-email';
 import type { ToolContext } from '@/lib/ai-tools/types';
+
+const originalResendKey = process.env.RESEND_API_KEY;
 
 function makeCtx(): ToolContext {
   return {
@@ -91,6 +100,19 @@ beforeEach(() => {
   recordOutboundMock.mockClear();
   sendDraftMock.mockResolvedValue({ sent: true, method: 'gmail' });
   checkSendAllowedMock.mockResolvedValue({ allowed: true });
+  getSignedDownloadUrlMock.mockClear();
+  getSignedDownloadUrlMock.mockResolvedValue('https://signed.example/file');
+  process.env.RESEND_API_KEY = originalResendKey ?? 'test-resend-key';
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+  })));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  if (originalResendKey === undefined) delete process.env.RESEND_API_KEY;
+  else process.env.RESEND_API_KEY = originalResendKey;
 });
 
 describe('sendEmailTool schema', () => {
@@ -389,5 +411,120 @@ describe('sendEmailTool handler — errors', () => {
     expect(result.display).toBe('success');
     expect(result.summary).toContain("Chippi's sender");
     expect((result.data as { fallback?: boolean }).fallback).toBe(true);
+  });
+});
+
+describe('sendEmailTool handler — attachments', () => {
+  const fileRow = {
+    id: 'file_1',
+    name: 'comp.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: 1024,
+    storageKey: 'files/space_1/comp.pdf',
+  };
+
+  it('treats a file id missing from this space as not found and does not send', async () => {
+    mockByTable = {
+      Contact: { single: { id: 'c_1', email: 'jane@example.com', name: 'Jane' } },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+      File: { rows: [] },
+    };
+
+    const result = await sendEmailTool.handler(
+      {
+        contactId: 'c_1',
+        subject: 'Comps',
+        body: 'See attached.',
+        attachmentFileIds: ['file_other_tenant'],
+      },
+      makeCtx(),
+    );
+
+    expect(result.display).toBe('error');
+    expect(result.summary).toMatch(/Attachment ids not found/);
+    expect(sendDraftMock).not.toHaveBeenCalled();
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(getSignedDownloadUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses attachments that exceed the combined 25 MB cap', async () => {
+    mockByTable = {
+      Contact: { single: { id: 'c_1', email: 'jane@example.com', name: 'Jane' } },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+      File: { rows: [{ ...fileRow, sizeBytes: 26 * 1024 * 1024 }] },
+    };
+
+    const result = await sendEmailTool.handler(
+      {
+        contactId: 'c_1',
+        subject: 'Comps',
+        body: 'See attached.',
+        attachmentFileIds: ['file_1'],
+      },
+      makeCtx(),
+    );
+
+    expect(result.display).toBe('error');
+    expect(result.summary).toMatch(/25 MB combined limit/);
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(getSignedDownloadUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('sends attachments through the platform sender and says so', async () => {
+    mockByTable = {
+      Contact: { single: { id: 'c_1', email: 'jane@example.com', name: 'Jane' } },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+      File: { rows: [fileRow] },
+    };
+
+    const result = await sendEmailTool.handler(
+      {
+        contactId: 'c_1',
+        subject: 'Comps',
+        body: 'See attached.',
+        attachmentFileIds: ['file_1'],
+      },
+      makeCtx(),
+    );
+
+    expect(result.display).toBe('success');
+    expect(result.summary).toContain("attachments cannot go through a connected inbox yet");
+    expect(sendDraftMock).not.toHaveBeenCalled();
+    expect(sendEmailFromCRMMock).toHaveBeenCalledWith(expect.objectContaining({
+      toEmail: 'jane@example.com',
+      subject: 'Comps',
+      spaceId: 'space_1',
+      attachments: [expect.objectContaining({ filename: 'comp.pdf', contentType: 'application/pdf' })],
+    }));
+    expect(recordOutboundMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ attachments: true, method: 'email' }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('fails closed when attachments cannot use a connected inbox and Resend is unset', async () => {
+    delete process.env.RESEND_API_KEY;
+    mockByTable = {
+      Contact: { single: { id: 'c_1', email: 'jane@example.com', name: 'Jane' } },
+      SpaceSetting: { single: { businessName: 'Jane Realty' } },
+      File: { rows: [fileRow] },
+    };
+
+    const result = await sendEmailTool.handler(
+      {
+        contactId: 'c_1',
+        subject: 'Comps [no-resend]',
+        body: 'See attached without a platform sender.',
+        attachmentFileIds: ['file_1'],
+      },
+      makeCtx(),
+    );
+
+    expect(result.display).toBe('error');
+    expect(result.summary).toMatch(/Platform sender is not configured/);
+    expect(sendEmailFromCRMMock).not.toHaveBeenCalled();
+    expect(sendDraftMock).not.toHaveBeenCalled();
   });
 });
