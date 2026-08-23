@@ -9,9 +9,12 @@
 import { CalendlyEmbed } from '@/components/marketing/giga/calendly-embed';
 import { Band, BlurRise, EyebrowPill, Serif } from '@/components/marketing/giga/primitives';
 
-export const metadata = { title: 'Book a demo · Chippi' };
+export const metadata = {
+  title: 'Book a live walkthrough · Chippi',
+  description: 'See Chippi move a real estate inquiry from first response to a booked tour, then map the same process to your team.',
+};
 
-const POINTS = ['See it read and draft a real lead', 'Watch a tour book itself', 'Ask how it fits your book'];
+const POINTS = ['Read and rank an inquiry', 'Draft the reply in your voice', 'Book from the real calendar'];
 
 export default function DemoPage() {
   return (
@@ -26,18 +29,17 @@ export default function DemoPage() {
         </div>
         <Band className="pt-40 pb-10 text-center sm:pt-44">
           <BlurRise trigger="load">
-            <EyebrowPill>See it live</EyebrowPill>
+            <EyebrowPill>Live product walkthrough</EyebrowPill>
           </BlurRise>
           <BlurRise trigger="load" delay={0.08}>
             <Serif as="h1" className="mx-auto mt-7 max-w-3xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
-              See Chippi run your floor.
+              See one lead move from inquiry to booked tour.
             </Serif>
           </BlurRise>
           <BlurRise trigger="load" delay={0.16}>
             <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-              For brokerages and teams sizing up Chippi. Pick a time and we will walk your floor through
-              it live: the inbox, the drafts, and the deals it keeps current, then answer how it fits
-              your book.
+              Bring your lead process. We will show how Chippi reads, ranks, drafts, books, and logs
+              each move. Then we will map the same flow to your agents and tools.
             </p>
           </BlurRise>
           <BlurRise trigger="load" delay={0.22}>

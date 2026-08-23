@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { PRICING_DICTS } from '@/lib/i18n/dictionaries/pricing';
+import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
 import { LANGS } from '@/lib/i18n/markets';
 
 /** Every string leaf with its path, so failures name the offending key. */
@@ -42,7 +43,7 @@ const JARGON = [
 
 /** Dictionaries under enforcement. Add each new page's dictionary here as it
  *  is rewritten, so the standard covers the whole site rather than one page. */
-const DICTS: Record<string, unknown> = { pricing: PRICING_DICTS };
+const DICTS: Record<string, unknown> = { pricing: PRICING_DICTS, home: HOME_DICTS };
 
 describe('marketing voice', () => {
   const all = Object.entries(DICTS).flatMap(([name, byLang]) =>

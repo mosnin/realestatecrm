@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Acceptable Use Policy | Chippi',
-  description: 'Acceptable Use Policy for Chippi, a B2B SaaS agentic OS for real estate agents and brokerages.',
+  description: 'Acceptable Use Policy for Chippi, a real estate lead conversion and operations service.',
 };
 
 export default function AcceptableUsePolicyPage() {

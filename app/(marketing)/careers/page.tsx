@@ -23,7 +23,7 @@ import {
 export const metadata = {
   title: 'Careers · Chippi',
   description:
-    'Help build the operating system real estate has been missing. We are a small team shipping fast, with taste, on a huge surface. If that sounds like you, reach out.',
+    'Help build the AI lead conversion teammate for real estate. We are a small team shipping close to customers, with a high bar for craft and trust.',
 };
 
 const CAREERS_EMAIL = 'careers@usechippi.com';
@@ -72,9 +72,8 @@ export default function CareersPage() {
             </BlurRise>
             <BlurRise trigger="load" delay={0.16}>
               <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-                We are a small team building the operating system real estate has been missing. The
-                surface is huge, the bar is high, and the work goes straight to people who feel it the
-                same day.
+                We are a small team building the lead conversion teammate real estate has been
+                missing. The surface is huge, the bar is high, and the work reaches customers fast.
               </p>
             </BlurRise>
             <BlurRise trigger="load" delay={0.24}>

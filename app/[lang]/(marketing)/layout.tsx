@@ -29,5 +29,5 @@ export default async function LocalizedMarketingLayout({
 }) {
   const { lang } = await params;
   if (!isLang(lang) || lang === 'en') notFound();
-  return <MarketingShell>{children}</MarketingShell>;
+  return <MarketingShell lang={lang}>{children}</MarketingShell>;
 }

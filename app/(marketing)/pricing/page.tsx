@@ -12,6 +12,7 @@ import { hreflangAlternates } from '@/lib/i18n/metadata';
 
 export const metadata = {
   title: PRICING_DICTS.en.metaTitle,
+  description: PRICING_DICTS.en.metaDescription,
   alternates: hreflangAlternates('/pricing', 'en'),
 };
 

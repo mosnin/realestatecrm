@@ -210,7 +210,7 @@ export default function BioPage() {
         eyebrow="Your public page"
         title="One link. Bio, listings, bookings."
         sub="Your public page carries your story, your active listings, and a tour-booking link, and every lead it captures lands in the same loop: scored, drafted, ready for your tap."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 

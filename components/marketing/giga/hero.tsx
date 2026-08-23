@@ -16,10 +16,11 @@ import { BlurRise, EyebrowPill, Mono } from './primitives';
 import { ShimmeringText } from '@/components/ui/shimmering-text';
 import { LogosCarousel } from '@/components/ui/logos-carousel';
 import { HeroChat } from './hero-chat';
+import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
+import type { Lang } from '@/lib/i18n/markets';
 
-const CAPABILITIES = ['Lead routing', 'Audit trails', 'Team analytics', 'Shared templates', 'Role controls', 'Automations'];
-
-export function Hero() {
+export function Hero({ lang = 'en' }: { lang?: Lang }) {
+  const t = HOME_DICTS[lang];
   return (
     <section className="relative isolate min-h-[100svh] overflow-hidden bg-black">
       {/* Full-bleed background photo + scrims */}
@@ -44,7 +45,7 @@ export function Hero() {
             {/* Slow light-sweep across the eyebrow — the one place the hero
                 shimmers. Tuned quiet: white-on-white/50, 2.4s cycle. */}
             <ShimmeringText
-              text="Introducing Chippi"
+              text={t.hero.eyebrow}
               duration={2.4}
               className="[--color:rgba(255,255,255,0.55)] [--shimmering-color:#ffffff]"
             />
@@ -59,15 +60,14 @@ export function Hero() {
             }}
             className="mt-7 text-balance font-light leading-[1.04] tracking-[-0.025em] text-white"
           >
-            The operating system
-            <span className="block">for real estate.</span>
+            {t.hero.line1}
+            <span className="block">{t.hero.line2}</span>
           </h1>
         </BlurRise>
 
         <BlurRise trigger="load" delay={0.28}>
           <p className="mx-auto mt-6 max-w-xl text-balance text-base leading-relaxed text-white/65 sm:text-lg">
-            Chippi works your whole book. It reads every lead, drafts in your voice, books the
-            tour, and keeps every deal moving, so your hours go to the work only you can do.
+            {t.hero.sub}
           </p>
         </BlurRise>
 
@@ -75,7 +75,7 @@ export function Hero() {
             old video/testimonial card). Frosted glass on the photo; branded
             with the real Chippi mark. */}
         <BlurRise trigger="load" delay={0.4} className="mt-10 w-full">
-          <HeroChat />
+          <HeroChat lang={lang} />
         </BlurRise>
       </div>
 
@@ -88,7 +88,7 @@ export function Hero() {
         className="absolute inset-x-0 bottom-0 z-10 border-t border-white/[0.08] bg-gradient-to-t from-black/80 to-transparent"
       >
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 py-6 sm:px-8">
-          <Mono className="text-[10px] text-white/40">Built for modern brokerages</Mono>
+          <Mono className="text-[10px] text-white/40">{t.hero.band}</Mono>
           {/* Staggered-wave capability carousel: items cycle column by column
               in a ripple. Handles reduced
               motion internally (renders static). */}
@@ -96,7 +96,7 @@ export function Hero() {
             columnCount={3}
             className="w-full max-w-3xl place-items-center gap-x-10"
           >
-            {CAPABILITIES.map((capability) => (
+            {t.hero.capabilities.map((capability) => (
               <span
                 key={capability}
                 className="whitespace-nowrap text-[17px] font-semibold tracking-tight text-white/40"

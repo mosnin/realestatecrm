@@ -22,7 +22,7 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
+    name: 'Chippi — AI Lead Conversion Teammate for Real Estate',
     short_name: 'Chippi',
     description:
       'An AI agent that runs your real estate agent workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current.',

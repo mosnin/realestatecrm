@@ -16,7 +16,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'For brokerages · Chippi',
   description:
-    'Give every agent on the floor a Chippi: leads routed to the right agent, replies in each agent\u2019s voice, and a live floor view with role-based controls and an audit log.',
+    'Convert more leads across the whole brokerage. Chippi routes each inquiry, prepares replies, books tours, and gives leaders a live action log.',
 };
 
 export default function BrokeragesPage() {
@@ -28,15 +28,15 @@ export default function BrokeragesPage() {
           labelIcon="Building2"
           headline={
             <>
-              One agent behind
-              <br className="hidden sm:block" /> every desk on the floor.
+              Convert more leads
+              <br className="hidden sm:block" /> across the whole floor.
             </>
           }
-          description="Give every agent a Chippi: leads routed, performance visible, and every send on the record, from a solo desk to hundreds of agents."
+          description="Give every agent a lead conversion teammate. Route each inquiry, keep the next move visible, and review every send from one workspace."
           features={[
-            { icon: 'ArrowRightLeft', title: 'Routing on arrival', desc: 'Leads auto-assigned by territory and load, logged with the reason.' },
-            { icon: 'Users', title: 'The floor, live', desc: 'Deals, drafts, and follow-ups per agent in real time.' },
-            { icon: 'ShieldCheck', title: 'Accountable', desc: 'Every send named, every action on the audit log.' },
+            { icon: 'ArrowRightLeft', title: 'Route each lead on arrival', desc: 'Assign by territory and load. Keep the reason on the record.' },
+            { icon: 'Users', title: 'See the chase across the floor', desc: 'View leads, drafts, follow-ups, and deals by agent.' },
+            { icon: 'ShieldCheck', title: 'Control every send', desc: 'Set roles, choose approvals, and review the action log.' },
           ]}
           image="/marketing/brokerages-hero.jpg"
           variant="floor"

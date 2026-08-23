@@ -18,9 +18,9 @@ import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 
 export const metadata = {
-  title: 'Plugins · Chippi',
+  title: 'Integrations · Chippi',
   description:
-    'Connect the tools you already pay for. Chippi plugs into your inbox, calendar, CRM, and messaging through Composio, then works inside them, no rip and replace.',
+    'Keep the tools you already use. Chippi works across your inbox, calendar, CRM, and messaging without a rip and replace.',
 };
 
 export default function IntegrationsPage() {
@@ -32,11 +32,11 @@ export default function IntegrationsPage() {
           labelIcon="Workflow"
           headline={
             <>
-              Chippi works where
-              <br className="hidden sm:block" /> you already work.
+              Keep your stack.
+              <br className="hidden sm:block" /> Add the teammate.
             </>
           }
-          description="Connect your inbox, calendar, CRM, and messaging in a couple of clicks. Chippi reads from and writes back to each one as it works, so nothing falls out of date."
+          description="Connect the apps you already pay for. Chippi reads the right context, completes the next move, and writes the result back where your team expects it."
           features={[
             { icon: 'Mail', title: 'Email and calendar', desc: 'Gmail, Outlook, Google Calendar, and Calendly.' },
             { icon: 'Users', title: 'Your CRM', desc: 'HubSpot, Salesforce, and Follow Up Boss, two-way.' },

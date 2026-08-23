@@ -127,7 +127,7 @@ export const CURRENCY_COOKIE = 'chippi_currency';
  * languages for paths in this list, so a page can't be redirected to a
  * translation that hasn't shipped yet. Grow this list as pages are localized.
  */
-export const LOCALIZED_PATHS: readonly string[] = ['/pricing'];
+export const LOCALIZED_PATHS: readonly string[] = ['/', '/pricing'];
 
 /** `/es/pricing` → { lang: 'es', basePath: '/pricing' }; `/pricing` → en. */
 export function splitLocalizedPath(pathname: string): { lang: Lang; basePath: string } {

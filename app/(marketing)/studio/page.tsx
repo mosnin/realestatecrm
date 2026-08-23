@@ -145,7 +145,7 @@ export default function StudioPage() {
         eyebrow="Content studio"
         title="The listing becomes the content."
         sub="Just listed, open house, just sold, Chippi drafts the post, the story, and the email in your voice, formatted for every channel, before you leave the driveway."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 

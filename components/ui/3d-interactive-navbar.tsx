@@ -461,7 +461,7 @@ function MobileSheet({
                 Log in
               </Link>
               <Link
-                href="/login/realtor?intent=signup"
+                href="/sign-up"
                 onClick={onClose}
                 className="flex h-11 items-center justify-center rounded-full bg-foreground text-[15px] font-medium text-background transition-transform active:scale-[0.98]"
               >
@@ -506,7 +506,7 @@ export function Navbar() {
               Log in
             </Link>
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="hidden h-9 items-center rounded-full bg-foreground px-4 text-[13.5px] font-medium text-background transition-transform duration-150 hover:opacity-90 active:scale-[0.98] md:inline-flex"
             >
               Start free

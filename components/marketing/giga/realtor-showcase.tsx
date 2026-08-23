@@ -175,14 +175,14 @@ export function RealtorShowcase() {
       eyebrow="Built for agents"
       headline={
         <>
-          Run your whole desk,
-          <br className="hidden sm:block" /> from one screen.
+          Keep every next move
+          <br className="hidden sm:block" /> on one screen.
         </>
       }
       product={{
         name: 'Real estate agent Dashboard',
         icon: Home,
-        desc: 'The home base for your whole business. Qualify leads, move deals, manage every contact, book tours, and put a public profile out front that wins you listings.',
+        desc: 'See who needs a reply, what should move next, and where each deal stands. Book tours and keep every contact current without changing tabs.',
         cta: { label: 'Explore the dashboard', href: '/agents' },
       }}
       topFeatures={TOP_FEATURES}

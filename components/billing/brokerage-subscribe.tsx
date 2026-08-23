@@ -40,7 +40,7 @@ export function BrokerageSubscribe({
    *  cadence toggle only appears when at least one shown plan supports annual. */
   annualEnabled: Record<BrokeragePlanId, boolean>;
 }) {
-  const [cadence, setCadence] = useState<Cadence>('monthly');
+  const [cadence, setCadence] = useState<Cadence>('annual');
   // Which plan's button is mid-request (so only that one spins, and a second
   // click can't open a second Checkout session).
   const [busyPlan, setBusyPlan] = useState<BrokeragePlanId | null>(null);

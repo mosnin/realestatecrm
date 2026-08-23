@@ -25,6 +25,9 @@ import {
   formatUsdPriceIn,
 } from '@/lib/i18n/currency';
 import { PRICING_DICTS, fill, pluralWord } from '@/lib/i18n/dictionaries/pricing';
+import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
+import { CHROME_DICTS } from '@/lib/i18n/dictionaries/chrome';
+import { AUTH_DICTS } from '@/lib/i18n/dictionaries/auth';
 import { PLANS, TOPUPS } from '@/lib/plans';
 
 describe('resolveMarket', () => {
@@ -63,6 +66,11 @@ describe('decideLangRouting (middleware language decision)', () => {
   it('geo redirects a first visit to the translated page', () => {
     const d = decideLangRouting({ pathname: '/pricing', country: 'CL', cookieLang: null, hlParam: null });
     expect(d).toEqual({ lang: 'es', redirectTo: '/es/pricing', setCookie: true });
+  });
+
+  it('geo redirects the homepage now that every offer line is translated', () => {
+    const d = decideLangRouting({ pathname: '/', country: 'CL', cookieLang: null, hlParam: null });
+    expect(d).toEqual({ lang: 'es', redirectTo: '/es', setCookie: true });
   });
 
   it('never redirects US/unknown visitors (crawler-safe: base stays base)', () => {
@@ -213,5 +221,31 @@ describe('pricing dictionaries (en is the canonical base)', () => {
     expect(pluralWord('ru', 15, forms)).toBe('кредитов');
     expect(pluralWord('en', 1, PRICING_DICTS.en.credits.creditForms)).toBe('credit');
     expect(pluralWord('en', 10, PRICING_DICTS.en.credits.creditForms)).toBe('credits');
+  });
+});
+
+describe('homepage dictionaries (en is the canonical base)', () => {
+  const enLeaves = new Map(stringLeaves(HOME_DICTS.en));
+
+  it.each(['es', 'ru'] as const)('%s carries every en key and token', (lang) => {
+    const leaves = new Map(stringLeaves(HOME_DICTS[lang]));
+    for (const [key, enVal] of enLeaves) {
+      expect((leaves.get(key) ?? '').trim().length, `missing or empty "${key}" in ${lang}`).toBeGreaterThan(0);
+      expect(tokensOf(leaves.get(key) ?? ''), `token mismatch at "${key}" in ${lang}`).toEqual(tokensOf(enVal));
+    }
+  });
+});
+
+describe.each([
+  ['marketing chrome', CHROME_DICTS],
+  ['authentication', AUTH_DICTS],
+] as const)('%s dictionaries', (_name, dictionaries) => {
+  const enLeaves = new Map(stringLeaves(dictionaries.en));
+
+  it.each(['es', 'ru'] as const)('%s carries every en key', (lang) => {
+    const leaves = new Map(stringLeaves(dictionaries[lang]));
+    for (const key of enLeaves.keys()) {
+      expect((leaves.get(key) ?? '').trim().length, `missing or empty "${key}" in ${lang}`).toBeGreaterThan(0);
+    }
   });
 });

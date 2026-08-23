@@ -84,7 +84,7 @@ export default function FilesPage() {
         eyebrow="Files"
         title="Filed to the right deal. Automatically."
         sub="Contracts, disclosures, photos, every document that lands in your inbox is read, matched, and filed to its deal. When you need one, it is one search away."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 

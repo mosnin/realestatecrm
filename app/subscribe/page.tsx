@@ -72,7 +72,7 @@ function SubscribeContent() {
   // annualEnabled is server-derived (Stripe annual price ids are server-only
   // env), delivered by /api/auth/me below; until it loads we assume no annual so
   // the toggle never flashes an option the checkout would refuse.
-  const [cadence, setCadence] = useState<'monthly' | 'annual'>('monthly');
+  const [cadence, setCadence] = useState<'monthly' | 'annual'>('annual');
   const [annualEnabled, setAnnualEnabled] = useState<Record<SelfServePlanId, boolean>>({
     solo: false,
     pro: false,

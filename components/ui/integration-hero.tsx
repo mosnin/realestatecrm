@@ -57,7 +57,7 @@ export default function IntegrationHero() {
           migration, no double entry.
         </p>
         <Link
-          href="/login/realtor?intent=signup"
+          href="/sign-up"
           className="mt-8 inline-flex h-11 items-center justify-center rounded-full bg-foreground px-6 text-sm font-medium text-background transition hover:bg-foreground/90"
         >
           Get started

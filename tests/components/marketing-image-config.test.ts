@@ -8,7 +8,7 @@ describe('marketing social-image route config', () => {
 
     for (const literal of [
       "export const runtime = 'edge'",
-      "export const alt = 'Chippi · Agentic OS for real estate'",
+      "export const alt = 'Chippi · AI lead conversion teammate for real estate'",
       'export const size = { width: 1200, height: 630 }',
       "export const contentType = 'image/png'",
     ]) {

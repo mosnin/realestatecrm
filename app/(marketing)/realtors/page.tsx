@@ -284,7 +284,7 @@ export default function RealtorsPage() {
         eyebrow="For solo real estate agents"
         title="Your book, worked while you close"
         sub="Chippi reads your inbox, sends every reply in your voice, and books tour times against your real calendar."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
@@ -531,7 +531,7 @@ export default function RealtorsPage() {
           </h2>
           <div className="mt-8 flex justify-center">
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial

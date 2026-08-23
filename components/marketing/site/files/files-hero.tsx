@@ -78,7 +78,7 @@ export function FilesHero() {
           </motion.p>
           <motion.div variants={item} className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
             >
               Start free trial

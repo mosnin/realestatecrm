@@ -9,9 +9,9 @@
  * translucent near-black blurred background + hairline border + soft shadow.
  *
  * Nav: two dropdowns, Product (Chippi, Agents, Brokerages, Integrations) and
- * Company (Our story, Research, Careers), each opening a frosted blurred
- * mega-menu, plus a plain Pricing link. Right cluster: Sign in + white
- * "See a demo" pill. Mobile: a full-screen blurred takeover.
+ * Company (Our story, Help, Demo, Careers), each opening a frosted blurred
+ * mega-menu, plus a plain Pricing link. Right cluster: Sign in + a direct
+ * free-trial action. Mobile: a full-screen blurred takeover.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -33,15 +33,17 @@ import {
   Building2,
   Blocks,
   Compass,
-  Microscope,
   Sprout,
   LifeBuoy,
+  PlayCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
+import { CHROME_DICTS } from '@/lib/i18n/dictionaries/chrome';
+import { localizedPath, type Lang } from '@/lib/i18n/markets';
 
 const SIGNIN = '/login/realtor';
-const DEMO = '/demo';
+const START = '/sign-up';
 
 interface MegaItem {
   icon: React.ElementType;
@@ -58,45 +60,43 @@ interface MenuConfig {
   items: MegaItem[];
 }
 
-/** The two nav dropdowns, reference-styled frosted panels. */
-const MENUS: Record<MenuKey, MenuConfig> = {
-  product: {
-    label: 'Product',
-    featured: {
-      eyebrow: 'MEET CHIPPI',
-      title: 'One teammate for the whole deal.',
-      body: 'It reads every lead, drafts in your voice, books the tour, and keeps the deal current.',
-      cta: 'Meet Chippi',
-      href: '/chippi',
+const PRODUCT_ITEMS = [
+  { icon: Aperture, href: '/chippi' },
+  { icon: UserRound, href: '/agents' },
+  { icon: Building2, href: '/brokerages' },
+  { icon: Blocks, href: '/integrations' },
+];
+
+const COMPANY_ITEMS = [
+  { icon: Compass, href: '/company' },
+  { icon: LifeBuoy, href: '/help' },
+  { icon: PlayCircle, href: '/demo' },
+  { icon: Sprout, href: '/careers' },
+];
+
+function menusFor(lang: Lang): Record<MenuKey, MenuConfig> {
+  const t = CHROME_DICTS[lang].header;
+  return {
+    product: {
+      label: t.product.label,
+      featured: { ...t.product.featured, href: '/chippi' },
+      items: PRODUCT_ITEMS.map((item, index) => ({ ...item, ...t.product.items[index] })),
     },
-    items: [
-      { icon: Aperture, label: 'Chippi', desc: 'The AI teammate that works your whole book', href: '/chippi' },
-      { icon: UserRound, label: 'For agents', desc: 'Your inbox, pipeline, and tours, handled', href: '/agents' },
-      { icon: Building2, label: 'For brokerages', desc: 'One agent behind every desk on the floor', href: '/brokerages' },
-      { icon: Blocks, label: 'Integrations', desc: 'Connect the tools you already pay for', href: '/integrations' },
-    ],
-  },
-  company: {
-    label: 'Company',
-    featured: {
-      eyebrow: 'OUR STORY',
-      title: 'Real estate, caught up to the world.',
-      body: 'Why we are building the operating system the industry has been missing.',
-      cta: 'Read our story',
-      href: '/company',
+    company: {
+      label: t.company.label,
+      featured: { ...t.company.featured, href: '/company' },
+      items: COMPANY_ITEMS.map((item, index) => ({ ...item, ...t.company.items[index] })),
     },
-    items: [
-      { icon: Compass, label: 'Our story', desc: 'The gap we set out to close, and the people closing it', href: '/company' },
-      { icon: LifeBuoy, label: 'Help Center', desc: 'Guides for every part of the workspace', href: '/help' },
-      { icon: Microscope, label: 'Research', desc: 'The work that shaped every feature', href: '/research' },
-      { icon: Sprout, label: 'Careers', desc: 'Help build the future of real estate', href: '/careers' },
-    ],
-  },
-};
+  };
+}
 
 const MENU_ORDER: MenuKey[] = ['product', 'company'];
 
-export function SiteHeader() {
+export function SiteHeader({ lang = 'en' }: { lang?: Lang }) {
+  const copy = CHROME_DICTS[lang].header;
+  const menus = menusFor(lang);
+  const homeHref = localizedPath('/', lang);
+  const pricingHref = localizedPath('/pricing', lang);
   const reduce = useReducedMotion();
   const [scrolled, setScrolled] = useState(false);
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null);
@@ -168,14 +168,14 @@ export function SiteHeader() {
         openMenu === menu ? 'text-white' : 'text-white/70 hover:text-white',
       )}
     >
-      {MENUS[menu].label}
+      {menus[menu].label}
       <ChevronDown
         className={cn('h-3.5 w-3.5 transition-transform duration-200', openMenu === menu && 'rotate-180')}
       />
     </button>
   );
 
-  const active = openMenu ? MENUS[openMenu] : null;
+  const active = openMenu ? menus[openMenu] : null;
 
   return (
     <>
@@ -191,7 +191,7 @@ export function SiteHeader() {
               style={clusterStyle}
               className="flex items-center gap-0.5 rounded-full border px-1.5"
             >
-              <Link href="/" aria-label="Chippi home" className="flex items-center px-3 py-2.5" onClick={closeAll}>
+              <Link href={homeHref} aria-label="Chippi home" className="flex items-center px-3 py-2.5" onClick={closeAll}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
               </Link>
@@ -199,11 +199,11 @@ export function SiteHeader() {
                 <NavTrigger menu="product" />
                 <NavTrigger menu="company" />
                 <Link
-                  href="/pricing"
+                  href={pricingHref}
                   onClick={closeAll}
                   className="rounded-full px-3.5 py-2 text-sm text-white/70 transition-colors hover:text-white"
                 >
-                  Pricing
+                  {copy.pricing}
                 </Link>
               </nav>
             </motion.div>
@@ -296,13 +296,13 @@ export function SiteHeader() {
               href={SIGNIN}
               className="hidden rounded-full px-3.5 py-1.5 text-sm text-white/70 transition-colors hover:text-white lg:inline-flex"
             >
-              Sign in
+              {copy.signIn}
             </Link>
             <Link
-              href={DEMO}
+              href={START}
               className="hidden h-9 items-center rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
             >
-              See a demo
+              {copy.start}
             </Link>
             <button
               type="button"
@@ -335,7 +335,7 @@ export function SiteHeader() {
               transition={{ duration: reduce ? 0 : 0.3, ease: EASE_OUT }}
             >
               <div className="flex h-16 items-center justify-between px-5 pt-3">
-                <Link href="/" className="flex items-center" onClick={closeAll}>
+                <Link href={homeHref} className="flex items-center" onClick={closeAll}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
                 </Link>
@@ -362,10 +362,10 @@ export function SiteHeader() {
                       style={{ fontFamily: 'var(--font-mono-display)' }}
                       className="px-1 text-[10px] font-medium uppercase tracking-[0.22em] text-white/35"
                     >
-                      {MENUS[key].label}
+                      {menus[key].label}
                     </motion.p>
                     <div className="mt-2 space-y-0.5">
-                      {MENUS[key].items.map((it) => {
+                      {menus[key].items.map((it) => {
                         const Icon = it.icon;
                         return (
                           <motion.div key={it.label} variants={itemVariants}>
@@ -387,23 +387,23 @@ export function SiteHeader() {
                 ))}
                 <motion.div variants={itemVariants}>
                   <Link
-                    href="/pricing"
+                    href={pricingHref}
                     onClick={closeAll}
                     style={{ fontFamily: 'var(--font-serif-display)' }}
                     className="block px-1 py-2 text-2xl text-white"
                   >
-                    Pricing
+                    {copy.pricing}
                   </Link>
                 </motion.div>
               </motion.nav>
 
               <div className="space-y-3 border-t border-white/10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5">
                 <Link
-                  href={DEMO}
+                  href={START}
                   onClick={closeAll}
                   className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-medium text-black"
                 >
-                  See a demo
+                  {copy.startLong}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -411,7 +411,7 @@ export function SiteHeader() {
                   onClick={closeAll}
                   className="flex h-12 w-full items-center justify-center rounded-full border border-white/15 text-sm font-medium text-white"
                 >
-                  Sign in
+                  {copy.signIn}
                 </Link>
               </div>
             </motion.div>

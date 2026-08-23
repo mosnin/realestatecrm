@@ -1,15 +1,12 @@
 'use client';
 
 /**
- * AuthPageLayout: rebuilt on the fortitudo "studio ASCII" auth design.
- * a premium split screen with an ASCII brand panel on the left (drifting
- * orange field + a brand-display tagline) and the Clerk form on the right.
+ * AuthPageLayout: a premium split screen with an architectural brand panel
+ * on the left and the Clerk form on the right.
  * The Clerk components, redirect wiring, role switcher, and ToS copy are
  * unchanged. Only the chrome around them is restyled.
  *
- * Theme-aware: the ASCII field is orange-on-transparent so the panel reads on
- * both light and dark. On mobile the brand panel collapses to a slim signature
- * strip above the form (fortitudo's mobile treatment).
+ * On mobile the photograph collapses to a slim signature strip above the form.
  */
 
 import React from 'react';
@@ -21,17 +18,20 @@ import { Building2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BODY_MUTED, CAPTION, H1 } from '@/lib/typography';
 import { PAGE_VARIANTS } from '@/lib/motion';
-import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
+import { AUTH_DICTS } from '@/lib/i18n/dictionaries/auth';
+import { localizedPath, type Lang } from '@/lib/i18n/markets';
 
 export interface AuthPageLayoutProps {
   children: React.ReactNode;
   heading: string;
   subheading?: string;
   variant?: 'realtor' | 'broker';
+  lang?: Lang;
 }
 
-export function AuthPageLayout({ children, heading, subheading, variant: _variant }: AuthPageLayoutProps) {
+export function AuthPageLayout({ children, heading, subheading, variant: _variant, lang = 'en' }: AuthPageLayoutProps) {
   const pathname = usePathname();
+  const t = AUTH_DICTS[lang];
 
   const isBrokerLogin = pathname.startsWith('/login/broker');
   const isRealtorLogin = pathname.startsWith('/login/realtor');
@@ -42,34 +42,43 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
       {/* ── Left brand image panel (desktop) ── */}
       <div className="relative hidden flex-col justify-between overflow-hidden border-r border-border/70 p-12 lg:flex">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/marketing/login-split.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src="/marketing/chippi-auth-building.webp"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/35" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_30%,rgba(255,150,79,0.20),transparent_60%)]" />
 
-        <Link href="/" className="relative z-10 flex items-center gap-2" aria-label="Chippi home">
+        <Link href={localizedPath('/', lang)} className="relative z-10 flex items-center gap-2" aria-label="Chippi home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-white.png" alt="Chippi" className="h-7 w-auto" />
         </Link>
 
         <div className="relative z-10">
           <p className="font-brand text-xs uppercase tracking-[0.25em] text-[#ff964f]">
-            The agentic OS for real estate
+            {t.brand.eyebrow}
           </p>
           <h2 className="font-title mt-4 text-4xl leading-tight tracking-tight text-white">
-            I keep your day moving, so you don&apos;t have to.
+            {t.brand.headline}
           </h2>
           <p className="mt-4 text-sm text-white/70">
-            Drafts · Scoring · Tours · Pipeline
+            {t.brand.capabilities}
           </p>
         </div>
       </div>
 
       {/* ── Right form panel ── */}
       <div className="relative flex w-full flex-col bg-background px-6 py-6 sm:px-10 sm:py-8 lg:py-10">
-        {/* Mobile signature strip. */}
-        <div className="absolute inset-x-0 top-0 h-24 overflow-hidden lg:hidden">
-          <AsciiField className="h-full w-full opacity-30" cell={10} />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-background" />
+        {/* Mobile architectural signature strip. */}
+        <div className="absolute inset-x-0 top-0 h-28 overflow-hidden lg:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/marketing/chippi-auth-building.webp"
+            alt=""
+            className="h-full w-full object-cover object-[center_42%] opacity-55"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 to-background" />
         </div>
 
         {/* Logo (mobile + as the panel's top mark). */}
@@ -87,7 +96,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
           >
             {/* Role switcher: fully rounded, paper-flat. */}
             {showRoleSwitcher && (
-              <div role="tablist" aria-label="Account type" className="mb-6 flex rounded-full bg-foreground/[0.04] p-1">
+              <div role="tablist" aria-label={t.accountType} className="mb-6 flex rounded-full bg-foreground/[0.04] p-1">
                 <Link
                   href="/login/realtor"
                   role="tab"
@@ -100,7 +109,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
                   )}
                 >
                   <User size={16} className="shrink-0 sm:size-[14px]" />
-                  Real estate agent
+                  {t.agent}
                 </Link>
                 <Link
                   href="/login/broker"
@@ -114,7 +123,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
                   )}
                 >
                   <Building2 size={16} className="shrink-0 sm:size-[14px]" />
-                  Broker
+                  {t.broker}
                 </Link>
               </div>
             )}
@@ -133,13 +142,13 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
 
         {/* ToS / Privacy. */}
         <p className={cn(CAPTION, 'relative z-10 shrink-0 pt-4 text-center leading-relaxed sm:text-left')}>
-          By continuing, you agree to our{' '}
+          {t.legal.prefix}{' '}
           <Link href="/legal/terms" className="underline underline-offset-4 transition-colors hover:text-foreground">
-            Terms of Service
+            {t.legal.terms}
           </Link>{' '}
-          and{' '}
+          {t.legal.and}{' '}
           <Link href="/legal/privacy" className="underline underline-offset-4 transition-colors hover:text-foreground">
-            Privacy Policy
+            {t.legal.privacy}
           </Link>
           .
         </p>

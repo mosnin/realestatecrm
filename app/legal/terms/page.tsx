@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Terms of Service | Chippi',
-  description: 'Terms of Service for Chippi, a B2B SaaS agentic OS for real estate agents and brokerages.',
+  description: 'Terms of Service for Chippi, a real estate lead conversion and operations service.',
 };
 
 export default function TermsPage() {
@@ -8,7 +8,7 @@ export default function TermsPage() {
     <article className="space-y-10">
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: June 24, 2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Last updated: August 23, 2026</p>
         <p className="text-sm text-muted-foreground">Effective: April 2, 2026</p>
       </header>
 
@@ -48,9 +48,9 @@ export default function TermsPage() {
       <section>
         <h2 className="text-xl font-semibold">3. Subscription Terms</h2>
         <div className="mt-3 text-sm text-muted-foreground space-y-3 leading-6">
-          <p>3.1. <strong className="text-foreground">Free Trial.</strong> New Subscribers are eligible for a 7-day free trial. During the trial period, you will have access to the CRM and credit-metered AI tools on your plan, including AI lead scoring, deal pipelines, tour scheduling, and MCP server integration. Voice calling is available only when Telnyx is configured for your deployment. No payment is required during the trial.</p>
-          <p>3.2. <strong className="text-foreground">Paid Subscription.</strong> Following the trial period, continued access to the Service requires a paid subscription at $97 per month (or such other pricing as may be displayed at the time of purchase).</p>
-          <p>3.3. <strong className="text-foreground">Auto-Renewal.</strong> Subscriptions automatically renew on a monthly basis. You will be charged at the beginning of each billing cycle unless you cancel before the renewal date.</p>
+          <p>3.1. <strong className="text-foreground">Free Trial.</strong> New Subscribers are eligible for a 7-day free trial. During the trial period, you will have access to the CRM and credit-metered AI tools on your plan, including AI lead scoring, deal pipelines, tour scheduling, and MCP server integration. Voice calling is available only when Telnyx is configured for your deployment. A payment method is required to start, but no subscription fee is charged during the trial.</p>
+          <p>3.2. <strong className="text-foreground">Paid Subscription.</strong> Following the trial period, continued access to the Service requires a paid subscription at the price and monthly or annual billing cadence displayed at the time of purchase.</p>
+          <p>3.3. <strong className="text-foreground">Auto-Renewal.</strong> Subscriptions automatically renew on the monthly or annual cadence selected at purchase. You will be charged at the beginning of each billing cycle unless you cancel before the renewal date.</p>
           <p>3.4. <strong className="text-foreground">Cancellation.</strong> You may cancel your subscription at any time through your account settings. Cancellation takes effect at the end of the current billing period. No refunds are provided for partial billing periods.</p>
           <p>3.5. <strong className="text-foreground">Payment Processing.</strong> All payments are processed by Stripe. By subscribing, you agree to Stripe&apos;s terms of service. Chippi does not store your full payment card details.</p>
           <p>3.6. <strong className="text-foreground">Price Changes.</strong> We may change subscription pricing with at least 30 days&apos; advance notice. Continued use of the Service after a price change constitutes acceptance of the new pricing.</p>

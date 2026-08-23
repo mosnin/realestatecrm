@@ -8,23 +8,24 @@ import { MotionProvider } from '@/components/motion/motion-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { SentryUser } from '@/components/observability/sentry-user';
 import { MarketingPixels } from '@/components/analytics/marketing-pixels';
+import { isLang, LANG_TAG } from '@/lib/i18n/markets';
 import './globals.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.usechippi.com'),
-  title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
-  description: 'An AI agent that runs your real estate agent workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current so you can focus on the deals that matter. Start your 7-day free trial.',
-  keywords: ['agentic OS', 'AI agent', 'real estate', 'realtors', 'brokerages', 'AI lead scoring', 'lead qualification', 'tour scheduling', 'deal pipeline', 'CRM'],
+  title: 'Chippi — AI Lead Conversion Teammate for Real Estate',
+  description: 'Turn more real estate leads into booked tours. Chippi reads every inquiry, ranks who is ready, drafts in your voice, books from your calendar, and keeps the CRM current.',
+  keywords: ['real estate AI', 'lead conversion', 'real estate agents', 'brokerages', 'lead scoring', 'lead qualification', 'tour scheduling', 'deal follow up', 'CRM'],
   openGraph: {
-    title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
-    description: 'An AI agent that runs your real estate agent workspace — qualifies leads, drafts follow-ups, schedules tours, and keeps your pipeline current.',
+    title: 'Chippi — AI Lead Conversion Teammate for Real Estate',
+    description: 'Turn more real estate leads into booked tours. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
     siteName: 'Chippi',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Chippi — Agentic OS for Real Estate Agents & Brokerages',
-    description: 'An AI agent that runs your real estate agent workspace — qualifies leads, drafts follow-ups, schedules tours, keeps your pipeline current.',
+    title: 'Chippi — AI Lead Conversion Teammate for Real Estate',
+    description: 'Turn more real estate leads into booked tours. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
   },
   appleWebApp: {
     capable: true,
@@ -55,9 +56,11 @@ export default async function RootLayout({
   // client-side JS from loading and prompting visitors to sign in.
   const h = await headers();
   const isPublicPage = h.get('x-public-page') === '1';
+  const requestedLang = h.get('x-language');
+  const documentLang = isLang(requestedLang) ? LANG_TAG[requestedLang] : 'en-US';
 
   const renderShell = (body: React.ReactNode) => (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={documentLang} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

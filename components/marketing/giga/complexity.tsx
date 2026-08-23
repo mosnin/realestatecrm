@@ -12,7 +12,7 @@ import { BlurRise, Eyebrow, PillGhost, Serif, Band } from './primitives';
 const COLUMNS = [
   {
     icon: GitBranch,
-    title: 'Routing that thinks',
+    title: 'Route every lead clearly',
     desc: 'Leads land with the right agent by territory and load, or hand-pick and write the brief. Every assignment is logged with the reason.',
   },
   {
@@ -22,7 +22,7 @@ const COLUMNS = [
   },
   {
     icon: ShieldCheck,
-    title: 'Audit-ready by design',
+    title: 'Every move has a receipt',
     desc: 'Every action Chippi takes is logged with the reason behind it, so the whole floor stays honest and reviewable.',
   },
 ];
@@ -32,15 +32,14 @@ export function Complexity() {
     <Band className="py-24 sm:py-32">
       <BlurRise>
         <div className="mx-auto max-w-2xl text-center">
-          <Eyebrow>Built for complexity</Eyebrow>
+          <Eyebrow>Built for brokerages</Eyebrow>
           <Serif className="mt-5 text-[clamp(2.25rem,4vw,3.75rem)] leading-[1.04] text-white">
-            Built to handle the
-            <br className="hidden sm:block" /> complexity of a brokerage.
+            Convert more leads
+            <br className="hidden sm:block" /> without losing control.
           </Serif>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-white/60">
-            One agent for the whole floor. Leads routed, performance visible, bottlenecks surfaced,
-            every action reviewable. It scales from a solo desk to hundreds of agents without an
-            enterprise maze.
+            Route the inquiry. See the next move. Review every send. Chippi gives each agent help
+            while leaders keep a clear view of the floor.
           </p>
           <div className="mt-8 flex justify-center">
             <PillGhost href="/brokerages">See the brokerage story</PillGhost>
