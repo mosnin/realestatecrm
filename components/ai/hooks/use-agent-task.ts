@@ -237,7 +237,7 @@ export function insertSteeringMessage(
   return [...pending.slice(0, index), next, ...pending.slice(index)];
 }
 
-function queuedMessagesFromTurns(
+export function queuedMessagesFromTurns(
   turns: readonly ConversationTurnRecord[],
 ): PendingTurnMessage[] {
   return turns
@@ -256,7 +256,7 @@ function queuedMessagesFromTurns(
     }));
 }
 
-function nextDispatchableQueuedTurn(
+export function nextDispatchableQueuedTurn(
   turns: readonly ConversationTurnRecord[],
 ): ConversationTurnRecord | null {
   if (turns.some((turn) => turn.status === 'running' || turn.status === 'paused')) {

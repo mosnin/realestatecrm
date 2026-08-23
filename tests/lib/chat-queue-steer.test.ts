@@ -2,8 +2,39 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   insertSteeringMessage,
+  nextDispatchableQueuedTurn,
+  queuedMessagesFromTurns,
   type PendingTurnMessage,
 } from '@/components/ai/hooks/use-agent-task';
+import type { ConversationTurnRecord } from '@/lib/chat/turn-control';
+
+function record(over: Partial<ConversationTurnRecord>): ConversationTurnRecord {
+  return {
+    id: 'turn-1',
+    spaceId: 'space-1',
+    conversationId: 'conversation-1',
+    mode: 'work',
+    source: 'typed',
+    clientRequestId: 'request-1',
+    message: 'queued text',
+    attachmentIds: [],
+    attachments: [],
+    priority: 0,
+    enqueueSeq: 1,
+    status: 'pending',
+    attemptToken: null,
+    attempts: 0,
+    leaseExpiresAt: null,
+    cancelRequestedAt: null,
+    startedAt: null,
+    finishedAt: null,
+    terminalReason: null,
+    lastError: null,
+    createdAt: '2026-08-22T00:00:00.000Z',
+    updatedAt: '2026-08-22T00:00:00.000Z',
+    ...over,
+  };
+}
 
 describe('Work queue and steering', () => {
   it('keeps steering instructions FIFO ahead of ordinary queued turns', () => {
@@ -34,6 +65,35 @@ describe('Work queue and steering', () => {
       'queued one',
       'queued two',
     ]);
+  });
+
+  it('dispatches the next pending turn even when a failed turn is still visible', () => {
+    const pending = record({ id: 'pending-1', status: 'pending', enqueueSeq: 2 });
+    const failed = record({ id: 'failed-1', status: 'failed', enqueueSeq: 1 });
+
+    expect(nextDispatchableQueuedTurn([failed, pending])?.id).toBe('pending-1');
+    expect(nextDispatchableQueuedTurn([
+      failed,
+      record({ id: 'running-1', status: 'running' }),
+      pending,
+    ])).toBeNull();
+    expect(nextDispatchableQueuedTurn([
+      record({ id: 'paused-1', status: 'paused' }),
+      pending,
+    ])).toBeNull();
+  });
+
+  it('keeps failed turns in the queue rail so the user can remove them', () => {
+    const messages = queuedMessagesFromTurns([
+      record({ id: 'q1', source: 'typed', status: 'pending', priority: 0, enqueueSeq: 2, message: 'queued' }),
+      record({ id: 'f1', source: 'typed', status: 'failed', priority: 0, enqueueSeq: 1, message: 'failed' }),
+      record({ id: 's1', source: 'steer', status: 'pending', priority: 10, enqueueSeq: 3, message: 'steer' }),
+      record({ id: 'r1', source: 'typed', status: 'running', message: 'live' }),
+    ]);
+
+    expect(messages.map((message) => message.id)).toEqual(['s1', 'f1', 'q1']);
+    expect(messages.find((message) => message.id === 'f1')?.status).toBe('failed');
+    expect(messages.find((message) => message.id === 's1')?.kind).toBe('steer');
   });
 
   it('persists Queue and Steer with exact turn identities before dispatch', () => {

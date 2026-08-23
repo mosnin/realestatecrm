@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePlannerOutput } from '@/lib/work-sessions/planner';
+import { hasUsablePlannerContent, parsePlannerOutput } from '@/lib/work-sessions/planner';
 
 describe('WorkSession planner output boundary', () => {
   it('accepts JSON wrapped in short explanatory prose', () => {
@@ -37,5 +37,13 @@ describe('WorkSession planner output boundary', () => {
 
   it('keeps a parseable empty payload distinguishable from unreadable output', () => {
     expect(parsePlannerOutput('{"steps":[]}')).toEqual({ steps: [], question: undefined });
+  });
+
+  it('treats a titled step or a real question as usable planner content', () => {
+    expect(hasUsablePlannerContent({ steps: [{ title: 'Pull comps' }] })).toBe(true);
+    expect(hasUsablePlannerContent({ steps: [], question: 'Which listing?' })).toBe(true);
+    expect(hasUsablePlannerContent({ steps: [null, { title: 42 }, { title: '   ' }] })).toBe(false);
+    expect(hasUsablePlannerContent({ steps: [], question: 'null' })).toBe(false);
+    expect(hasUsablePlannerContent({ steps: [] })).toBe(false);
   });
 });
