@@ -69,6 +69,7 @@ import {
   shouldShowFollowUpSuggestions,
   shouldShowInlineWorkActivity,
   shouldShowPlanCard,
+  steerQueuedInstruction,
 } from '@/lib/chippi/chat-ux';
 
 /**
@@ -1200,9 +1201,10 @@ export function ChippiWorkspace({
   );
 
   const steerQueuedMessage = useCallback(async (turnId: string, text: string, mode: ChatMode) => {
-    const removed = await removeQueuedMessage(turnId);
-    if (!removed) return;
-    await handleSteer(text, [], mode);
+    await steerQueuedInstruction({
+      steer: () => handleSteer(text, [], mode),
+      remove: () => removeQueuedMessage(turnId),
+    });
   }, [handleSteer, removeQueuedMessage]);
 
   const saveQueuedEdit = useCallback(async () => {
