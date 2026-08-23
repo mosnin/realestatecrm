@@ -6,6 +6,7 @@ import {
   CURRENCY_COOKIE,
   LANG_COOKIE,
   decideLangRouting,
+  isLang,
   resolveMarket,
 } from '@/lib/i18n/markets';
 
@@ -140,6 +141,7 @@ export default clerkMiddleware(async (auth, request) => {
         cookieLang: request.cookies.get(LANG_COOKIE)?.value,
         hlParam: request.nextUrl.searchParams.get('hl'),
       });
+      headers.set('x-language', lang);
       const res = redirectTo
         ? NextResponse.redirect(new URL(redirectTo, request.url))
         : NextResponse.next({ request: { headers } });
@@ -160,6 +162,31 @@ export default clerkMiddleware(async (auth, request) => {
   // homepage). The page also re-checks auth as a fallback.
   if (pathname === '/' && session.userId) {
     return NextResponse.redirect(new URL('/auth/redirect?intent=realtor', request.url));
+  }
+
+  // Logged-out homepage: settle language and currency after the auth check so
+  // returning customers still reach their workspace, while first-time visitors
+  // can land on the localized homepage selected from Vercel's country header.
+  if (pathname === '/' && request.method === 'GET') {
+    const headers = new Headers(request.headers);
+    headers.set('x-public-page', '1');
+    const country = request.headers.get('x-vercel-ip-country');
+    const { lang, redirectTo, setCookie } = decideLangRouting({
+      pathname,
+      country,
+      cookieLang: request.cookies.get(LANG_COOKIE)?.value,
+      hlParam: request.nextUrl.searchParams.get('hl'),
+    });
+    headers.set('x-language', lang);
+    const res = redirectTo
+      ? NextResponse.redirect(new URL(redirectTo, request.url))
+      : NextResponse.next({ request: { headers } });
+    const cookieOpts = { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' as const };
+    if (setCookie) res.cookies.set(LANG_COOKIE, lang, cookieOpts);
+    if (!request.cookies.get(CURRENCY_COOKIE)) {
+      res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
+    }
+    return res;
   }
 
   // Authenticated users on auth pages → send to their dashboard.
@@ -248,6 +275,10 @@ export default clerkMiddleware(async (auth, request) => {
   // Pass the current pathname to layouts via request header (used by subscription gate)
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', pathname);
+  if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login')) {
+    const cookieLang = request.cookies.get(LANG_COOKIE)?.value;
+    if (isLang(cookieLang)) requestHeaders.set('x-language', cookieLang);
+  }
   return NextResponse.next({
     request: {
       headers: requestHeaders,

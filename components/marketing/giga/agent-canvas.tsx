@@ -183,18 +183,18 @@ const STEPS: ShowcaseStep[] = [
 export function AgentCanvas() {
   return (
     <FeatureShowcase
-      eyebrow="Meet your AI cowork"
+      eyebrow="From inquiry to booked tour"
       headline={
         <>
-          Built to handle
-          <br className="hidden sm:block" /> the whole deal.
+          One teammate works
+          <br className="hidden sm:block" /> the entire lead chase.
         </>
       }
       product={{
-        name: 'Real Estate OS',
+        name: 'Lead conversion teammate',
         icon: LayoutGrid,
-        desc: 'Chippi is the operating system for your real-estate business. It finds anything, works your pipeline, talks to your clients, and clears the busywork, so your hours go to closing.',
-        cta: { label: 'Explore Real Estate OS', href: '/agents' },
+        desc: 'Chippi reads every inquiry, ranks the next call, drafts in your voice, books the tour, and leaves a clear record of what changed.',
+        cta: { label: 'See Chippi for agents', href: '/agents' },
       }}
       topFeatures={TOP_FEATURES}
       steps={STEPS}

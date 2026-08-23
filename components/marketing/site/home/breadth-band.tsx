@@ -1,6 +1,6 @@
 /**
  * BreadthBand, the "more than the inbox" beat: breadth should read as an
- * agentic OS, not a follow-up tool. Four capabilities, each tied to a real
+ * lead conversion teammate, not another inbox. Four capabilities tied to real
  * tool in the live registry (lib/ai-tools/tools), framed honestly:
  *
  * - Deep work: delegate_task spawns a focused sub-agent run with live
@@ -48,7 +48,7 @@ export function BreadthBand() {
       <FadeUp className="mx-auto max-w-2xl text-center">
         <EyebrowChip className="justify-center">Beyond the inbox</EyebrowChip>
         <h2 className="mt-5 text-4xl font-semibold leading-[1.05] sm:text-5xl">
-          <TwoTone parts={[{ t: 'Not a' }, { t: 'follow-up tool.', dim: true }, { t: 'An' }, { t: 'operating system.', dim: true }]} />
+          <TwoTone parts={[{ t: 'More than' }, { t: 'another inbox.', dim: true }, { t: 'A teammate' }, { t: 'for the whole lead journey.', dim: true }]} />
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg">
           The inbox loop is where it starts. Chippi runs across your whole day,

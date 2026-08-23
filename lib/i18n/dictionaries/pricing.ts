@@ -24,10 +24,11 @@ import type { Lang } from '../markets';
 
 const en = {
   metaTitle: 'Pricing · Chippi',
+  metaDescription: 'Turn more inquiries into booked tours. Start free for 7 days and save 20% with yearly billing.',
   hero: {
-    pill: 'Pricing',
-    h1: 'Pay for what you use.',
-    sub: 'Try it free for 7 days. Chippi does the work you hate. You keep the deals.',
+    pill: '7 days free · Save 20% yearly',
+    h1: 'Choose the work you want off your plate.',
+    sub: 'Every plan includes Chippi. Pick the amount of work your book needs. Yearly billing saves 20%.',
   },
   plans: {
     individualEyebrow: 'For one agent',
@@ -48,31 +49,31 @@ const en = {
     perSeatLine: '+{price}/person, +{credits} credits',
     cards: {
       solo: {
-        blurb: 'Chippi reads your leads and writes back for you.',
-        highlights: ['Answers every new lead', 'Books showings for you', 'Works with your email and calendar'],
-        cta: 'Start free',
+        blurb: 'For one agent who wants every lead worked.',
+        highlights: ['Reads and ranks every new lead', 'Drafts replies in your voice', 'Books tours from your calendar'],
+        cta: 'Start 7 days free',
       },
       pro: {
-        blurb: 'For agents with a lot of leads coming in.',
-        highlights: ['Everything in Solo', 'More credits each month', 'We answer you first'],
-        cta: 'Start free',
+        blurb: 'For a busy agent with more leads to work.',
+        highlights: ['Everything in Solo', 'More work included each month', 'Priority help when you need it'],
+        cta: 'Start 7 days free',
       },
       team: {
-        blurb: 'See what everyone on your team is doing.',
-        highlights: ['Sends each lead to the right person', 'One screen for the whole team', 'You decide who can do what'],
+        blurb: 'For a team that wants one clear lead process.',
+        highlights: ['Routes each lead to the right person', 'Shows the whole floor in one place', 'Keeps roles and action logs clear'],
         cta: 'Start a team',
       },
       team_plus: {
-        blurb: 'Run a big team. Keep it simple.',
-        highlights: ['Everything in Team', 'More people and more credits', 'Cheaper per person'],
+        blurb: 'For a large floor that needs more room.',
+        highlights: ['Everything in Team', 'More people and work included', 'Lower cost for each extra person'],
         cta: 'Start Team Plus',
       },
     },
   },
   seats: {
     eyebrow: 'Adding people',
-    h2: 'Add someone. We fix the bill.',
-    sub: 'Team and Team Plus come with people included. Need more? Each extra person costs the same flat price. Add or remove them any time.',
+    h2: 'Grow the team without changing plans.',
+    sub: 'Team plans include seats. Add or remove people any time. The bill updates with you.',
     perAgentSuffix: '/ extra person / mo',
     /** {credits} formatted credit count */
     creditsPerAgent: '+{credits} credits for each person you add',
@@ -81,8 +82,8 @@ const en = {
   },
   credits: {
     eyebrow: 'Credits',
-    h2: 'One credit = one job Chippi does.',
-    sub: 'Big jobs cost more. Small jobs cost almost nothing. Credits you do not use wait 30 days for you.',
+    h2: 'See what each job costs.',
+    sub: 'A lead rank costs {leadScore} credit. A tour booking costs {tourBooking} credits. Unused credits stay 30 days.',
     workflows: {
       tour_booking: 'Book a showing',
       daily_briefing: 'Your daily update',
@@ -115,13 +116,17 @@ const en = {
         q: 'How does team pricing work?',
         a: 'Add someone and we fix the bill for you. Extra people cost a flat price each month. That is {teamSeat} on Team and {teamPlusSeat} on Team Plus. Add or remove them any time. No jumping plans. No sales calls unless you want one.',
       },
+      {
+        q: 'Why is yearly selected first?',
+        a: 'Yearly billing saves 20%. You can switch to monthly before checkout.',
+      },
     ],
   },
   closing: {
-    h2: 'Try Chippi free for 7 days.',
-    sub: 'Connect your email. Chippi starts working your leads today. Cancel before day 7 and you pay nothing.',
-    startTrial: 'Start free',
-    bookDemo: 'See a demo',
+    h2: 'Give Chippi seven days with your leads.',
+    sub: 'Connect your email and calendar. Cancel before day 7 and pay nothing.',
+    startTrial: 'Start 7 days free',
+    bookDemo: 'Book a live walkthrough',
   },
   /** Shown only when the display currency isn't USD (checkout bills USD until
    *  Stripe currency_options ship). {currency} = the display currency code. */
@@ -132,10 +137,11 @@ export type PricingDict = typeof en;
 
 const es: PricingDict = {
   metaTitle: 'Precios · Chippi',
+  metaDescription: 'Convierte más consultas en visitas agendadas. Prueba 7 días gratis y ahorra 20% con pago anual.',
   hero: {
-    pill: 'Precios',
-    h1: 'Paga por lo que usas.',
-    sub: 'Pruébalo gratis 7 días. Chippi hace el trabajo que odias. Tú te quedas con los negocios.',
+    pill: '7 días gratis · Ahorra 20% al año',
+    h1: 'Elige el trabajo que quieres quitarte de encima.',
+    sub: 'Todos los planes incluyen Chippi. Elige cuánto trabajo necesita tu cartera. El pago anual ahorra 20%.',
   },
   plans: {
     individualEyebrow: 'Para un agente',
@@ -153,31 +159,31 @@ const es: PricingDict = {
     perSeatLine: '+{price}/persona, +{credits} créditos',
     cards: {
       solo: {
-        blurb: 'Chippi lee tus leads y les responde por ti.',
-        highlights: ['Responde cada lead nuevo', 'Agenda las visitas por ti', 'Funciona con tu correo y tu calendario'],
-        cta: 'Empieza gratis',
+        blurb: 'Para un agente que quiere atender cada lead.',
+        highlights: ['Lee y califica cada lead nuevo', 'Escribe respuestas con tu voz', 'Agenda visitas desde tu calendario'],
+        cta: 'Prueba 7 días gratis',
       },
       pro: {
-        blurb: 'Para agentes que reciben muchos leads.',
-        highlights: ['Todo lo de Solo', 'Más créditos cada mes', 'Te respondemos primero'],
-        cta: 'Empieza gratis',
+        blurb: 'Para un agente ocupado con más leads.',
+        highlights: ['Todo lo de Solo', 'Más trabajo incluido cada mes', 'Ayuda prioritaria cuando la necesites'],
+        cta: 'Prueba 7 días gratis',
       },
       team: {
-        blurb: 'Mira qué hace todo tu equipo.',
-        highlights: ['Manda cada lead a la persona correcta', 'Una pantalla para todo el equipo', 'Tú decides quién puede hacer qué'],
+        blurb: 'Para un equipo que quiere un proceso claro.',
+        highlights: ['Manda cada lead a la persona correcta', 'Muestra todo el equipo en un lugar', 'Aclara los permisos y registros'],
         cta: 'Crea un equipo',
       },
       team_plus: {
-        blurb: 'Maneja un equipo grande. Sin complicarte.',
-        highlights: ['Todo lo de Team', 'Más personas y más créditos', 'Más barato por persona'],
+        blurb: 'Para un equipo grande que necesita más espacio.',
+        highlights: ['Todo lo de Team', 'Más personas y trabajo incluido', 'Menor precio por persona extra'],
         cta: 'Empieza Team Plus',
       },
     },
   },
   seats: {
     eyebrow: 'Agregar personas',
-    h2: 'Agrega a alguien. Nosotros arreglamos la cuenta.',
-    sub: 'Team y Team Plus ya incluyen personas. ¿Necesitas más? Cada persona extra cuesta lo mismo. Agrégalas o quítalas cuando quieras.',
+    h2: 'Haz crecer el equipo sin cambiar de plan.',
+    sub: 'Los planes Team incluyen personas. Agrégalas o quítalas cuando quieras. La cuenta se actualiza sola.',
     perAgentSuffix: '/ persona extra / mes',
     creditsPerAgent: '+{credits} créditos por cada persona que agregues',
     largeFloor: '¿Tienes un equipo grande?',
@@ -185,8 +191,8 @@ const es: PricingDict = {
   },
   credits: {
     eyebrow: 'Créditos',
-    h2: 'Un crédito = un trabajo que hace Chippi.',
-    sub: 'Los trabajos grandes cuestan más. Los pequeños casi nada. Los créditos que no uses te esperan 30 días.',
+    h2: 'Mira cuánto cuesta cada trabajo.',
+    sub: 'Calificar un lead cuesta {leadScore} crédito. Agendar una visita cuesta {tourBooking} créditos. Tus créditos duran 30 días.',
     workflows: {
       tour_booking: 'Agendar una visita',
       daily_briefing: 'Tu resumen del día',
@@ -217,23 +223,28 @@ const es: PricingDict = {
         q: '¿Cómo funciona el precio para equipos?',
         a: 'Agrega a alguien y nosotros arreglamos la cuenta. Cada persona extra cuesta un precio fijo al mes. Son {teamSeat} en Team y {teamPlusSeat} en Team Plus. Agrégalas o quítalas cuando quieras. Sin cambiar de plan. Sin llamadas de ventas, a menos que tú quieras.',
       },
+      {
+        q: '¿Por qué aparece primero el pago anual?',
+        a: 'El pago anual ahorra 20%. Puedes cambiar al mensual antes de pagar.',
+      },
     ],
   },
   closing: {
-    h2: 'Prueba Chippi gratis 7 días.',
-    sub: 'Conecta tu correo. Chippi empieza a trabajar tus leads hoy. Cancela antes del día 7 y no pagas nada.',
-    startTrial: 'Empieza gratis',
-    bookDemo: 'Ver una demo',
+    h2: 'Dale a Chippi siete días con tus leads.',
+    sub: 'Conecta tu correo y calendario. Cancela antes del día 7 y no pagas nada.',
+    startTrial: 'Prueba 7 días gratis',
+    bookDemo: 'Agenda una demo en vivo',
   },
   billedInUsdNote: 'Los precios se muestran en {currency} para ayudarte. Cobramos en USD.',
 };
 
 const ru: PricingDict = {
   metaTitle: 'Цены · Chippi',
+  metaDescription: 'Превращайте больше обращений в показы. Попробуйте 7 дней бесплатно и сэкономьте 20% при оплате за год.',
   hero: {
-    pill: 'Цены',
-    h1: 'Платите за то, что используете.',
-    sub: 'Попробуйте бесплатно 7 дней. Chippi делает работу, которую вы не любите. Сделки остаются вам.',
+    pill: '7 дней бесплатно · Скидка 20% за год',
+    h1: 'Выберите работу, которую хотите снять с себя.',
+    sub: 'Во всех планах есть Chippi. Выберите нужный объём работы. Оплата за год экономит 20%.',
   },
   plans: {
     individualEyebrow: 'Для одного агента',
@@ -251,31 +262,31 @@ const ru: PricingDict = {
     perSeatLine: '+{price}/человек, +{credits} кредитов',
     cards: {
       solo: {
-        blurb: 'Chippi читает ваши лиды и отвечает за вас.',
-        highlights: ['Отвечает на каждый новый лид', 'Записывает на показы за вас', 'Работает с вашей почтой и календарём'],
-        cta: 'Начать бесплатно',
+        blurb: 'Для одного агента, который хочет обработать каждый лид.',
+        highlights: ['Читает и оценивает каждый новый лид', 'Пишет ответы в вашем стиле', 'Записывает на показы по календарю'],
+        cta: '7 дней бесплатно',
       },
       pro: {
-        blurb: 'Для агентов, у которых много лидов.',
-        highlights: ['Всё из плана Solo', 'Больше кредитов каждый месяц', 'Отвечаем вам первым'],
-        cta: 'Начать бесплатно',
+        blurb: 'Для занятого агента с большим потоком лидов.',
+        highlights: ['Всё из плана Solo', 'Больше работы включено каждый месяц', 'Приоритетная помощь при необходимости'],
+        cta: '7 дней бесплатно',
       },
       team: {
-        blurb: 'Видно, что делает вся ваша команда.',
-        highlights: ['Отправляет каждый лид нужному человеку', 'Один экран для всей команды', 'Вы решаете, кому что можно'],
+        blurb: 'Для команды, которой нужен единый порядок работы.',
+        highlights: ['Направляет лид нужному человеку', 'Показывает всю команду в одном месте', 'Сохраняет роли и журнал действий'],
         cta: 'Создать команду',
       },
       team_plus: {
-        blurb: 'Большая команда. И всё просто.',
-        highlights: ['Всё из плана Team', 'Больше людей и кредитов', 'Дешевле за человека'],
+        blurb: 'Для большой команды, которой нужно больше места.',
+        highlights: ['Всё из плана Team', 'Больше людей и работы включено', 'Ниже цена за дополнительного человека'],
         cta: 'Начать Team Plus',
       },
     },
   },
   seats: {
     eyebrow: 'Добавить людей',
-    h2: 'Добавьте человека. Счёт поправим сами.',
-    sub: 'В Team и Team Plus места уже входят. Нужно больше? Каждый лишний человек стоит одну и ту же цену. Добавляйте и убирайте когда угодно.',
+    h2: 'Расширяйте команду без смены плана.',
+    sub: 'В планах Team уже есть места. Добавляйте и убирайте людей. Счёт обновится сам.',
     perAgentSuffix: '/ доп. человек / мес',
     creditsPerAgent: '+{credits} кредитов за каждого добавленного человека',
     largeFloor: 'У вас большая команда?',
@@ -283,8 +294,8 @@ const ru: PricingDict = {
   },
   credits: {
     eyebrow: 'Кредиты',
-    h2: 'Один кредит = одна работа Chippi.',
-    sub: 'Большие работы стоят дороже. Мелкие — почти ничего. Неиспользованные кредиты ждут вас 30 дней.',
+    h2: 'Смотрите цену каждой работы.',
+    sub: 'Оценка лида стоит {leadScore} кредит. Запись на показ стоит {tourBooking} кредитов. Кредиты хранятся 30 дней.',
     workflows: {
       tour_booking: 'Записать на показ',
       daily_briefing: 'Ваша сводка за день',
@@ -315,13 +326,17 @@ const ru: PricingDict = {
         q: 'Как считается цена для команды?',
         a: 'Добавьте человека — счёт поправим сами. Каждый лишний человек стоит фиксированную цену в месяц. Это {teamSeat} на плане Team и {teamPlusSeat} на плане Team Plus. Добавляйте и убирайте когда угодно. Без смены плана. Без звонков продавцов, пока вы сами не захотите.',
       },
+      {
+        q: 'Почему сначала выбрана оплата за год?',
+        a: 'Оплата за год экономит 20%. До оплаты можно выбрать месяц.',
+      },
     ],
   },
   closing: {
-    h2: 'Попробуйте Chippi бесплатно 7 дней.',
-    sub: 'Подключите почту. Chippi начнёт работать с вашими лидами уже сегодня. Отмените до 7-го дня — не заплатите ничего.',
-    startTrial: 'Начать бесплатно',
-    bookDemo: 'Посмотреть демо',
+    h2: 'Дайте Chippi семь дней с вашими лидами.',
+    sub: 'Подключите почту и календарь. Отмените до 7-го дня и ничего не платите.',
+    startTrial: '7 дней бесплатно',
+    bookDemo: 'Записаться на живой показ',
   },
   billedInUsdNote: 'Цены показаны в {currency} для удобства. Списываем в USD.',
 };

@@ -20,7 +20,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
-export const alt = 'Chippi · Agentic OS for real estate';
+export const alt = 'Chippi · AI lead conversion teammate for real estate';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -78,7 +78,7 @@ export default async function Image() {
               letterSpacing: '0.2em',
             }}
           >
-            The agentic OS for real estate
+            Turn more leads into booked tours
           </span>
           <span
             style={{

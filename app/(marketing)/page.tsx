@@ -19,11 +19,20 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { Hero } from '@/components/marketing/giga/hero';
 import { Stats } from '@/components/marketing/giga/stats';
+import { HomeMechanism } from '@/components/marketing/giga/home-mechanism';
 import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
 import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
 import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
 import { Complexity } from '@/components/marketing/giga/complexity';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
+import { hreflangAlternates } from '@/lib/i18n/metadata';
+
+export const metadata = {
+  title: HOME_DICTS.en.metaTitle,
+  description: HOME_DICTS.en.metaDescription,
+  alternates: hreflangAlternates('/', 'en'),
+};
 
 export default async function MarketingHomePage() {
   const { userId } = await auth();
@@ -37,6 +46,7 @@ export default async function MarketingHomePage() {
       <div className="dark bg-[#0a0a0a] text-white">
         <Hero />
         <Stats />
+        <HomeMechanism />
         <AgentCanvas />
         <RealtorShowcase />
         <BrokerageShowcase />

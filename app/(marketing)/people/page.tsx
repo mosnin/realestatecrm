@@ -328,7 +328,7 @@ export default function PeoplePage() {
         eyebrow="People"
         title="Every contact, a living record."
         sub="Scored with the reason the moment they land. Every email, text, tour, and note on one timeline. The whole relationship, kept warm while you are in the field."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
@@ -512,7 +512,7 @@ export default function PeoplePage() {
           </p>
           <div className="mt-9 flex justify-center">
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial

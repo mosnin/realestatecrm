@@ -102,7 +102,7 @@ const GROUPS: NavGroup[] = [
     },
     items: [
       { icon: Home, label: 'Meet Chippi', desc: 'The agent inside the CRM', href: '/chippi' },
-      { icon: Plug, label: 'Plugins', desc: 'The tools you already use', href: '/integrations' },
+      { icon: Plug, label: 'Integrations', desc: 'The tools you already use', href: '/integrations' },
       { icon: Building2, label: 'Company', desc: 'Why we built Chippi', href: '/company' },
       { icon: PlayCircle, label: 'Book a demo', desc: 'See it on your own floor', href: '/demo' },
       { icon: Activity, label: 'Status', desc: 'Live system status', href: '/status' },
@@ -110,7 +110,7 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
-const SIGNUP = '/login/realtor?intent=signup';
+const SIGNUP = '/sign-up';
 
 export function SiteNav() {
   const [open, setOpen] = useState<string | null>(null);

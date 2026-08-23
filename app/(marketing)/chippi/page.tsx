@@ -18,7 +18,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'Meet Chippi',
   description:
-    'Chippi is the AI teammate that works your whole book: reading every lead, replying in your voice, booking tours against your real calendar, and keeping the deal current.',
+    'Meet the AI lead conversion teammate for real estate. Chippi reads every inquiry, ranks intent, drafts replies, books tours, and keeps the CRM current.',
 };
 
 export default function MeetChippiPage() {
@@ -30,15 +30,15 @@ export default function MeetChippiPage() {
           labelIcon="LayoutGrid"
           headline={
             <>
-              Not another tool.
-              <br className="hidden sm:block" /> A teammate.
+              One teammate from
+              <br className="hidden sm:block" /> inquiry to booked tour.
             </>
           }
-          description="Chippi lives inside your CRM and works the hours between closings: reading, drafting, booking, and logging. You get the decisions, not the busywork."
+          description="Chippi works across your inbox, calendar, and CRM. It reads, ranks, drafts, books, and logs the next move. You decide what may send."
           features={[
-            { icon: 'Inbox', title: 'Reads every lead', desc: 'Every inbound read the moment it lands, history in context.' },
-            { icon: 'MessagesSquare', title: 'Replies sent in your voice', desc: 'Ask Chippi to reply and it sends through your connected inbox.' },
-            { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times proposed against your real availability.' },
+            { icon: 'Inbox', title: 'Reads every inquiry', desc: 'New leads arrive with their history and next move in context.' },
+            { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Send through your own connected inbox when you are ready.' },
+            { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times come from your real availability, not a separate calendar.' },
           ]}
           image="/marketing/chippi-hero.jpg"
           variant="chippi"

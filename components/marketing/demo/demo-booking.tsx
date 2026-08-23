@@ -45,7 +45,7 @@ export function DemoBooking() {
         <p className="mt-8 text-center text-sm text-neutral-600">
           Prefer to start now?{' '}
           <Link
-            href="/login/realtor?intent=signup"
+            href="/sign-up"
             className="font-semibold text-[#ff4b29] transition-colors hover:text-[#e84418]"
           >
             Start your free trial

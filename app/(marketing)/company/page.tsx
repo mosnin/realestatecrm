@@ -22,7 +22,7 @@ import {
 export const metadata = {
   title: 'Our story · Chippi',
   description:
-    'Real estate deserves to work the way the rest of the world already does. We built Chippi to close the gap between what is now possible and what agents actually get.',
+    'We built Chippi so real estate teams can work every lead without losing the human relationship that closes the deal.',
 };
 
 /* Beliefs, the things we will not move on. */
@@ -32,16 +32,16 @@ const BELIEFS = [
     body: 'Settings, toggles, customization layers, they are admissions the team could not pick. Picking is the work. We will not make your day harder so our spec was easier.',
   },
   {
-    title: 'Nothing leaves without your name on it.',
-    body: 'Chippi drafts, books, and updates, but by default every move is yours to approve. You can grant per-task autonomy when you trust it. The default is you in the loop, and that is where the trust lives.',
+    title: 'Your rules control every send.',
+    body: 'You choose what Chippi may send automatically. Everything else waits for approval. Every action keeps an owner, a reason, and a receipt.',
   },
   {
     title: 'Chippi has one voice.',
     body: 'Wherever Chippi shows up, a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It is how you learn to trust the agent across every surface.',
   },
   {
-    title: 'No numbers we cannot defend.',
-    body: 'No 10x headline. No minutes-saved-per-day claim. The day we can prove a number against your own data, we will quote it, and footnote it. Until then, the agent does the talking.',
+    title: 'Proof before promises.',
+    body: 'No made-up returns. No invented time savings. We show the work, log the result, and let your own data make the case.',
   },
 ];
 
@@ -63,13 +63,13 @@ export default function CompanyPage() {
             </BlurRise>
             <BlurRise trigger="load" delay={0.08}>
               <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
-                Real estate deserves to work the way the world already does.
+                More leads should not mean less time with clients.
               </Serif>
             </BlurRise>
             <BlurRise trigger="load" delay={0.16}>
               <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-                We built Chippi because the tools agents and brokerages live in were drawn for a slower
-                era. The work should not be the chrome. The work should be the deals.
+                We built Chippi to work the chase between an inquiry and a booked tour. Agents keep
+                the judgment, trust, and relationship that move the deal.
               </p>
             </BlurRise>
             <BlurRise trigger="load" delay={0.24}>
@@ -89,22 +89,19 @@ export default function CompanyPage() {
             <BlurRise>
               <Eyebrow>The gap</Eyebrow>
               <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-                The work moved on.
-                <br className="hidden sm:block" /> The software did not.
+                The leads kept coming.
+                <br className="hidden sm:block" /> The follow-up did not keep up.
               </Serif>
             </BlurRise>
             <BlurRise delay={0.1}>
               <div className="space-y-6 text-[15px] leading-relaxed text-white/60 lg:pt-2">
                 <p>
-                  An agent&apos;s day is mostly attention management: email, calendar, replies,
-                  follow-ups, pipeline updates. The actual selling, the listening and judging and
-                  knowing, happens in maybe ten percent of it.
+                  An agent&apos;s day jumps between email, calendar, replies, follow-ups, and deal
+                  updates. The selling happens in the moments that need judgment and trust.
                 </p>
                 <p>
-                  Everywhere else, that other ninety percent has started to run itself. In real estate
-                  it still does not. The tools are stuck a generation behind what is now possible. That
-                  distance, between what could happen and what actually does, is the whole reason Chippi
-                  exists.
+                  The coordination around those moments should not depend on memory. Chippi exists to
+                  read the inquiry, prepare the next move, book the tour, and leave a clear record.
                 </p>
               </div>
             </BlurRise>

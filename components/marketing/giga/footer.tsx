@@ -8,32 +8,26 @@
 
 import Link from 'next/link';
 import AnimatedGradientBackground from '@/components/ui/animated-gradient-background';
+import { CHROME_DICTS } from '@/lib/i18n/dictionaries/chrome';
+import { localizedPath, type Lang } from '@/lib/i18n/markets';
 
-const columns: Record<string, { label: string; href: string }[]> = {
-  Product: [
-    { label: 'Agents', href: '/agents' },
-    { label: 'Brokerages', href: '/brokerages' },
-    { label: 'Integrations', href: '/integrations' },
-    { label: 'Pricing', href: '/pricing' },
-  ],
-  Company: [
-    { label: 'Company', href: '/company' },
-    { label: 'See a demo', href: '/demo' },
-    { label: 'Sign in', href: '/login/realtor' },
-  ],
-  Resources: [
-    { label: 'Help Center', href: '/help' },
-    { label: 'Research', href: '/research' },
-    { label: 'Status', href: '/status' },
-    { label: 'Privacy', href: '/privacy' },
-    { label: 'Terms', href: '/terms' },
-  ],
-};
-
-const SECURITY_PRACTICES = ['Access', 'Audit', 'Privacy'];
+const COLUMN_HREFS = [
+  ['/agents', '/brokerages', '/integrations', '/pricing', '/sign-up'],
+  ['/company', '/demo', '/login/realtor'],
+  ['/help', '/status', '/privacy', '/terms'],
+];
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
 
-export function SiteFooter() {
+export function SiteFooter({ lang = 'en' }: { lang?: Lang }) {
+  const copy = CHROME_DICTS[lang].footer;
+  const columns = copy.headings.map((heading, columnIndex) => ({
+    heading,
+    items: copy.links[columnIndex].map((label, itemIndex) => {
+      const baseHref = COLUMN_HREFS[columnIndex][itemIndex];
+      const href = baseHref === '/pricing' ? localizedPath('/pricing', lang) : baseHref;
+      return { label, href };
+    }),
+  }));
   return (
     <footer className="relative bg-white dark:bg-[#0a0a0a]">
       {/* Warm gradient band (Chippi orange / pink / yellow), anchored toward the
@@ -67,10 +61,10 @@ export function SiteFooter() {
               <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="hidden h-5 w-auto dark:block" />
               <span style={MONO} className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/40">
                 <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-500" />
-                Security controls
+                {copy.control}
               </span>
               <div className="mt-3 flex items-center gap-2">
-                {SECURITY_PRACTICES.map((practice) => (
+                {copy.practices.map((practice) => (
                   <span
                     key={practice}
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-neutral-50 text-center text-[8px] font-semibold uppercase leading-tight tracking-wide text-neutral-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/50"
@@ -83,7 +77,7 @@ export function SiteFooter() {
 
             {/* Right: link columns */}
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-              {Object.entries(columns).map(([heading, items]) => (
+              {columns.map(({ heading, items }) => (
                 <div key={heading}>
                   <span style={MONO} className="text-[11px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/40">
                     {heading}
@@ -108,7 +102,7 @@ export function SiteFooter() {
           {/* Meta row */}
           <div className="mt-14 flex flex-col items-center gap-3 border-t border-black/[0.06] pt-6 dark:border-white/[0.08] sm:flex-row sm:justify-between">
             <p className="text-xs text-neutral-400 dark:text-white/40">
-              &copy; {new Date().getFullYear()} Chippi, Inc. All rights reserved.
+              &copy; {new Date().getFullYear()} Chippi, Inc. {copy.rights}
             </p>
             <div className="flex items-center gap-5">
               <a

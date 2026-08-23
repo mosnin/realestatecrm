@@ -160,14 +160,14 @@ export function BrokerageShowcase() {
       eyebrow="Built for brokerages"
       headline={
         <>
-          One agent behind
-          <br className="hidden sm:block" /> every desk.
+          One conversion teammate
+          <br className="hidden sm:block" /> behind every desk.
         </>
       }
       product={{
         name: 'Brokerage Dashboard',
         icon: Building2,
-        desc: 'Run the whole floor from one place. Route leads, watch performance live, set roles and approvals, and manage seats, with every action on the audit log.',
+        desc: 'Route every inquiry, keep the next move visible, set roles and approvals, and review each action from one live floor view.',
         cta: { label: 'Explore brokerages', href: '/brokerages' },
       }}
       topFeatures={TOP_FEATURES}

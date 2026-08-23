@@ -13,7 +13,7 @@ const columns = {
   Product: [
     { label: 'For real estate agents', href: '/realtors' },
     { label: 'For brokerages', href: '/brokerages' },
-    { label: 'Plugins', href: '/integrations' },
+    { label: 'Integrations', href: '/integrations' },
     { label: 'Pricing', href: '/pricing' },
   ],
   Company: [
@@ -42,11 +42,11 @@ export function SiteFooter() {
                 Chippi
               </p>
               <p className="mt-4 max-w-md text-3xl font-bold leading-[1.05] tracking-[-0.03em] text-zinc-950 sm:text-4xl">
-                The busywork runs itself. The hours go to closing.
+                Turn more leads into booked tours.
               </p>
             </div>
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="inline-flex h-12 w-fit items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
@@ -58,8 +58,8 @@ export function SiteFooter() {
           <div className="grid grid-cols-2 gap-8 pt-12 md:grid-cols-4">
             <div className="col-span-2 md:col-span-1">
               <p className="max-w-xs text-sm leading-relaxed text-neutral-600">
-                The agentic OS for real-estate agents and brokerages, every
-                real estate agent with Chippi doing real work for them.
+                Your AI lead conversion teammate. Chippi reads every inquiry,
+                ranks intent, drafts the next reply, and keeps tours moving.
               </p>
             </div>
             {Object.entries(columns).map(([heading, items]) => (

@@ -24,6 +24,7 @@ export async function generateMetadata({
   if (!isLang(lang) || lang === 'en') return {};
   return {
     title: PRICING_DICTS[lang].metaTitle,
+    description: PRICING_DICTS[lang].metaDescription,
     alternates: hreflangAlternates('/pricing', lang),
   };
 }

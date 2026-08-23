@@ -13,7 +13,7 @@ import { CtaSection } from '@/components/marketing/giga/cta';
 export const metadata = {
   title: 'For agents · Chippi',
   description:
-    'Chippi works your book while you close: reading the inbox, sending replies in your voice, and booking tours against your real calendar.',
+    'Turn more real estate inquiries into booked tours without living in your inbox. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
 };
 
 export default function AgentsPage() {
@@ -21,19 +21,19 @@ export default function AgentsPage() {
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Real Estate OS"
+          label="For individual agents"
           labelIcon="LayoutGrid"
           headline={
             <>
-              Your whole book, worked
-              <br className="hidden sm:block" /> while you close.
+              Turn more inquiries into booked tours.
+              <br className="hidden sm:block" /> Keep your day for clients.
             </>
           }
-          description="Chippi reads every lead, drafts in your voice, books the tour, and keeps the deal current, so your hours go to closing, not admin."
+          description="Chippi reads every inquiry and ranks who is ready. It drafts in your voice, books from your calendar, and keeps the CRM current."
           features={[
-            { icon: 'MessagesSquare', title: 'Replies sent in your voice', desc: 'Ask Chippi to reply and it sends through your connected inbox.' },
-            { icon: 'KanbanSquare', title: 'Know who to call first', desc: 'Leads scored against your live pipeline and ranked by intent.' },
-            { icon: 'CalendarCheck', title: 'Tours book themselves', desc: 'Ask Chippi to book; the calendar, thread, and deal all update.' },
+            { icon: 'MessagesSquare', title: 'Never miss the first move', desc: 'Every new inquiry is read and a reply is prepared in your voice.' },
+            { icon: 'KanbanSquare', title: 'Call the right lead next', desc: 'Chippi ranks intent and shows the reasons behind each score.' },
+            { icon: 'CalendarCheck', title: 'End calendar ping pong', desc: 'Tours book from your real availability and update the deal.' },
           ]}
           image="/marketing/agents-hero.jpg"
           variant="inbox"

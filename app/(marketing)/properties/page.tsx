@@ -176,7 +176,7 @@ export default function PropertiesPage() {
         eyebrow="Properties"
         title="Every property. One place."
         sub="Chippi syncs your listings in from the CRMs you already run and keeps them current, photos, documents, and showings attached to the listing, one search away."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 

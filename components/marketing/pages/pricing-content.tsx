@@ -33,7 +33,7 @@ import {
   PillGhost,
 } from '@/components/marketing/giga/primitives';
 
-const SIGNUP = '/login/realtor?intent=signup';
+const SIGNUP = '/sign-up';
 
 /* Only workflows that are actually built + metered today are advertised here
  * (mirrors the pre-i18n page: tour_booking / daily_briefing / lead_score). */
@@ -136,7 +136,12 @@ export function PricingContent({ lang }: { lang: Lang }) {
             <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
               {t.credits.h2}
             </Serif>
-            <p className="mt-5 text-[14px] leading-relaxed text-white/55">{t.credits.sub}</p>
+            <p className="mt-5 text-[14px] leading-relaxed text-white/55">
+              {fill(t.credits.sub, {
+                leadScore: WORKFLOW_CREDIT_COST.lead_score,
+                tourBooking: WORKFLOW_CREDIT_COST.tour_booking,
+              })}
+            </p>
           </div>
           <ul className="mt-8 divide-y divide-white/[0.06] overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.02]">
             {ADVERTISED_WORKFLOWS.map((k) => (

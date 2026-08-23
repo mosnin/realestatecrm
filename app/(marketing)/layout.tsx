@@ -30,11 +30,14 @@ import { SiteFooter } from '@/components/marketing/giga/footer';
 import { FooterReveal } from '@/components/ui/footer-reveal';
 import { FprScript } from '@/components/affiliate/fpr-script';
 import { ChatbaseWidget } from '@/components/marketing/chatbase-widget';
+import type { Lang } from '@/lib/i18n/markets';
 
 export default function MarketingLayout({
   children,
+  lang = 'en',
 }: {
   children: React.ReactNode;
+  lang?: Lang;
 }) {
   return (
     <div
@@ -58,7 +61,7 @@ export default function MarketingLayout({
           </linearGradient>
         </defs>
       </svg>
-      <SiteHeader />
+      <SiteHeader lang={lang} />
       {/* FooterReveal: the footer stays pinned under the page and is uncovered
           as the content slides up on the last stretch of scroll. The content
           wrapper carries the shell background so it occludes the pinned footer
@@ -66,7 +69,7 @@ export default function MarketingLayout({
       <FooterReveal
         className="flex flex-1 flex-col"
         contentClassName="flex flex-1 flex-col bg-white dark:bg-[#0a0a0a]"
-        footer={<SiteFooter />}
+        footer={<SiteFooter lang={lang} />}
       >
         <main className="flex-1">{children}</main>
       </FooterReveal>

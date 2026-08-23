@@ -32,11 +32,11 @@ import { PRICING_DICTS, fill } from '@/lib/i18n/dictionaries/pricing';
 import { useDisplayCurrency } from '@/components/marketing/local-price';
 import { Band, BlurRise, Eyebrow } from './primitives';
 
-const SIGNUP = '/login/realtor?intent=signup';
-const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}&plan=${plan}`;
+const SIGNUP = '/sign-up';
+const signupHref = (plan: 'solo' | 'pro') => `${SIGNUP}?plan=${plan}`;
 /** Self-serve brokerage entry — Team / Team Plus check out in-app after broker
  *  sign-in (the brokerage-scoped /api/billing/checkout), not via /demo. */
-const BROKER_SIGNIN = '/login/broker';
+const BROKER_SIGNUP = '/sign-up?intent=broker';
 
 /** Annual = 20% off the monthly rate (matches the seat-add-on annual discount). */
 const ANNUAL_FACTOR = 0.8;
@@ -52,8 +52,8 @@ const CARD_ORDER: { individual: CardId[]; team: CardId[] } = {
 const CARD_META: Record<CardId, { href: string; featured?: boolean }> = {
   solo: { href: signupHref('solo') },
   pro: { href: signupHref('pro'), featured: true },
-  team: { href: BROKER_SIGNIN },
-  team_plus: { href: BROKER_SIGNIN, featured: true },
+  team: { href: BROKER_SIGNUP },
+  team_plus: { href: BROKER_SIGNUP, featured: true },
 };
 
 function PlanCard({ id, cycle, lang }: { id: CardId; cycle: Cycle; lang: Lang }) {
@@ -196,7 +196,7 @@ export function PricingPlans({
   lang?: Lang;
 }) {
   const t = PRICING_DICTS[lang].plans;
-  const [cycle, setCycle] = useState<Cycle>('monthly');
+  const [cycle, setCycle] = useState<Cycle>('annual');
   // Annual is a preview that only makes sense when it's actually purchasable;
   // when it isn't, hide the toggle and pin the cycle to monthly so no card ever
   // shows a 20%-off price the in-app checkout would refuse.

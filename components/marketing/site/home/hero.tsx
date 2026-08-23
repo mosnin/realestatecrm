@@ -179,7 +179,7 @@ export function Hero() {
 
           <Enter delay={0.28}>
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="mt-9 inline-flex items-center rounded-full bg-white px-7 py-3.5 text-[15px] font-semibold text-[#15131a] shadow-[0_10px_28px_rgba(40,20,10,0.12)] transition-transform duration-150 hover:scale-[1.03] active:scale-[0.97]"
             >
               Get Started

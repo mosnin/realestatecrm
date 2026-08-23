@@ -324,7 +324,7 @@ export default function DealsPage() {
         eyebrow="Deals"
         title="A pipeline that runs itself."
         sub="Stages advance as things actually happen, and every move lands in a plain-language log. The board reflects today, not last week."
-        primaryCta={{ label: 'Start free trial', href: '/login/realtor?intent=signup' }}
+        primaryCta={{ label: 'Start free trial', href: '/sign-up' }}
         secondaryCta={{ label: 'Book a demo', href: '/demo' }}
       />
 
@@ -465,7 +465,7 @@ export default function DealsPage() {
           </p>
           <div className="mt-9 flex justify-center">
             <Link
-              href="/login/realtor?intent=signup"
+              href="/sign-up"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[#ff4b29] px-7 text-[15px] font-semibold text-white transition-all duration-150 hover:bg-[#e84418] active:scale-[0.98]"
             >
               Start free trial
