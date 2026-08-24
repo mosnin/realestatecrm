@@ -15,6 +15,8 @@ describe('root metadata and market localization', () => {
     expect(source).toContain("from '@clerk/localizations/ru-RU'");
     expect(source).toContain("requestedLang === 'es'");
     expect(source).toContain("requestedLang === 'ru'");
+    expect(source).toContain("formFieldInputPlaceholder__signUpPassword: 'Crea una contraseña'");
+    expect(source).toContain("formFieldInputPlaceholder__signUpPassword: 'Создайте пароль'");
     expect(source).toContain('<ClerkProvider localization={clerkLocalization}>');
   });
 });
