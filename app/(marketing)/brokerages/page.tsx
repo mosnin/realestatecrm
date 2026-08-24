@@ -12,65 +12,67 @@ import {
 } from '@/components/marketing/giga/brokerage-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import { isAnnualAvailable } from '@/lib/plans';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'For brokerages · Chippi',
-  description:
-    'Convert more leads across the whole brokerage. Chippi routes each inquiry, prepares replies, books tours, and gives leaders a live action log.',
-};
+const FEATURE_ICONS = ['ArrowRightLeft', 'Users', 'ShieldCheck'] as const;
 
-export default function BrokeragesPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].brokerages;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
+
+export default async function BrokeragesPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].brokerages;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Brokerage view"
+          label={t.hero.label}
           labelIcon="Building2"
           headline={
             <>
-              Convert more leads
-              <br className="hidden sm:block" /> across the whole floor.
+              {t.hero.headline[0]}
+              <br className="hidden sm:block" /> {t.hero.headline[1]}
             </>
           }
-          description="Give every agent a lead conversion teammate. Route each inquiry, keep the next move visible, and review every send from one workspace."
+          description={t.hero.description}
           features={[
-            { icon: 'ArrowRightLeft', title: 'Route each lead on arrival', desc: 'Assign by territory and load. Keep the reason on the record.' },
-            { icon: 'Users', title: 'See the chase across the floor', desc: 'View leads, drafts, follow-ups, and deals by agent.' },
-            { icon: 'ShieldCheck', title: 'Control every send', desc: 'Set roles, choose approvals, and review the action log.' },
+            { ...t.hero.features[0]!, icon: FEATURE_ICONS[0] },
+            { ...t.hero.features[1]!, icon: FEATURE_ICONS[1] },
+            { ...t.hero.features[2]!, icon: FEATURE_ICONS[2] },
           ]}
           image="/marketing/brokerages-hero.jpg"
           variant="floor"
           mockupSrc="/marketing/hero/brokerage-dashboard.svg"
-          mockupAlt="The Chippi brokerage dashboard — the floor, live"
+          mockupAlt={t.hero.mockupAlt}
         />
-        <BrokerageRoutingShowcase />
-        <BrokerageFloorShowcase />
-        <BrokerageApprovalsShowcase />
+        {lang === 'en' ? (
+          <>
+            <BrokerageRoutingShowcase />
+            <BrokerageFloorShowcase />
+            <BrokerageApprovalsShowcase />
+          </>
+        ) : null}
         <PricingTeaser
+          lang={lang}
+          annualEnabled={isAnnualAvailable('team') && isAnnualAvailable('team_plus')}
           headline={
             <>
-              Pricing that scales
-              <br className="hidden sm:block" /> with your floor.
+              {t.pricingHeadline[0]}
+              <br className="hidden sm:block" /> {t.pricingHeadline[1]}
             </>
           }
           plans={[
-            {
-              name: 'Team',
-              price: '$497',
-              blurb: 'For the growing floor.',
-              features: ['5 seats included', '24,000 workflow credits / mo', '+$79 per extra seat'],
-            },
-            {
-              name: 'Team Plus',
-              price: '$897',
-              blurb: 'For the established brokerage.',
-              features: ['10 seats included', '50,000 workflow credits / mo', '+$69 per extra seat'],
-              featured: true,
-            },
+            { id: 'team' },
+            { id: 'team_plus', featured: true },
           ]}
         />
       </div>
-      <CtaSection />
+      <CtaSection lang={lang} />
     </>
   );
 }
