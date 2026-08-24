@@ -31,14 +31,16 @@ import { FooterReveal } from '@/components/ui/footer-reveal';
 import { FprScript } from '@/components/affiliate/fpr-script';
 import { ChatbaseWidget } from '@/components/marketing/chatbase-widget';
 import type { Lang } from '@/lib/i18n/markets';
+import { getRequestLang } from '@/lib/i18n/request';
 
-export default function MarketingLayout({
+export default async function MarketingLayout({
   children,
-  lang = 'en',
+  lang,
 }: {
   children: React.ReactNode;
   lang?: Lang;
 }) {
+  const resolvedLang = lang ?? (await getRequestLang());
   return (
     <div
       // The shell follows the user's light/dark preference (the root <html>
@@ -61,7 +63,7 @@ export default function MarketingLayout({
           </linearGradient>
         </defs>
       </svg>
-      <SiteHeader lang={lang} />
+      <SiteHeader lang={resolvedLang} />
       {/* FooterReveal: the footer stays pinned under the page and is uncovered
           as the content slides up on the last stretch of scroll. The content
           wrapper carries the shell background so it occludes the pinned footer
@@ -69,7 +71,7 @@ export default function MarketingLayout({
       <FooterReveal
         className="flex flex-1 flex-col"
         contentClassName="flex flex-1 flex-col bg-white dark:bg-[#0a0a0a]"
-        footer={<SiteFooter lang={lang} />}
+        footer={<SiteFooter lang={resolvedLang} />}
       >
         <main className="flex-1">{children}</main>
       </FooterReveal>

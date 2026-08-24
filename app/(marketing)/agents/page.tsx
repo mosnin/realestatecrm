@@ -9,65 +9,67 @@ import { AgentInboxShowcase, AgentPipelineShowcase } from '@/components/marketin
 import { ContentShowcase } from '@/components/marketing/giga/content-showcase';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import { isAnnualAvailable } from '@/lib/plans';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'For agents · Chippi',
-  description:
-    'Turn more real estate inquiries into booked tours without living in your inbox. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
-};
+const FEATURE_ICONS = ['MessagesSquare', 'KanbanSquare', 'CalendarCheck'] as const;
 
-export default function AgentsPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].agents;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
+
+export default async function AgentsPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].agents;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="For individual agents"
+          label={t.hero.label}
           labelIcon="LayoutGrid"
           headline={
             <>
-              Turn more inquiries into booked tours.
-              <br className="hidden sm:block" /> Keep your day for clients.
+              {t.hero.headline[0]}
+              <br className="hidden sm:block" /> {t.hero.headline[1]}
             </>
           }
-          description="Chippi reads every inquiry and ranks who is ready. It drafts in your voice, books from your calendar, and keeps the CRM current."
+          description={t.hero.description}
           features={[
-            { icon: 'MessagesSquare', title: 'Never miss the first move', desc: 'Every new inquiry is read and a reply is prepared in your voice.' },
-            { icon: 'KanbanSquare', title: 'Call the right lead next', desc: 'Chippi ranks intent and shows the reasons behind each score.' },
-            { icon: 'CalendarCheck', title: 'End calendar ping pong', desc: 'Tours book from your real availability and update the deal.' },
+            { ...t.hero.features[0]!, icon: FEATURE_ICONS[0] },
+            { ...t.hero.features[1]!, icon: FEATURE_ICONS[1] },
+            { ...t.hero.features[2]!, icon: FEATURE_ICONS[2] },
           ]}
           image="/marketing/agents-hero.jpg"
           variant="inbox"
           mockupSrc="/marketing/hero/agents-dashboard.svg"
-          mockupAlt="The Chippi agent dashboard — inbox, pipeline, and tours"
+          mockupAlt={t.hero.mockupAlt}
         />
-        <AgentInboxShowcase />
-        <ContentShowcase />
-        <AgentPipelineShowcase />
+        {lang === 'en' ? (
+          <>
+            <AgentInboxShowcase />
+            <ContentShowcase />
+            <AgentPipelineShowcase />
+          </>
+        ) : null}
         <PricingTeaser
+          lang={lang}
+          annualEnabled={isAnnualAvailable('solo') && isAnnualAvailable('pro')}
           headline={
             <>
-              Simple pricing,
-              <br className="hidden sm:block" /> built for one agent.
+              {t.pricingHeadline[0]}
+              <br className="hidden sm:block" /> {t.pricingHeadline[1]}
             </>
           }
           plans={[
-            {
-              name: 'Solo',
-              price: '$97',
-              blurb: 'For the agent getting started with Chippi.',
-              features: ['1 seat', '3,000 workflow credits / mo', 'Every Chippi feature'],
-            },
-            {
-              name: 'Pro Performer',
-              price: '$197',
-              blurb: 'For the producer running at full speed.',
-              features: ['1 seat', '8,000 workflow credits / mo', 'Priority support'],
-              featured: true,
-            },
+            { id: 'solo' },
+            { id: 'pro', featured: true },
           ]}
         />
       </div>
-      <CtaSection />
+      <CtaSection lang={lang} />
     </>
   );
 }

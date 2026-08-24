@@ -19,36 +19,20 @@ import {
   PillPrimary,
   PillGhost,
 } from '@/components/marketing/giga/primitives';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Careers · Chippi',
-  description:
-    'Help build the AI lead conversion teammate for real estate. We are a small team shipping close to customers, with a high bar for craft and trust.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].careers;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
 const CAREERS_EMAIL = 'careers@usechippi.com';
 
-/* How we work, the things that shape every day here. */
-const PRINCIPLES = [
-  {
-    title: 'Taste is the spec.',
-    body: 'We pick instead of ship a settings page. Small team, strong opinions, decisions made and owned. The craft is the work, not the chrome around it.',
-  },
-  {
-    title: 'Ship close to the user.',
-    body: 'We sit with agents and brokers, watch the real day, and turn what we hear into product the same week. Short loops, real feedback, no theater.',
-  },
-  {
-    title: 'Accountable, by design.',
-    body: 'We are building an agent people trust with their book. That trust is a feature: every action has an owner, an outcome, and a receipt, and we hold that line in the code.',
-  },
-  {
-    title: 'One voice, everywhere.',
-    body: 'An action card, a toast, an activity row, the same signature carries through. Consistency and polish are not the last pass; they are how we build.',
-  },
-];
-
-export default function CareersPage() {
+export default async function CareersPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].careers;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
@@ -63,25 +47,24 @@ export default function CareersPage() {
           </div>
           <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
             <BlurRise trigger="load">
-              <EyebrowPill>Careers</EyebrowPill>
+              <EyebrowPill>{t.heroEyebrow}</EyebrowPill>
             </BlurRise>
             <BlurRise trigger="load" delay={0.08}>
               <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
-                Help build the future of real estate.
+                {t.heroHeadline}
               </Serif>
             </BlurRise>
             <BlurRise trigger="load" delay={0.16}>
               <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-                We are a small team building the lead conversion teammate real estate has been
-                missing. The surface is huge, the bar is high, and the work reaches customers fast.
+                {t.heroBody}
               </p>
             </BlurRise>
             <BlurRise trigger="load" delay={0.24}>
               <div className="mt-9 flex flex-wrap justify-center gap-3">
                 <PillPrimary href={`mailto:${CAREERS_EMAIL}`} withArrow>
-                  Get in touch
+                  {t.contact}
                 </PillPrimary>
-                <PillGhost href="/company">Our story</PillGhost>
+                <PillGhost href="/company">{t.story}</PillGhost>
               </div>
             </BlurRise>
           </Band>
@@ -90,13 +73,13 @@ export default function CareersPage() {
         {/* How we work */}
         <Band className="py-24 sm:py-28">
           <BlurRise className="mx-auto max-w-2xl text-center">
-            <Eyebrow className="justify-center">How we work</Eyebrow>
+            <Eyebrow className="justify-center">{t.workEyebrow}</Eyebrow>
             <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              A few things that shape every day.
+              {t.workHeadline}
             </Serif>
           </BlurRise>
           <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
-            {PRINCIPLES.map((p, i) => (
+            {t.principles.map((p, i) => (
               <BlurRise key={p.title} delay={i * 0.06}>
                 <div className="h-full rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8">
                   <h3 style={{ fontFamily: 'var(--font-sans)' }} className="text-[16px] font-semibold text-white">
@@ -112,16 +95,16 @@ export default function CareersPage() {
         {/* Open positions. Keep this state factual until a real requisition is approved. */}
         <Band id="open-positions" className="scroll-mt-24 py-24 sm:py-28">
           <BlurRise className="mx-auto max-w-2xl text-center">
-            <Eyebrow className="justify-center">Open positions</Eyebrow>
+            <Eyebrow className="justify-center">{t.openingsEyebrow}</Eyebrow>
             <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              No open roles right now.
+              {t.openingsHeadline}
             </Serif>
             <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-white/55">
-              We are still happy to meet thoughtful builders. Email{' '}
+              {t.openingsBeforeEmail}{' '}
               <a href="mailto:careers@usechippi.com" className="text-[#ff9a6e] underline-offset-4 hover:underline">
                 careers@usechippi.com
               </a>{' '}
-              and tell us what you would want to own.
+              {t.openingsAfterEmail}
             </p>
           </BlurRise>
         </Band>
@@ -130,17 +113,16 @@ export default function CareersPage() {
         <Band className="pb-28 pt-4 sm:pb-36">
           <BlurRise className="mx-auto max-w-2xl text-center">
             <Serif className="text-[clamp(1.9rem,3.8vw,3rem)] leading-[1.06] text-white">
-              Do not see your role?
+              {t.closeHeadline}
             </Serif>
             <p className="mx-auto mt-5 max-w-md text-[15px] leading-relaxed text-white/55">
-              We are always meeting great people. Tell us what you would want to build, and the surface
-              you would want to own.
+              {t.closeBody}
             </p>
             <a
               href={`mailto:${CAREERS_EMAIL}`}
               className="mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-white px-6 text-[14px] font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98]"
             >
-              Get in touch
+              {t.contact}
               <ArrowRight className="h-4 w-4" />
             </a>
             <p className="mt-4 text-[12.5px] text-white/40">{CAREERS_EMAIL}</p>
