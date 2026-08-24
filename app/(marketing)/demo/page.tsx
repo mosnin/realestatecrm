@@ -8,15 +8,17 @@
 
 import { CalendlyEmbed } from '@/components/marketing/giga/calendly-embed';
 import { Band, BlurRise, EyebrowPill, Serif } from '@/components/marketing/giga/primitives';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Book a live walkthrough · Chippi',
-  description: 'See Chippi move a real estate inquiry from first response to a booked tour, then map the same process to your team.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].demo;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
-const POINTS = ['Read and rank an inquiry', 'Draft the reply in your voice', 'Book from the real calendar'];
-
-export default function DemoPage() {
+export default async function DemoPage() {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].demo;
   return (
     <div className="dark bg-[#0a0a0a] text-white">
       {/* Hero */}
@@ -29,22 +31,21 @@ export default function DemoPage() {
         </div>
         <Band className="pt-40 pb-10 text-center sm:pt-44">
           <BlurRise trigger="load">
-            <EyebrowPill>Live product walkthrough</EyebrowPill>
+            <EyebrowPill>{t.eyebrow}</EyebrowPill>
           </BlurRise>
           <BlurRise trigger="load" delay={0.08}>
             <Serif as="h1" className="mx-auto mt-7 max-w-3xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
-              See one lead move from inquiry to booked tour.
+              {t.headline}
             </Serif>
           </BlurRise>
           <BlurRise trigger="load" delay={0.16}>
             <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-              Bring your lead process. We will show how Chippi reads, ranks, drafts, books, and logs
-              each move. Then we will map the same flow to your agents and tools.
+              {t.body}
             </p>
           </BlurRise>
           <BlurRise trigger="load" delay={0.22}>
             <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[13px] text-white/50">
-              {POINTS.map((p) => (
+              {t.points.map((p) => (
                 <span key={p} className="inline-flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#ff7a45]" />
                   {p}
