@@ -33,10 +33,24 @@ describe('marketing claims', () => {
 
   it('does not publish illustrative job openings', () => {
     const careers = readFileSync('app/(marketing)/careers/page.tsx', 'utf8');
+    const marketingCopy = readFileSync(
+      'lib/i18n/dictionaries/marketing-pages.ts',
+      'utf8',
+    );
+    const source = `${careers}\n${marketingCopy}`;
 
-    expect(careers).not.toContain('Head of PR, Europe');
-    expect(careers).not.toContain('Head of Growth Marketing');
-    expect(careers).toContain('No open roles right now.');
+    expect(source).not.toContain('Head of PR, Europe');
+    expect(source).not.toContain('Head of Growth Marketing');
+    expect(careers).toContain('MARKETING_PAGE_DICTS[lang].careers');
+    expect(marketingCopy).toContain(
+      "openingsHeadline: 'No open roles right now.'",
+    );
+    expect(marketingCopy).toContain(
+      "openingsHeadline: 'No hay puestos abiertos ahora.'",
+    );
+    expect(marketingCopy).toContain(
+      "openingsHeadline: 'Сейчас открытых позиций нет.'",
+    );
   });
 
   it('does not publish sample research as completed studies', () => {
