@@ -30,7 +30,7 @@ const en = {
       items: [
         { label: 'Our story', desc: 'The gap we set out to close' },
         { label: 'Help Center', desc: 'Guides for every part of Chippi' },
-        { label: 'Live walkthrough', desc: 'See an inquiry become a booked tour' },
+        { label: 'Research', desc: 'The work that shaped every feature' },
         { label: 'Careers', desc: 'Help build the future of real estate' },
       ],
     },
@@ -38,13 +38,14 @@ const en = {
     signIn: 'Sign in',
     start: 'Start free',
     startLong: 'Start free for 7 days',
+    demo: 'See a demo',
   },
   footer: {
     headings: ['Product', 'Company', 'Resources'],
     links: [
-      ['Agents', 'Brokerages', 'Integrations', 'Pricing', 'Start free'],
+      ['Agents', 'Brokerages', 'Integrations', 'Pricing'],
       ['Company', 'Live walkthrough', 'Sign in'],
-      ['Help Center', 'Status', 'Privacy', 'Terms'],
+      ['Help Center', 'Research', 'Status', 'Privacy', 'Terms'],
     ],
     control: 'Built for control',
     practices: ['Roles', 'Logs', 'Privacy'],
@@ -82,7 +83,7 @@ const es: ChromeDict = {
       items: [
         { label: 'Nuestra historia', desc: 'El problema que decidimos resolver' },
         { label: 'Centro de ayuda', desc: 'Guías para cada parte de Chippi' },
-        { label: 'Demo en vivo', desc: 'Mira una consulta convertirse en visita' },
+        { label: 'Investigación', desc: 'El trabajo que dio forma a cada función' },
         { label: 'Trabaja con nosotros', desc: 'Ayuda a construir el futuro inmobiliario' },
       ],
     },
@@ -90,13 +91,14 @@ const es: ChromeDict = {
     signIn: 'Iniciar sesión',
     start: 'Prueba gratis',
     startLong: 'Prueba 7 días gratis',
+    demo: 'Ver una demo',
   },
   footer: {
     headings: ['Producto', 'Empresa', 'Recursos'],
     links: [
-      ['Agentes', 'Inmobiliarias', 'Conexiones', 'Precios', 'Prueba gratis'],
+      ['Agentes', 'Inmobiliarias', 'Conexiones', 'Precios'],
       ['Empresa', 'Demo en vivo', 'Iniciar sesión'],
-      ['Centro de ayuda', 'Estado', 'Privacidad', 'Términos'],
+      ['Centro de ayuda', 'Investigación', 'Estado', 'Privacidad', 'Términos'],
     ],
     control: 'Creado para darte control',
     practices: ['Roles', 'Registros', 'Privacidad'],
@@ -132,7 +134,7 @@ const ru: ChromeDict = {
       items: [
         { label: 'Наша история', desc: 'Какую проблему мы решили' },
         { label: 'Центр помощи', desc: 'Инструкции по всем частям Chippi' },
-        { label: 'Живой показ', desc: 'Как обращение превращается в показ' },
+        { label: 'Исследования', desc: 'Работа, на которой основаны функции' },
         { label: 'Вакансии', desc: 'Помогите строить будущее недвижимости' },
       ],
     },
@@ -140,13 +142,14 @@ const ru: ChromeDict = {
     signIn: 'Войти',
     start: 'Начать бесплатно',
     startLong: '7 дней бесплатно',
+    demo: 'Посмотреть демо',
   },
   footer: {
     headings: ['Продукт', 'Компания', 'Ресурсы'],
     links: [
-      ['Агенты', 'Агентства', 'Подключения', 'Цены', 'Начать бесплатно'],
+      ['Агенты', 'Агентства', 'Подключения', 'Цены'],
       ['Компания', 'Живой показ', 'Войти'],
-      ['Центр помощи', 'Статус', 'Конфиденциальность', 'Условия'],
+      ['Центр помощи', 'Исследования', 'Статус', 'Конфиденциальность', 'Условия'],
     ],
     control: 'Контроль в основе',
     practices: ['Роли', 'Журнал', 'Данные'],

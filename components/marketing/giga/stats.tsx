@@ -29,7 +29,9 @@ export function Stats({ lang = 'en' }: { lang?: Lang }) {
               <div key={s.label} className="px-5 first:pl-0 sm:px-10">
                 <Mono className="text-[10px] text-white/40">{s.label}</Mono>
                 <span
-                  className="mt-3 block text-[clamp(1.2rem,2.8vw,2.75rem)] font-light leading-none tracking-tight text-white"
+                  className={lang === 'en'
+                    ? 'mt-3 block text-[2.75rem] font-light leading-none tracking-tight tabular-nums text-white sm:text-[3.5rem] lg:text-[4.25rem]'
+                    : 'mt-3 block text-[clamp(1.2rem,2.8vw,2.75rem)] font-light leading-none tracking-tight text-white'}
                   style={{ fontFamily: 'var(--font-sans)' }}
                 >
                   {s.value}

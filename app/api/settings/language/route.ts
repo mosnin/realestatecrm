@@ -2,7 +2,8 @@
  * Account language preference.
  *
  * GET  → { language }               — the signed-in user's stored language.
- * POST { language } → { ok, persisted } — store it and pin the `chippi_lang`
+ * POST { language } → { ok, persisted } — store it and pin the explicit
+ *   language preference cookie
  *   cookie so the logged-out site (and the geo middleware) immediately follow
  *   the explicit choice on this browser; the DB row makes it portable across
  *   devices and is the future source for in-app/email language.
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   const res = NextResponse.json({ ok: true, persisted });
-  // Explicit choice → pin the same cookie the marketing middleware honors.
+  // Explicit choice → pin the same preference cookie middleware honors.
   res.cookies.set(LANG_COOKIE, language, LANG_COOKIE_OPTS);
   return res;
 }

@@ -65,12 +65,19 @@ describe('resolveMarket', () => {
 describe('decideLangRouting (middleware language decision)', () => {
   it('geo redirects a first visit to the translated page', () => {
     const d = decideLangRouting({ pathname: '/pricing', country: 'CL', cookieLang: null, hlParam: null });
-    expect(d).toEqual({ lang: 'es', redirectTo: '/es/pricing', setCookie: true });
+    expect(d).toEqual({ lang: 'es', redirectTo: '/es/pricing', setCookie: false });
+  });
+
+  it('never turns an automatic country result into a durable language preference', () => {
+    for (const country of ['US', 'CL', 'RU', null]) {
+      const d = decideLangRouting({ pathname: '/', country, cookieLang: null, hlParam: null });
+      expect(d.setCookie).toBe(false);
+    }
   });
 
   it('geo redirects the homepage now that every offer line is translated', () => {
     const d = decideLangRouting({ pathname: '/', country: 'CL', cookieLang: null, hlParam: null });
-    expect(d).toEqual({ lang: 'es', redirectTo: '/es', setCookie: true });
+    expect(d).toEqual({ lang: 'es', redirectTo: '/es', setCookie: false });
   });
 
   it('never redirects US/unknown visitors (crawler-safe: base stays base)', () => {

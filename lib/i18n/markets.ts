@@ -8,7 +8,7 @@
  *
  * Resolution order everywhere in the product:
  *   1. Explicit user choice (profile fields for logged-in users, the
- *      `chippi_lang` / `chippi_currency` cookies for logged-out visitors).
+ *      `chippi_lang_pref` cookie for logged-out visitors).
  *   2. Geo (Vercel's `x-vercel-ip-country` header, read in middleware).
  *   3. Default: English / USD — the American English site is the canonical
  *      base version of the product.
@@ -116,9 +116,11 @@ export function resolveMarket(country: string | null | undefined): Market {
 }
 
 /** Cookie names shared by middleware (writer) and client components (readers).
- *  `chippi_lang` records a language preference (geo-derived or explicit via
- *  `?hl=`); `chippi_currency` records the display currency. */
-export const LANG_COOKIE = 'chippi_lang';
+ *  The language cookie records EXPLICIT choice only. Geo resolution is never
+ *  persisted, so a stale edge location cannot trap a visitor in a language.
+ *  The new name intentionally ignores legacy `chippi_lang` cookies that mixed
+ *  automatic geo detection with real user preference. */
+export const LANG_COOKIE = 'chippi_lang_pref';
 export const CURRENCY_COOKIE = 'chippi_currency';
 
 /**
@@ -146,7 +148,7 @@ export function localizedPath(basePath: string, lang: Lang): string {
  * The pure language-routing decision the middleware executes — extracted so
  * behavior is unit-testable without Clerk/Next plumbing.
  *
- * Inputs: the request path, the visitor's country, the `chippi_lang` cookie,
+ * Inputs: the request path, the visitor's country, the explicit preference cookie,
  * and an explicit `?hl=` override. Output: the lang to persist in the cookie
  * and, when the visitor should be reading this page in another language, the
  * path to 302 to.
@@ -157,9 +159,9 @@ export function localizedPath(basePath: string, lang: Lang): string {
  *    choice: it always renders as-is — a shared Spanish link, or Googlebot
  *    crawling `/es/pricing` from a US IP, must never bounce to another
  *    language. Geo/cookie never redirect off a prefixed page.
- *  - On the UNPREFIXED base pages, cookie wins over geo, and geo only applies
- *    when there is no cookie: first visit from Santiago to `/pricing` lands on
- *    `/es/pricing`; a bot crawling from a US IP stays on the base version.
+ *  - On the UNPREFIXED base pages, an explicit preference wins over geo.
+ *    Geo is evaluated on every request and is never written to the preference
+ *    cookie, so changing location or correcting a bad edge lookup self-heals.
  *  - Redirects only target translations that actually exist (LOCALIZED_PATHS).
  */
 export function decideLangRouting(input: {
@@ -196,7 +198,7 @@ export function decideLangRouting(input: {
   return {
     lang,
     redirectTo: translatable && lang !== pageLang ? localizedPath(basePath, lang) : null,
-    // Persist a first visit's geo-settled language so the choice is stable.
-    setCookie: cookie === null,
+    // Automatic geo detection is deliberately never persisted.
+    setCookie: false,
   };
 }

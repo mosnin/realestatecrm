@@ -14,7 +14,6 @@ import {
   Band,
   BlurRise,
   Eyebrow,
-  EyebrowPill,
   Serif,
   PillPrimary,
   PillGhost,
@@ -46,9 +45,6 @@ export default async function CareersPage() {
             <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
           </div>
           <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
-            <BlurRise trigger="load">
-              <EyebrowPill>{t.heroEyebrow}</EyebrowPill>
-            </BlurRise>
             <BlurRise trigger="load" delay={0.08}>
               <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
                 {t.heroHeadline}

@@ -1,7 +1,7 @@
 /**
  * Account language preference route — the setting that lets a US-English
  * account switch to Spanish/Russian. Asserts the auth gate, input validation,
- * the User-row update scoped by clerkId, the chippi_lang cookie pin, and the
+ * the User-row update scoped by clerkId, the explicit preference cookie, and the
  * pre-migration honesty contract (cookie still set, persisted:false — never a
  * 500 while prod is ahead of the language-column migration).
  */
@@ -103,7 +103,7 @@ describe('POST /api/settings/language', () => {
     expect(await res.json()).toEqual({ ok: true, persisted: true });
     expect(db.lastUpdate).toEqual({ language: 'es' });
     expect(db.lastEq).toEqual(['clerkId', 'clerk_user_1']);
-    expect(res.headers.get('set-cookie')).toContain('chippi_lang=es');
+    expect(res.headers.get('set-cookie')).toContain('chippi_lang_pref=es');
   });
 
   it('pre-migration: DB error still sets the cookie and reports persisted:false', async () => {
@@ -111,6 +111,6 @@ describe('POST /api/settings/language', () => {
     const res = await post({ language: 'ru' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, persisted: false });
-    expect(res.headers.get('set-cookie')).toContain('chippi_lang=ru');
+    expect(res.headers.get('set-cookie')).toContain('chippi_lang_pref=ru');
   });
 });

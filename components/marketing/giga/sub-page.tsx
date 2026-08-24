@@ -7,7 +7,7 @@
  * high-fidelity placeholders in the reference aesthetic.
  */
 
-import { BlurRise, EyebrowPill, Eyebrow, PillPrimary, PillGhost, Serif, Band } from './primitives';
+import { BlurRise, Eyebrow, PillPrimary, PillGhost, Serif, Band } from './primitives';
 import { FEATURE_ICONS, type FeatureIconName } from './icons';
 
 export interface SubFeature {
@@ -41,9 +41,6 @@ export function SubPageHero({
       </div>
 
       <div className="mx-auto max-w-4xl px-5 pb-24 pt-40 text-center sm:px-8 sm:pb-28 sm:pt-48">
-        <BlurRise trigger="load" delay={0.05}>
-          <EyebrowPill>{eyebrow}</EyebrowPill>
-        </BlurRise>
         <BlurRise trigger="load" delay={0.15}>
           <Serif
             as="h1"

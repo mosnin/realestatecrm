@@ -7,7 +7,7 @@
  */
 
 import { CalendlyEmbed } from '@/components/marketing/giga/calendly-embed';
-import { Band, BlurRise, EyebrowPill, Serif } from '@/components/marketing/giga/primitives';
+import { Band, BlurRise, Serif } from '@/components/marketing/giga/primitives';
 import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
 import { getRequestLang } from '@/lib/i18n/request';
 import type { Metadata } from 'next';
@@ -30,9 +30,6 @@ export default async function DemoPage() {
           <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_38%,transparent_35%,rgba(10,10,10,0.6)_100%)]" />
         </div>
         <Band className="pt-40 pb-10 text-center sm:pt-44">
-          <BlurRise trigger="load">
-            <EyebrowPill>{t.eyebrow}</EyebrowPill>
-          </BlurRise>
           <BlurRise trigger="load" delay={0.08}>
             <Serif as="h1" className="mx-auto mt-7 max-w-3xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
               {t.headline}

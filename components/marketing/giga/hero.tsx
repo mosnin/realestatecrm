@@ -4,7 +4,7 @@
  * Hero, the full-bleed, cinematic opener (reference-matched).
  *
  * A full-bleed photographic background (real-estate / architecture placeholder)
- * under dark gradient scrims. Centered: a glassy eyebrow pill, a HUGE two-line
+ * under dark gradient scrims. Centered: a simple gradient introduction, a HUGE two-line
  * thin serif headline (clamped ~40→92px, light weight, tight leading), a
  * one-line muted subhead, and a white rounded-full pill CTA. A small glassy
  * capability band fades in along the very bottom. Every element blur-rises in
@@ -12,8 +12,7 @@
  * entrance language); respects prefers-reduced-motion via BlurRise.
  */
 
-import { BlurRise, EyebrowPill, Mono } from './primitives';
-import { ShimmeringText } from '@/components/ui/shimmering-text';
+import { BlurRise, Mono } from './primitives';
 import { LogosCarousel } from '@/components/ui/logos-carousel';
 import { HeroChat } from './hero-chat';
 import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
@@ -41,15 +40,9 @@ export function Hero({ lang = 'en' }: { lang?: Lang }) {
       {/* Centered headline stack */}
       <div className="mx-auto flex min-h-[100svh] max-w-4xl flex-col items-center justify-center px-5 pb-32 pt-28 text-center sm:px-8">
         <BlurRise trigger="load" delay={0.05}>
-          <EyebrowPill>
-            {/* Slow light-sweep across the eyebrow — the one place the hero
-                shimmers. Tuned quiet: white-on-white/50, 2.4s cycle. */}
-            <ShimmeringText
-              text={t.hero.eyebrow}
-              duration={2.4}
-              className="[--color:rgba(255,255,255,0.55)] [--shimmering-color:#ffffff]"
-            />
-          </EyebrowPill>
+          <p className="bg-gradient-to-r from-[#ff7a45] via-[#d878f2] to-[#a96df5] bg-clip-text text-xl font-semibold tracking-tight text-transparent sm:text-2xl">
+            {t.hero.intro}
+          </p>
         </BlurRise>
 
         <BlurRise trigger="load" delay={0.15}>

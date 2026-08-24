@@ -28,7 +28,7 @@ describe('marketing claims', () => {
     expect(source).not.toContain('Trusted across modern brokerages');
     expect(source).not.toContain("'Compass'");
     expect(source).not.toContain("'RE/MAX'");
-    expect(source).toContain('Your AI lead conversion teammate');
+    expect(source).toContain('Introducing Chippi');
   });
 
   it('does not publish illustrative job openings in any market', () => {
