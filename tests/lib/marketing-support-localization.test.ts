@@ -42,6 +42,11 @@ describe('supporting marketing localization', () => {
     }
   });
 
+  it('forces a full document navigation when the visitor changes language', () => {
+    const switcher = source('components/marketing/local-price.tsx');
+    expect(switcher).toContain('window.location.assign(href)');
+  });
+
   it('keeps supporting page prices annual first and local currency aware', () => {
     const teaser = source('components/marketing/giga/pricing-teaser.tsx');
     expect(teaser).toContain('ANNUAL_FACTOR = 0.8');

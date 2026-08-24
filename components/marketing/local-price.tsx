@@ -106,19 +106,29 @@ export function CurrencyNote({ lang, className }: { lang: Lang; className?: stri
 export function LangSwitcher({ current, basePath }: { current: Lang; basePath: string }) {
   return (
     <nav aria-label="Language" className="flex items-center justify-center gap-3 text-[12px]">
-      {LANGS.filter(isLang).map((l) => (
-        <a
-          key={l}
-          href={`${localizedPath(basePath, l)}?hl=${l}`}
-          className={
-            l === current
-              ? 'font-medium text-neutral-900 dark:text-white'
-              : 'text-neutral-400 transition-colors hover:text-neutral-700 dark:text-white/40 dark:hover:text-white/70'
-          }
-        >
-          {LANG_LABELS[l]}
-        </a>
-      ))}
+      {LANGS.filter(isLang).map((l) => {
+        const href = `${localizedPath(basePath, l)}?hl=${l}`;
+        return (
+          <a
+            key={l}
+            href={href}
+            onClick={(event) => {
+              // A locale change must rebuild the root Clerk provider with the
+              // new localization. Force a document navigation instead of
+              // allowing an app-router transition to retain the old locale.
+              event.preventDefault();
+              window.location.assign(href);
+            }}
+            className={
+              l === current
+                ? 'font-medium text-neutral-900 dark:text-white'
+                : 'text-neutral-400 transition-colors hover:text-neutral-700 dark:text-white/40 dark:hover:text-white/70'
+            }
+          >
+            {LANG_LABELS[l]}
+          </a>
+        );
+      })}
     </nav>
   );
 }
