@@ -14,65 +14,67 @@ import {
 } from '@/components/marketing/giga/chippi-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import { isAnnualAvailable } from '@/lib/plans';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Meet Chippi',
-  description:
-    'Meet the AI lead conversion teammate for real estate. Chippi reads every inquiry, ranks intent, drafts replies, books tours, and keeps the CRM current.',
-};
+const FEATURE_ICONS = ['Inbox', 'MessagesSquare', 'CalendarCheck'] as const;
 
-export default function MeetChippiPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].chippi;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
+
+export default async function MeetChippiPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].chippi;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Meet Chippi"
+          label={t.hero.label}
           labelIcon="LayoutGrid"
           headline={
             <>
-              One teammate from
-              <br className="hidden sm:block" /> inquiry to booked tour.
+              {t.hero.headline[0]}
+              <br className="hidden sm:block" /> {t.hero.headline[1]}
             </>
           }
-          description="Chippi works across your inbox, calendar, and CRM. It reads, ranks, drafts, books, and logs the next move. You decide what may send."
+          description={t.hero.description}
           features={[
-            { icon: 'Inbox', title: 'Reads every inquiry', desc: 'New leads arrive with their history and next move in context.' },
-            { icon: 'MessagesSquare', title: 'Drafts in your voice', desc: 'Send through your own connected inbox when you are ready.' },
-            { icon: 'CalendarCheck', title: 'Books the tour', desc: 'Times come from your real availability, not a separate calendar.' },
+            { ...t.hero.features[0]!, icon: FEATURE_ICONS[0] },
+            { ...t.hero.features[1]!, icon: FEATURE_ICONS[1] },
+            { ...t.hero.features[2]!, icon: FEATURE_ICONS[2] },
           ]}
           image="/marketing/chippi-hero.jpg"
           variant="chippi"
           mockupSrc="/marketing/hero/chippi-dashboard.svg"
-          mockupAlt="The Chippi workspace — Chippi at work on the book"
+          mockupAlt={t.hero.mockupAlt}
         />
-        <ChippiReadsShowcase />
-        <ChippiDecidesShowcase />
-        <ChippiActsShowcase />
+        {lang === 'en' ? (
+          <>
+            <ChippiReadsShowcase />
+            <ChippiDecidesShowcase />
+            <ChippiActsShowcase />
+          </>
+        ) : null}
         <PricingTeaser
+          lang={lang}
+          annualEnabled={isAnnualAvailable('solo') && isAnnualAvailable('team')}
           headline={
             <>
-              One teammate.
-              <br className="hidden sm:block" /> From a desk to a floor.
+              {t.pricingHeadline[0]}
+              <br className="hidden sm:block" /> {t.pricingHeadline[1]}
             </>
           }
           plans={[
-            {
-              name: 'Solo',
-              price: '$97',
-              blurb: 'For the agent putting Chippi on their book.',
-              features: ['1 seat', '3,000 workflow credits / mo', 'Every Chippi feature'],
-            },
-            {
-              name: 'Team',
-              price: '$497',
-              blurb: 'For the brokerage running the whole floor on Chippi.',
-              features: ['5 seats included', '24,000 workflow credits / mo', '+$79 per extra seat'],
-              featured: true,
-            },
+            { id: 'solo' },
+            { id: 'team', featured: true },
           ]}
         />
       </div>
-      <CtaSection />
+      <CtaSection lang={lang} />
     </>
   );
 }
