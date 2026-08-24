@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClerkProvider } from '@clerk/nextjs';
+import { esES } from '@clerk/localizations/es-ES';
+import { ruRU } from '@clerk/localizations/ru-RU';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AmplitudeProvider } from '@/components/amplitude-provider';
 import { MotionProvider } from '@/components/motion/motion-provider';
@@ -58,6 +60,11 @@ export default async function RootLayout({
   const isPublicPage = h.get('x-public-page') === '1';
   const requestedLang = h.get('x-language');
   const documentLang = isLang(requestedLang) ? LANG_TAG[requestedLang] : 'en-US';
+  const clerkLocalization = requestedLang === 'es'
+    ? esES
+    : requestedLang === 'ru'
+      ? ruRU
+      : undefined;
 
   const renderShell = (body: React.ReactNode) => (
     <html lang={documentLang} suppressHydrationWarning>
@@ -85,7 +92,7 @@ export default async function RootLayout({
 
   if (isPublicPage) return renderShell(children);
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={clerkLocalization}>
       <SentryUser />
       {renderShell(children)}
     </ClerkProvider>
