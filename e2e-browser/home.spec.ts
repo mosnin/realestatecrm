@@ -38,3 +38,37 @@ test('marketing sign in navigation keeps the auth provider mounted', async ({ pa
   await expect(page.getByRole('heading', { name: 'Welcome back, real estate agent.' })).toBeVisible();
   await expect(page.getByText('Something broke.')).toHaveCount(0);
 });
+
+test('homepage proof band stays contained on a phone viewport', async ({ page }) => {
+  await blockExternalRequests(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const response = await page.goto('/');
+  expect(response, 'homepage should respond').toBeTruthy();
+  expect(response!.status()).toBe(200);
+
+  const proofBand = page.getByTestId('homepage-proof-band');
+  const values = ['Read', 'Ranked', 'Booked'].map((value) =>
+    proofBand.getByText(value, { exact: true }),
+  );
+  await values[0].scrollIntoViewIfNeeded();
+
+  const boxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+  for (const value of values) {
+    await expect(value).toBeVisible();
+    const box = await value.boundingBox();
+    expect(box, 'proof value should have a rendered box').toBeTruthy();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    boxes.push(box!);
+  }
+
+  expect(boxes[0].y).toBeLessThan(boxes[1].y);
+  expect(boxes[1].y).toBeLessThan(boxes[2].y);
+
+  const viewport = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+});
