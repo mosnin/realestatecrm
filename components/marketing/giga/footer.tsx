@@ -10,11 +10,12 @@ import Link from 'next/link';
 import AnimatedGradientBackground from '@/components/ui/animated-gradient-background';
 import { CHROME_DICTS } from '@/lib/i18n/dictionaries/chrome';
 import { localizedPath, type Lang } from '@/lib/i18n/markets';
+import { LangSwitcher } from '@/components/marketing/local-price';
 
 const COLUMN_HREFS = [
-  ['/agents', '/brokerages', '/integrations', '/pricing', '/sign-up'],
+  ['/agents', '/brokerages', '/integrations', '/pricing'],
   ['/company', '/demo', '/login/realtor'],
-  ['/help', '/status', '/privacy', '/terms'],
+  ['/help', '/research', '/status', '/privacy', '/terms'],
 ];
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
 
@@ -104,6 +105,7 @@ export function SiteFooter({ lang = 'en' }: { lang?: Lang }) {
             <p className="text-xs text-neutral-400 dark:text-white/40">
               &copy; {new Date().getFullYear()} Chippi, Inc. {copy.rights}
             </p>
+            <LangSwitcher current={lang} basePath="/" />
             <div className="flex items-center gap-5">
               <a
                 href="https://x.com/usechippi"

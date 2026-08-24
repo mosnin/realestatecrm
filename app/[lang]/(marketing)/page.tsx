@@ -4,7 +4,10 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Hero } from '@/components/marketing/giga/hero';
 import { Stats } from '@/components/marketing/giga/stats';
-import { HomeMechanism } from '@/components/marketing/giga/home-mechanism';
+import { AgentCanvas } from '@/components/marketing/giga/agent-canvas';
+import { RealtorShowcase } from '@/components/marketing/giga/realtor-showcase';
+import { BrokerageShowcase } from '@/components/marketing/giga/brokerage-showcase';
+import { Complexity } from '@/components/marketing/giga/complexity';
 import { CtaSection } from '@/components/marketing/giga/cta';
 import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
 import { hreflangAlternates } from '@/lib/i18n/metadata';
@@ -41,7 +44,10 @@ export default async function LocalizedHome({
       <div className="dark bg-[#0a0a0a] text-white">
         <Hero lang={lang} />
         <Stats lang={lang} />
-        <HomeMechanism lang={lang} />
+        <AgentCanvas />
+        <RealtorShowcase />
+        <BrokerageShowcase />
+        <Complexity />
       </div>
       <CtaSection lang={lang} />
     </>

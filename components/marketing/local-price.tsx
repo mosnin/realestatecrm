@@ -14,7 +14,6 @@
  */
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
   CURRENCY_COOKIE,
   DEFAULT_CURRENCY,
@@ -102,23 +101,23 @@ export function CurrencyNote({ lang, className }: { lang: Lang; className?: stri
 
 /**
  * Minimal language switcher. Links carry `?hl=` so the middleware re-pins the
- * `chippi_lang` cookie — the explicit choice then wins over geo everywhere.
+ * explicit preference cookie — the explicit choice then wins over geo everywhere.
  */
 export function LangSwitcher({ current, basePath }: { current: Lang; basePath: string }) {
   return (
     <nav aria-label="Language" className="flex items-center justify-center gap-3 text-[12px]">
       {LANGS.filter(isLang).map((l) => (
-        <Link
+        <a
           key={l}
           href={`${localizedPath(basePath, l)}?hl=${l}`}
           className={
             l === current
-              ? 'font-medium text-white'
-              : 'text-white/40 transition-colors hover:text-white/70'
+              ? 'font-medium text-neutral-900 dark:text-white'
+              : 'text-neutral-400 transition-colors hover:text-neutral-700 dark:text-white/40 dark:hover:text-white/70'
           }
         >
           {LANG_LABELS[l]}
-        </Link>
+        </a>
       ))}
     </nav>
   );

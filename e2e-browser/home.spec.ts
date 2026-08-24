@@ -5,7 +5,7 @@ import { blockExternalRequests, collectUnexpectedErrors } from './helpers';
  * Marketing homepage — the front door. Real render + hydration + navigation:
  *   - the hero headline is actually painted (not a blank/errored shell),
  *   - hydration produces no console errors of severity error,
- *   - the header's primary CTA ("Start free") really reaches sign-up.
+ *   - the restored header CTA ("See a demo") really reaches the demo page.
  */
 test('marketing home renders the hero and the primary CTA navigates', async ({ page }) => {
   await blockExternalRequests(page);
@@ -21,8 +21,20 @@ test('marketing home renders the hero and the primary CTA navigates', async ({ p
   ).toBeVisible();
   expect(errors, 'no unexpected console/page errors on the marketing homepage').toEqual([]);
 
-  // Primary CTA in the sticky header starts the self-serve conversion path.
-  await page.getByRole('link', { name: 'Start free' }).first().click();
-  await page.waitForURL('**/sign-up');
-  expect(new URL(page.url()).pathname).toBe('/sign-up');
+  // Preserve the original sticky-header action and destination.
+  await page.getByRole('link', { name: 'See a demo' }).first().click();
+  await page.waitForURL('**/demo');
+  expect(new URL(page.url()).pathname).toBe('/demo');
+});
+
+test('marketing sign in navigation keeps the auth provider mounted', async ({ page }) => {
+  await blockExternalRequests(page);
+
+  const response = await page.goto('/');
+  expect(response, 'homepage should respond').toBeTruthy();
+  await page.getByRole('link', { name: 'Sign in' }).first().click();
+  await page.waitForURL('**/login/realtor');
+
+  await expect(page.getByRole('heading', { name: 'Welcome back, real estate agent.' })).toBeVisible();
+  await expect(page.getByText('Something broke.')).toHaveCount(0);
 });

@@ -6,9 +6,8 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { BODY_MUTED, QUIET_LINK } from '@/lib/typography';
 import { cn } from '@/lib/utils';
-import { cookies } from 'next/headers';
 import { AUTH_DICTS } from '@/lib/i18n/dictionaries/auth';
-import { isLang, LANG_COOKIE } from '@/lib/i18n/markets';
+import { getRequestLang } from '@/lib/i18n/request';
 
 export const metadata: Metadata = { title: 'Sign Up — Chippi' };
 
@@ -18,8 +17,7 @@ export default async function SignUpPage({
   searchParams: Promise<{ intent?: string; redirect_url?: string }>;
 }) {
   const { intent, redirect_url } = await searchParams;
-  const cookieLang = (await cookies()).get(LANG_COOKIE)?.value;
-  const lang = isLang(cookieLang) ? cookieLang : 'en';
+  const lang = await getRequestLang();
   const copy = AUTH_DICTS[lang].signup;
   const isBroker = intent === 'broker';
   const redirectIntent = isBroker ? 'broker' : 'realtor';

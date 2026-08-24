@@ -18,5 +18,6 @@ describe('root metadata and market localization', () => {
     expect(source).toContain("formFieldInputPlaceholder__signUpPassword: 'Crea una contraseña'");
     expect(source).toContain("formFieldInputPlaceholder__signUpPassword: 'Создайте пароль'");
     expect(source).toContain('<ClerkProvider localization={clerkLocalization}>');
+    expect(source).not.toContain('if (isPublicPage) return renderShell(children)');
   });
 });

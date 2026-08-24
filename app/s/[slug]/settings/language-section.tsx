@@ -3,7 +3,7 @@
 /**
  * Language preference — lets a user switch their account language (e.g. a US
  * English account to Spanish). Saves to the User row via
- * /api/settings/language, which also pins the `chippi_lang` cookie so the
+ * /api/settings/language, which also pins an explicit preference cookie so the
  * public site follows the choice immediately on this browser.
  *
  * Honest-UI note: today the language applies to Chippi's public website

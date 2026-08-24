@@ -53,11 +53,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Public-facing pages (intake, booking, status) set this header in
-  // middleware so we can skip ClerkProvider entirely — prevents Clerk's
-  // client-side JS from loading and prompting visitors to sign in.
   const h = await headers();
-  const isPublicPage = h.get('x-public-page') === '1';
   const requestedLang = h.get('x-language');
   const documentLang = isLang(requestedLang) ? LANG_TAG[requestedLang] : 'en-US';
   const clerkLocalization = requestedLang === 'es'
@@ -96,7 +92,9 @@ export default async function RootLayout({
     </html>
   );
 
-  if (isPublicPage) return renderShell(children);
+  // Keep the provider topology stable across client-side navigation. When the
+  // homepage omitted ClerkProvider, clicking Sign in reused that root layout
+  // and Clerk hooks crashed before the auth screen could render.
   return (
     <ClerkProvider localization={clerkLocalization}>
       <SentryUser />

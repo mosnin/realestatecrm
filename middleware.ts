@@ -147,9 +147,9 @@ export default clerkMiddleware(async (auth, request) => {
         : NextResponse.next({ request: { headers } });
       const cookieOpts = { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' as const };
       if (setCookie) res.cookies.set(LANG_COOKIE, lang, cookieOpts);
-      if (!request.cookies.get(CURRENCY_COOKIE)) {
-        res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
-      }
+      // Currency follows the current IP on every public request. It is display
+      // state, not a durable preference, so a location change self-corrects.
+      res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
       return res;
     }
     return NextResponse.next({ request: { headers } });
@@ -183,9 +183,7 @@ export default clerkMiddleware(async (auth, request) => {
       : NextResponse.next({ request: { headers } });
     const cookieOpts = { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax' as const };
     if (setCookie) res.cookies.set(LANG_COOKIE, lang, cookieOpts);
-    if (!request.cookies.get(CURRENCY_COOKIE)) {
-      res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
-    }
+    res.cookies.set(CURRENCY_COOKIE, resolveMarket(country).currency, cookieOpts);
     return res;
   }
 
@@ -276,8 +274,23 @@ export default clerkMiddleware(async (auth, request) => {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', pathname);
   if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login')) {
+    const explicit = request.nextUrl.searchParams.get('hl');
     const cookieLang = request.cookies.get(LANG_COOKIE)?.value;
-    if (isLang(cookieLang)) requestHeaders.set('x-language', cookieLang);
+    const lang = isLang(explicit)
+      ? explicit
+      : isLang(cookieLang)
+        ? cookieLang
+        : resolveMarket(request.headers.get('x-vercel-ip-country')).lang;
+    requestHeaders.set('x-language', lang);
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    if (isLang(explicit) && explicit !== cookieLang) {
+      res.cookies.set(LANG_COOKIE, explicit, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+      });
+    }
+    return res;
   }
   return NextResponse.next({
     request: {

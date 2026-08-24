@@ -29,7 +29,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { EASE_OUT } from '@/lib/motion';
-import { BlurRise, Eyebrow, EyebrowPill, Serif, PillPrimary, PillGhost } from './primitives';
+import { BlurRise, Eyebrow, Serif, PillPrimary, PillGhost } from './primitives';
 import { ChippiCircuit } from '@/components/experience/chippi-circuit';
 
 const MONO = { fontFamily: 'var(--font-mono-display), ui-monospace, monospace' } as const;
@@ -152,7 +152,6 @@ export function HelpCenter() {
               height={171}
               className="mx-auto mb-8 h-6 w-auto"
             />
-            <EyebrowPill>Help Center</EyebrowPill>
           </BlurRise>
           <BlurRise trigger="load" delay={0.15}>
             <Serif

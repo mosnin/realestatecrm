@@ -9,9 +9,8 @@
  * translucent near-black blurred background + hairline border + soft shadow.
  *
  * Nav: two dropdowns, Product (Chippi, Agents, Brokerages, Integrations) and
- * Company (Our story, Help, Demo, Careers), each opening a frosted blurred
- * mega-menu, plus a plain Pricing link. Right cluster: Sign in + a direct
- * free-trial action. Mobile: a full-screen blurred takeover.
+ * Company (Our story, Help, Research, Careers), each opening a frosted blurred
+ * mega-menu, plus a plain Pricing link. Right cluster: Sign in + See a demo.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -35,7 +34,7 @@ import {
   Compass,
   Sprout,
   LifeBuoy,
-  PlayCircle,
+  Microscope,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EASE_OUT } from '@/lib/motion';
@@ -43,7 +42,7 @@ import { CHROME_DICTS } from '@/lib/i18n/dictionaries/chrome';
 import { localizedPath, type Lang } from '@/lib/i18n/markets';
 
 const SIGNIN = '/login/realtor';
-const START = '/sign-up';
+const DEMO = '/demo';
 
 interface MegaItem {
   icon: React.ElementType;
@@ -70,7 +69,7 @@ const PRODUCT_ITEMS = [
 const COMPANY_ITEMS = [
   { icon: Compass, href: '/company' },
   { icon: LifeBuoy, href: '/help' },
-  { icon: PlayCircle, href: '/demo' },
+  { icon: Microscope, href: '/research' },
   { icon: Sprout, href: '/careers' },
 ];
 
@@ -299,10 +298,10 @@ export function SiteHeader({ lang = 'en' }: { lang?: Lang }) {
               {copy.signIn}
             </Link>
             <Link
-              href={START}
+              href={DEMO}
               className="hidden h-9 items-center rounded-full bg-white px-4 text-sm font-medium text-black transition-all duration-200 hover:bg-white/90 active:scale-[0.98] lg:inline-flex"
             >
-              {copy.start}
+              {copy.demo}
             </Link>
             <button
               type="button"
@@ -399,11 +398,11 @@ export function SiteHeader({ lang = 'en' }: { lang?: Lang }) {
 
               <div className="space-y-3 border-t border-white/10 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5">
                 <Link
-                  href={START}
+                  href={DEMO}
                   onClick={closeAll}
                   className="flex h-12 w-full items-center justify-center gap-1.5 rounded-full bg-white text-sm font-medium text-black"
                 >
-                  {copy.startLong}
+                  {copy.demo}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link

@@ -9,7 +9,7 @@ const en = {
   metaTitle: 'Chippi · Turn more leads into booked tours',
   metaDescription: 'Chippi reads and ranks every inquiry. It drafts in your voice, books tours, and keeps the CRM current.',
   hero: {
-    eyebrow: 'Your AI lead conversion teammate',
+    intro: 'Introducing Chippi',
     line1: 'Turn more leads into',
     line2: 'booked tours.',
     sub: 'Chippi reads every inquiry and ranks who is ready. It drafts in your voice, books from your real calendar, and keeps the CRM current. You stay in control of what sends.',
@@ -21,6 +21,12 @@ const en = {
     demo: 'Book a live walkthrough',
     terms: 'Card required. Nothing charged until day 7. Cancel before then and pay nothing.',
     outcomes: ['Every inquiry read', 'Best leads ranked', 'Tours booked', 'Every action logged'],
+  },
+  chat: {
+    placeholder: 'Ask Chippi to draft a follow-up, prepare a tour, or find your best leads…',
+    askLabel: 'Ask Chippi',
+    examples: ['Draft a follow-up', 'Prepare me for a tour', 'Find my best leads'],
+    demo: 'or watch a 90-second demo →',
   },
   proof: {
     intro: 'The lead conversion loop stops depending on your memory. Chippi handles the chase. You keep the relationship.',
@@ -44,10 +50,9 @@ const en = {
   },
   closing: {
     eyebrow: 'Try it on your book',
-    headline: 'Give Chippi seven days.',
-    subheadline: 'Keep the deals. Lose the chase.',
+    headline: 'Ready to see Chippi',
+    flips: ['work your real leads?', 'rank the next call?', 'book the tour?', 'keep the CRM current?'],
     body: 'Connect your inbox and calendar. See Chippi read, rank, draft, and book against your real leads. Cancel before day 7 and pay nothing.',
-    start: 'Start free for 7 days',
     demo: 'Book a live walkthrough',
   },
 };
@@ -58,7 +63,7 @@ const es: HomeDict = {
   metaTitle: 'Chippi · Convierte más leads en visitas agendadas',
   metaDescription: 'Chippi lee y califica cada consulta. Escribe con tu voz, agenda visitas y actualiza el CRM.',
   hero: {
-    eyebrow: 'Tu asistente de IA para convertir leads',
+    intro: 'Te presentamos a Chippi',
     line1: 'Convierte más leads en',
     line2: 'visitas agendadas.',
     sub: 'Chippi lee cada consulta y muestra quién está listo. Escribe con tu voz, agenda desde tu calendario y actualiza el CRM. Tú decides qué se envía.',
@@ -70,6 +75,12 @@ const es: HomeDict = {
     demo: 'Agenda una demo en vivo',
     terms: 'Se requiere tarjeta. No cobramos hasta el día 7. Cancela antes y no pagas nada.',
     outcomes: ['Cada consulta leída', 'Mejores leads primero', 'Visitas agendadas', 'Cada acción registrada'],
+  },
+  chat: {
+    placeholder: 'Pídele a Chippi un seguimiento, preparar una visita o encontrar tus mejores leads…',
+    askLabel: 'Preguntar a Chippi',
+    examples: ['Escribe un seguimiento', 'Prepárame para una visita', 'Encuentra mis mejores leads'],
+    demo: 'o mira una demo de 90 segundos →',
   },
   proof: {
     intro: 'La conversión ya no depende de tu memoria. Chippi hace el seguimiento. Tú cuidas la relación.',
@@ -93,10 +104,9 @@ const es: HomeDict = {
   },
   closing: {
     eyebrow: 'Pruébalo con tus leads',
-    headline: 'Dale siete días a Chippi.',
-    subheadline: 'Quédate con los negocios. Deja el seguimiento.',
+    headline: 'Mira cómo Chippi',
+    flips: ['trabaja con tus leads.', 'prioriza la próxima llamada.', 'agenda la visita.', 'actualiza el CRM.'],
     body: 'Conecta tu correo y calendario. Mira cómo Chippi lee, califica, escribe y agenda con tus leads. Cancela antes del día 7 y no pagas nada.',
-    start: 'Prueba 7 días gratis',
     demo: 'Agenda una demo en vivo',
   },
 };
@@ -105,7 +115,7 @@ const ru: HomeDict = {
   metaTitle: 'Chippi · Больше лидов превращаются в показы',
   metaDescription: 'Chippi читает обращения, оценивает готовность, пишет в вашем стиле, назначает показы и обновляет CRM.',
   hero: {
-    eyebrow: 'Ваш ИИ-напарник по работе с лидами',
+    intro: 'Знакомьтесь: Chippi',
     line1: 'Превращайте больше лидов',
     line2: 'в назначенные показы.',
     sub: 'Chippi читает каждое обращение и показывает готовых клиентов. Пишет в вашем стиле, назначает время по календарю и обновляет CRM. Вы решаете, что отправлять.',
@@ -117,6 +127,12 @@ const ru: HomeDict = {
     demo: 'Записаться на живой показ',
     terms: 'Нужна карта. Списание только на 7-й день. Отмените раньше и ничего не платите.',
     outcomes: ['Каждое обращение прочитано', 'Лучшие лиды наверху', 'Показы назначены', 'Каждое действие записано'],
+  },
+  chat: {
+    placeholder: 'Попросите Chippi написать ответ, подготовить показ или найти лучшие лиды…',
+    askLabel: 'Спросить Chippi',
+    examples: ['Написать ответ', 'Подготовить меня к показу', 'Найти лучшие лиды'],
+    demo: 'или посмотреть 90-секундную демонстрацию →',
   },
   proof: {
     intro: 'Работа с лидами больше не зависит от памяти. Chippi ведёт процесс. Вы сохраняете отношения.',
@@ -140,10 +156,9 @@ const ru: HomeDict = {
   },
   closing: {
     eyebrow: 'Проверьте на своих лидах',
-    headline: 'Дайте Chippi семь дней.',
-    subheadline: 'Сделки остаются вам. Погоню берёт Chippi.',
+    headline: 'Посмотрите, как Chippi',
+    flips: ['работает с вашими лидами.', 'выбирает следующий звонок.', 'назначает показ.', 'обновляет CRM.'],
     body: 'Подключите почту и календарь. Смотрите, как Chippi читает, оценивает, пишет и назначает показы. Отмените до 7-го дня и ничего не платите.',
-    start: '7 дней бесплатно',
     demo: 'Записаться на живой показ',
   },
 };

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { EASE_OUT } from '@/lib/motion';
+import { TextFlip } from '@/components/ui/text-flip';
 import { HOME_DICTS } from '@/lib/i18n/dictionaries/home';
 import type { Lang } from '@/lib/i18n/markets';
 
@@ -42,7 +43,9 @@ export function CtaSection({ lang = 'en' }: { lang?: Lang }) {
           </span>
           <h2 className="mt-5 text-[clamp(2rem,4vw,3.5rem)] leading-[1.04] tracking-[-0.02em] text-neutral-900 dark:text-white">
             {t.headline}
-            <span className="block text-neutral-500 dark:text-white/55">{t.subheadline}</span>
+            <TextFlip as={motion.span} interval={2.8} className="block">
+              {t.flips.map((line) => <span key={line}>{line}</span>)}
+            </TextFlip>
           </h2>
         </motion.div>
 
@@ -50,21 +53,13 @@ export function CtaSection({ lang = 'en' }: { lang?: Lang }) {
           <p className="max-w-sm text-[13.5px] leading-relaxed text-neutral-600 dark:text-white/55">
             {t.body}
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/sign-up"
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-neutral-900 px-6 text-[14px] font-medium text-white transition-all duration-200 hover:bg-neutral-800 active:scale-[0.98] dark:bg-white dark:text-black dark:hover:bg-white/90"
-            >
-              {t.start}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/demo"
-              className="inline-flex h-11 items-center rounded-full border border-black/15 px-6 text-[14px] font-medium text-neutral-800 transition-colors hover:border-black/30 dark:border-white/20 dark:text-white dark:hover:border-white/40"
-            >
-              {t.demo}
-            </Link>
-          </div>
+          <Link
+            href="/demo"
+            className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-neutral-900 px-6 text-[14px] font-medium text-white transition-all duration-200 hover:bg-neutral-800 active:scale-[0.98] dark:bg-white dark:text-black dark:hover:bg-white/90"
+          >
+            {t.demo}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </motion.div>
       </div>
     </section>
