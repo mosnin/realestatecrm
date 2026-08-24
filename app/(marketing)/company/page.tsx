@@ -18,34 +18,18 @@ import {
   PillPrimary,
   PillGhost,
 } from '@/components/marketing/giga/primitives';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Our story · Chippi',
-  description:
-    'We built Chippi so real estate teams can work every lead without losing the human relationship that closes the deal.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].company;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
-/* Beliefs, the things we will not move on. */
-const BELIEFS = [
-  {
-    title: 'Configuration is failure to decide.',
-    body: 'Settings, toggles, customization layers, they are admissions the team could not pick. Picking is the work. We will not make your day harder so our spec was easier.',
-  },
-  {
-    title: 'Your rules control every send.',
-    body: 'You choose what Chippi may send automatically. Everything else waits for approval. Every action keeps an owner, a reason, and a receipt.',
-  },
-  {
-    title: 'Chippi has one voice.',
-    body: 'Wherever Chippi shows up, a draft card, a toast, an activity row, the same signature carries through. Nothing else does. It is how you learn to trust the agent across every surface.',
-  },
-  {
-    title: 'Proof before promises.',
-    body: 'No made-up returns. No invented time savings. We show the work, log the result, and let your own data make the case.',
-  },
-];
-
-export default function CompanyPage() {
+export default async function CompanyPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].company;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
@@ -59,25 +43,24 @@ export default function CompanyPage() {
           </div>
           <Band className="pt-40 pb-24 text-center sm:pt-48 sm:pb-28">
             <BlurRise trigger="load">
-              <EyebrowPill>Our story</EyebrowPill>
+              <EyebrowPill>{t.heroEyebrow}</EyebrowPill>
             </BlurRise>
             <BlurRise trigger="load" delay={0.08}>
               <Serif as="h1" className="mx-auto mt-7 max-w-4xl text-[clamp(2.25rem,5vw,4rem)] leading-[1.05] text-white">
-                More leads should not mean less time with clients.
+                {t.heroHeadline}
               </Serif>
             </BlurRise>
             <BlurRise trigger="load" delay={0.16}>
               <p className="mx-auto mt-7 max-w-xl text-[15px] leading-relaxed text-white/55">
-                We built Chippi to work the chase between an inquiry and a booked tour. Agents keep
-                the judgment, trust, and relationship that move the deal.
+                {t.heroBody}
               </p>
             </BlurRise>
             <BlurRise trigger="load" delay={0.24}>
               <div className="mt-9 flex flex-wrap justify-center gap-3">
                 <PillPrimary href="/demo" withArrow>
-                  See a demo
+                  {t.demo}
                 </PillPrimary>
-                <PillGhost href="/chippi">Meet Chippi</PillGhost>
+                <PillGhost href="/chippi">{t.meet}</PillGhost>
               </div>
             </BlurRise>
           </Band>
@@ -87,22 +70,15 @@ export default function CompanyPage() {
         <Band className="py-24 sm:py-28">
           <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
             <BlurRise>
-              <Eyebrow>The gap</Eyebrow>
+              <Eyebrow>{t.gapEyebrow}</Eyebrow>
               <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-                The leads kept coming.
-                <br className="hidden sm:block" /> The follow-up did not keep up.
+                {t.gapHeadline[0]}
+                <br className="hidden sm:block" /> {t.gapHeadline[1]}
               </Serif>
             </BlurRise>
             <BlurRise delay={0.1}>
               <div className="space-y-6 text-[15px] leading-relaxed text-white/60 lg:pt-2">
-                <p>
-                  An agent&apos;s day jumps between email, calendar, replies, follow-ups, and deal
-                  updates. The selling happens in the moments that need judgment and trust.
-                </p>
-                <p>
-                  The coordination around those moments should not depend on memory. Chippi exists to
-                  read the inquiry, prepare the next move, book the tour, and leave a clear record.
-                </p>
+                {t.gapBody.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
               </div>
             </BlurRise>
           </div>
@@ -111,13 +87,13 @@ export default function CompanyPage() {
         {/* Beliefs */}
         <Band className="py-24 sm:py-28">
           <BlurRise className="mx-auto max-w-2xl text-center">
-            <Eyebrow className="justify-center">What we believe</Eyebrow>
+            <Eyebrow className="justify-center">{t.beliefsEyebrow}</Eyebrow>
             <Serif className="mt-5 text-[clamp(1.75rem,3.4vw,2.75rem)] leading-[1.08] text-white">
-              A few things we will not move on.
+              {t.beliefsHeadline}
             </Serif>
           </BlurRise>
           <div className="mx-auto mt-14 grid max-w-4xl gap-5 sm:grid-cols-2">
-            {BELIEFS.map((b, i) => (
+            {t.beliefs.map((b, i) => (
               <BlurRise key={b.title} delay={i * 0.06}>
                 <div className="h-full rounded-3xl border border-white/[0.08] bg-white/[0.02] p-8">
                   <h3 style={{ fontFamily: 'var(--font-sans)' }} className="text-[16px] font-semibold text-white">
@@ -130,7 +106,7 @@ export default function CompanyPage() {
           </div>
         </Band>
       </div>
-      <CtaSection />
+      <CtaSection lang={lang} />
     </>
   );
 }
