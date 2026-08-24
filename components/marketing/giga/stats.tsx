@@ -24,14 +24,22 @@ export function Stats({ lang = 'en' }: { lang?: Lang }) {
         </BlurRise>
 
         <BlurRise delay={0.1}>
-          <div className="grid grid-cols-3 divide-x divide-white/[0.1]">
+          <div
+            data-testid="homepage-proof-band"
+            className="grid divide-y divide-white/[0.1] md:grid-cols-3 md:divide-x md:divide-y-0"
+          >
             {t.items.map((s) => (
-              <div key={s.label} className="px-5 first:pl-0 sm:px-10">
-                <Mono className="text-[10px] text-white/40">{s.label}</Mono>
+              <div
+                key={s.label}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-6 py-6 first:pt-0 last:pb-0 md:block md:px-6 md:py-0 md:first:pl-0 md:last:pr-0 xl:px-10"
+              >
+                <Mono className="max-w-[12rem] text-[10px] leading-relaxed text-white/40">
+                  {s.label}
+                </Mono>
                 <span
                   className={lang === 'en'
-                    ? 'mt-3 block text-[2.75rem] font-light leading-none tracking-tight tabular-nums text-white sm:text-[3.5rem] lg:text-[4.25rem]'
-                    : 'mt-3 block text-[clamp(1.2rem,2.8vw,2.75rem)] font-light leading-none tracking-tight text-white'}
+                    ? 'block whitespace-nowrap text-[2.5rem] font-light leading-none tracking-tight text-white md:mt-3 md:text-[clamp(2rem,5vw,3.5rem)] xl:text-[clamp(3.5rem,4.8vw,4.25rem)]'
+                    : 'block whitespace-nowrap text-[clamp(1.2rem,7vw,2.25rem)] font-light leading-none tracking-tight text-white md:mt-3 md:text-[clamp(1.2rem,3vw,2.75rem)]'}
                   style={{ fontFamily: 'var(--font-sans)' }}
                 >
                   {s.value}
