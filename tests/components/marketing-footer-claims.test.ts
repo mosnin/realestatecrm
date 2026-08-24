@@ -31,7 +31,7 @@ describe('marketing claims', () => {
     expect(source).toContain('Your AI lead conversion teammate');
   });
 
-  it('does not publish illustrative job openings', () => {
+  it('does not publish illustrative job openings in any market', () => {
     const careers = readFileSync('app/(marketing)/careers/page.tsx', 'utf8');
     const marketingCopy = readFileSync(
       'lib/i18n/dictionaries/marketing-pages.ts',
