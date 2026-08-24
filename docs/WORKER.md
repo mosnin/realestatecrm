@@ -124,13 +124,16 @@ that every minute field aligns to the */5 master tick. Redeploy the worker
 
 ## Notes
 
-- Vercel cron and Inngest cron are OFF: `vercel.json` declares no `crons`,
-  and the Inngest cron mirrors register only if `INNGEST_CRONS_ENABLED` is
-  set. Exactly one scheduler is live at a time — no double-ticking.
-  **Never set `INNGEST_CRONS_ENABLED` while the Worker is deployed**: both
-  carry the same job list, so every recurring job would fire twice (duplicate
-  reminders, duplicate sends). The readiness page reports that combination as
-  `down`.
+- The Worker is the production scheduler. Inngest cron mirrors register only
+  if `INNGEST_CRONS_ENABLED` is set. **Never set `INNGEST_CRONS_ENABLED`
+  while the Worker is deployed**: both carry the same job list, so every
+  recurring job would fire twice (duplicate reminders, duplicate sends). The
+  readiness page reports that combination as `down`.
+- `vercel.json` is **not** cron-empty. It keeps exactly three idempotent
+  recovery routes (`workspace-run-recovery`, `work-session-action-recovery`,
+  `conversation-turn-recovery`) as a belt-and-suspenders rail if a Worker
+  deploy is stale. Do not add more Vercel crons — `tests/lib/worker-schedule-parity.test.ts`
+  pins that list. The readiness page reports extra Vercel crons as `down`.
 - Inngest still carries the event-driven functions (scheduled posts, Composio
   triggers, work sessions) until those are migrated onto the tasks queue.
 - The Worker holds no DB credentials and no service-role key — it only calls

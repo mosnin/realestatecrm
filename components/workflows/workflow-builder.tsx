@@ -268,6 +268,9 @@ const ACTION_ORDER: WorkflowActionType[] = [
   'run_workflow',
 ];
 
+/** Delay is kept for existing steps only — async waits are not scheduled yet. */
+const ADDABLE_ACTIONS: WorkflowActionType[] = ACTION_ORDER.filter((t) => t !== 'delay');
+
 const ACTION_CATEGORIES: { label: string; keys: WorkflowActionType[] }[] = [
   {
     label: 'Actions',
@@ -305,7 +308,7 @@ const ACTION_DESCRIPTIONS: Record<WorkflowActionType, string> = {
   schedule_message: 'Queue an AI-drafted email to auto-send after a delay',
   create_task: 'Create a follow-up task for you or your team',
   run_chippi: 'Ask Chippi to research, summarize, or reason',
-  delay: 'Pause the workflow before the next step',
+  delay: 'Not available — waits are not scheduled yet (later steps would not run)',
   filter: 'Stop the run if a condition is not met',
   formatter: 'Transform text, numbers, or dates before the next step',
   webhook_post: 'POST JSON to any HTTPS endpoint — CRMs, Slack, or custom backends',
@@ -1441,13 +1444,14 @@ function AddStepPicker({
   const [category, setCategory] = useState<'All' | 'Actions' | 'Logic'>('All');
   const q = query.toLowerCase().trim();
 
-  const baseOrder = exclude ? ACTION_ORDER.filter((t) => !exclude.includes(t)) : ACTION_ORDER;
+  const hidden: WorkflowActionType[] = ['delay', ...(exclude ?? [])];
+  const baseOrder = ACTION_ORDER.filter((t) => !hidden.includes(t));
 
   const pool = q
     ? baseOrder
     : category === 'All'
       ? baseOrder
-      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys.filter((t) => !exclude?.includes(t)) ?? baseOrder);
+      : (ACTION_CATEGORIES.find((c) => c.label === category)?.keys.filter((t) => !hidden.includes(t)) ?? baseOrder);
 
   const filtered = q
     ? pool.filter(
@@ -1727,7 +1731,7 @@ function ActionZapCard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ACTION_ORDER.map((a) => (
+                  {(row.type === 'delay' ? ACTION_ORDER : ADDABLE_ACTIONS).map((a) => (
                     <SelectItem key={a} value={a}>
                       {ACTION_LABELS[a]}
                     </SelectItem>
@@ -4980,7 +4984,7 @@ function BranchActionConfig({
                             onValueChange={(v) =>
                               updateSubAction(path.id, subRow.id, { type: v as WorkflowActionType })
                             }
-                            options={ACTION_ORDER
+                            options={(subRow.type === 'delay' ? ACTION_ORDER : ADDABLE_ACTIONS)
                               .filter((t) => t !== 'branch')
                               .map((t) => ({ value: t, label: ACTION_LABELS[t] }))}
                           />
@@ -5375,7 +5379,9 @@ function ActionConfig({
     })() : null;
     return (
       <div className="space-y-2.5">
-        <p className={CAPTION}>Pause the automation before the next step runs.</p>
+        <p className={CAPTION}>
+          Wait is not scheduled yet. This step stops the run so later sends do not fire immediately. Remove it until async delays ship.
+        </p>
         {/* Mode toggle: relative / until weekday / until date */}
         <div className="flex items-center rounded-md border border-border/60 bg-background p-0.5 w-fit">
           {(['relative', 'until_weekday', 'until_date'] as const).map((m) => (

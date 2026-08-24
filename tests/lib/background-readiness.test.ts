@@ -135,6 +135,7 @@ describe('getBackgroundReadiness', () => {
     expect(report.overall).toBe('ok');
     expect(checkByKey(report.checks, 'worker').status).toBe('ok');
     expect(checkByKey(report.checks, 'scheduler-conflict').status).toBe('ok');
+    expect(checkByKey(report.checks, 'vercel-safety-rail').status).toBe('ok');
     expect(checkByKey(report.checks, 'executor').status).toBe('ok');
     expect(checkByKey(report.checks, 'chat-offload').status).toBe('ok');
     expect(checkByKey(report.checks, 'cron').status).toBe('ok');

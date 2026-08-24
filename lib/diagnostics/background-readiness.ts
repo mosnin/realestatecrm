@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase';
 import { redis, isRedisConfigured } from '@/lib/redis';
 import { workerHealth, readWorkerTick } from '@/lib/queue';
 import { CRON_MANIFEST } from '@/lib/inngest/cron-functions';
+import { VERCEL_SAFETY_RAIL_CRONS } from '@/lib/jobs/vercel-safety-rail';
 
 export type ReadinessStatus = 'ok' | 'degraded' | 'missing';
 
@@ -249,6 +250,25 @@ function checkSchedulerConflict(): ReadinessCheck {
     detail: inngestCrons
       ? 'Inngest cron mirrors are the active scheduler; the Cloudflare worker is not configured.'
       : 'Exactly one scheduler is active (the Cloudflare worker).',
+  };
+}
+
+/**
+ * Vercel may only host the three idempotent recovery routes. Extra crons
+ * would double-fire with the Worker. The list is imported from the same
+ * constant the parity test pins against vercel.json.
+ */
+function checkVercelSafetyRail(): ReadinessCheck {
+  const key = 'vercel-safety-rail';
+  const label = 'Vercel recovery safety rail';
+  const paths = VERCEL_SAFETY_RAIL_CRONS.map((c) => c.path).join(', ');
+  return {
+    key,
+    label,
+    status: 'ok',
+    detail:
+      `Vercel cron is limited to the three idempotent recovery routes (${paths}). ` +
+      'The Worker owns every other recurring job. Do not add more Vercel crons.',
   };
 }
 
@@ -499,6 +519,7 @@ export async function getBackgroundReadiness(spaceId?: string): Promise<Backgrou
   const checks: ReadinessCheck[] = [
     await checkWorker(),
     checkSchedulerConflict(),
+    checkVercelSafetyRail(),
     checkCron(),
     checkExecutor(),
     checkChatOffload(),

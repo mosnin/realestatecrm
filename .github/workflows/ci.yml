@@ -90,3 +90,26 @@ jobs:
             git diff docs/repo-map.generated.md
             exit 1
           fi
+
+  # Modal agent unit tests (pytest). Complements the TS suite; does not need
+  # a live database. SQL shell tests in tests/postgres/ stay local / secret-gated.
+  agent-pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install agent test dependencies
+        working-directory: agent
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -e .
+
+      - name: Agent unit tests
+        working-directory: agent
+        run: python -m pytest tests/ -q

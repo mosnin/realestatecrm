@@ -266,6 +266,7 @@ describe('branch action', () => {
       OPTS,
     );
     expect(result.status).toBe('ok');
-    expect(result.detail.stepsRun).toBe(3);
+    // Delay now halts — we do not skip the wait and run the next dummy steps.
+    expect(result.detail.stepsRun).toBe(1);
   });
 });

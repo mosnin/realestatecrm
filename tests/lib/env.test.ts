@@ -45,6 +45,9 @@ const CONTROLLED_OPTIONAL_KEYS = [
   'CHIPPI_CHAT_RUNTIME',
   'CHIPPI_REASONING_EFFORT',
   'OPENROUTER_API_KEY',
+  'TENANT_GUARD',
+  'TENANT_GUARD_ENFORCE',
+  'ACCOUNT_DELETION_HARD_DELETE',
 ] as const;
 
 describe('environment feature readiness warnings', () => {

@@ -1,7 +1,7 @@
 /**
  * GET /api/drip/tick
  *
- * Cron tick (every 30 min — see lib/inngest/cron-functions.ts). Discovers
+ * Cron tick (every 30 min — Cloudflare Worker `cron-drip-tick`). Discovers
  * every space with a live drip enrollment and advances each space's due
  * steps (lib/drip/engine.ts's advanceAllDueSpaces): stop-on-reply first, else
  * schedule the due step as a "ScheduledMessage" for the EXISTING

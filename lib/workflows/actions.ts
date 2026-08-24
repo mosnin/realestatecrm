@@ -464,11 +464,13 @@ function runDelay(
         : (delayMinutes ?? 1);
 
   return {
-    status: 'ok',
+    status: 'skipped',
+    stop: true,
     detail: {
       delayMode: mode,
       delayMinutes: computedMinutes,
-      note: 'Delay recorded. Async resumption is not yet active — subsequent steps ran immediately.',
+      note:
+        'Wait is not scheduled yet. Later steps were not run — we do not skip the wait and send immediately. Remove this step or wait until async delays ship (docs/FEATURE-FREEZE.md).',
     },
   };
 }

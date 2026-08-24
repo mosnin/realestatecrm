@@ -1095,7 +1095,7 @@ function ActionInspector({
         <MiniSelect
           value={action.type}
           onValueChange={(v) => setType(v as WorkflowActionType)}
-          options={ACTION_ORDER.map((a) => ({ value: a, label: ACTION_LABELS[a] }))}
+          options={(action.type === 'delay' ? ACTION_ORDER : ACTION_ORDER.filter((t) => t !== 'delay')).map((a) => ({ value: a, label: ACTION_LABELS[a] }))}
         />
       </div>
 

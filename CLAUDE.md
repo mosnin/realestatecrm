@@ -4,8 +4,10 @@ Real-estate CRM SaaS ("Chippi"): Next.js 15 App Router + React 19 on Vercel,
 Clerk auth, Supabase Postgres (service-role + manual `spaceId` scoping — RLS is
 defense-in-depth only), OpenAI Agents SDK (TS in `lib/ai-tools/`, Python on
 Modal in `agent/`), OpenRouter for all text LLM calls (`lib/llm.ts`), background
-work is Inngest (crons in `lib/inngest/cron-functions.ts` + events in
-`lib/inngest/functions.ts`) + Modal — Vercel cron removed.
+work is the Cloudflare Worker (`worker/`, `docs/WORKER.md`) for recurring
+jobs plus Inngest for **events only** (`lib/inngest/functions.ts`) and Modal
+for the agent. Do not set `INNGEST_CRONS_ENABLED` while the Worker is live.
+`vercel.json` keeps three idempotent recovery crons as a safety rail only.
 
 ## Product non-negotiables (do not regress these)
 

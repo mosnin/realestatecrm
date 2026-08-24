@@ -21,6 +21,13 @@ describe('workflow templates', () => {
     },
   );
 
+  it('does not ship Wait/Delay steps — those halt instead of waiting', () => {
+    for (const template of WORKFLOW_TEMPLATES) {
+      const delayActions = template.state.actions.filter((a) => a.type === 'delay');
+      expect(delayActions, template.id).toEqual([]);
+    }
+  });
+
   it('the branching template produces a non-linear graph (Advanced-locked)', () => {
     const t = WORKFLOW_TEMPLATES.find((x) => x.id === 'hot-vs-warm-branch');
     expect(t).toBeDefined();
