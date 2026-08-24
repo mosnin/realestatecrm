@@ -16,65 +16,66 @@ import {
 } from '@/components/marketing/giga/integrations-extra-showcases';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
+import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
+import { getRequestLang } from '@/lib/i18n/request';
+import { isAnnualAvailable } from '@/lib/plans';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Integrations · Chippi',
-  description:
-    'Keep the tools you already use. Chippi works across your inbox, calendar, CRM, and messaging without a rip and replace.',
-};
+const FEATURE_ICONS = ['Mail', 'Users', 'MessagesSquare'] as const;
 
-export default function IntegrationsPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const t = MARKETING_PAGE_DICTS[await getRequestLang()].integrations;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
+
+export default async function IntegrationsPage() {
+  const lang = await getRequestLang();
+  const t = MARKETING_PAGE_DICTS[lang].integrations;
   return (
     <>
       <div className="dark bg-[#0a0a0a] text-white">
         <SubHero
-          label="Integrations"
+          label={t.hero.label}
           labelIcon="Workflow"
           headline={
             <>
-              Keep your stack.
-              <br className="hidden sm:block" /> Add the teammate.
+              {t.hero.headline[0]}
+              <br className="hidden sm:block" /> {t.hero.headline[1]}
             </>
           }
-          description="Connect the apps you already pay for. Chippi reads the right context, completes the next move, and writes the result back where your team expects it."
+          description={t.hero.description}
           features={[
-            { icon: 'Mail', title: 'Email and calendar', desc: 'Gmail, Outlook, Google Calendar, and Calendly.' },
-            { icon: 'Users', title: 'Your CRM', desc: 'HubSpot, Salesforce, and Follow Up Boss, two-way.' },
-            { icon: 'MessagesSquare', title: 'Messaging', desc: 'WhatsApp and Slack. Documents live on the deal.' },
+            { ...t.hero.features[0]!, icon: FEATURE_ICONS[0] },
+            { ...t.hero.features[1]!, icon: FEATURE_ICONS[1] },
+            { ...t.hero.features[2]!, icon: FEATURE_ICONS[2] },
           ]}
           image="/marketing/integrations-hero.jpg"
           variant="integrations"
         />
-        <IntegrationsShowcase />
-        <IntegrationsDrift />
-        <IntegrationsSetupShowcase />
-        <IntegrationsAutomationShowcase />
+        {lang === 'en' ? (
+          <>
+            <IntegrationsShowcase />
+            <IntegrationsDrift />
+            <IntegrationsSetupShowcase />
+            <IntegrationsAutomationShowcase />
+          </>
+        ) : null}
         <PricingTeaser
-          eyebrow="Pricing"
+          lang={lang}
+          annualEnabled={isAnnualAvailable('solo') && isAnnualAvailable('team')}
           headline={
             <>
-              Every plan includes
-              <br className="hidden sm:block" /> every integration.
+              {t.pricingHeadline[0]}
+              <br className="hidden sm:block" /> {t.pricingHeadline[1]}
             </>
           }
           plans={[
-            {
-              name: 'Solo',
-              price: '$97',
-              blurb: 'For the agent connecting their first tools.',
-              features: ['1 seat', '3,000 workflow credits / mo', 'Every integration included'],
-            },
-            {
-              name: 'Team',
-              price: '$497',
-              blurb: 'For the floor running on a shared stack.',
-              features: ['5 seats included', '24,000 workflow credits / mo', '+$79 per extra seat'],
-              featured: true,
-            },
+            { id: 'solo' },
+            { id: 'team', featured: true },
           ]}
         />
       </div>
-      <CtaSection />
+      <CtaSection lang={lang} />
     </>
   );
 }
