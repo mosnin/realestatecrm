@@ -122,10 +122,10 @@ export const LANG_COOKIE = 'chippi_lang';
 export const CURRENCY_COOKIE = 'chippi_currency';
 
 /**
- * Marketing paths that exist in every language tree (`/pricing` ↔
- * `/es/pricing` ↔ `/ru/pricing`). The middleware only auto-redirects across
- * languages for paths in this list, so a page can't be redirected to a
- * translation that hasn't shipped yet. Grow this list as pages are localized.
+ * Marketing paths with canonical prefixed mirrors (`/pricing` ↔
+ * `/es/pricing` ↔ `/ru/pricing`). Supporting pages keep one stable URL and
+ * render the middleware-set `x-language` directly; only paths in this list
+ * participate in cross-language redirects.
  */
 export const LOCALIZED_PATHS: readonly string[] = ['/', '/pricing'];
 
