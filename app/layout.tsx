@@ -61,9 +61,15 @@ export default async function RootLayout({
   const requestedLang = h.get('x-language');
   const documentLang = isLang(requestedLang) ? LANG_TAG[requestedLang] : 'en-US';
   const clerkLocalization = requestedLang === 'es'
-    ? esES
+    ? {
+        ...esES,
+        formFieldInputPlaceholder__signUpPassword: 'Crea una contraseña',
+      }
     : requestedLang === 'ru'
-      ? ruRU
+      ? {
+          ...ruRU,
+          formFieldInputPlaceholder__signUpPassword: 'Создайте пароль',
+        }
       : undefined;
 
   const renderShell = (body: React.ReactNode) => (
