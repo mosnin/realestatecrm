@@ -9,7 +9,13 @@ import { cn } from '@/lib/utils';
 import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
-import type { NavItem, NavChild } from '@/lib/nav-items';
+import type { NavItem } from '@/lib/nav-items';
+import {
+  isNavChildActive,
+  isNavItemActive,
+  navItemOwnsMatch,
+  resolveNavActive,
+} from '@/lib/nav-active';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED } from '@/lib/geometry';
 import {
@@ -225,64 +231,6 @@ export const brokerMemberNavSections: BrokerNavSection[] = [
     ],
   },
 ];
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Helpers: determine active state for nav items and children
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function isChildActive(child: NavChild, pathname: string, base: string, searchParams?: string): boolean {
-  const [childPath, childQuery] = child.href.split('?');
-  const fullHref = `${base}${childPath}`;
-
-  // If the child has query params, match both pathname AND query params
-  if (childQuery) {
-    if (pathname !== fullHref && !pathname.startsWith(fullHref + '/')) return false;
-    // Compare query params
-    const childParams = new URLSearchParams(childQuery);
-    const currentParams = new URLSearchParams(searchParams || '');
-    for (const [key, value] of childParams.entries()) {
-      if (currentParams.get(key) !== value) return false;
-    }
-    return true;
-  }
-
-  // No query params — use path matching
-  if (child.exact) {
-    return pathname === fullHref && !searchParams;
-  }
-  return pathname.startsWith(fullHref);
-}
-
-/** Returns true if the current pathname belongs to this item or any of its children. */
-function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean {
-  if (item.href === '') {
-    return pathname === base;
-  }
-  if (item.children) {
-    // Check children first — some children like /form-analytics don't share the parent prefix
-    const childMatch = item.children.some((child) => {
-      const childPath = child.href.split('?')[0];
-      const fullChildPath = `${base}${childPath}`;
-      return child.exact
-        ? pathname === fullChildPath
-        : pathname.startsWith(fullChildPath);
-    });
-    if (childMatch) return true;
-  }
-  // An `exact` parent only owns its own exact route — used by the broker
-  // Chippi entry (/broker), whose href is a prefix of every other broker
-  // route. Without this, a prefix match would light up Chippi on every
-  // broker page.
-  if (item.exact) {
-    return pathname === `${base}${item.href}`;
-  }
-  // A sub-route promoted to its own nav row (Today at /chippi/brief) is
-  // disclaimed by the parent so the two rows never light up together.
-  if (item.excludePaths?.some((p) => pathname.startsWith(`${base}${p}`))) {
-    return false;
-  }
-  return pathname.startsWith(`${base}${item.href}`);
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Section label (used in broker nav)
@@ -1177,30 +1125,6 @@ function RealtorNav({
   const reducedMotion = useReducedMotion() ?? false;
   const settingsItem = realtorNavItems.find((item) => item.href === '/settings')!;
 
-  // Accordion: at most one parent is expanded at a time. The parent that
-  // owns the active route auto-expands; if no parent owns it, everyone
-  // stays collapsed. Computed from pathname so route changes (incl. soft
-  // navigations) keep the open section in sync without a separate effect.
-  const findActiveParentKey = (): string | null => {
-    for (const item of realtorNavItems) {
-      if (item.children?.length && doesItemOwnPath(item, pathname, base)) {
-        return item.href;
-      }
-    }
-    return null;
-  };
-  const [expandedKey, setExpandedKey] = useState<string | null>(findActiveParentKey);
-
-  useEffect(() => {
-    const next = findActiveParentKey();
-    // Only auto-set if the route actually maps to a parent. If the user
-    // navigates to a leaf that lives outside any parent (e.g. /contacts),
-    // leave whatever they last opened alone — closing it on every nav
-    // would feel hostile.
-    if (next) setExpandedKey(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, base]);
-
   // AI-related items always sit at the top
   const aiItems = realtorNavItems.filter((item) => item.isAI);
   // CORE — the daily doors, in canonical lib/nav-items.ts order: Today,
@@ -1237,9 +1161,41 @@ function RealtorNav({
     });
   }
 
+  // Every row this sidebar actually renders, in render order — the input to
+  // active-state resolution. A row the realtor can't see must not win a route
+  // away from one they can.
+  const renderedNavItems = [
+    ...aiItems,
+    ...coreItems,
+    ...moreItems,
+    ...realtorMoreNavItems,
+    settingsItem,
+  ];
+  // The ONE selected nav target for this route. Resolved across the whole tree
+  // so a route reachable from two rows (a promoted sub-route, a dropdown child
+  // pointing at another row's page) selects exactly one of them.
+  const navMatch = resolveNavActive(renderedNavItems, pathname, base, searchParamsString);
+
+  // Accordion: at most one parent is expanded at a time. The parent that
+  // owns the active route auto-expands; if no parent owns it, everyone
+  // stays collapsed. Derived from the resolved match so route changes (incl.
+  // soft navigations) keep the open section in sync.
+  const activeParentKey =
+    renderedNavItems.find((item) => item.children?.length && navItemOwnsMatch(item, navMatch))
+      ?.href ?? null;
+  const [expandedKey, setExpandedKey] = useState<string | null>(activeParentKey);
+
+  useEffect(() => {
+    // Only auto-set if the route actually maps to a parent. If the user
+    // navigates to a leaf that lives outside any parent (e.g. /contacts),
+    // leave whatever they last opened alone — closing it on every nav
+    // would feel hostile.
+    if (activeParentKey) setExpandedKey(activeParentKey);
+  }, [activeParentKey]);
+
   // More disclosure state: closed by default (the whole point), auto-open
   // when the active route lives inside it, manual choice remembered.
-  const moreOwnsPath = moreItems.some((item) => doesItemOwnPath(item, pathname, base));
+  const moreOwnsPath = moreItems.some((item) => navItemOwnsMatch(item, navMatch));
   // The server cannot see localStorage. Reading it in the state initializer
   // made the server render More collapsed while a returning browser rendered
   // it expanded on the first client pass, forcing every realtor route through
@@ -1350,14 +1306,19 @@ function RealtorNav({
 
   const renderItem = (item: NavItem) => {
     const hasChildren = !!(item.children && item.children.length > 0);
+    const isExpanded = hasChildren && expandedKey === item.href;
     return (
       <SidebarNavItem
         key={item.href}
         item={item}
         base={base}
-        isActive={doesItemOwnPath(item, pathname, base)}
-        isExpanded={hasChildren && expandedKey === item.href}
-        isChildActive={(child) => isChildActive(child, pathname, base, searchParamsString)}
+        // When a child row is on screen and owns the route, the child carries
+        // the highlight — the parent doesn't double up on it.
+        isActive={isNavItemActive(item, navMatch, {
+          childrenVisible: isExpanded && !collapsed,
+        })}
+        isExpanded={isExpanded}
+        isChildActive={(child) => isNavChildActive(item, child, navMatch)}
         onToggle={handleToggle(item.href)}
         badge={getBadge(item)}
         badgeText={getBadgeText(item)}
@@ -1371,7 +1332,7 @@ function RealtorNav({
       href: `${base}${child.href}`,
       label: `${item.label} · ${child.label}`,
       icon: item.icon,
-      isActive: isChildActive(child, pathname, base, searchParamsString),
+      isActive: isNavChildActive(item, child, navMatch),
     }));
   const hiddenRailItems = [...moreItems, ...realtorMoreNavItems];
   const railMoreLinks: SidebarRailLink[] = [
@@ -1381,7 +1342,9 @@ function RealtorNav({
         href: `${base}${item.href}`,
         label: item.label,
         icon: item.icon,
-        isActive: doesItemOwnPath(item, pathname, base),
+        // Rail rows have no visible children, so the row itself carries the
+        // selection for anything it owns.
+        isActive: navItemOwnsMatch(item, navMatch),
         badgeText: getBadgeText(item),
       },
       ...childRailLinks(item),
@@ -1515,9 +1478,9 @@ function RealtorNav({
         <SidebarNavItem
           item={settingsItem}
           base={base}
-          isActive={doesItemOwnPath(settingsItem, pathname, base)}
+          isActive={isNavItemActive(settingsItem, navMatch)}
           isExpanded={false}
-          isChildActive={(child) => isChildActive(child, pathname, base, searchParamsString)}
+          isChildActive={(child) => isNavChildActive(settingsItem, child, navMatch)}
           onToggle={handleToggle(settingsItem.href)}
           collapsed={collapsed}
         />
@@ -1571,38 +1534,40 @@ export function Sidebar({
   // RealtorNav. Declared here (not inside the broker branch) because that
   // branch returns early and hooks must not live after a conditional return.
   // base is "" for the broker nav (its hrefs are already absolute, e.g.
-  // /broker/leads), so doesItemOwnPath is called with base "" below.
+  // /broker/leads), so the resolver is called with base "" below.
   const brokerSections =
     brokerageRole === 'realtor_member'
       ? brokerMemberNavSections
       : brokerAdminNavSections;
-  const findBrokerActiveParentKey = (): string | null => {
-    for (const section of brokerSections) {
-      for (const item of section.items) {
-        if (item.children?.length && doesItemOwnPath(item, pathname, '')) {
-          return item.href;
-        }
-      }
-    }
-    return null;
-  };
-  const [brokerExpandedKey, setBrokerExpandedKey] = useState<string | null>(
-    findBrokerActiveParentKey,
-  );
-  useEffect(() => {
-    const next = findBrokerActiveParentKey();
-    // Same as RealtorNav: only auto-open when the route maps to a parent.
-    // Navigating to a leaf outside any parent leaves the user's last-opened
-    // section alone rather than collapsing it on every navigation.
-    if (next) setBrokerExpandedKey(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, brokerageRole]);
-  const handleBrokerToggle = (key: string) => () =>
-    setBrokerExpandedKey((prev) => (prev === key ? null : key));
   const canManageBrokerage =
     brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin';
   const isVisibleBrokerItem = (item: BrokerNavItem) =>
     !item.adminOnly || canManageBrokerage;
+  // Only the rows this broker can actually see take part in resolution — an
+  // admin-only row must not win a route away from a row a member can reach.
+  const brokerVisibleItems = brokerSections
+    .flatMap((section) => section.items)
+    .filter(isVisibleBrokerItem);
+  // One selected row per route. The broker Chippi dropdown deliberately
+  // cross-links routes that other rows own (Today → /broker/brief, Inbox →
+  // /broker/reviews); the resolver hands those routes to the owning row, so
+  // the Chippi group no longer lights up alongside them.
+  const brokerMatch = resolveNavActive(brokerVisibleItems, pathname, '', searchParamsString);
+  const brokerActiveParentKey =
+    brokerVisibleItems.find(
+      (item) => item.children?.length && navItemOwnsMatch(item, brokerMatch),
+    )?.href ?? null;
+  const [brokerExpandedKey, setBrokerExpandedKey] = useState<string | null>(
+    brokerActiveParentKey,
+  );
+  useEffect(() => {
+    // Same as RealtorNav: only auto-open when the route maps to a parent.
+    // Navigating to a leaf outside any parent leaves the user's last-opened
+    // section alone rather than collapsing it on every navigation.
+    if (brokerActiveParentKey) setBrokerExpandedKey(brokerActiveParentKey);
+  }, [brokerActiveParentKey]);
+  const handleBrokerToggle = (key: string) => () =>
+    setBrokerExpandedKey((prev) => (prev === key ? null : key));
   const brokerPrimaryItems = (brokerSections[0]?.items ?? []).filter(isVisibleBrokerItem);
   const brokerSettingsItem = brokerPrimaryItems.find(
     (item) => item.href === '/broker/settings',
@@ -1625,7 +1590,7 @@ export function Sidebar({
         href: child.href,
         label: `${item.label} · ${child.label}`,
         icon: item.icon,
-        isActive: isChildActive(child, pathname, '', searchParamsString),
+        isActive: isNavChildActive(item, child, brokerMatch),
       }));
   const brokerRailMoreLinks: SidebarRailLink[] = [
     ...brokerCoreItems.flatMap(brokerChildRailLinks),
@@ -1634,7 +1599,7 @@ export function Sidebar({
         href: item.href,
         label: item.label,
         icon: item.icon,
-        isActive: doesItemOwnPath(item, pathname, ''),
+        isActive: navItemOwnsMatch(item, brokerMatch),
       },
       ...brokerChildRailLinks(item),
     ]),
@@ -1780,11 +1745,9 @@ export function Sidebar({
                     item={item}
                     base=""
                     collapsed
-                    isActive={doesItemOwnPath(item, pathname, '')}
+                    isActive={navItemOwnsMatch(item, brokerMatch)}
                     isExpanded={false}
-                    isChildActive={(child) =>
-                      isChildActive(child, pathname, '', searchParamsString)
-                    }
+                    isChildActive={(child) => isNavChildActive(item, child, brokerMatch)}
                     onToggle={handleBrokerToggle(item.href)}
                   />
                 ))}
@@ -1794,11 +1757,9 @@ export function Sidebar({
                     item={brokerSettingsItem}
                     base=""
                     collapsed
-                    isActive={doesItemOwnPath(brokerSettingsItem, pathname, '')}
+                    isActive={navItemOwnsMatch(brokerSettingsItem, brokerMatch)}
                     isExpanded={false}
-                    isChildActive={(child) =>
-                      isChildActive(child, pathname, '', searchParamsString)
-                    }
+                    isChildActive={(child) => isNavChildActive(brokerSettingsItem, child, brokerMatch)}
                     onToggle={handleBrokerToggle(brokerSettingsItem.href)}
                   />
                 )}
@@ -1812,18 +1773,18 @@ export function Sidebar({
                     <div key={section.label}>
                       <SectionLabel>{section.label}</SectionLabel>
                       {visibleItems.map((item) => {
-                        const isActive = doesItemOwnPath(item, pathname, '');
                         const hasChildren = !!item.children?.length;
+                        const isExpanded = hasChildren && brokerExpandedKey === item.href;
                         return (
                           <SidebarNavItem
                             key={item.href}
                             item={item}
                             base=""
-                            isActive={isActive}
-                            isExpanded={hasChildren && brokerExpandedKey === item.href}
-                            isChildActive={(child) =>
-                              isChildActive(child, pathname, '', searchParamsString)
-                            }
+                            isActive={isNavItemActive(item, brokerMatch, {
+                              childrenVisible: isExpanded,
+                            })}
+                            isExpanded={isExpanded}
+                            isChildActive={(child) => isNavChildActive(item, child, brokerMatch)}
                             onToggle={handleBrokerToggle(item.href)}
                           />
                         );

@@ -20,7 +20,13 @@ import { useTheme } from '@/components/theme-provider';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrandLogo } from '@/components/brand-logo';
 import { secondaryNavItems, realtorNavItems } from '@/lib/nav-items';
-import type { NavChild, NavItem } from '@/lib/nav-items';
+import type { NavItem } from '@/lib/nav-items';
+import {
+  isNavChildActive,
+  isNavItemActive,
+  navItemOwnsMatch,
+  resolveNavActive,
+} from '@/lib/nav-active';
 import { SECTION_LABEL } from '@/lib/typography';
 import { SidebarConversations } from '@/components/dashboard/sidebar-conversations';
 import { SidebarNavItem } from '@/components/dashboard/sidebar-nav-item';
@@ -68,32 +74,6 @@ interface HeaderProps {
   isPlatformAdmin?: boolean;
 }
 
-/** Returns true if the pathname belongs to this item or any of its children.
- *  Mirrors the desktop sidebar's helper so accordion auto-expansion is
- *  computed the same way on both viewports. */
-function doesItemOwnPath(item: NavItem, pathname: string, base: string): boolean {
-  if (item.children?.length) {
-    const childOwns = item.children.some((child) => {
-      const childPath = child.href.split('?')[0];
-      const fullChildPath = `${base}${childPath}`;
-      return child.exact
-        ? pathname === fullChildPath
-        : pathname.startsWith(fullChildPath);
-    });
-    if (childOwns) return true;
-  }
-  return pathname.startsWith(`${base}${item.href}`);
-}
-
-/** Lightweight child-active match for the mobile drawer. Realtor children
- *  today don't carry query params, so the desktop's query-string branch
- *  isn't needed here. If that changes, swap this for the shared helper. */
-function isMobileChildActive(child: NavChild, pathname: string, base: string): boolean {
-  const fullHref = `${base}${child.href.split('?')[0]}`;
-  if (child.exact) return pathname === fullHref;
-  return pathname === fullHref || pathname.startsWith(`${fullHref}/`);
-}
-
 export function Header({ slug, spaceId, spaceName, title, accountName = null, isBroker = false, isBrokerOnly = false, brokerageName = null, brokerageRole = null, isPlatformAdmin = false }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -131,25 +111,26 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
     return () => window.removeEventListener(CHIPPI_SIDEBAR_REVEAL_EVENT, revealHistory);
   }, [isOnChatRoot]);
 
+  // Active nav row for the drawer — resolved through the SAME helper the
+  // desktop sidebar uses, so one route selects exactly one row on both
+  // viewports. The drawer has no search-param context (reading it here would
+  // force a Suspense boundary on every dashboard route), so query-scoped
+  // children like "New workflow" (/automations?new=1) simply don't claim the
+  // selection on mobile; their parent row does.
+  const navMatch = resolveNavActive(realtorNavItems, pathname, base);
+
   // Accordion expansion state for the mobile drawer — same contract as the
   // desktop sidebar: at most one parent open at a time, auto-expand the
   // parent that owns the current route. Closing the drawer doesn't reset
   // this; reopening reflects whatever route the realtor is on now.
-  const findActiveParentKey = (): string | null => {
-    for (const item of realtorNavItems) {
-      if (item.children?.length && doesItemOwnPath(item, pathname, base)) {
-        return item.href;
-      }
-    }
-    return null;
-  };
-  const [expandedKey, setExpandedKey] = useState<string | null>(findActiveParentKey);
+  const activeParentKey =
+    realtorNavItems.find((item) => item.children?.length && navItemOwnsMatch(item, navMatch))
+      ?.href ?? null;
+  const [expandedKey, setExpandedKey] = useState<string | null>(activeParentKey);
 
   useEffect(() => {
-    const next = findActiveParentKey();
-    if (next) setExpandedKey(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, base]);
+    if (activeParentKey) setExpandedKey(activeParentKey);
+  }, [activeParentKey]);
 
   const handleToggle = (key: string) => () =>
     setExpandedKey((prev) => (prev === key ? null : key));
@@ -159,24 +140,24 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
   // the shared broker nav sections (base="" since broker hrefs are absolute).
   const brokerSections =
     brokerageRole === 'realtor_member' ? brokerMemberNavSections : brokerAdminNavSections;
-  const findBrokerActiveParentKey = (): string | null => {
-    for (const section of brokerSections) {
-      for (const item of section.items) {
-        if (item.children?.length && doesItemOwnPath(item, pathname, '')) {
-          return item.href;
-        }
-      }
-    }
-    return null;
-  };
+  const canManageBrokerage =
+    brokerageRole === 'broker_owner' || brokerageRole === 'broker_admin';
+  const isVisibleBrokerItem = (item: NavItem & { adminOnly?: boolean }) =>
+    !item.adminOnly || canManageBrokerage;
+  const brokerVisibleItems = brokerSections
+    .flatMap((section) => section.items)
+    .filter(isVisibleBrokerItem);
+  const brokerMatch = resolveNavActive(brokerVisibleItems, pathname, '');
+  const brokerActiveParentKey =
+    brokerVisibleItems.find(
+      (item) => item.children?.length && navItemOwnsMatch(item, brokerMatch),
+    )?.href ?? null;
   const [brokerExpandedKey, setBrokerExpandedKey] = useState<string | null>(
-    findBrokerActiveParentKey,
+    brokerActiveParentKey,
   );
   useEffect(() => {
-    const next = findBrokerActiveParentKey();
-    if (next) setBrokerExpandedKey(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, brokerageRole]);
+    if (brokerActiveParentKey) setBrokerExpandedKey(brokerActiveParentKey);
+  }, [brokerActiveParentKey]);
   const handleBrokerToggle = (key: string) => () =>
     setBrokerExpandedKey((prev) => (prev === key ? null : key));
 
@@ -313,14 +294,17 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
                   <div className="space-y-0.5">
                     {realtorNavItems.map((item) => {
                       const hasChildren = !!item.children?.length;
+                      const isExpanded = hasChildren && expandedKey === item.href;
                       return (
                         <SidebarNavItem
                           key={item.href}
                           item={item}
                           base={base}
-                          isActive={doesItemOwnPath(item, pathname, base)}
-                          isExpanded={hasChildren && expandedKey === item.href}
-                          isChildActive={(child) => isMobileChildActive(child, pathname, base)}
+                          isActive={isNavItemActive(item, navMatch, {
+                            childrenVisible: isExpanded,
+                          })}
+                          isExpanded={isExpanded}
+                          isChildActive={(child) => isNavChildActive(item, child, navMatch)}
                           onToggle={handleToggle(item.href)}
                           onNavigate={closeDrawer}
                         />
@@ -339,12 +323,7 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
               {isBroker && showBrokerMobileNavOnly && (
                 <div className="space-y-3">
                   {brokerSections.map((section) => {
-                    const visibleItems = section.items.filter(
-                      (item) =>
-                        !item.adminOnly ||
-                        brokerageRole === 'broker_owner' ||
-                        brokerageRole === 'broker_admin',
-                    );
+                    const visibleItems = section.items.filter(isVisibleBrokerItem);
                     if (visibleItems.length === 0) return null;
                     return (
                       <div key={section.label || 'primary'} className="space-y-0.5">
@@ -353,14 +332,17 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
                         ) : null}
                         {visibleItems.map((item) => {
                           const hasChildren = !!item.children?.length;
+                          const isExpanded = hasChildren && brokerExpandedKey === item.href;
                           return (
                             <SidebarNavItem
                               key={item.href}
                               item={item}
                               base=""
-                              isActive={doesItemOwnPath(item, pathname, '')}
-                              isExpanded={hasChildren && brokerExpandedKey === item.href}
-                              isChildActive={(child) => isMobileChildActive(child, pathname, '')}
+                              isActive={isNavItemActive(item, brokerMatch, {
+                                childrenVisible: isExpanded,
+                              })}
+                              isExpanded={isExpanded}
+                              isChildActive={(child) => isNavChildActive(item, child, brokerMatch)}
                               onToggle={handleBrokerToggle(item.href)}
                               onNavigate={closeDrawer}
                             />
