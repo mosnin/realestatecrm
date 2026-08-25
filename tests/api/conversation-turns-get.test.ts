@@ -24,8 +24,10 @@ const state = vi.hoisted(() => ({
   } as Record<string, unknown> | null,
   blockers: [] as Array<Record<string, unknown>>,
   pending: [] as Array<Record<string, unknown>>,
+  pausedRuns: [] as Array<Record<string, unknown>>,
   blockersError: null as unknown,
   pendingError: null as unknown,
+  pausedError: null as unknown,
 }));
 
 vi.mock('@/lib/api-auth', () => ({
@@ -72,6 +74,9 @@ vi.mock('@/lib/supabase', () => {
         if (filters.eqStatus === 'pending') {
           return Promise.resolve({ data: state.pending, error: state.pendingError }).then(resolve, reject);
         }
+      }
+      if (table === 'AgentPausedRun') {
+        return Promise.resolve({ data: state.pausedRuns, error: state.pausedError }).then(resolve, reject);
       }
       return Promise.resolve({ data: [], error: null }).then(resolve, reject);
     };
@@ -129,8 +134,10 @@ beforeEach(() => {
   };
   state.blockers = [];
   state.pending = [];
+  state.pausedRuns = [];
   state.blockersError = null;
   state.pendingError = null;
+  state.pausedError = null;
 });
 
 describe('GET /api/ai/turns queue reconciliation', () => {
@@ -179,5 +186,51 @@ describe('GET /api/ai/turns queue reconciliation', () => {
     state.conversation = null;
     expect((await GET(request('missing'))).status).toBe(404);
     expect(recoverMock).not.toHaveBeenCalled();
+  });
+
+  it('restores the approval card for a paused turn from AgentPausedRun', async () => {
+    state.blockers = [turn({ id: 'paused-1', status: 'paused' })];
+    state.pausedRuns = [{
+      id: 'pause-row-1',
+      status: 'pending',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      turnId: 'paused-1',
+      conversationId: 'conversation-1',
+      createdAt: '2026-08-25T11:00:00.000Z',
+      approvals: [{
+        callId: 'call-1',
+        toolName: 'send_email',
+        arguments: { toEmail: 'pat@example.com' },
+        summary: 'Send an email to Pat',
+      }],
+    }];
+
+    const response = await GET(request('conversation-1'));
+    const body = await response.json() as {
+      turns: Array<{ id: string; status: string }>;
+      pendingApproval: { requestId: string; name: string; summary: string } | null;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.turns[0]).toMatchObject({ id: 'paused-1', status: 'paused' });
+    expect(body.pendingApproval).toEqual({
+      requestId: 'pause-row-1',
+      callId: 'call-1',
+      name: 'send_email',
+      args: { toEmail: 'pat@example.com' },
+      summary: 'Send an email to Pat',
+    });
+    expect(events).toContain('AgentPausedRun');
+  });
+
+  it('does not query paused runs when the queue has no paused turn', async () => {
+    state.pending = [turn({ id: 'p1' })];
+
+    const response = await GET(request('conversation-1'));
+    const body = await response.json() as { pendingApproval: unknown };
+
+    expect(response.status).toBe(200);
+    expect(body.pendingApproval).toBeNull();
+    expect(events).not.toContain('AgentPausedRun');
   });
 });

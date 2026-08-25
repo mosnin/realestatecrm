@@ -16,6 +16,11 @@ import {
   type ConversationTurnAttachment,
   type ConversationTurnRecord,
 } from '@/lib/chat/turn-control';
+import {
+  pendingApprovalFromPausedRun,
+  pickPausedRunForTurn,
+  type RestoredPendingApproval,
+} from '@/lib/chat/restore-pending-approval';
 
 export const runtime = 'nodejs';
 
@@ -95,7 +100,39 @@ export async function GET(req: NextRequest) {
   }
   const turns = [...(blockers.data ?? []), ...(pending.data ?? [])]
     .map((turn) => ({ ...(turn as unknown as Record<string, unknown>), lastError: null })) as unknown as ConversationTurnRecord[];
-  return NextResponse.json({ turns });
+
+  // A paused turn holds the queue until the realtor decides. After reload the
+  // SSE `permission_required` event is gone, so restore the checkpoint here
+  // or the composer stays locked with no Approve/Deny card.
+  let pendingApproval: RestoredPendingApproval | null = null;
+  const pausedTurn = turns.find((turn) => turn.status === 'paused');
+  if (pausedTurn) {
+    const { data: pausedRows, error: pausedError } = await tenantTable(
+      supabase,
+      'AgentPausedRun',
+      { spaceId: bound.space.id },
+    )
+      .select('id, status, expiresAt, approvals, turnId, conversationId, createdAt')
+      .eq('conversationId', conversationId)
+      .eq('status', 'pending')
+      .order('createdAt', { ascending: false })
+      .limit(10);
+    if (!pausedError) {
+      const rows = (pausedRows ?? []) as Array<{
+        id: string;
+        status: string;
+        expiresAt: string | null;
+        approvals: unknown;
+        turnId?: string | null;
+        conversationId: string | null;
+        createdAt?: string;
+      }>;
+      const chosen = pickPausedRunForTurn(rows, pausedTurn.id);
+      pendingApproval = chosen ? pendingApprovalFromPausedRun(chosen) : null;
+    }
+  }
+
+  return NextResponse.json({ turns, pendingApproval });
 }
 
 export async function POST(req: NextRequest) {
