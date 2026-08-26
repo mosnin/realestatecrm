@@ -1,55 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { formConfigSchema } from '@/lib/form-config-schema';
-import type {
-  IntakeFormConfig,
-  FormQuestion,
-} from '@/lib/types';
+import type { IntakeFormConfig } from '@/lib/types';
+import { generateSystemFields } from '@/lib/form-contact-step';
 
-// ── Stable IDs for system fields ──
-// These IDs MUST match the Zod schema superRefine check in form-config-schema.ts
-// which validates that system fields with ids 'name', 'email', 'phone' are present.
-const SYSTEM_NAME_ID = 'name';
-const SYSTEM_EMAIL_ID = 'email';
-const SYSTEM_PHONE_ID = 'phone';
-
-// ── System field generator ──
-
-/** Returns the three required system fields (name, email, phone) with system: true */
-export function generateSystemFields(): FormQuestion[] {
-  return [
-    {
-      id: SYSTEM_NAME_ID,
-      type: 'text',
-      label: 'What should I call you?',
-      placeholder: 'Alex Johnson',
-      required: true,
-      position: 0,
-      system: true,
-      validation: { minLength: 1, maxLength: 120 },
-    },
-    {
-      id: SYSTEM_EMAIL_ID,
-      type: 'email',
-      label: "What's the best email to reach you?",
-      placeholder: 'alex@email.com',
-      required: true,
-      position: 1,
-      system: true,
-      validation: { maxLength: 255 },
-    },
-    {
-      id: SYSTEM_PHONE_ID,
-      type: 'phone',
-      label: 'And a phone number?',
-      placeholder: '(555) 123-4567',
-      required: true,
-      position: 2,
-      system: true,
-      validation: { maxLength: 40 },
-    },
-  ];
-}
+export { generateSystemFields } from '@/lib/form-contact-step';
+export {
+  applyCaptureContactStep,
+  isCaptureContactStepEnabled,
+} from '@/lib/form-contact-step';
 
 // ── Default Rental Form Config ──
 // The 10-question rental intake used when a realtor hasn't customized

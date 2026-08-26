@@ -2,6 +2,12 @@ export interface IntakeFormConfig {
   version: number;
   leadType: 'rental' | 'buyer' | 'general';
   sections: FormSection[];
+  /**
+   * When omitted or true, the public intake asks name + email + phone
+   * together as the first bundled step. When false, that step is skipped
+   * and the three system questions may be absent from the config.
+   */
+  captureContactStep?: boolean;
 }
 
 export interface FormSection {

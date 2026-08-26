@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formConfigSchema } from '@/lib/form-config-schema';
+import { formConfigSchema, isCaptureContactStepEnabled } from '@/lib/form-config-schema';
 import {
   RENTAL_APPLICATION_TEMPLATE,
   BUYER_INQUIRY_TEMPLATE,
@@ -31,6 +31,15 @@ describe('built-in form templates', () => {
     expect(RENTAL_APPLICATION_TEMPLATE.leadType).toBe('rental');
     expect(BUYER_INQUIRY_TEMPLATE.leadType).toBe('buyer');
     expect(GENERAL_LEAD_CAPTURE_TEMPLATE.leadType).toBe('general');
+  });
+
+  it('defaults the contact step ON (flag omitted) and still includes name/email/phone', () => {
+    for (const { config } of FORM_TEMPLATES) {
+      expect(config.captureContactStep).toBeUndefined();
+      expect(isCaptureContactStepEnabled(config)).toBe(true);
+      const ids = config.sections.flatMap((s) => s.questions.map((q) => q.id));
+      expect(ids).toEqual(expect.arrayContaining(['name', 'email', 'phone']));
+    }
   });
 });
 

@@ -3,7 +3,8 @@
  *
  * Validates:
  *   - At least one section with at least one question
- *   - System fields (name, email, phone) present and required
+ *   - System fields (name, email, phone) present and required when
+ *     captureContactStep is omitted or true (default ON)
  *   - Unique question IDs across all sections
  *   - Valid non-negative positions
  *   - Options required for select/radio/multi_select types
@@ -88,13 +89,27 @@ const formSectionSchema = z.object({
 
 // ── Full form config ──────────────────────────────────────────────────────────
 
+export const SYSTEM_CONTACT_FIELD_IDS = ['name', 'email', 'phone'] as const;
+
+/** Omit / undefined / true = ON. Only an explicit `false` turns the step off. */
+export function isCaptureContactStepEnabled(
+  config: { captureContactStep?: boolean } | null | undefined,
+): boolean {
+  return config?.captureContactStep !== false;
+}
+
+export function isSystemContactFieldId(id: string): boolean {
+  return (SYSTEM_CONTACT_FIELD_IDS as readonly string[]).includes(id);
+}
+
 export const formConfigSchema = z
   .object({
     version: z.number().int().positive(),
     leadType: z.enum(['rental', 'buyer', 'general']),
     sections: z.array(formSectionSchema).min(1, 'At least one section is required').max(50),
+    captureContactStep: z.boolean().optional(),
   })
-  .superRefine((config: { version: number; leadType: string; sections: z.infer<typeof formSectionSchema>[] }, ctx: z.RefinementCtx) => {
+  .superRefine((config, ctx: z.RefinementCtx) => {
     // Collect all question IDs and check for duplicates
     const allQuestionIds = new Set<string>();
     const allQuestions: z.infer<typeof formQuestionSchema>[] = [];
@@ -113,29 +128,27 @@ export const formConfigSchema = z
       }
     }
 
-    // Ensure system fields exist and are required
-    const systemFields = [
-      { id: 'name', label: 'name' },
-      { id: 'email', label: 'email' },
-      { id: 'phone', label: 'phone' },
-    ];
-
-    for (const field of systemFields) {
-      const systemQuestion = allQuestions.find(
-        (q) => q.id === field.id && q.system === true,
-      );
-      if (!systemQuestion) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `System field "${field.id}" must be present with system: true`,
-          path: ['sections'],
-        });
-      } else if (!systemQuestion.required) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `System field "${field.id}" must be required`,
-          path: ['sections'],
-        });
+    // When the bundled contact step is ON (default), the three system fields
+    // must be present, marked system: true, and required. When the realtor
+    // turns the step OFF, those questions may be omitted entirely.
+    if (isCaptureContactStepEnabled(config)) {
+      for (const fieldId of SYSTEM_CONTACT_FIELD_IDS) {
+        const systemQuestion = allQuestions.find(
+          (q) => q.id === fieldId && q.system === true,
+        );
+        if (!systemQuestion) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `System field "${fieldId}" must be present with system: true`,
+            path: ['sections'],
+          });
+        } else if (!systemQuestion.required) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `System field "${fieldId}" must be required`,
+            path: ['sections'],
+          });
+        }
       }
     }
 
@@ -175,14 +188,13 @@ export const formConfigSchema = z
     }
 
     // Validate section-level visibleWhen
-    const SYSTEM_FIELD_IDS = ['name', 'email', 'phone'];
     for (let si = 0; si < config.sections.length; si++) {
       const section = config.sections[si];
       if (!section.visibleWhen) continue;
 
       // Sections containing system fields must not have visibleWhen
       const hasSystemField = section.questions.some(
-        (q) => q.system || SYSTEM_FIELD_IDS.includes(q.id),
+        (q) => q.system || isSystemContactFieldId(q.id),
       );
       if (hasSystemField) {
         ctx.addIssue({

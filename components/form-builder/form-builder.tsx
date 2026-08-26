@@ -48,6 +48,10 @@ import {
 import { QUESTION_TYPES, getQuestionTypeConfig } from './question-types';
 import { H3, SECTION_LABEL } from '@/lib/typography';
 import type { IntakeFormConfig, FormSection, FormQuestion } from './types';
+import {
+  applyCaptureContactStep,
+  isCaptureContactStepEnabled,
+} from '@/lib/form-contact-step';
 
 // ── Helpers ──
 
@@ -1107,8 +1111,44 @@ export function FormBuilder({ config, onChange }: FormBuilderProps) {
     [config.sections, updateSections],
   );
 
+  const contactStepOn = isCaptureContactStepEnabled(config);
+
+  const handleContactStepToggle = useCallback(
+    (enabled: boolean) => {
+      const next = applyCaptureContactStep(config, enabled);
+      const stillSelected =
+        selectedId != null &&
+        (next.sections.some((section) => section.id === selectedId) ||
+          next.sections.some((section) =>
+            section.questions.some((question) => question.id === selectedId),
+          ));
+      if (!stillSelected) {
+        setSelectedId(null);
+      }
+      onChange(next);
+    },
+    [config, onChange, selectedId],
+  );
+
   return (
     <div className="relative">
+      <div className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-border/70 bg-background px-4 py-3">
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor="capture-contact-step" className="text-sm font-medium">
+            Ask for name, email, and phone first
+          </Label>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            When on, applicants see one first step that collects all three together.
+            Turn off to start with your custom questions.
+          </p>
+        </div>
+        <Switch
+          id="capture-contact-step"
+          checked={contactStepOn}
+          onCheckedChange={handleContactStepToggle}
+          aria-label="Ask for name, email, and phone first"
+        />
+      </div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

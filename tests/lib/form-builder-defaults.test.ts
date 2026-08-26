@@ -14,6 +14,8 @@ import {
   DEFAULT_BUYER_FORM_CONFIG,
   DEFAULT_RENTAL_FORM_CONFIG,
 } from '@/lib/form-builder';
+import { isCaptureContactStepEnabled } from '@/lib/form-contact-step';
+import { validateFormConfig } from '@/lib/form-builder';
 
 describe('getDefaultFormConfig', () => {
   it('returns the buyer config for buyer and the rental config for rental', () => {
@@ -24,6 +26,17 @@ describe('getDefaultFormConfig', () => {
   it('tags each default with its own leadType (self-consistent)', () => {
     expect(getDefaultFormConfig('buyer').leadType).toBe('buyer');
     expect(getDefaultFormConfig('rental').leadType).toBe('rental');
+  });
+
+  it('defaults the contact step ON (flag omitted) and includes the three system fields', () => {
+    for (const leadType of ['rental', 'buyer'] as const) {
+      const config = getDefaultFormConfig(leadType);
+      expect(config.captureContactStep).toBeUndefined();
+      expect(isCaptureContactStepEnabled(config)).toBe(true);
+      const ids = config.sections.flatMap((s) => s.questions.map((q) => q.id));
+      expect(ids).toEqual(expect.arrayContaining(['name', 'email', 'phone']));
+      expect(validateFormConfig(config).success).toBe(true);
+    }
   });
 });
 

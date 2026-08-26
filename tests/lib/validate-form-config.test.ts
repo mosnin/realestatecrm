@@ -43,7 +43,7 @@ describe('validateFormConfig', () => {
     expect(validateFormConfig('nope').success).toBe(false);
   });
 
-  it('requires the three system fields present + required', () => {
+  it('requires the three system fields present + required when the contact step is on (default)', () => {
     const noPhone = clone();
     noPhone.sections[0].questions = noPhone.sections[0].questions.filter((q: { id: string }) => q.id !== 'phone');
     expect(validateFormConfig(noPhone).success).toBe(false);
@@ -51,6 +51,42 @@ describe('validateFormConfig', () => {
     const optionalEmail = clone();
     optionalEmail.sections[0].questions.find((q: { id: string }) => q.id === 'email').required = false;
     expect(validateFormConfig(optionalEmail).success).toBe(false);
+
+    const explicitOn = clone();
+    explicitOn.captureContactStep = true;
+    expect(validateFormConfig(explicitOn).success).toBe(true);
+
+    const explicitOnMissing = clone();
+    explicitOnMissing.captureContactStep = true;
+    explicitOnMissing.sections[0].questions = explicitOnMissing.sections[0].questions.filter(
+      (q: { id: string }) => q.id !== 'name',
+    );
+    expect(validateFormConfig(explicitOnMissing).success).toBe(false);
+  });
+
+  it('allows configs without the three system questions when captureContactStep is false', () => {
+    const off = {
+      version: 1,
+      leadType: 'rental' as const,
+      captureContactStep: false,
+      sections: [
+        {
+          id: 's1',
+          title: 'Timing',
+          position: 0,
+          questions: [
+            { id: 'when', type: 'text', label: 'When are you moving?', required: true, position: 0 },
+          ],
+        },
+      ],
+    };
+    expect(validateFormConfig(off).success).toBe(true);
+
+    const omittedStillRequires = clone();
+    omittedStillRequires.sections[0].questions = omittedStillRequires.sections[0].questions.filter(
+      (q: { id: string }) => q.id !== 'phone',
+    );
+    expect(validateFormConfig(omittedStillRequires).success).toBe(false);
   });
 
   it('rejects duplicate question IDs across sections', () => {
