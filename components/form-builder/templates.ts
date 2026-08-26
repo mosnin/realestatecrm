@@ -12,8 +12,9 @@ function id() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RENTAL TEMPLATE — standalone rental form (no Getting Started section)
-// The Getting Started step is handled by the intake form automatically.
+// RENTAL TEMPLATE — standalone rental form.
+// Name / email / phone live in section 0. The public intake bundles them
+// into one first step when captureContactStep is omitted or true.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const RENTAL_TEMPLATE: IntakeFormConfig = {
@@ -258,8 +259,9 @@ export const RENTAL_TEMPLATE: IntakeFormConfig = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BUYER TEMPLATE — standalone buyer form (no Getting Started section)
-// The Getting Started step is handled by the intake form automatically.
+// BUYER TEMPLATE — standalone buyer form.
+// Name / email / phone live in section 0. The public intake bundles them
+// into one first step when captureContactStep is omitted or true.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const BUYER_TEMPLATE: IntakeFormConfig = {

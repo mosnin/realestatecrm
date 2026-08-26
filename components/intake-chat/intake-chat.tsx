@@ -50,6 +50,13 @@ import {
   DEFAULT_RENTAL_FORM_CONFIG,
   DEFAULT_BUYER_FORM_CONFIG,
 } from '@/lib/form-builder';
+import { generateSystemFields } from '@/lib/form-contact-step';
+import {
+  buildIntakeQuestionList,
+  CONTACT_STEP_ID,
+  LEAD_TYPE_QUESTION_ID,
+  isSyntheticIntakeQuestionId,
+} from '@/lib/intake-question-list';
 import { TITLE_FONT } from '@/lib/typography';
 import {
   AlertCircle,
@@ -86,31 +93,11 @@ export interface IntakeChatProps {
   brokerageId?: string;
 }
 
-// ── Synthetic lead-type question (dual-config flows) ─────────────────────────
+// ── Synthetic lead-type + bundled contact step ───────────────────────────────
 
-const LEAD_TYPE_QUESTION_ID = '__leadType__';
+type ContactDraft = { name: string; email: string; phone: string };
 
-const LEAD_TYPE_QUESTION: FormQuestion = {
-  id: LEAD_TYPE_QUESTION_ID,
-  type: 'radio',
-  label: 'Are you looking to rent or buy?',
-  required: true,
-  position: 0,
-  options: [
-    { value: 'rental', label: 'Renting' },
-    { value: 'buyer', label: 'Buying' },
-  ],
-};
-
-// ── Pure helpers ─────────────────────────────────────────────────────────────
-
-function flattenQuestions(config: IntakeFormConfig | null | undefined): FormQuestion[] {
-  if (!config) return [];
-  const sections = [...config.sections].sort((a, b) => a.position - b.position);
-  return sections.flatMap((s) =>
-    [...s.questions].sort((a, b) => a.position - b.position),
-  );
-}
+const EMPTY_CONTACT_DRAFT: ContactDraft = { name: '', email: '', phone: '' };
 
 function evaluateVisibility(
   condition: FormQuestion['visibleWhen'],
@@ -185,8 +172,15 @@ function buildApplicationPayload(args: {
   const systemEmail = at('email') ?? '';
   const systemPhone = at('phone') ?? '';
 
+  const answersForPayload: AnswerMap = { ...answers };
+  for (const key of Object.keys(answersForPayload)) {
+    if (isSyntheticIntakeQuestionId(key)) {
+      delete answersForPayload[key];
+    }
+  }
+
   return {
-    ...answers,
+    ...answersForPayload,
     slug,
     spaceId,
     ...(brokerageId ? { brokerageId } : {}),
@@ -210,7 +204,7 @@ function buildApplicationPayload(args: {
     ...(privacyConsent !== undefined ? { privacyConsent } : {}),
     sourceLabel: 'intake-chat',
     formConfigVersion,
-    answers,
+    answers: answersForPayload,
     completedSteps: Array.from({ length: visibleQuestionCount }, (_, i) => i + 1),
   };
 }
@@ -267,6 +261,7 @@ export function IntakeChat({
   // from the answers map.
   const [answeredOrder, setAnsweredOrder] = useState<string[]>([]);
   const [pendingValue, setPendingValue] = useState<string | string[]>('');
+  const [contactDraft, setContactDraft] = useState<ContactDraft>(EMPTY_CONTACT_DRAFT);
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('asking');
   const [applicationRef, setApplicationRef] = useState<string | null>(null);
@@ -280,8 +275,10 @@ export function IntakeChat({
   }, [leadType, effectiveRental, effectiveBuyer, onlyConfig]);
 
   const questionList = useMemo<FormQuestion[]>(() => {
-    const base = flattenQuestions(activeConfig);
-    return hasDual ? [LEAD_TYPE_QUESTION, ...base] : base;
+    return buildIntakeQuestionList({
+      config: activeConfig,
+      includeLeadType: hasDual,
+    });
   }, [activeConfig, hasDual]);
 
   const currentQuestion = useMemo<FormQuestion | null>(() => {
@@ -303,7 +300,11 @@ export function IntakeChat({
     if (!currentQuestion) return;
     if (askedRef.current.has(currentQuestion.id)) return;
     askedRef.current.add(currentQuestion.id);
-    setPendingValue(currentQuestion.type === 'multi_select' ? [] : '');
+    if (currentQuestion.id === CONTACT_STEP_ID) {
+      setContactDraft(EMPTY_CONTACT_DRAFT);
+    } else {
+      setPendingValue(currentQuestion.type === 'multi_select' ? [] : '');
+    }
     setPendingError(null);
   }, [currentQuestion]);
 
@@ -337,6 +338,28 @@ export function IntakeChat({
     [],
   );
 
+  const commitContactStep = useCallback((draft: ContactDraft) => {
+    const fields = generateSystemFields();
+    for (const field of fields) {
+      const value = draft[field.id as keyof ContactDraft];
+      const error = validateQuestion(field, value);
+      if (error) {
+        setPendingError(error);
+        return;
+      }
+    }
+    setAnswers((prev) => ({
+      ...prev,
+      [CONTACT_STEP_ID]: '1',
+      name: draft.name.trim(),
+      email: draft.email.trim(),
+      phone: draft.phone.trim(),
+    }));
+    setAnsweredOrder((prev) => [...prev, CONTACT_STEP_ID]);
+    setContactDraft(EMPTY_CONTACT_DRAFT);
+    setPendingError(null);
+  }, []);
+
   // Skip an optional question — record an empty answer and advance.
   const skipOptional = useCallback((question: FormQuestion) => {
     if (question.required) return;
@@ -354,17 +377,33 @@ export function IntakeChat({
     const prior = answers[lastId];
 
     setAnsweredOrder((o) => o.slice(0, -1));
-    setAnswers((prev) => {
-      const next = { ...prev };
-      delete next[lastId];
-      return next;
-    });
+    if (lastId === CONTACT_STEP_ID) {
+      const restored: ContactDraft = {
+        name: typeof answers.name === 'string' ? answers.name : '',
+        email: typeof answers.email === 'string' ? answers.email : '',
+        phone: typeof answers.phone === 'string' ? answers.phone : '',
+      };
+      setAnswers((prev) => {
+        const next = { ...prev };
+        delete next[CONTACT_STEP_ID];
+        delete next.name;
+        delete next.email;
+        delete next.phone;
+        return next;
+      });
+      askedRef.current.add(lastId);
+      setContactDraft(restored);
+    } else {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        delete next[lastId];
+        return next;
+      });
+      askedRef.current.add(lastId);
+      setPendingValue(prior ?? '');
+    }
     if (lastId === LEAD_TYPE_QUESTION_ID) setLeadType(null);
 
-    // Mark as already-asked so the reset effect leaves our restored value
-    // alone; then restore what they had.
-    askedRef.current.add(lastId);
-    setPendingValue(prior ?? '');
     setPendingError(null);
     submitFiredRef.current = false;
     if (phase !== 'asking') setPhase('asking');
@@ -438,9 +477,9 @@ export function IntakeChat({
   ).length;
   const projectedDualTotal =
     hasDual && leadType === null
-      ? 1 + Math.max(
-          flattenQuestions(effectiveRental).length,
-          flattenQuestions(effectiveBuyer).length,
+      ? Math.max(
+          buildIntakeQuestionList({ config: effectiveRental, includeLeadType: true }).length,
+          buildIntakeQuestionList({ config: effectiveBuyer, includeLeadType: true }).length,
         )
       : 0;
   const totalQuestions = Math.max(liveTotal, projectedDualTotal);
@@ -551,13 +590,19 @@ export function IntakeChat({
               <CurrentQuestion
                 question={currentQuestion}
                 value={pendingValue}
+                contactDraft={contactDraft}
                 isFirst={answeredCount === 0}
                 agentName={agentName}
                 onChange={(v) => {
                   setPendingValue(v);
                   if (pendingError) setPendingError(null);
                 }}
+                onContactDraftChange={(draft) => {
+                  setContactDraft(draft);
+                  if (pendingError) setPendingError(null);
+                }}
                 onCommit={(v) => commitAnswer(currentQuestion, v)}
+                onCommitContact={commitContactStep}
                 onSkip={() => skipOptional(currentQuestion)}
                 error={pendingError}
                 accentColor={customization.accentColor}
@@ -625,10 +670,13 @@ function ProgressDots({
 interface CurrentQuestionProps {
   question: FormQuestion;
   value: string | string[];
+  contactDraft: ContactDraft;
   isFirst: boolean;
   agentName: string;
   onChange: (v: string | string[]) => void;
+  onContactDraftChange: (draft: ContactDraft) => void;
   onCommit: (v: string | string[]) => void;
+  onCommitContact: (draft: ContactDraft) => void;
   onSkip: () => void;
   error: string | null;
   accentColor: string;
@@ -637,10 +685,13 @@ interface CurrentQuestionProps {
 function CurrentQuestion({
   question,
   value,
+  contactDraft,
   isFirst,
   agentName,
   onChange,
+  onContactDraftChange,
   onCommit,
+  onCommitContact,
   onSkip,
   error,
   accentColor,
@@ -709,18 +760,28 @@ function CurrentQuestion({
           !affordanceReady && 'pointer-events-none',
         )}
       >
-        {renderInputForQuestion({
-          question,
-          value,
-          onChange,
-          onCommit,
-          accentColor,
-          error,
-        })}
+        {question.id === CONTACT_STEP_ID ? (
+          <ContactBundleFields
+            draft={contactDraft}
+            onChange={onContactDraftChange}
+            onCommit={onCommitContact}
+            accentColor={accentColor}
+            error={error}
+          />
+        ) : (
+          renderInputForQuestion({
+            question,
+            value,
+            onChange,
+            onCommit,
+            accentColor,
+            error,
+          })
+        )}
         {error && (
           <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">{error}</p>
         )}
-        {!question.required && question.type !== 'checkbox' && (
+        {question.id !== CONTACT_STEP_ID && !question.required && question.type !== 'checkbox' && (
           <div className="mt-5 flex justify-center">
             <button
               type="button"
@@ -743,6 +804,85 @@ interface InputProps {
   onCommit: (v: string | string[]) => void;
   accentColor: string;
   error: string | null;
+}
+
+function ContactBundleFields({
+  draft,
+  onChange,
+  onCommit,
+  accentColor,
+  error,
+}: {
+  draft: ContactDraft;
+  onChange: (draft: ContactDraft) => void;
+  onCommit: (draft: ContactDraft) => void;
+  accentColor: string;
+  error: string | null;
+}) {
+  const fields = generateSystemFields();
+  const nameReady = draft.name.trim().length > 0;
+  const emailReady = draft.email.trim().length > 0;
+  const phoneReady = draft.phone.trim().length > 0;
+  const sendDisabled = !nameReady || !emailReady || !phoneReady;
+
+  const update = (key: keyof ContactDraft, value: string) => {
+    onChange({ ...draft, [key]: value });
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-md space-y-3 text-left">
+      {fields.map((field, index) => {
+        const key = field.id as keyof ContactDraft;
+        const value = draft[key];
+        const isPhone = field.type === 'phone';
+        const isEmail = field.type === 'email';
+        return (
+          <label key={field.id} className="block space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              {field.id === 'name' ? 'Name' : field.id === 'email' ? 'Email' : 'Phone'}
+            </span>
+            <input
+              type={isEmail ? 'email' : isPhone ? 'tel' : 'text'}
+              inputMode={isEmail ? 'email' : isPhone ? 'tel' : 'text'}
+              value={value}
+              autoComplete={
+                isEmail ? 'email' : isPhone ? 'tel-national' : 'name'
+              }
+              autoFocus={index === 0}
+              placeholder={field.placeholder}
+              onChange={(e) =>
+                update(key, isPhone ? formatPhoneAsTyped(e.target.value) : e.target.value)
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!sendDisabled) onCommit(draft);
+                }
+              }}
+              aria-invalid={Boolean(error)}
+              className={cn(
+                'h-12 w-full rounded-2xl border bg-background/80 px-4 text-[15px] text-foreground',
+                'outline-none backdrop-blur-sm placeholder:text-muted-foreground/50',
+                'transition-colors duration-150',
+                error
+                  ? 'border-rose-500/60'
+                  : 'border-border/70 focus:border-foreground/40',
+              )}
+            />
+          </label>
+        );
+      })}
+      <div className="flex justify-center pt-2">
+        <PrimaryActionButton
+          accentColor={accentColor}
+          disabled={sendDisabled}
+          onClick={() => onCommit(draft)}
+        >
+          Continue
+        </PrimaryActionButton>
+      </div>
+    </div>
+  );
 }
 
 function renderInputForQuestion(props: InputProps) {
