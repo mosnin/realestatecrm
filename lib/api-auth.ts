@@ -273,8 +273,10 @@ export async function requirePaidSpaceOwner(
 }
 
 /**
- * Verifies the calling user owns the space that a contact belongs to.
- * Returns { userId, space, contactSpaceId } or a 4xx NextResponse.
+ * Verifies the caller can operate the space that a contact belongs to
+ * (owner of that book, or an invited seat). Looks up the contact first,
+ * then checks access — never the caller's first-owned space. A miss and
+ * a foreign contact both 404 so this is not an existence oracle.
  */
 export async function requireContactAccess(
   contactId: string,
@@ -283,17 +285,45 @@ export async function requireContactAccess(
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
 
-  const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { data: dbUser } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', userId)
+    .maybeSingle();
+  if (!dbUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { data: rows, error } = await tenantTable(supabase, 'Contact', { spaceId: space.id })
+  const { data: contact, error } = await unscoped(
+    supabase.from('Contact'),
+    'resolve contact space then verify the caller owns or holds a seat on it',
+  )
     .select('spaceId')
     .eq('id', contactId)
-    .limit(1)
     .maybeSingle();
-
   if (error) throw error;
-  if (!rows) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  return { userId, space };
+  const { data: owned } = await supabase
+    .from('Space')
+    .select('*')
+    .eq('id', contact.spaceId)
+    .eq('ownerId', dbUser.id)
+    .maybeSingle();
+  if (owned) return { userId, space: owned as Space };
+
+  const { data: seat } = await tenantTable(supabase, 'SpaceMembership', {
+    spaceId: contact.spaceId,
+  })
+    .select('id')
+    .eq('userId', dbUser.id)
+    .maybeSingle();
+  if (!seat) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const { data: memberSpace } = await supabase
+    .from('Space')
+    .select('*')
+    .eq('id', contact.spaceId)
+    .maybeSingle();
+  if (!memberSpace) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  return { userId, space: memberSpace as Space };
 }
