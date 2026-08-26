@@ -21,10 +21,11 @@ export function LogoutButton() {
       type="button"
       onClick={logout}
       disabled={pending}
-      className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
+      aria-label="Sign out"
+      title="Sign out"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground/70 transition-colors hover:bg-foreground/[0.04] hover:text-foreground disabled:opacity-50"
     >
-      {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />}
-      Sign out
+      {pending ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} strokeWidth={1.75} />}
     </button>
   );
 }

@@ -183,13 +183,10 @@ function AdminUserFooter() {
         <UserButton
           appearance={{ elements: { userButtonAvatarBox: 'w-7 h-7' } }}
         />
-        <div className="flex-1 min-w-0 leading-tight">
+        <div className="flex-1 min-w-0 leading-tight" title={email ?? displayName}>
           <p className="text-[13px] font-medium text-foreground truncate">
             {displayName}
           </p>
-          {email && (
-            <p className="text-[11px] text-muted-foreground truncate">{email}</p>
-          )}
         </div>
       </div>
     </div>

@@ -63,6 +63,7 @@ import {
   Coins,
   CalendarClock,
   MoreHorizontal,
+  Mail,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -628,14 +629,18 @@ function WorkspaceSwitcherRows({
   return (
     <>
       {userEmail && (
-        <div className="flex items-center gap-2 px-2.5 py-2">
-          <span className="flex-1 truncate text-[12px] text-foreground/85">
-            {userEmail}
-          </span>
+        <div className="flex items-center gap-2 px-2.5 py-2" title={userEmail}>
+          <Mail
+            size={13}
+            strokeWidth={1.75}
+            className="text-foreground/55 flex-shrink-0"
+            aria-hidden
+          />
+          <span className="sr-only">{userEmail}</span>
           <ChevronsUpDown
             size={12}
             strokeWidth={1.75}
-            className="text-muted-foreground/60 flex-shrink-0"
+            className="text-muted-foreground/60 flex-shrink-0 ml-auto"
           />
         </div>
       )}

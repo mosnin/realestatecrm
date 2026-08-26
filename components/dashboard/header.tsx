@@ -1,6 +1,6 @@
 'use client';
 
-import { UserButton, useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { Sun, Moon, X } from 'lucide-react';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useState, useEffect } from 'react';
@@ -43,6 +43,7 @@ import { Building2, ArrowLeftRight, Briefcase, ChevronDown, ArrowLeft, Bell, Cre
 import { NotificationCenter } from './notification-center';
 import { NotificationBell } from '@/components/broker/notification-bell';
 import { ShareLinksMenu } from './share-links-menu';
+import { HeaderAccountIcons } from './header-account-icons';
 import { getBreadcrumbLabel } from '@/lib/breadcrumb-routes';
 
 // Broker mobile nav is sourced from the SINGLE source of truth shared with the
@@ -558,9 +559,7 @@ export function Header({ slug, spaceId, spaceName, title, accountName = null, is
         >
           {theme === 'dark' ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
         </button>
-        <div className="[&_.cl-userButtonTrigger]:rounded-full">
-          <UserButton />
-        </div>
+        <HeaderAccountIcons />
       </div>
     </header>
   );
