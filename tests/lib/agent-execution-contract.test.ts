@@ -76,5 +76,13 @@ describe('Work intent-to-execution contract', () => {
     expect(prompt).toMatch(/send_email.*never.*draft_email/i);
     expect(prompt).toContain('create_automation');
     expect(prompt).toContain('add_person');
+    expect(prompt).toMatch(/do not say you can only draft or cannot work autonomously/i);
+  });
+
+  it('exposes create_automation for autonomous follow-up wording', () => {
+    expect(namesFor('Can you do autonomous follow-ups?')).toContain('create_automation');
+    expect(getChatTools('Can you work autonomously?').map((tool) => tool.name)).toContain(
+      'create_automation',
+    );
   });
 });

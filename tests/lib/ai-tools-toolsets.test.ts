@@ -255,6 +255,27 @@ describe('toolsets — per-turn selection', () => {
     });
 
     it.each([
+      'Can you do autonomous follow-ups?',
+      'Can you work autonomously?',
+      'Set up autonomous followups for new leads',
+      'Follow up automatically after every tour',
+      'I want automatic follow-ups',
+    ])('loads create_automation for standing follow-up asks: %s', (message) => {
+      expect(selectToolsets(message)).toContain('automations');
+      expect(getChatTools(message).map((tool) => tool.name)).toContain('create_automation');
+      const tools = getChatTools(message, { workMode: true });
+      expect(tools.map((tool) => tool.name)).toContain('create_automation');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(['create_automation']);
+    });
+
+    it('does not treat a one-off follow-up date as an automation', () => {
+      const message = 'Set a follow-up for Jane tomorrow';
+      expect(selectDirectExecutionToolNames(message, getChatTools(message, { workMode: true }))).not.toEqual(
+        ['create_automation'],
+      );
+    });
+
+    it.each([
       ['delete the contact named Jane', 'delete_contact'],
       ['archive the contact named Jane', 'archive_person'],
       ['merge the contacts for Jane Smith and Jane Doe', 'merge_persons'],

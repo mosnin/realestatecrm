@@ -25,6 +25,7 @@ vi.mock('@/lib/integrations/trigger-catalog', () => ({
 
 import {
   createWorkflowFromDescription,
+  requestedDelayMinutes,
   WorkflowCreationError,
 } from '@/lib/workflows/create-from-description';
 
@@ -135,6 +136,53 @@ describe('createWorkflowFromDescription', () => {
       message: expect.stringContaining('did not contain the requested send action'),
     } satisfies Partial<WorkflowCreationError>);
     expect(mocks.createWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('parses day and week waits for timed follow-ups', () => {
+    expect(requestedDelayMinutes('Follow up with every new lead in 2 days')).toBe(2880);
+    expect(requestedDelayMinutes('Text them after 1 week')).toBe(10080);
+    expect(requestedDelayMinutes('Email every new lead immediately')).toBe(0);
+  });
+
+  it('turns a generated delay-plus-draft into a timed send for autonomous follow-ups', async () => {
+    mocks.complete.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              name: 'Autonomous follow-up',
+              description: 'Follows new leads after two days.',
+              definition: {
+                trigger: { type: 'lead_created', config: {} },
+                conditions: { op: 'and', rules: [] },
+                actions: [
+                  { type: 'delay', config: { delayMinutes: 2880 } },
+                  { type: 'draft_message', config: { channel: 'sms', instruction: 'Check in.' } },
+                ],
+                autonomy: 'draft',
+              },
+            }),
+          },
+        },
+      ],
+    });
+
+    const result = await createWorkflowFromDescription({
+      spaceId: 'space-1',
+      description: 'Set up autonomous follow-ups: text every new lead after 2 days',
+    });
+
+    expect(result.definition.autonomy).toBe('auto');
+    expect(result.definition.actions).toEqual([
+      expect.objectContaining({
+        type: 'schedule_message',
+        config: expect.objectContaining({
+          channel: 'sms',
+          instruction: 'Check in.',
+          delayMinutes: 2880,
+        }),
+      }),
+    ]);
   });
 
   it('does not mistake an inbound-message trigger for an instruction to send', async () => {

@@ -32,6 +32,12 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/never tell the realtor you have no tools/i);
   });
 
+  it('forbids refusing autonomous follow-ups', () => {
+    const prompt = buildSystemPrompt(makeCtx());
+    expect(prompt).toMatch(/autonomous follow-ups/i);
+    expect(prompt).toMatch(/do not say you can only draft or cannot work autonomously/i);
+  });
+
   it('does not send the model to find_integration_tool when none are attached', () => {
     const prompt = buildSystemPrompt(makeCtx());
     expect(prompt).toMatch(/do not call `find_integration_tool`/i);
