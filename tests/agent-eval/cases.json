@@ -254,15 +254,13 @@
       "rationale": "'Why isn't X working' is help-desk — recall_docs. Don't guess at app behavior, don't try to dispatch Gmail."
     },
     {
-      "id": "studio-image",
+      "id": "studio-image-paused",
       "prompt": "Make me a listing graphic for 412 Elm — modern, sage green",
       "context": {"connected_toolkits": []},
       "expected": {
-        "tool_calls_must_include": ["generate_studio_image"],
-        "tool_calls_must_not_include": ["find_integration_tool", "draft_message"],
-        "max_tool_calls": 4
+        "tool_calls_must_not_include": ["generate_studio_image", "edit_studio_image"]
       },
-      "rationale": "Marketing content = Studio. Make it, don't describe what you'd make."
+      "rationale": "Studio is paused. Do not call a missing image tool."
     },
     {
       "id": "outreach-known-contact-by-name",

@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, ExternalLink, Briefcase, CalendarDays, Share2,
-  ChevronRight, Sparkles, BarChart3,
+  ChevronRight, BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Property, AreaReport } from '@/lib/types';
@@ -199,23 +199,7 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
           <Trash2 /> Delete
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {/* Contextual handoffs — the feature appears where the work is
-              (the Focus Update's "capabilities, not destinations"). Studio
-              opens with a flyer prompt built from the listing's real facts;
-              CMA opens with this address as the subject. */}
-          <Button variant="outline" size="sm" asChild>
-            <Link
-              href={`/s/${slug}/studio/create?prompt=${encodeURIComponent(
-                `A polished "Just Listed" social flyer for ${addr}${facts ? ` — ${facts}` : ''}${
-                  property.listPrice != null
-                    ? `, listed at $${Math.round(property.listPrice).toLocaleString()}`
-                    : ''
-                }. Clean typography, room for the listing photo.`,
-              )}`}
-            >
-              <Sparkles /> Make a flyer
-            </Link>
-          </Button>
+          {/* Contextual handoff — CMA opens with this address as the subject. */}
           <Button variant="outline" size="sm" asChild>
             <Link href={`/s/${slug}/cma?address=${encodeURIComponent(addr)}`}>
               <BarChart3 /> Run a CMA

@@ -41,7 +41,7 @@ const STEPS = [
     title: 'You choose the autonomy',
     short_description: 'Choose draft or automatic',
     full_description:
-      'Automatic mode completes sends and connected-app actions when the trigger fires. Choose Draft mode only when you want a compose-and-review step. You can change the setting per workflow, any time.',
+      'Automatic mode completes sends and connected-app actions when the trigger fires. Draft and Draft + notify still wait for your tap. You can change the setting per workflow, any time.',
   },
   {
     title: 'Test before it goes live',

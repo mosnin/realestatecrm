@@ -2315,7 +2315,7 @@ function RunHealthChip({ status }: { status: WorkflowRecord['lastRunStatus'] }) 
 
 function AutonomyPill({ autonomy }: { autonomy: WorkflowAutonomy }) {
   const label =
-    autonomy === 'draft' ? 'Drafts' : autonomy === 'notify' ? 'Auto + notify' : 'Autonomous';
+    autonomy === 'draft' ? 'Drafts' : autonomy === 'notify' ? 'Draft + notify' : 'Autonomous';
   const cls =
     autonomy === 'auto'
       ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'

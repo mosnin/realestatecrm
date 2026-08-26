@@ -358,13 +358,13 @@ const DATE_FORMAT_OPTIONS = [
 
 const AUTONOMY_OPTIONS: { value: WorkflowAutonomy; label: string }[] = [
   { value: 'draft', label: 'Draft only — I approve' },
-  { value: 'notify', label: 'Auto + notify me' },
+  { value: 'notify', label: 'Draft + notify me' },
   { value: 'auto', label: 'Fully autonomous' },
 ];
 
 const AUTONOMY_CAPTION: Record<WorkflowAutonomy, string> = {
   draft: 'Every action is drafted for your approval — nothing goes out on its own.',
-  notify: 'Actions run automatically and you get a heads-up each time.',
+  notify: 'Every action is still drafted for your approval — you also get a heads-up.',
   auto: 'Actions run without approval, including sends and connected-app calls. Use with care.',
 };
 
@@ -382,8 +382,8 @@ const AUTONOMY_META: Record<WorkflowAutonomy, { label: string; consequence: stri
     icon: PencilLine,
   },
   notify: {
-    label: 'Auto + notify',
-    consequence: 'Runs on its own; pings you each time.',
+    label: 'Draft + notify',
+    consequence: 'Drafts for your tap; pings you each time.',
     icon: BellRing,
   },
   auto: {

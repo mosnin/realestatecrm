@@ -36,6 +36,7 @@ describe('toolsets — per-turn selection', () => {
     // Conditional tools still need registry reachability coverage. Opt in for
     // this assertion only; production remains feature-off by default.
     vi.stubEnv('NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
     // A message that trips every pattern + core + orphans must surface the
     // whole catalog. Guards against a tool silently becoming uncallable.
     const everyKeyword =
@@ -350,6 +351,7 @@ describe('toolsets — per-turn selection', () => {
     });
 
     it('authorizes Studio generation only for an explicit image request', () => {
+      vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
       const message = 'Generate a listing image for 10 Main Street';
       const tools = getChatTools(message, { workMode: true });
       expect(tools.map((tool) => tool.name)).toContain('generate_studio_image');

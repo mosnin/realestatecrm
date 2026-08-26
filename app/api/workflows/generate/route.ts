@@ -55,7 +55,7 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 
 AUTONOMY (how much AI acts without human review):
 - draft: always draft for human approval (use only when they explicitly ask to draft)
-- notify: auto-send but notify the agent
+- notify: still drafts; also notify the realtor (does not send)
 - auto: fully autonomous. Use this when they say send, automatic, autonomous, or follow up automatically. NEVER emit a "delay" action — those halt and do not wait. Put the wait on schedule_message.delayMinutes (2 days = 2880).
 
 Return ONLY a JSON object with these exact fields:

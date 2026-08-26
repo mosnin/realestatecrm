@@ -22,11 +22,14 @@ import { runStudioEdit } from '@/lib/studio/edit';
 import { StudioGenerationError } from '@/lib/studio/generate';
 import { checkStudioSpendBudget } from '@/lib/studio/spend';
 import { tenantTable } from '@/lib/tenant-db';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;

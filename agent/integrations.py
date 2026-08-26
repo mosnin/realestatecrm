@@ -45,7 +45,7 @@ MAX_TOTAL_TOOLS = 100
 # Number of native tools shipped on every Chippi agent. Source of truth
 # is chippi.py:make_chippi_agent's base_tools list — bump this constant
 # when adding/removing natives so the budget math stays honest.
-_NATIVE_TOOL_COUNT = 36
+_NATIVE_TOOL_COUNT = 43
 
 # Composio schema fetch — Vercel proxies through to Composio; one round
 # trip per agent build. Same timeout shape as the dispatcher search.
@@ -65,17 +65,19 @@ _EXEC_TIMEOUT = 120.0
 # Keep this in sync with chippi.py:make_chippi_agent's base_tools list.
 _NATIVE_TOOL_NAMES = frozenset({
     "create_contact", "find_contacts", "get_contact_activity", "update_contact",
+    "delete_contact",
     "create_deal", "find_deals", "update_deal", "advance_deal_stage",
-    "request_deal_review",
-    "book_tour", "route_lead", "add_property", "send_property_packet",
+    "request_deal_review", "delete_deal",
+    "book_tour", "delete_tour", "route_lead", "add_property", "send_property_packet",
+    "delete_property",
     "recall_memory", "store_memory", "manage_goal", "manage_routines",
     "draft_message", "send_email_now", "send_sms_now",
     "outcome", "analyze_portfolio", "generate_priority_list",
+    "get_weather", "research_area",
     "process_inbound_message", "read_attachment", "ask_realtor",
     "log_activity_run", "recall_docs", "create_plan",
     "get_intake_form", "add_intake_question", "remove_intake_question",
     "update_intake_question", "save_intake_form",
-    "generate_studio_image", "edit_studio_image",
     "message_teammate", "create_automation",
     "list_plugins", "use_plugin",
     # Dispatcher tools — curated must never collide with these either.

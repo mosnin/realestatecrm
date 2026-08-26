@@ -30,6 +30,7 @@ import { ALL_TOOLS } from './tools';
 import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import type { ToolDefinition } from './types';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 /**
@@ -315,7 +316,7 @@ function selectWorkMutationScope(message: string): Set<string> | null {
     allowed.add('control_browser');
     allowed.add('browser_task');
   }
-  if (IMAGE_GENERATION_INTENT.test(text)) {
+  if (IMAGE_GENERATION_INTENT.test(text) && isStudioEnabled()) {
     scoped = true;
     allowed.add('generate_studio_image');
   }
@@ -512,5 +513,7 @@ export function getChatTools(
   ) {
     wanted.add('start_work_session');
   }
-  return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));
+  return ALL_TOOLS.filter((t) => wanted.has(t.name)
+    && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled())
+    && (t.name !== 'generate_studio_image' || isStudioEnabled()));
 }

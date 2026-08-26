@@ -4,9 +4,9 @@ One agent, all the tools. No coordinator, no specialists, no handoffs.
 Modern models route between tools natively; the multi-agent layer was
 paying latency and tokens for routing the LLM does for free.
 
-This agent serves both surfaces:
-  - chat (the realtor talks to Chippi via /api/ai/task → Modal chat_turn)
-  - autonomous (event triggers fire run_agent_for_space → same agent)
+This agent is the optional Modal runtime (`CHIPPI_CHAT_RUNTIME=modal`).
+Default chat is the TypeScript loop. The same agent also serves
+autonomous event triggers (`run_agent_for_space`).
 
 The opening message tells Chippi which mode it's in.
 
@@ -32,7 +32,6 @@ Tool surface:
   - create_plan
   - get_intake_form / add_intake_question / remove_intake_question
     / update_intake_question / save_intake_form
-  - generate_studio_image / edit_studio_image
   - message_teammate / create_automation
   - list_plugins / use_plugin
 """
@@ -80,7 +79,6 @@ from tools.questions import ask_realtor
 from tools.routing import route_lead
 from tools.tours import book_tour, delete_tour
 from tools.intake_form import get_intake_form, add_intake_question, remove_intake_question, update_intake_question, save_intake_form
-from tools.studio import generate_studio_image, edit_studio_image
 from tools.team import message_teammate, create_automation
 from tools.plugins import list_plugins, use_plugin
 
@@ -202,9 +200,6 @@ connected yet and point them to Settings → Integrations.
   one-line takeaway instead (e.g. "Three are overdue; want me to draft
   nudges?"). For KPIs, call analyze_portfolio; for showing weather (tour
   prep), call get_weather.
-- After generate_studio_image / edit_studio_image: the chat renders the saved
-  Studio file as a generated-media card. Never emit markdown for the temporary
-  provider URL, paste a raw URL, or repeat the result dict.
 - After an email draft_message: it renders a Send/Cancel card, so don't paste
   the body in prose — one short lead-in plus the `nextStep` is enough (the
   realtor must know it's drafted and whether a contact stub was auto-created).
@@ -406,9 +401,6 @@ def make_chippi_agent(
         remove_intake_question,
         update_intake_question,
         save_intake_form,
-        # Studio — content generation
-        generate_studio_image,
-        edit_studio_image,
         # Team — brokerage messaging + silent automation building
         message_teammate,
         create_automation,

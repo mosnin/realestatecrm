@@ -13,11 +13,14 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioGeneration, StudioGenerationError } from '@/lib/studio/generate';
 import { checkStudioSpendBudget } from '@/lib/studio/spend';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const secret = process.env.AGENT_INTERNAL_SECRET;
   if (!secret) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });

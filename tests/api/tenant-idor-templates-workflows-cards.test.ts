@@ -7,7 +7,7 @@
  * Cross-tenant ids must 404 (no existence oracle) and must not leak victim PII.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
 vi.mock('next/server', async (importOriginal) => {
@@ -376,6 +376,13 @@ describe('PATCH /api/deals/reorder — Deal + DealStage scoped before RPC', () =
 });
 
 describe('DELETE /api/studio/schedule — StudioPost scoped, 404 not 409', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('404s a foreign post and does not cancel', async () => {
     seed('StudioPost', { data: null });
 

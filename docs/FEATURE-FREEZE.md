@@ -10,6 +10,7 @@ rollout flags stay off. See `docs/PROD-STATE.md`.
 | Research Workspace / headless browser | `CHIPPI_RESEARCH_WORKSPACE_*` + space allowlist | `docs/BROWSER-CONTROL.md` — not activated on live `chippi` |
 | Managed Workspace Runs | `CHIPPI_WORKSPACE_RUNS_*` | `docs/chippy-workspace-runs.md` |
 | Workbench | `NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED` | Spreadsheet surface |
+| Studio | `NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED` | Paused — default off. Implementation and tables stay; flag restores the surface |
 | Realtime voice + floor manager | `REALTIME_VOICE_GATEWAY_ENABLED`, `CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED` | Server-controlled beta |
 | Durable schedule occurrences | `DURABLE_SCHEDULE_OCCURRENCES_ENABLED` | Construction-only — no executor |
 | Account hard-delete | `ACCOUNT_DELETION_HARD_DELETE` | Needs `docs/DATA-DELETION.md` sign-off |

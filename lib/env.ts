@@ -140,6 +140,7 @@ const optionalSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
   NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED: z.string().optional(),
 
   // Credit metering kill switch (lib/billing/meter.ts). Enforcement is ON by
   // default; set CREDITS_ENFORCED=false to disable the credit gate entirely
@@ -449,6 +450,7 @@ function warnConditionalInvariants(env: Env): void {
     { key: 'REALTIME_VOICE_GATEWAY_ENABLED', allowed: ['0', '1'] },
     { key: 'CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED', allowed: ['false', 'true'] },
     { key: 'NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', allowed: ['false', 'true'] },
     { key: 'CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
     { key: 'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
     { key: 'CHIPPI_WORKSPACE_RUNS_ENABLED', allowed: ['false', 'true'] },
