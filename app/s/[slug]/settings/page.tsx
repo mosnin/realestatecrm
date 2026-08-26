@@ -4,6 +4,8 @@ import { auth } from '@clerk/nextjs/server';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { GeneralSettingsForm, DangerZone } from './general-settings-form';
+import { WorkspacePeopleSection } from './workspace-people-section';
+import { ownerHasPaidWorkspace, userCanManageSpace } from '@/lib/workspaces';
 import { ProfileSection } from './profile-section';
 import { LanguageSection } from './language-section';
 import { NotificationsSection } from './notifications-section';
@@ -132,6 +134,20 @@ export default async function SettingsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
+  const { data: settingsUser } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', userId)
+    .maybeSingle();
+  const isAccountOwner = settingsUser?.id === space.ownerId;
+  const canManagePeople = settingsUser
+    ? await userCanManageSpace(settingsUser.id, space.id)
+    : false;
+  const ownerIsPaid = settingsUser
+    ? await ownerHasPaidWorkspace(space.ownerId, userId)
+    : false;
+  const canInvitePeople = canManagePeople && ownerIsPaid;
+
   let settings: SpaceSetting | null = null;
   try {
     const { data, error } = await supabase
@@ -187,7 +203,7 @@ export default async function SettingsPage({
   }
   const activeTabLabel = TABS.find((tab) => tab.id === activeTab)?.label ?? 'Workspace';
   const nextActionByTab: Record<TabId, string> = {
-    workspace: 'Confirm the workspace identity and public slug before changing deeper controls.',
+    workspace: 'Confirm the workspace identity, then invite people if this business is on a paid plan.',
     you: 'Make sure your public profile and AI personalization describe the same professional voice.',
     connections: 'Connect the account Chippi needs for the next real action you want it to complete.',
     memory: 'Remove anything stale so future work starts from current facts.',
@@ -257,14 +273,22 @@ export default async function SettingsPage({
           tab is identity, not configuration. */}
       {activeTab === 'workspace' && (
         <StaggerReveal className="space-y-12">
+          {isAccountOwner && (
           <section className="space-y-5">
             <p className={SECTION_LABEL}>Workspace</p>
             <GeneralSettingsForm space={space} />
           </section>
+          )}
+          <section className="space-y-5 pt-10 border-t border-border/60">
+            <p className={SECTION_LABEL}>People</p>
+            <WorkspacePeopleSection slug={space.slug} canInvite={canInvitePeople} />
+          </section>
+          {isAccountOwner && (
           <section className="space-y-5 pt-10 border-t border-border/60">
             <p className={cn(SECTION_LABEL, 'text-destructive/80')}>Danger zone</p>
             <DangerZone space={space} />
           </section>
+          )}
         </StaggerReveal>
       )}
 

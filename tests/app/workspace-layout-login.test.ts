@@ -167,6 +167,26 @@ describe('DashboardLayout login gate', () => {
     await expect(renderLayout()).rejects.toThrow('redirect:/setup');
   });
 
+  it('lets an invited teammate into a workspace they do not own', async () => {
+    loadDashboardUserMock.mockResolvedValue({
+      id: 'user-2',
+      name: 'Ada',
+      onboard: true,
+      isPlatformAdmin: false,
+      space: { id: 'space-owned' },
+      accessibleSpaceIds: ['space-owned', 'space-invited'],
+    });
+    getSpaceFromSlugMock.mockResolvedValue({
+      id: 'space-invited',
+      slug: 'acme',
+      name: 'Acme',
+      ownerId: 'user-1',
+    });
+    const ui = (await renderLayout()) as ReactElement;
+    expect(treeHas(ui, '"data-ok":"1"')).toBe(true);
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
   it('renders children when the user owns the space', async () => {
     loadDashboardUserMock.mockResolvedValue({
       id: 'user-1',

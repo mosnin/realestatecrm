@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { supabase } from '@/lib/supabase';
 import { normalizeSlug } from '@/lib/intake';
+import { unscoped } from '@/lib/supabase-guard';
 import type { Space } from '@/lib/types';
 
 /** Columns the subscription gate and Studio entitlement checks read. */
@@ -73,6 +74,8 @@ export type DashboardUser = {
   onboard: boolean;
   isPlatformAdmin: boolean;
   space: { id: string } | null;
+  /** Owned spaces plus spaces the user was invited into. */
+  accessibleSpaceIds: string[];
 };
 
 const USER_SELECT_FULL = 'id, onboard, platformRole, name';
@@ -110,31 +113,50 @@ export async function loadDashboardUser(clerkUserId: string): Promise<DashboardU
   }
   if (!row) return null;
 
-  const { data: spaceRow } = await supabase
+  const { data: ownedRows } = await supabase
     .from('Space')
     .select('id')
     .eq('ownerId', row.id)
-    .maybeSingle();
+    .order('createdAt', { ascending: true });
+  const ownedIds = (ownedRows ?? []).map((s) => s.id as string);
+
+  let memberIds: string[] = [];
+  try {
+    const { data: memberships } = await unscoped(
+      supabase.from('SpaceMembership'),
+      'load every workspace the signed-in user belongs to',
+    )
+      .select('spaceId')
+      .eq('userId', row.id);
+    memberIds = (memberships ?? []).map((m) => m.spaceId as string);
+  } catch {
+    memberIds = [];
+  }
+
+  const accessibleSpaceIds = [...new Set([...ownedIds, ...memberIds])];
+  const primaryId = ownedIds[0] ?? memberIds[0] ?? null;
 
   return {
     id: row.id,
     name: row.name ?? null,
     onboard: Boolean(row.onboard),
     isPlatformAdmin: row.platformRole === 'admin',
-    space: spaceRow ? { id: spaceRow.id as string } : null,
+    space: primaryId ? { id: primaryId } : null,
+    accessibleSpaceIds,
   };
 }
 
 export async function getSpaceByOwnerId(ownerId: string): Promise<Space | null> {
-  // Space.ownerId is UNIQUE, so a user has at most one (producing) Space — the
-  // .limit(1) is belt-and-suspenders, not a "pick one of many". Note that
-  // space.brokerageId is the intake-config owner, NOT a membership signal:
-  // membership lives in BrokerageMembership. Don't read brokerageId as "which
-  // brokerage this user belongs to."
+  // A paid owner can now have several Spaces (Apple and Pixar). Callers that
+  // still want "the first book" — login, onboarding, cron fallbacks — take
+  // the oldest. space.brokerageId is the intake-config owner, NOT a membership
+  // signal: membership lives in BrokerageMembership. Don't read brokerageId as
+  // "which brokerage this user belongs to."
   const { data, error } = await supabase
     .from('Space')
     .select('*')
     .eq('ownerId', ownerId)
+    .order('createdAt', { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -142,11 +164,12 @@ export async function getSpaceByOwnerId(ownerId: string): Promise<Space | null> 
 }
 
 /**
- * True when the Clerk user owns the given Space. Space.ownerId is UNIQUE, so
- * ownership is the precise (spaceId, userId) binding. Used by the internal
- * integration routes to reject a mismatched pair — the AGENT_INTERNAL_SECRET
- * bearer authenticates Modal, not the space, so without this a caller could
- * charge another workspace's rate-limit budget or probe its connected toolkits.
+ * True when the Clerk user owns the given Space. Ownership is the precise
+ * (spaceId, userId) binding — a person may own more than one Space. Used by
+ * the internal integration routes to reject a mismatched pair — the
+ * AGENT_INTERNAL_SECRET bearer authenticates Modal, not the space, so without
+ * this a caller could charge another workspace's rate-limit budget or probe
+ * its connected toolkits.
  */
 export async function userOwnsSpace(spaceId: string, clerkUserId: string): Promise<boolean> {
   const { data: user } = await supabase
@@ -195,6 +218,7 @@ export const getSpaceForUser = cache(async function getSpaceForUser(
       .from('Space')
       .select(columns)
       .eq('ownerId', user.id)
+      .order('createdAt', { ascending: true })
       .limit(1)
       .maybeSingle();
     return { data, error };

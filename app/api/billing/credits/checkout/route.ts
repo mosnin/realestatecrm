@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceAccountOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { TOPUPS, type TopupId, canBuyTopups } from '@/lib/plans';
 import { resolveBillingAccount } from '@/lib/billing/account';
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Top-ups are not configured yet.' }, { status: 503 });
     }
 
-    const auth = await requireSpaceOwner(slug);
+    const auth = await requireSpaceAccountOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { userId, space } = auth;
 

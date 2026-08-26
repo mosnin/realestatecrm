@@ -747,6 +747,78 @@ export async function sendBrokerageInvitation(params: BrokerageInvitationEmailPa
   }
 }
 
+export interface SpaceInvitationEmailParams {
+  toEmail: string;
+  workspaceName: string;
+  inviterName: string;
+  token: string;
+}
+
+export async function sendSpaceInvitation(params: SpaceInvitationEmailParams): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    logger.warn('[email] RESEND_API_KEY not set — skipping space invitation');
+    return;
+  }
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const FROM = getFromAddress();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.usechippi.com';
+  const { toEmail, workspaceName, inviterName, token } = params;
+  const acceptUrl = `${appUrl}/invite/space/${token}`;
+  const safeEmail = toEmail.replace(/[\r\n\t]/g, ' ').slice(0, 200);
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:${FONT_SANS_STACK}">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:32px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="background:#0f172a;padding:20px 28px">
+          <p style="margin:0;color:#94a3b8;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.05em">Workspace invitation</p>
+          <p style="margin:4px 0 0;color:#ffffff;font-size:20px;font-weight:700">${esc(workspaceName)}</p>
+        </td></tr>
+        <tr><td style="padding:24px 28px">
+          <p style="margin:0;font-size:15px;color:#111827;line-height:1.6">
+            <strong>${esc(inviterName)}</strong> invited you into <strong>${esc(workspaceName)}</strong> on Chippi.
+          </p>
+          <p style="margin:12px 0 0;font-size:13px;color:#6b7280;line-height:1.5">
+            You'll work in that business's book — people, deals, and Chippi — not a separate personal workspace.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px">
+            <tr><td>
+              <a href="${acceptUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 22px;border-radius:8px">Accept invitation →</a>
+            </td></tr>
+          </table>
+          <p style="margin:16px 0 0;font-size:11px;color:#9ca3af">This invitation expires in 7 days.</p>
+        </td></tr>
+        <tr><td style="padding:16px 28px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#9ca3af">Sent to ${esc(safeEmail)}. If this was a mistake, ignore it.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  try {
+    const result = await resend.emails.send({
+      from: FROM,
+      to: toEmail,
+      subject: `You're invited to ${workspaceName.replace(/[\r\n\t]/g, ' ').slice(0, 80)} on Chippi`,
+      html,
+    });
+    if (result.error) {
+      logger.error('[email] space invitation: Resend API error', {
+        to: redactEmail(toEmail),
+        resendError: result.error,
+      });
+    }
+  } catch (err) {
+    logger.error('[email] space invitation failed', { to: redactEmail(toEmail) }, err);
+  }
+}
+
 // ── Application confirmation email (sent to the applicant) ──────────────────
 
 export interface ApplicationConfirmationParams {

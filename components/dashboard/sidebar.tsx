@@ -492,10 +492,28 @@ export function WorkspaceSwitcher({
 }) {
   const base = `/s/${slug}`;
   const [drawerExpanded, setDrawerExpanded] = useState(false);
+  const [extraBusinesses, setExtraBusinesses] = useState<
+    { id: string; slug: string; name: string }[]
+  >([]);
+  const [canCreateBusiness, setCanCreateBusiness] = useState(false);
 
-  // Build the workspace list. The realtor's own workspace is always first;
-  // brokerage memberships follow. Each gets a ⌘1/⌘2/⌘3… shortcut so the
-  // popover doubles as a keyboard switcher — same shape as the inspiration.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/workspaces')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { workspaces?: { id: string; slug: string; name: string }[]; canCreate?: boolean } | null) => {
+        if (cancelled || !data) return;
+        setExtraBusinesses(data.workspaces ?? []);
+        setCanCreateBusiness(!!data.canCreate);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build the workspace list. The current business first, then other books
+  // this person owns or was invited into, then brokerage memberships.
   const workspaces: {
     key: string;
     name: string;
@@ -510,6 +528,16 @@ export function WorkspaceSwitcher({
       href: base,
       icon: Briefcase,
       isCurrent: !isOnBrokerPage,
+    });
+  }
+  for (const extra of extraBusinesses) {
+    if (extra.slug === slug) continue;
+    workspaces.push({
+      key: extra.id,
+      name: extra.name,
+      href: `/s/${extra.slug}`,
+      icon: Briefcase,
+      isCurrent: false,
     });
   }
   for (const b of brokerageMemberships) {
@@ -553,6 +581,7 @@ export function WorkspaceSwitcher({
               workspaces={workspaces}
               userEmail={userEmail}
               hasTeam={brokerageMemberships.length > 0}
+              canCreateBusiness={canCreateBusiness}
             />
           </div>
         )}
@@ -600,6 +629,7 @@ export function WorkspaceSwitcher({
             userEmail={userEmail}
             hasTeam={brokerageMemberships.length > 0}
             collapsed={collapsed}
+            canCreateBusiness={canCreateBusiness}
           />
         </Popover>
         {!collapsed && showQuickCreate && (
@@ -614,6 +644,7 @@ function WorkspaceSwitcherRows({
   workspaces,
   userEmail,
   hasTeam,
+  canCreateBusiness,
 }: {
   workspaces: {
     key: string;
@@ -624,6 +655,7 @@ function WorkspaceSwitcherRows({
   }[];
   userEmail: string | null;
   hasTeam: boolean;
+  canCreateBusiness?: boolean;
 }) {
   return (
     <>
@@ -670,6 +702,7 @@ function WorkspaceSwitcherRows({
         );
       })}
       <div className="my-1 mx-1 h-px bg-border/60" />
+      <NewBusinessRow canCreate={!!canCreateBusiness} />
       <Link
         href="/brokerage"
         className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
@@ -691,6 +724,7 @@ function WorkspaceSwitcherPopoverContent({
   userEmail,
   hasTeam,
   collapsed,
+  canCreateBusiness,
 }: {
   workspaces: {
     key: string;
@@ -702,6 +736,7 @@ function WorkspaceSwitcherPopoverContent({
   userEmail: string | null;
   hasTeam: boolean;
   collapsed: boolean;
+  canCreateBusiness?: boolean;
 }) {
   return (
     <PopoverContent
@@ -714,8 +749,95 @@ function WorkspaceSwitcherPopoverContent({
         workspaces={workspaces}
         userEmail={userEmail}
         hasTeam={hasTeam}
+        canCreateBusiness={canCreateBusiness}
       />
     </PopoverContent>
+  );
+}
+
+function NewBusinessRow({ canCreate }: { canCreate: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError('');
+    try {
+      const res = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = (await res.json()) as { slug?: string; error?: string };
+      if (!res.ok || !data.slug) {
+        setError(data.error ?? 'Could not create the business.');
+        return;
+      }
+      window.location.href = `/s/${data.slug}`;
+    } catch {
+      setError("Couldn't reach the server — usually temporary.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (!canCreate) {
+    return (
+      <Link
+        href="/subscribe"
+        className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
+      >
+        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
+        <span className="flex-1 text-left">New business · paid</span>
+      </Link>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="group flex items-center gap-2 h-9 px-2 w-full rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
+      >
+        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
+        <span className="flex-1 text-left">New business</span>
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={(e) => void create(e)} className="px-2 py-1.5 space-y-1.5">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Business name"
+        maxLength={80}
+        autoFocus
+        className="w-full h-8 rounded-md border border-border/70 bg-background px-2 text-[12px] outline-none focus:ring-2 focus:ring-ring"
+      />
+      {error && <p className="text-[11px] text-destructive">{error}</p>}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="submit"
+          disabled={pending || name.trim().length < 2}
+          className="h-7 px-2.5 rounded-md bg-foreground text-background text-[11px] font-medium disabled:opacity-40"
+        >
+          {pending ? 'Creating…' : 'Create'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(''); }}
+          className="h-7 px-2 text-[11px] text-muted-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

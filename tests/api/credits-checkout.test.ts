@@ -16,7 +16,10 @@ vi.hoisted(() => {
 });
 
 const { requireSpaceOwnerMock } = vi.hoisted(() => ({ requireSpaceOwnerMock: vi.fn() }));
-vi.mock('@/lib/api-auth', () => ({ requireSpaceOwner: requireSpaceOwnerMock }));
+vi.mock('@/lib/api-auth', () => ({
+  requireSpaceOwner: requireSpaceOwnerMock,
+  requireSpaceAccountOwner: requireSpaceOwnerMock,
+}));
 
 const { checkRateLimitMock } = vi.hoisted(() => ({ checkRateLimitMock: vi.fn(async () => ({ allowed: true })) }));
 vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: checkRateLimitMock }));

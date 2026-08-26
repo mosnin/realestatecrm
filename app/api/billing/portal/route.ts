@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
-import { requireSpaceOwner } from '@/lib/api-auth';
+import { requireSpaceAccountOwner } from '@/lib/api-auth';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { slug } = body;
   if (!slug) return NextResponse.json({ error: 'slug required' }, { status: 400 });
 
-  const auth = await requireSpaceOwner(slug);
+  const auth = await requireSpaceAccountOwner(slug);
   if (auth instanceof NextResponse) return auth;
   const { userId, space } = auth;
 

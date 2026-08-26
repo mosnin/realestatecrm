@@ -152,6 +152,8 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   AgentRunArtifact: 'spaceId',
   ScheduleOccurrence: 'spaceId',
   InviteCodeRedemption: 'spaceId',
+  SpaceMembership: 'spaceId',
+  SpaceInvitation: 'spaceId',
 
   // ── brokerage-scoped (the broker/team surface) ──────────────────────────
   BrokerNotification: 'brokerageId',

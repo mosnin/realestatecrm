@@ -32,6 +32,10 @@ describe('TENANT_TABLES registry completeness', () => {
     for (const t of ['MessagingSuppression', 'MessagingConsent', 'WorkSessionAction']) {
       expect(isTenantTable(t), `${t} must be registered`).toBe(true);
     }
+    for (const t of ['SpaceMembership', 'SpaceInvitation']) {
+      expect(isTenantTable(t), `${t} must be a registered tenant table`).toBe(true);
+      expect(scopeColumnFor(t)).toBe('spaceId');
+    }
   });
 
   it('covers chat, artifacts, tokens, and billing tables the guard was blind to', () => {

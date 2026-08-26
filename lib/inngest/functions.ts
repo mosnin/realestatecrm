@@ -40,7 +40,13 @@ import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 async function spaceIdForOwner(userId: unknown): Promise<string> {
   if (typeof userId !== 'string' || !userId) return 'unknown';
   try {
-    const { data } = await supabase.from('Space').select('id').eq('ownerId', userId).maybeSingle();
+    const { data } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('ownerId', userId)
+      .order('createdAt', { ascending: true })
+      .limit(1)
+      .maybeSingle();
     return data?.id ?? 'unknown';
   } catch {
     return 'unknown';

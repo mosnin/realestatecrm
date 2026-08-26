@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,10 +139,30 @@ export default async function AuthRedirectPage({
     .from('Space')
     .select('slug')
     .eq('ownerId', user.id)
+    .order('createdAt', { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (space?.slug) {
     redirect(`/s/${space.slug}`);
+  }
+
+  const { data: membership } = await unscoped(
+    supabase.from('SpaceMembership'),
+    'login redirect lists every workspace seat for this user',
+  )
+    .select('spaceId')
+    .eq('userId', user.id)
+    .limit(1)
+    .maybeSingle();
+  // SpaceMembership is listed by user (every seat they hold), not one spaceId.
+  if (membership?.spaceId) {
+    const { data: memberSpace } = await supabase
+      .from('Space')
+      .select('slug')
+      .eq('id', membership.spaceId)
+      .maybeSingle();
+    if (memberSpace?.slug) redirect(`/s/${memberSpace.slug}`);
   }
 
   redirect('/setup');
