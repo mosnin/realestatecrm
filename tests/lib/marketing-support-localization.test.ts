@@ -47,6 +47,13 @@ describe('supporting marketing localization', () => {
     expect(switcher).toContain('window.location.assign(href)');
   });
 
+  it('keeps the homepage proof band inside narrow viewports', () => {
+    const stats = source('components/marketing/giga/stats.tsx');
+    expect(stats).toContain('divide-y');
+    expect(stats).toContain('md:grid-cols-3');
+    expect(stats).toContain('whitespace-nowrap');
+  });
+
   it('keeps supporting page prices annual first and local currency aware', () => {
     const teaser = source('components/marketing/giga/pricing-teaser.tsx');
     expect(teaser).toContain('ANNUAL_FACTOR = 0.8');
