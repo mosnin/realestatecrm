@@ -178,7 +178,7 @@ function thenClause(actions: ActionRowState[]): string {
 
 const AUTONOMY_CLAUSE: Record<WorkflowAutonomy, string> = {
   draft: 'You approve each one before anything goes out.',
-  notify: 'It runs on its own and keeps you posted.',
+  notify: 'It drafts for your tap and pings you when a draft is ready.',
   auto: 'It runs fully on its own — no approval needed.',
 };
 

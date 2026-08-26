@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   falConfigured: vi.fn(),
@@ -40,8 +40,11 @@ const ctx: ToolContext = {
 };
 
 describe('generate_studio_image', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
     mocks.falConfigured.mockReturnValue(true);
     mocks.checkStudioSpendBudget.mockResolvedValue({
       allowed: true,
@@ -64,6 +67,19 @@ describe('generate_studio_image', () => {
         model: 'seedance-video',
       }).success,
     ).toBe(false);
+  });
+
+  it('fails before provider work when Studio is paused', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'false');
+    const paused = await generateStudioImageTool.handler(
+      { prompt: 'A twilight listing hero' },
+      ctx,
+    );
+    expect(paused.display).toBe('error');
+    expect(paused.summary).toMatch(/paused/i);
+    expect(mocks.falConfigured).not.toHaveBeenCalled();
+    expect(mocks.checkStudioSpendBudget).not.toHaveBeenCalled();
+    expect(mocks.runStudioGeneration).not.toHaveBeenCalled();
   });
 
   it('fails before provider work when Studio or spend authority is unavailable', async () => {

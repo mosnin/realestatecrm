@@ -30,6 +30,7 @@ import { ALL_TOOLS } from './tools';
 import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import type { ToolDefinition } from './types';
 import { isWorkbenchEnabled } from '@/lib/chippi/workbench-flag';
+import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-intent';
 
 /**
@@ -125,6 +126,13 @@ export const TOOLSETS: Record<string, readonly string[]> = {
   browser: ['control_browser', 'browser_task'],
 };
 
+/**
+ * Standing / unattended work. Includes the words realtors actually say
+ * ("autonomous follow-ups", "automatically") — not just "create a workflow".
+ */
+const AUTOMATION_INTENT =
+  /\b(automation|automate|automatic(?:ally)?|autonomous(?:ly)?|workflow|every\s+time|whenever|on\s+autopilot)\b|\b(?:standing|recurring|ongoing)\s+follow[\s-]?ups?\b|\bfollow[\s-]?ups?\s+(?:on\s+)?(?:automatic(?:ally)?|autonomous(?:ly)?|auto|autopilot)\b/i;
+
 /** Keyword → toolset. Over-inclusive by design; mirrors router.ts regex style. */
 const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['people', /\b(person|people|contact|lead|buyer|seller|prospect|client|merge|archive|delete|remove|hot|cold|warm|follow|meeting|call|note)\b/i],
@@ -134,7 +142,7 @@ const TOOLSET_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['calendar', /\b(calendar|availab\w*|book|slot|appointment|busy|free|block|agenda)\b/i],
   ['drafting', /\b(draft|compose|write(?:\s+me)?|prepare)\b[\s\S]{0,80}\b(email|text|sms|message|reply)\b/i],
   ['comms', /\b(send|email|sms|text|message|packet|reply|forward|reach|outreach|blast)\b/i],
-  ['automations', /\b(automation|automate|workflow|every\s+time|whenever|on\s+autopilot)\b/i],
+  ['automations', AUTOMATION_INTENT],
   ['pipeline', /\b(pipeline|quiet|overdue|stuck|stalled|at[\s-]?risk|priority|leak|stats|statistics|numbers|metrics|kpis?|dashboard|snapshot|how am i doing|how'?s business)\b/i],
   ['brokerage', /\b(broker|team|realtor|agent|roster|assign|review|performance|production)\b/i],
   ['files', /\b(file|upload|document|attachment|pdf|photo|packet|spreadsheet|csv|tsv|xlsx?|excel|workbench|summarize|normaliz(?:e|ing|ation)|deduplicat(?:e|ing|ion)|remove\s+duplicate\s+rows?|trim(?:ming)?\s+whitespace|rename\s+(?:a\s+)?column|add\s+(?:a\s+)?(?:[a-z][\w -]{0,48}\s+)?column|tag\s+(?:every\s+)?(?:row|sheet)|phone\s+numbers?)\b/i],
@@ -150,8 +158,6 @@ const EXPLICIT_DRAFT_INTENT =
   /\b(draft|compose|write(?:\s+me)?|prepare)\b[\s\S]{0,80}\b(email|text|sms|message|reply)\b/i;
 const EXPLICIT_SEND_INTENT =
   /\b(send|email(?:s|ed|ing)?|text(?:s|ed|ing)?|sms|reply|forward)\b|\bmessage(?:s|d|ing)?\s+(?:a|the|this|that|my|our|all|every|each|new|lead|client|contact|buyer|seller|prospect|them|him|her)\b/i;
-const AUTOMATION_INTENT =
-  /\b(automation|automate|workflow|every\s+time|whenever|on\s+autopilot)\b/i;
 const CONTACT_CREATION_INTENT =
   /\b(?:add|create|save|log)\s+(?:(?:a|the|this|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b|\b(?:add|create|save)\b[\s\S]{0,40}\bas\s+(?:(?:a|the|new)\s+)?(?:contact|person|lead|buyer|seller|prospect|client)\b/i;
 const DURABLE_WORK_INTENT =
@@ -183,7 +189,7 @@ export function isUnsupportedPdfDeliverableIntent(message: string): boolean {
  * independent mutations (create contact + send email + create automation).
  */
 const AUTOMATION_CREATION_INTENT =
-  /\b(?:create|build|make|add|set[\s-]?up|configure|automate)\b[\s\S]{0,70}\b(?:automation|workflow)\b|\b(?:automation|workflow)\b[\s\S]{0,40}\b(?:create|build|make|add|set[\s-]?up|configure)\b/i;
+  /\b(?:create|build|make|add|set[\s-]?up|configure|automate|enable|start)\b[\s\S]{0,80}\b(?:automation|workflow|autonomous(?:ly)?|automatic(?:ally)?)\b|\b(?:automation|workflow)\b[\s\S]{0,40}\b(?:create|build|make|add|set[\s-]?up|configure)\b|\b(?:autonomous(?:ly)?|automatic(?:ally)?)\s+follow[\s-]?ups?\b|\bfollow[\s-]?ups?\s+(?:on\s+)?(?:automatic(?:ally)?|autonomous(?:ly)?|auto|autopilot)\b|\b(?:automatically|autonomously)\b[\s\S]{0,50}\b(?:follow[\s-]?up|nurture|check[\s-]?in)\b|\b(?:can you|could you|are you able to|do you)\b[\s\S]{0,50}\b(?:autonomous(?:ly)?|automatic(?:ally)?|on\s+autopilot)\b|\b(?:work|run|operate|act)\s+autonomous(?:ly)?\b/i;
 const PROPERTY_VALUE_ANALYSIS_INTENT =
   /\b(?:analy[sz]e|estimate|evaluate|valuation|cma)\b[\s\S]{0,90}\b(?:propert\w*|home|house|listing|address|value|price|comp(?:arable)?s?)\b|\b(?:property|home|house|listing)\s+(?:value|valuation|price|comps?)\b/i;
 const EMAIL_SEND_INTENT =
@@ -310,7 +316,7 @@ function selectWorkMutationScope(message: string): Set<string> | null {
     allowed.add('control_browser');
     allowed.add('browser_task');
   }
-  if (IMAGE_GENERATION_INTENT.test(text)) {
+  if (IMAGE_GENERATION_INTENT.test(text) && isStudioEnabled()) {
     scoped = true;
     allowed.add('generate_studio_image');
   }
@@ -450,6 +456,10 @@ export function getChatTools(
     wanted.delete('send_sms');
     wanted.delete('send_property_packet');
     wanted.delete('add_person');
+    // One-off CRM reminder dates compete with standing automations on the
+    // same "follow-up" wording. Keep set_followup off this turn.
+    wanted.delete('set_followup');
+    wanted.delete('clear_followup');
   }
 
   if (capabilities.workMode) {
@@ -503,5 +513,7 @@ export function getChatTools(
   ) {
     wanted.add('start_work_session');
   }
-  return ALL_TOOLS.filter((t) => wanted.has(t.name) && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()));
+  return ALL_TOOLS.filter((t) => wanted.has(t.name)
+    && (!['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled())
+    && (t.name !== 'generate_studio_image' || isStudioEnabled()));
 }

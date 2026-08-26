@@ -20,6 +20,7 @@ import { activeToolkits } from '@/lib/integrations/connections';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { inngest } from '@/lib/inngest/client';
 import { tenantTable } from '@/lib/tenant-db';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 
 export const runtime = 'nodejs';
@@ -44,6 +45,8 @@ async function connectedSocials(
 }
 
 export async function GET() {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);
@@ -65,6 +68,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const { userId } = auth;
@@ -250,6 +255,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);

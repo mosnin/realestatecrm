@@ -29,7 +29,6 @@ import {
   Calendar,
   Inbox,
   Building2,
-  Aperture,
   FolderOpen,
   Settings,
   Phone,
@@ -219,7 +218,6 @@ const NAV: { icon: React.ElementType; label: string; badge?: string }[] = [
   { icon: Calendar, label: 'Calendar' },
   { icon: Inbox, label: 'Mailbox' },
   { icon: Building2, label: 'Properties' },
-  { icon: Aperture, label: 'Studio' },
   { icon: FolderOpen, label: 'Files' },
 ];
 

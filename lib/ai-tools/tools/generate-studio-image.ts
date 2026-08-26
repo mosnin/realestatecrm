@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { defineTool } from '../types';
+import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 import { falConfigured } from '@/lib/studio/fal';
 import { runStudioGeneration, StudioGenerationError } from '@/lib/studio/generate';
 import { checkStudioSpendBudget } from '@/lib/studio/spend';
@@ -42,6 +43,9 @@ export const generateStudioImageTool = defineTool<typeof parameters, GeneratedSt
   summariseCall: (args) => `Generate and save an image: ${args.prompt.slice(0, 180)}`,
 
   async handler(args, ctx) {
+    if (!isStudioEnabled()) {
+      return { summary: 'Studio is paused.', display: 'error' };
+    }
     if (!falConfigured()) {
       return { summary: 'Studio image generation is not configured.', display: 'error' };
     }

@@ -5,18 +5,13 @@
  *
  * ─── Important: dual-runtime split ────────────────────────────────────────
  *
- * These TypeScript tools run in the Next.js loop (`lib/ai-tools/loop.ts`)
- * — the deprecated approval-resume path and the in-process sub-agent
- * skills. **The realtor's chat agent runs in Modal/Python** and has its
- * OWN tool catalog at `agent/tools/*.py`.
+ * These TypeScript tools run in the Next.js chat loop (`lib/ai-tools/loop.ts`)
+ * when `CHIPPI_CHAT_RUNTIME=ts` (the default). Modal/Python (`agent/tools/*.py`)
+ * is opt-in via `CHIPPI_CHAT_RUNTIME=modal` and has its own catalog.
  *
- * Adding a tool here does NOT add it to the chat the realtor uses. The
- * two lists are hand-maintained today. If you need a new verb available
- * to the chat agent, you also need a Python equivalent in `agent/tools/`.
- *
- * The right fix is to consolidate runtimes (one source of truth) or
- * generate the Python catalog from this list at deploy time. Until that
- * lands, this comment exists to keep us honest about the gap.
+ * Adding a tool here does NOT add it to the Modal runtime. The two lists are
+ * hand-maintained today. If you need a new verb on the optional Python agent,
+ * you also need an equivalent in `agent/tools/`.
  *
  * ─── Contract ─────────────────────────────────────────────────────────────
  *

@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { RECURRING_JOBS } from '../../worker/src/schedule';
 import { CRON_MANIFEST } from '@/lib/inngest/cron-functions';
+import { VERCEL_SAFETY_RAIL_CRONS } from '@/lib/jobs/vercel-safety-rail';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -43,15 +44,12 @@ describe('worker recurring jobs', () => {
 
   it('keeps an exact Vercel safety rail for the three idempotent recovery routes', () => {
     const vercelJson = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8'));
-    const recoveryIds = [
-      'cron-workspace-run-recovery',
-      'cron-work-session-action-recovery',
-      'cron-conversation-turn-recovery',
-    ];
-    const expected = recoveryIds.map((id) => {
-      const job = RECURRING_JOBS.find((entry) => entry.id === id);
-      expect(job, `worker schedule is missing recovery job ${id}`).toBeDefined();
-      return { path: job!.path, schedule: job!.pattern };
+    const expected = VERCEL_SAFETY_RAIL_CRONS.map((rail) => {
+      const job = RECURRING_JOBS.find((entry) => entry.id === rail.id);
+      expect(job, `worker schedule is missing recovery job ${rail.id}`).toBeDefined();
+      expect(job!.path).toBe(rail.path);
+      expect(job!.pattern).toBe(rail.schedule);
+      return { path: rail.path, schedule: rail.schedule };
     });
 
     expect(vercelJson.crons).toEqual(expected);

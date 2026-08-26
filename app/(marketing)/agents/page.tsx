@@ -6,7 +6,6 @@
 
 import { SubHero } from '@/components/marketing/giga/sub-hero';
 import { AgentInboxShowcase, AgentPipelineShowcase } from '@/components/marketing/giga/agents-showcases';
-import { ContentShowcase } from '@/components/marketing/giga/content-showcase';
 import { PricingTeaser } from '@/components/marketing/giga/pricing-teaser';
 import { CtaSection } from '@/components/marketing/giga/cta';
 import { MARKETING_PAGE_DICTS } from '@/lib/i18n/dictionaries/marketing-pages';
@@ -50,7 +49,6 @@ export default async function AgentsPage() {
         {lang === 'en' ? (
           <>
             <AgentInboxShowcase />
-            <ContentShowcase />
             <AgentPipelineShowcase />
           </>
         ) : null}

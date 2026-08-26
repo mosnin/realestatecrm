@@ -72,7 +72,7 @@ const STEPS: ShowcaseStep[] = [
   {
     key: 'messaging',
     title: 'Every channel',
-    desc: 'Reach clients where they already are. Chippi sends and follows up over text and WhatsApp, in your voice, around the clock.',
+    desc: 'Reach clients where they already are. Chippi drafts follow-ups over text and WhatsApp in your voice. Approved automations can send around the clock.',
     mockup: (
       <Frost title="Messaging" badge="Connected">
         <Row icon={MessageSquare} title="WhatsApp" meta="send + follow up" tone="text-[#ff9a6e]" right={ON} active />

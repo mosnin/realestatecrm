@@ -14,8 +14,9 @@
  * the strict "due this hour" rule for their first fire. See
  * isScheduleDueWithWatermark for the per-cadence rule.
  *
- * IMPORTANT: like every autonomous path, a workflow run DRAFTS — it never sends
- * an outbound channel unattended. The executor owns that contract.
+ * IMPORTANT: the executor honors the workflow's autonomy. `draft` / `notify`
+ * persist drafts only. `auto` plus `schedule_message` actually sends via the
+ * scheduled-message dispatcher. Do not describe this tick as draft-only.
  *
  * Auth: Bearer ${CRON_SECRET}. Disable: set CRON_WORKFLOWS_DISABLED=1.
  */

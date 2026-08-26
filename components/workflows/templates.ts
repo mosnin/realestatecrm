@@ -471,26 +471,19 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         },
         {
           ...blankAction(),
-          type: 'delay',
+          type: 'schedule_message',
+          channel: 'sms',
           delayMinutes: '2880',
           delayUnit: 'minutes' as const,
-        },
-        {
-          ...blankAction(),
-          type: 'draft_message',
-          channel: 'sms',
           instruction:
             'Two days have passed since first contact. Draft a gentle check-in asking if they had a chance to browse listings and if they have any questions.',
         },
         {
           ...blankAction(),
-          type: 'delay',
-          delayMinutes: '4320',
+          type: 'schedule_message',
+          channel: 'sms',
+          delayMinutes: '7200',
           delayUnit: 'minutes' as const,
-        },
-        {
-          ...blankAction(),
-          type: 'run_chippi',
           instruction:
             'Five days in. Find 2–3 listings that match what this lead said they are looking for and draft a brief, personalised message sharing those picks with a note on why each one fits their criteria.',
         },
@@ -708,14 +701,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         },
         {
           ...blankAction(),
-          type: 'delay',
+          type: 'schedule_message',
+          channel: 'sms',
           delayMinutes: '1440',
           delayUnit: 'minutes' as const,
-        },
-        {
-          ...blankAction(),
-          type: 'draft_message',
-          channel: 'sms',
           instruction:
             'It has been 24 hours since first contact. Draft a short follow-up asking this lead a few quick questions about what they are looking for: budget range, must-have features, desired neighbourhoods, and timeline. Keep it casual and easy to respond to.',
         },
@@ -737,14 +726,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
       actions: [
         {
           ...blankAction(),
-          type: 'delay',
+          type: 'schedule_message',
+          channel: 'sms',
           delayMinutes: '60',
           delayUnit: 'minutes' as const,
-        },
-        {
-          ...blankAction(),
-          type: 'draft_message',
-          channel: 'sms',
           instruction:
             'An hour has passed since the tour. Draft a friendly text asking for their honest gut-reaction: did they love it, was it missing something key, or just okay? Ask them to reply with a quick rating (1–5) or a few words. Keep it short and low pressure.',
         },
@@ -1057,14 +1042,10 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         },
         {
           ...blankAction(),
-          type: 'delay',
+          type: 'schedule_message',
+          channel: 'sms',
           delayMinutes: '43200',
           delayUnit: 'minutes' as const,
-        },
-        {
-          ...blankAction(),
-          type: 'draft_message',
-          channel: 'sms',
           instruction:
             'It has been 30 days since {{lead.name}} closed on their home. Draft a warm personal check-in asking how they are settling in, if everything is going smoothly, and whether they know anyone else who might be looking to buy or sell soon. Keep it short and genuinely warm — not salesy.',
         },

@@ -140,12 +140,19 @@ const optionalSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
   NEXT_PUBLIC_AGENT_AUTO_SEND: z.string().optional(),
   NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED: z.string().optional(),
 
   // Credit metering kill switch (lib/billing/meter.ts). Enforcement is ON by
   // default; set CREDITS_ENFORCED=false to disable the credit gate entirely
   // (emergency rollback — workflows run free, nobody blocked for a zero
   // balance). Any other value (or unset) leaves enforcement ON.
   CREDITS_ENFORCED: z.string().optional(),
+
+  // Tenant-scope observer / enforce (lib/supabase-guard.ts). Optional so CI
+  // and preview boot; prod should set TENANT_GUARD=1 (see docs/PROD-STATE.md).
+  TENANT_GUARD: z.string().optional(),
+  TENANT_GUARD_ENFORCE: z.string().optional(),
+  ACCOUNT_DELETION_HARD_DELETE: z.string().optional(),
 
   // Sentry
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
@@ -443,6 +450,7 @@ function warnConditionalInvariants(env: Env): void {
     { key: 'REALTIME_VOICE_GATEWAY_ENABLED', allowed: ['0', '1'] },
     { key: 'CHIPPI_REALTIME_VOICE_FLOOR_MANAGER_ENABLED', allowed: ['false', 'true'] },
     { key: 'NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', allowed: ['false', 'true'] },
+    { key: 'NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', allowed: ['false', 'true'] },
     { key: 'CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
     { key: 'NEXT_PUBLIC_CHIPPI_RESEARCH_WORKSPACE_ENABLED', allowed: ['false', 'true'] },
     { key: 'CHIPPI_WORKSPACE_RUNS_ENABLED', allowed: ['false', 'true'] },
@@ -451,6 +459,9 @@ function warnConditionalInvariants(env: Env): void {
     { key: 'CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', allowed: ['false', 'true'] },
     { key: 'NEXT_PUBLIC_CHIPPI_WORKSPACE_RUN_FOLLOW_UPS_ENABLED', allowed: ['false', 'true'] },
     { key: 'CHIPPI_WORKSPACE_RUN_TASK_RECOVERY_ENABLED', allowed: ['false', 'true'] },
+    { key: 'TENANT_GUARD', allowed: ['0', '1'] },
+    { key: 'TENANT_GUARD_ENFORCE', allowed: ['0', '1'] },
+    { key: 'ACCOUNT_DELETION_HARD_DELETE', allowed: ['false', 'true'] },
     { key: 'AGENT_RUN_POLICY_MODE', allowed: ['shadow', 'enforce'] },
     { key: 'DURABLE_SCHEDULE_OCCURRENCES_ENABLED', allowed: ['0', '1', 'false', 'true'] },
     { key: 'CHIPPI_CHAT_RUNTIME', allowed: ['ts', 'modal'] },
@@ -609,6 +620,13 @@ function warnConditionalInvariants(env: Env): void {
   ) {
     envWarn(
       '[env] WORK_SESSION_ACTIONS_DISABLED treats every non-empty value as enabled; use 1 to disable or UNSET it to enable actions.',
+    );
+  }
+
+  if (!isValue(env, 'TENANT_GUARD', '1') && process.env.NODE_ENV === 'production') {
+    envWarn(
+      '[env] TENANT_GUARD is not 1 — unscoped tenant-table reads will not be observed. ' +
+        'Set TENANT_GUARD=1 in production (docs/PROD-STATE.md), then TENANT_GUARD_ENFORCE=1 after a clean week.',
     );
   }
 

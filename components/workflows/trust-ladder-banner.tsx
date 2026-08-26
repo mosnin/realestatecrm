@@ -12,9 +12,9 @@
  *
  * Honest by construction: it doesn't flip any switch itself. Autonomy is a
  * per-automation choice the realtor already controls in the builder ("Draft
- * only" → "Auto + notify"), so the banner points there rather than taking an
+ * only" → "Draft + notify"), so the banner points there rather than taking an
  * action on the realtor's behalf. "Nothing sends without you" stays true until
- * the realtor decides otherwise — and they can take it back anytime.
+ * they set a workflow to Fully autonomous — and they can take it back anytime.
  */
 
 import { useEffect, useState } from 'react';
@@ -83,9 +83,9 @@ export function TrustLadderBanner() {
         <p className="text-sm font-medium text-foreground">Your drafts are landing well.</p>
         <p className={cn(CAPTION, 'leading-snug')}>{reason}</p>
         <p className={cn(CAPTION, 'leading-snug text-muted-foreground/80')}>
-          Open any automation below and set it to “Auto + notify” to let it send on its own —
-          you’ll still get a heads-up each time, and you can switch it back to drafts whenever
-          you want.
+          Open any automation below and set it to “Draft + notify” — I’ll still wait for your
+          tap, and ping you when a draft is ready. Switch to Fully autonomous only when you
+          want approved send steps to go out on their own.
         </p>
       </div>
       <button

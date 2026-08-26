@@ -2,21 +2,20 @@
  * Trust ladder — earned autonomy, lane by lane.
  *
  * Most automations start in draft-only: Chippi prepares, the realtor approves.
- * The one default-on send is inbound first touch (SpaceSetting.autoFirstTouchSend),
- * which sends and tells you — the `notify` rung — and can be turned off.
+ * Inbound first touch (SpaceSetting.autoFirstTouchSend) is a separate setting
+ * that can send and tell you — it is not workflow `notify`.
  * Later lanes still earn autonomy. As a lane
  * accumulates a track record of drafts the realtor approved *unchanged*, Chippi
  * offers to graduate exactly that lane one step up the ladder — and the realtor
  * can take it back anytime.
  *
- * The ladder (one step per graduation):
+ * The ladder (one step per graduation). Only `auto` + schedule_message sends:
  *   draft  → notify → auto
- *   (review)  (sends, tells you)  (sends silently)
+ *   (review)  (draft + ping)  (sends)
  *
- * draft → notify is the meaningful first step: Chippi starts sending on its own
- * but pings the realtor each time, so trust is extended with a safety net. The
- * point is to make the scariest part of automation feel inevitable and safe,
- * never forced.
+ * draft → notify is the first step: Chippi still drafts for your tap and pings
+ * you when a draft is ready. The send step is notify → auto. The point is to
+ * make the scariest part of automation feel inevitable and safe, never forced.
  *
  * This module is the PURE decision layer — no IO. Given a lane's track record it
  * decides whether to offer a graduation and to what. The recording of outcomes
@@ -101,7 +100,7 @@ export function autonomyLabel(a: Autonomy): string {
     case 'draft':
       return 'Draft only';
     case 'notify':
-      return 'Auto + notify';
+      return 'Draft + notify';
     case 'auto':
       return 'Fully autonomous';
   }
@@ -145,7 +144,7 @@ export function evaluateGraduation(
   const rejectRate = total > 0 ? stats.rejected / total : 0;
   if (rejectRate > cfg.maxRejectRate) return none(current);
 
-  const verb = to === 'notify' ? 'send these and tell you each time' : 'send these on its own';
+  const verb = to === 'notify' ? 'draft these and tell you each time' : 'send these on its own';
   return {
     offer: true,
     from: current,

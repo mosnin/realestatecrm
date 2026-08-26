@@ -34,7 +34,7 @@ export const createAutomationTool = defineTool<typeof parameters, CreateAutomati
   name: 'create_automation',
   riskLevel: 'low',
   description:
-    'Actually create and enable a standing CRM workflow. Explicit send/email/text instructions become executable auto actions, while explicit draft instructions remain draft actions. Returns the persisted workflow receipt.',
+    'Create and enable a standing CRM workflow, including autonomous or automatic follow-ups. Explicit send/email/text/follow-up instructions become executable auto actions. Explicit draft instructions remain draft actions. Returns the persisted workflow receipt.',
   parameters,
   requiresApproval: true,
   rateLimit: { max: 10, windowSeconds: 3600 },

@@ -86,7 +86,7 @@ const GUIDES: Guide[] = [
   {
     icon: Workflow,
     title: 'Automations',
-    desc: 'Standing orders Chippi runs on its own — every run still drafts for your tap.',
+    desc: 'Standing orders you design once. Draft waits for your tap. Automatic with a send step actually sends.',
     steps: [
       'Workflows react to an event: a new lead, a reply, a deal changing stage.',
       'Routines run on a schedule: every morning, every weekday, every hour.',

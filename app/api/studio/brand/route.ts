@@ -12,6 +12,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { tenantTable } from '@/lib/tenant-db';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,8 @@ interface BrandHandles {
 const EMPTY = { colors: [] as string[], voice: '', handles: {} as BrandHandles };
 
 export async function GET() {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);
@@ -46,6 +49,8 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const space = await getSpaceForUser(authResult.userId);

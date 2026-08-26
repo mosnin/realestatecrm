@@ -50,6 +50,11 @@ dev = [
   "ruff>=0.11.0",
 ]
 
+# Flat layout has multiple top-level packages (memory, security, tools).
+# Without an explicit find, setuptools refuses `pip install -e .` in CI.
+[tool.setuptools.packages.find]
+include = ["memory*", "security*", "tools*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

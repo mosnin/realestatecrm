@@ -107,7 +107,7 @@ describe('summarizeFormState — blank tolerance (mid-edit)', () => {
 
     const notify = emptyFormState();
     notify.autonomy = 'notify';
-    expect(summarizeFormState(notify).autonomy).toMatch(/keeps you posted/i);
+    expect(summarizeFormState(notify).autonomy).toMatch(/draft|ping/i);
 
     const auto = emptyFormState();
     auto.autonomy = 'auto';

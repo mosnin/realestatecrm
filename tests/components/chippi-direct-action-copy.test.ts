@@ -9,7 +9,6 @@ describe('Chippi direct-action product copy', () => {
   const permissionPrompt = read('components/ai/blocks/permission-prompt-view.tsx');
   const marketing = read('components/marketing/giga/agent-canvas.tsx');
   const integrations = read('app/s/[slug]/chippi/integrations/page.tsx');
-  const automationIntro = read('components/workflows/automations-intro.tsx');
   const workSessions = read('components/chippi/work-sessions-strip.tsx');
   const taskDetail = read('app/s/[slug]/chippi/tasks/[taskId]/page.tsx');
   const taskList = read('app/s/[slug]/chippi/tasks/page.tsx');
@@ -53,10 +52,14 @@ describe('Chippi direct-action product copy', () => {
     expect(permissionPrompt).not.toMatch(/draft: review and send|approve before running/i);
   });
 
-  it('presents explicit Draft mode as a choice, not the agent-wide fallback', () => {
-    expect(automationIntro).toContain("short_description: 'Choose draft or automatic'");
-    expect(automationIntro).toContain('Choose Draft mode only when you want a compose-and-review step.');
-    expect(automationIntro).not.toContain("short_description: 'Draft-first by default'");
+  it('presents explicit Draft mode as a choice, not the agent-wide fallback', async () => {
+    const { AUTOMATIONS_INTRO_STEPS } = await import('@/components/workflows/automations-intro');
+    const autonomy = AUTOMATIONS_INTRO_STEPS.find((step) => step.title === 'You choose the autonomy');
+    expect(autonomy).toBeDefined();
+    expect(autonomy?.short_description).toMatch(/draft or automatic/i);
+    expect(autonomy?.short_description).not.toMatch(/draft-first/i);
+    expect(autonomy?.full_description).toMatch(/automatic mode completes sends/i);
+    expect(autonomy?.full_description).toMatch(/draft and draft \+ notify still wait/i);
   });
 
   it('quarantines legacy Work approval waits instead of offering human review', () => {

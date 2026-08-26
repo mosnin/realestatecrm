@@ -67,6 +67,9 @@ const SLA_TASK_KIND = 'lead_sla_followup';
 // these already exists for a contact, the sweep must not cut another.
 const OPEN_TASK_STATUSES = ['queued', 'running', 'paused'];
 
+/** Per-tick cap so the SLA cron stays inside the Worker window as brokerages grow. */
+export const SLA_BROKERAGE_TICK_CAP = 200;
+
 function minutesSince(iso: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 }
@@ -269,12 +272,20 @@ export async function sweepAllBrokerages(): Promise<SlaSweepResult[]> {
     .from('Brokerage')
     .select('id, name, slaFirstResponseMinutes, slaEscalateMinutes')
     .eq('slaEnabled', true)
-    .limit(5000);
+    .limit(SLA_BROKERAGE_TICK_CAP + 1);
   if (error) {
     logger.error('[broker-sla] failed to load brokerages', {}, error);
     return [];
   }
-  const policies = (data ?? []) as BrokerageSlaPolicy[];
+  const loaded = (data ?? []) as BrokerageSlaPolicy[];
+  const truncated = loaded.length > SLA_BROKERAGE_TICK_CAP;
+  if (truncated) {
+    logger.warn('[broker-sla] brokerage tick cap hit — remaining rows wait for the next sweep', {
+      loaded: loaded.length,
+      cap: SLA_BROKERAGE_TICK_CAP,
+    });
+  }
+  const policies = truncated ? loaded.slice(0, SLA_BROKERAGE_TICK_CAP) : loaded;
   const out: SlaSweepResult[] = [];
   for (const p of policies) {
     try {

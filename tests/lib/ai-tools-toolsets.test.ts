@@ -36,6 +36,7 @@ describe('toolsets — per-turn selection', () => {
     // Conditional tools still need registry reachability coverage. Opt in for
     // this assertion only; production remains feature-off by default.
     vi.stubEnv('NEXT_PUBLIC_CHIPPI_WORKBENCH_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
     // A message that trips every pattern + core + orphans must surface the
     // whole catalog. Guards against a tool silently becoming uncallable.
     const everyKeyword =
@@ -255,6 +256,31 @@ describe('toolsets — per-turn selection', () => {
     });
 
     it.each([
+      'Can you do autonomous follow-ups?',
+      'Can you work autonomously?',
+      'Set up autonomous followups for new leads',
+      'Follow up automatically after every tour',
+      'I want automatic follow-ups',
+    ])('loads create_automation for standing follow-up asks: %s', (message) => {
+      expect(selectToolsets(message)).toContain('automations');
+      const chatNames = getChatTools(message).map((tool) => tool.name);
+      expect(chatNames).toContain('create_automation');
+      expect(chatNames).not.toContain('set_followup');
+      const tools = getChatTools(message, { workMode: true });
+      expect(tools.map((tool) => tool.name)).toContain('create_automation');
+      expect(tools.map((tool) => tool.name)).not.toContain('set_followup');
+      expect(selectDirectExecutionToolNames(message, tools)).toEqual(['create_automation']);
+    });
+
+    it('does not treat a one-off follow-up date as an automation', () => {
+      const message = 'Set a follow-up for Jane tomorrow';
+      expect(getChatTools(message).map((tool) => tool.name)).toContain('set_followup');
+      expect(selectDirectExecutionToolNames(message, getChatTools(message, { workMode: true }))).not.toEqual(
+        ['create_automation'],
+      );
+    });
+
+    it.each([
       ['delete the contact named Jane', 'delete_contact'],
       ['archive the contact named Jane', 'archive_person'],
       ['merge the contacts for Jane Smith and Jane Doe', 'merge_persons'],
@@ -325,6 +351,7 @@ describe('toolsets — per-turn selection', () => {
     });
 
     it('authorizes Studio generation only for an explicit image request', () => {
+      vi.stubEnv('NEXT_PUBLIC_CHIPPI_STUDIO_ENABLED', 'true');
       const message = 'Generate a listing image for 10 Main Street';
       const tools = getChatTools(message, { workMode: true });
       expect(tools.map((tool) => tool.name)).toContain('generate_studio_image');

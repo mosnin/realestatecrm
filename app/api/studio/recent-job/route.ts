@@ -20,6 +20,7 @@ import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 export const runtime = 'nodejs';
 
@@ -29,6 +30,8 @@ export const runtime = 'nodejs';
 const RUNNING_MAX_AGE_S = 600;
 
 export async function GET(req: Request) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);

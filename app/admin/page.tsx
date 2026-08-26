@@ -45,6 +45,7 @@ import {
   SURFACE_CARD,
 } from '@/components/ui/surface-card';
 import { hasCurrentSubscription } from '@/lib/api-auth';
+import { mrrFromPlans } from '@/lib/billing/mrr';
 
 export default async function AdminOverviewPage() {
   const isAdmin = await isPlatformAdmin();
@@ -284,23 +285,34 @@ export default async function AdminOverviewPage() {
 
     // ── Revenue metrics ───────────────────────────────────────────────
     try {
-      const subRes = await supabase
-        .from('Space')
-        .select('stripeSubscriptionStatus, stripePeriodEnd');
-      const statuses = (subRes.data ?? []) as {
+      const [subRes, brokRes] = await Promise.all([
+        supabase.from('Space').select('plan, stripeSubscriptionStatus, stripePeriodEnd'),
+        supabase.from('Brokerage').select('plan, stripeSubscriptionStatus, stripePeriodEnd'),
+      ]);
+      type SubRow = {
+        plan: string | null;
         stripeSubscriptionStatus: string | null;
         stripePeriodEnd: string | null;
-      }[];
-      totalSpaces = statuses.length;
-      for (const row of statuses) {
+      };
+      const spaceRows = (subRes.data ?? []) as SubRow[];
+      const brokerageRows = (brokRes.data ?? []) as SubRow[];
+      // Spaces own Solo/Pro; brokerages own Team/Team Plus. Do not sum both
+      // for the same customer (a team space may still carry a leftover status).
+      const statuses = [
+        ...spaceRows.filter((r) => r.plan !== 'team' && r.plan !== 'team_plus'),
+        ...brokerageRows.filter((r) => r.plan === 'team' || r.plan === 'team_plus'),
+      ];
+      totalSpaces = spaceRows.length;
+      const mrrRows = statuses.map((row) => {
         const s = row.stripeSubscriptionStatus;
         const current = hasCurrentSubscription(s, row.stripePeriodEnd, now);
         if (s === 'active' && current) activeSubscriptions++;
         else if (s === 'trialing' && current) trialUsers++;
         else if (s === 'past_due') pastDueUsers++;
         else if (s === 'canceled') canceledUsers++;
-      }
-      mrr = activeSubscriptions * 97;
+        return { plan: row.plan, status: s, current };
+      });
+      mrr = mrrFromPlans(mrrRows);
       churnRate =
         activeSubscriptions + canceledUsers > 0
           ? Math.round((canceledUsers / (activeSubscriptions + canceledUsers)) * 100)

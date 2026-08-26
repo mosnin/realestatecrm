@@ -6,7 +6,7 @@ import { monitorCron } from '@/lib/cron-monitor';
 /**
  * GET /api/cron/lead-sla — the speed-to-lead enforcement sweep.
  *
- * Runs every 15 minutes (see vercel.json). For each brokerage with SLA
+ * Runs every 15 minutes (Cloudflare Worker schedule). For each brokerage with SLA
  * enforcement on, it finds routed leads sitting un-worked past the first-
  * response window and acts: nudges the assigned realtor, then escalates to the
  * broker if the lead stays cold. Idempotent via per-contact tags, so a lead is

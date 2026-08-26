@@ -33,6 +33,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('@/lib/billing/cost-budget-alarm', () => ({
+  alarmDailyCostBudgets: vi.fn(async () => ({ scanned: 0, over: 0 })),
+}));
+
 import { GET as cleanupGET } from '@/app/api/cron/cleanup/route';
 import { GET as sweepGET } from '@/app/api/cron/sweep-paused-runs/route';
 import { logger } from '@/lib/logger';

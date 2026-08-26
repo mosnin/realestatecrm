@@ -18,7 +18,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { logger } from '@/lib/logger';
-import { getLLMClient, openaiModel } from '@/lib/llm';
+import { getLLMClient, usageAccountingParams } from '@/lib/llm';
+import { sanitizeGeneratedWorkflowForm } from '@/lib/workflows/create-from-description';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -42,7 +43,6 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - schedule_message: schedule a message to send later (config: { channel: "sms"|"email", instruction: string, delayMinutes: number })
 - create_task: create a follow-up task (config: { title: string, dueInDays?: number })
 - run_chippi: run an AI agent with instructions (config: { instruction: string })
-- delay: wait before the next step (config: { delayMinutes: number })
 - filter: stop workflow if condition not met (config: { field: string, operator: "eq"|"neq"|"gt"|"gte"|"lt"|"lte"|"exists"|"not_exists", value?: string|number })
 - formatter: transform a value — text/number/date (config: { input: string (field path like "lead.name" or literal), operation: "uppercase"|"lowercase"|"capitalize"|"trim"|"replace"|"number_format"|"date_format"|"extract_number"|"extract_email"|"extract_phone", find?: string, replacement?: string, format?: "MM/DD/YYYY"|"YYYY-MM-DD"|"Month D, YYYY"|"relative", toFixed?: number })
 - call_integration: call a connected app (config: { toolkit: string, action: string })
@@ -54,9 +54,9 @@ AVAILABLE ACTIONS (ordered list, 1-5 actions):
 - get_variable: read a named variable, optionally with a default (config: { varName: string, varDefault?: string }); the value is available as {{vars.<varName>}}
 
 AUTONOMY (how much AI acts without human review):
-- draft: always draft for human approval (safest)
-- notify: auto-send but notify the agent
-- auto: fully autonomous (use only if asked for full automation)
+- draft: always draft for human approval (use only when they explicitly ask to draft)
+- notify: still drafts; also notify the realtor (does not send)
+- auto: fully autonomous. Use this when they say send, automatic, autonomous, or follow up automatically. NEVER emit a "delay" action — those halt and do not wait. Put the wait on schedule_message.delayMinutes (2 days = 2880).
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -77,7 +77,7 @@ Return ONLY a JSON object with these exact fields:
       "type": "<action_type>",
       "channel": "<sms|email, for message actions>",
       "instruction": "<AI instruction text, for draft_message/schedule_message/run_chippi>",
-      "delayMinutes": "<number as string, for schedule_message/delay>",
+      "delayMinutes": "<number as string, for schedule_message>",
       "title": "<task title, for create_task>",
       "dueInDays": "<number as string, for create_task>",
       "toolkit": "<app name, for call_integration>",
@@ -100,10 +100,10 @@ Return ONLY a JSON object with these exact fields:
       "varDefault": "<default value when unset, for get_variable>"
     }
   ],
-  "autonomy": "draft"
+  "autonomy": "auto"
 }
 
-Keep instructions conversational and real-estate focused. Draft messages as if written by a skilled realtor. For run_chippi instructions, describe what the AI should do.`;
+Keep instructions conversational and real-estate focused. For explicit send / automatic / autonomous follow-ups, use schedule_message and autonomy auto. Use draft_message ONLY when they explicitly ask to draft. For run_chippi instructions, describe what the AI should do.`;
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth();
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
       response_format: { type: 'json_object' },
       temperature: 0.3,
       max_tokens: 1000,
+      ...(usageAccountingParams() as Record<string, never>),
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'AI generation failed — try rephrasing.' }, { status: 500 });
     }
 
-    return NextResponse.json({ workflow: parsed });
+    return NextResponse.json({ workflow: sanitizeGeneratedWorkflowForm(prompt, parsed) });
   } catch (err) {
     logger.error('[workflows/generate] LLM error', { spaceId: space.id }, err);
     return NextResponse.json(

@@ -35,8 +35,8 @@ export const { GET, POST, PUT } = serve({
     workSessionPlan,
     workSessionExecute,
     workspaceRunTaskExecute,
-    // Cron mirrors — opt-in only (see header note); Vercel cron is the
-    // production scheduler.
+    // Cron mirrors — opt-in only (see header note); the Cloudflare Worker
+    // is the production scheduler.
     ...(inngestCronFallbackEnabled() ? cronFunctions : []),
   ],
 });

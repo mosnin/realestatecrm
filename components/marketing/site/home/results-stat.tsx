@@ -103,7 +103,7 @@ export function ResultsStat() {
             <div className="mt-10">
               <p className="text-6xl font-bold tracking-tight text-zinc-950 dark:text-white sm:text-7xl">24/7</p>
               <p className="mt-2 max-w-xs text-base leading-snug text-neutral-600 dark:text-white/60">
-                Chippi works your book around the clock, in your voice, always.
+                Chippi works your book around the clock — drafts in your voice, sends when you approve or set a workflow to automatic.
               </p>
             </div>
           </div>

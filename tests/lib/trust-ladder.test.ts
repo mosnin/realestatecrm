@@ -34,6 +34,7 @@ describe('ladder rungs', () => {
   });
   it('labels each rung', () => {
     expect(autonomyLabel('draft')).toMatch(/draft/i);
+    expect(autonomyLabel('notify')).toMatch(/draft \+ notify/i);
     expect(autonomyLabel('auto')).toMatch(/autonomous/i);
   });
 });

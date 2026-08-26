@@ -13,8 +13,9 @@ import Link from 'next/link';
 import { CalendarRange } from 'lucide-react';
 import { Reveal } from '@/components/marketing/site/reveal';
 
-// TODO: paste the Calendly inline-embed URL here
-// e.g. 'https://calendly.com/your-org/chippi-walkthrough'
+// Live Calendly inline-embed URL. Empty on purpose until a real booking
+// page exists — do not invent a calendar. Team / Team Plus still go through
+// this page; Solo/Pro can start the trial without a call.
 const CALENDLY_URL = '';
 
 export function DemoBooking() {
@@ -34,9 +35,12 @@ export function DemoBooking() {
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#ff4b29] ring-1 ring-black/5">
                 <CalendarRange className="h-5 w-5" />
               </span>
-              <p className="mt-3 text-sm font-semibold tracking-tight text-zinc-950">Scheduler</p>
-              <p className="mt-1 text-[11px] uppercase tracking-wider text-neutral-500">
-                Paste CALENDLY_URL to go live
+              <p className="mt-3 text-sm font-semibold tracking-tight text-zinc-950">
+                Live booking is not set up yet
+              </p>
+              <p className="mt-1 max-w-xs text-[13px] leading-relaxed text-neutral-500">
+                There is no calendar behind this card. Start a Solo or Pro trial,
+                or email us about Team.
               </p>
             </div>
           )}

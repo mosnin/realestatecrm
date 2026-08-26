@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu, X, ChevronDown, ArrowRight,
-  PenLine, Target, CalendarCheck, KanbanSquare, Megaphone, Home, FolderOpen,
+  PenLine, Target, CalendarCheck, KanbanSquare, Home, FolderOpen,
   GitBranch, BarChart3, MessagesSquare, Users, MessageCircle, Link2,
   Plug, Building2, Activity, PlayCircle,
 } from 'lucide-react';
@@ -60,7 +60,7 @@ const GROUPS: NavGroup[] = [
     featured: {
       eyebrow: 'For solo real estate agents',
       title: 'Your extra teammate in the field.',
-      body: 'Replies sent in your voice, leads scored, tours booked, from your phone, between showings.',
+      body: 'Drafts in your voice, leads scored, tours booked, from your phone, between showings.',
       cta: 'See the real estate agent story',
       href: '/realtors',
     },
@@ -69,7 +69,6 @@ const GROUPS: NavGroup[] = [
       { icon: Target, label: 'Know who to call first', desc: 'Scored against your live deals', href: '/people' },
       { icon: CalendarCheck, label: 'Book the tour', desc: 'Reply with a time, it’s handled', href: '/realtors' },
       { icon: KanbanSquare, label: 'An honest pipeline', desc: 'One workspace, not six tabs', href: '/deals' },
-      { icon: Megaphone, label: 'Post the listing', desc: 'Flyers and posts, made in place', href: '/studio' },
       { icon: Link2, label: 'Capture every lead', desc: 'Forms, pages, one public bio', href: '/capture' },
     ],
   },

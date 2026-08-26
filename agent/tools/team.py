@@ -116,7 +116,7 @@ async def create_automation(
     ctx: RunContextWrapper[AgentContext],
     description: str,
 ) -> dict[str, Any]:
-    """Build and enable a standing automation from a plain-English description. Explicit send instructions execute; explicit draft instructions draft."""
+    """Build and enable a standing automation, including autonomous or automatic follow-ups. Explicit send/follow-up instructions execute; explicit draft instructions draft."""
     # description: what should happen and when, e.g. "when a new lead comes in,
     # draft a text within 5 minutes and set a follow-up task for tomorrow".
     clean = (description or "").strip()

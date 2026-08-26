@@ -10,9 +10,9 @@
  *   2. Connected + records → staggered list of contacts from the live CRM.
  *   3. Connected + empty → honest empty state (the CRM returned nothing).
  *
- * Live toolkits: hubspot, salesforce, pipedrive, zoho (all have Composio connectors).
- * Coming-soon toolkits: follow_up_boss, compass, boomtown, kvcore, real_geeks
- *   (no Composio toolkit exists yet — rendered as disabled "Coming soon" pills).
+ * Live toolkits: hubspot, salesforce, pipedrive, zoho (Composio OAuth).
+ * Native API-key: follow_up_boss, kvcore.
+ * Coming-soon: compass, boomtown, real_geeks.
  *
  * Data contract: GET /api/sync?slug=<slug>
  *   { connected: boolean, source: string | null, records: SyncRecord[] }
@@ -54,18 +54,40 @@ interface CrmEntry {
   comingSoon?: boolean;
   /** Native (non-Composio) connect — opens the API-key dialog instead of OAuth. */
   native?: boolean;
+  nativeRoute?: string;
+  keyLabel?: string;
+  helpText?: string;
+  placeholder?: string;
 }
 
 /** CRM + real-estate entries surfaced on this page, in display order.
  *  Follow Up Boss leads the real-estate group (native API-key connect).
  *  General CRMs follow (Composio OAuth). Coming-soon entries render as
  *  disabled pills — no fake connect path. */
-const CRM_ENTRIES: CrmEntry[] = [
+export const CRM_ENTRIES: CrmEntry[] = [
   // Real-estate CRMs — Follow Up Boss connects natively via API key
-  { toolkit: 'follow_up_boss', name: 'Follow Up Boss', blurb: 'Paste your API key — Chippi mirrors your people.', native: true },
+  {
+    toolkit: 'follow_up_boss',
+    name: 'Follow Up Boss',
+    blurb: 'Paste your API key — Chippi mirrors your people.',
+    native: true,
+    nativeRoute: '/api/integrations/follow-up-boss',
+    keyLabel: 'API key',
+    helpText: 'Find it in Follow Up Boss under Admin → API.',
+    placeholder: 'fka_live_…',
+  },
   { toolkit: 'compass', name: 'Compass', blurb: 'Mirror your Compass pipeline.', comingSoon: true },
   { toolkit: 'boomtown', name: 'BoomTown', blurb: 'Pull BoomTown leads here.', comingSoon: true },
-  { toolkit: 'kvcore', name: 'kvCORE', blurb: 'Pull kvCORE leads and tasks.', comingSoon: true },
+  {
+    toolkit: 'kvcore',
+    name: 'kvCORE',
+    blurb: 'Paste your API token — Chippi mirrors leads and tasks.',
+    native: true,
+    nativeRoute: '/api/integrations/kvcore',
+    keyLabel: 'API token',
+    helpText: 'In kvCORE: Lead Engine → Lead Dropbox → My API Tokens → generate a Contacts token.',
+    placeholder: 'Paste your kvCORE / BoldTrail API token',
+  },
   { toolkit: 'real_geeks', name: 'Real Geeks', blurb: 'Pull Real Geeks leads.', comingSoon: true },
   // General CRMs — live Composio connectors
   { toolkit: 'hubspot', name: 'HubSpot', blurb: 'Sync deals and contacts from HubSpot.' },
@@ -80,6 +102,7 @@ const SOURCE_LABEL: Record<string, string> = {
   pipedrive: 'Pipedrive',
   zoho: 'Zoho CRM',
   follow_up_boss: 'Follow Up Boss',
+  kvcore: 'kvCORE',
 };
 
 function sourceLabel(source: string | null): string {
@@ -199,7 +222,7 @@ export function SyncView({ slug }: SyncViewProps) {
 function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => void }) {
   const [busyToolkit, setBusyToolkit] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const [fubOpen, setFubOpen] = useState(false);
+  const [nativeEntry, setNativeEntry] = useState<CrmEntry | null>(null);
 
   async function handleOAuthConnect(toolkit: string) {
     setBusyToolkit(toolkit);
@@ -219,7 +242,7 @@ function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => 
     }
   }
 
-  // Real-estate CRMs (native FUB + coming-soon) lead; general OAuth CRMs follow.
+  // Real-estate CRMs (native FUB/kvCORE + coming-soon) lead; general OAuth CRMs follow.
   const realEstate = CRM_ENTRIES.filter((e) => e.native || e.comingSoon);
   const live = CRM_ENTRIES.filter((e) => !e.native && !e.comingSoon);
 
@@ -229,7 +252,7 @@ function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => 
         <p className="text-sm text-destructive">{connectError}</p>
       )}
 
-      {/* Real-estate CRMs — Follow Up Boss connects natively, the rest soon */}
+      {/* Real-estate CRMs — FUB and kvCORE connect natively, the rest soon */}
       <section className="space-y-3">
         <p className={SECTION_LABEL}>Real estate CRMs</p>
         <ul className="divide-y divide-border/60">
@@ -239,7 +262,7 @@ function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => 
               entry={entry}
               busy={busyToolkit === entry.toolkit}
               onConnect={() =>
-                entry.native ? setFubOpen(true) : handleOAuthConnect(entry.toolkit)
+                entry.native ? setNativeEntry(entry) : handleOAuthConnect(entry.toolkit)
               }
             />
           ))}
@@ -272,12 +295,14 @@ function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => 
         .
       </p>
 
-      <FubConnectDialog
+      <NativeConnectDialog
         slug={slug}
-        open={fubOpen}
-        onOpenChange={setFubOpen}
+        entry={nativeEntry}
+        onOpenChange={(open) => {
+          if (!open) setNativeEntry(null);
+        }}
         onConnected={() => {
-          setFubOpen(false);
+          setNativeEntry(null);
           onConnected();
         }}
       />
@@ -285,40 +310,43 @@ function ConnectPanel({ slug, onConnected }: { slug: string; onConnected: () => 
   );
 }
 
-/* ── Follow Up Boss — native API-key connect dialog ──────────────────── */
+/* ── Native API-key connect dialog (Follow Up Boss, kvCORE) ─────────── */
 
-function FubConnectDialog({
+function NativeConnectDialog({
   slug,
-  open,
+  entry,
   onOpenChange,
   onConnected,
 }: {
   slug: string;
-  open: boolean;
+  entry: CrmEntry | null;
   onOpenChange: (v: boolean) => void;
   onConnected: () => void;
 }) {
   const [apiKey, setApiKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const open = entry !== null;
+  const route = entry?.nativeRoute ?? '';
+  const name = entry?.name ?? 'CRM';
 
   async function submit() {
     const key = apiKey.trim();
-    if (!key) {
-      setError('Enter your Follow Up Boss API key.');
+    if (!key || !route) {
+      setError(`Enter your ${entry?.keyLabel ?? 'API key'}.`);
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch('/api/integrations/follow-up-boss', {
+      const res = await fetch(route, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, apiKey: key }),
       });
       const json = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
-        setError(json.error ?? 'Could not connect Follow Up Boss.');
+        setError(json.error ?? `Could not connect ${name}.`);
         setBusy(false);
         return;
       }
@@ -326,7 +354,7 @@ function FubConnectDialog({
       setBusy(false);
       onConnected();
     } catch {
-      setError('Could not reach Follow Up Boss. Try again.');
+      setError(`Could not reach ${name}. Try again.`);
       setBusy(false);
     }
   }
@@ -335,19 +363,18 @@ function FubConnectDialog({
     <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle style={TITLE_FONT}>Connect Follow Up Boss.</DialogTitle>
+          <DialogTitle style={TITLE_FONT}>Connect {name}.</DialogTitle>
           <DialogDescription className={BODY_MUTED}>
-            Paste your API key and Chippi mirrors your people here. Find it in
-            Follow Up Boss → Admin → API.
+            {entry?.helpText ?? 'Paste your key and Chippi mirrors your people here.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2 pt-1">
-          <Label htmlFor="fub-api-key" className={SECTION_LABEL}>
-            API key
+          <Label htmlFor="native-api-key" className={SECTION_LABEL}>
+            {entry?.keyLabel ?? 'API key'}
           </Label>
           <Input
-            id="fub-api-key"
+            id="native-api-key"
             type="password"
             autoComplete="off"
             value={apiKey}
@@ -361,7 +388,7 @@ function FubConnectDialog({
                 void submit();
               }
             }}
-            placeholder="fka_live_…"
+            placeholder={entry?.placeholder ?? ''}
             disabled={busy}
             className="rounded-full"
           />
@@ -466,13 +493,20 @@ function SyncToolbar({
   slug: string;
   onRefresh: () => void;
 }) {
-  const isNative = source === 'follow_up_boss';
+  const nativeRoute =
+    source === 'follow_up_boss'
+      ? '/api/integrations/follow-up-boss'
+      : source === 'kvcore'
+        ? '/api/integrations/kvcore'
+        : null;
+  const isNative = nativeRoute !== null;
   const [disconnecting, setDisconnecting] = useState(false);
 
   async function disconnect() {
+    if (!nativeRoute) return;
     setDisconnecting(true);
     try {
-      await fetch('/api/integrations/follow-up-boss', {
+      await fetch(nativeRoute, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug }),

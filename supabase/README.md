@@ -48,9 +48,11 @@ finds nothing (it lives in the bootstrap), and may wrongly conclude the schema
 is unreproducible — or edits `schema.sql` expecting it to affect a live DB it
 never touches again. The layers are both required and neither alone is complete.
 
-## Follow-up (not yet done — needs a live DB)
+## Follow-up (needs a live DB — see `docs/PROD-STATE.md`)
 
 The cleanest long-term fix is to **regenerate a single, current baseline** via
 `pg_dump --schema-only` from production and replace the stale `schema.sql`, so
-the two layers collapse into one authoritative file. That requires DB access and
-is out of scope for a code-only change; tracked here so it isn't lost.
+the two layers collapse into one authoritative file. Run that only after the
+Phase 0 migration-status row is `ok`. Until then, `migrations/` plus this
+bootstrap remain the apply order; do not edit `schema.sql` expecting it to
+touch prod.

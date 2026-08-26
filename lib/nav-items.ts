@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export interface NavItem {
 // Everything else in the sidebar is the realtor-facing substrate they still
 // expect from a CRM: People, Deals, Calendar, Properties, Intake.
 
-export const realtorNavItems: NavItem[] = [
+const realtorNavCatalog: NavItem[] = [
   {
     href: '/chippi',
     label: 'Chippi',
@@ -175,6 +176,11 @@ export const realtorNavItems: NavItem[] = [
     icon: Settings,
   },
 ];
+
+/** Studio stays in the catalog so the flag can restore it; default-off hides the row. */
+export const realtorNavItems: NavItem[] = realtorNavCatalog.filter(
+  (item) => item.href !== '/studio' || isStudioEnabled(),
+);
 
 /**
  * Secondary "More" section — intentionally empty. The sidebar checks

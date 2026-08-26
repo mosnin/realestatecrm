@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { logger } from '@/lib/logger';
 import { getSignedDownloadUrl } from '@/lib/storage';
+import { rejectIfStudioPaused } from '@/lib/studio/paused';
 
 
 export const runtime = 'nodejs';
@@ -17,6 +18,8 @@ export const runtime = 'nodejs';
 const PAGE_SIZE = 60;
 
 export async function GET(req: Request) {
+  const paused = rejectIfStudioPaused();
+  if (paused) return paused;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const space = await getSpaceForUser(auth.userId);

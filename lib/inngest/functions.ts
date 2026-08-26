@@ -32,6 +32,7 @@ import { isRedisConfigured, redis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { recordDeadLetter, originalEventData } from './dead-letter';
 import { unscoped } from '@/lib/supabase-guard';
+import { isStudioEnabled } from '@/lib/chippi/studio-flag';
 
 
 /** Resolve the space owned by a user (Space.ownerId is unique). Best-effort —
@@ -91,6 +92,7 @@ export const publishScheduledPost = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
+    if (!isStudioEnabled()) return { skipped: 'studio paused' };
     const postId = String((event.data as { postId?: unknown }).postId ?? '');
     if (!postId) return { skipped: 'no postId' };
 

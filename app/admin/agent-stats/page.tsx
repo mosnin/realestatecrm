@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { unscoped } from '@/lib/supabase-guard';
 import { isPlatformAdmin } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 import { SurfaceCard } from '@/components/ui/surface-card';
@@ -8,6 +9,12 @@ import { AdminPageHeader } from '@/app/admin/components/admin-page-header';
 import { StatGrid } from '@/app/admin/components/stat-grid';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SECTION_LABEL, CAPTION, META } from '@/lib/typography';
+import {
+  costVsGrantTable,
+  DEFAULT_COST_ALARM_MULTIPLIER,
+  planLabel,
+  type CostVsGrantRow,
+} from '@/lib/billing/cost-vs-credits';
 
 export const metadata = { title: 'Agent System Health — Admin' };
 
@@ -93,6 +100,45 @@ async function fetchAgentStats(days: number): Promise<AgentStatsResponse> {
   };
 }
 
+async function fetchCostVsCredits(days: number): Promise<CostVsGrantRow[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data: usage, error: usageErr } = await unscoped(
+    supabase.from('ChatUsage').select('spaceId, costUsd').gte('createdAt', since).limit(5_000),
+    'admin agent-stats: ChatUsage cost vs credit grant across tenants',
+  );
+  if (usageErr) {
+    console.error('[admin/agent-stats] ChatUsage cost scan failed', usageErr.message);
+    return [];
+  }
+
+  const bySpace = new Map<string, number>();
+  for (const row of (usage ?? []) as { spaceId: string; costUsd: string | number | null }[]) {
+    bySpace.set(row.spaceId, (bySpace.get(row.spaceId) ?? 0) + parseFloat(String(row.costUsd ?? 0)));
+  }
+  const spaceIds = Array.from(bySpace.keys());
+  if (spaceIds.length === 0) return [];
+
+  const { data: spaces, error: spaceErr } = await supabase
+    .from('Space')
+    .select('id, plan')
+    .in('id', spaceIds);
+  if (spaceErr) {
+    console.error('[admin/agent-stats] Space plan lookup failed', spaceErr.message);
+    return [];
+  }
+  const planById = new Map(
+    ((spaces ?? []) as { id: string; plan: string | null }[]).map((s) => [s.id, s.plan]),
+  );
+  return costVsGrantTable(
+    spaceIds.map((spaceId) => ({
+      spaceId,
+      plan: planById.get(spaceId) ?? null,
+      costUsd: bySpace.get(spaceId) ?? 0,
+    })),
+    days,
+  );
+}
+
 function fmt(n: number): string {
   return n.toLocaleString('en-US');
 }
@@ -113,10 +159,14 @@ export default async function AgentStatsPage({
   const days = Math.min(Math.max(1, parseInt(daysParam ?? '30', 10) || 30), 365);
 
   let stats: AgentStatsResponse | null = null;
+  let costVsCredits: CostVsGrantRow[] = [];
   let fetchError = false;
 
   try {
-    stats = await fetchAgentStats(days);
+    [stats, costVsCredits] = await Promise.all([
+      fetchAgentStats(days),
+      fetchCostVsCredits(days),
+    ]);
   } catch (err) {
     console.error('[admin/agent-stats] page data fetch failed', err);
     fetchError = true;
@@ -151,7 +201,7 @@ export default async function AgentStatsPage({
       <AdminPageHeader
         eyebrow="System."
         title="Agent health"
-        subtitle={`Last ${days} day${days !== 1 ? 's' : ''} · all spaces.`}
+        subtitle={`Launch dashboard · last ${days} day${days !== 1 ? 's' : ''} · all spaces.`}
         actions={
           <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
             {dayOptions.map((d) => (
@@ -282,6 +332,71 @@ export default async function AgentStatsPage({
             )}
         </SurfaceCard>
       </div>
+
+      <SurfaceCard>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className={SECTION_LABEL}>Chat cost vs credit grant</h2>
+            <span className={CAPTION}>
+              OpenRouter usage.cost · alert at {DEFAULT_COST_ALARM_MULTIPLIER}×
+              pro-rated grant
+            </span>
+          </div>
+          {costVsCredits.length === 0 ? (
+            <EmptyState
+              icon={Bot}
+              title="No paid-space ChatUsage in this period."
+              size="sm"
+              variant="flush"
+            />
+          ) : (
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-border">
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium')}>Space</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium')}>Plan</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium text-right')}>Spend</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 pr-4 font-medium text-right')}>Grant budget</th>
+                    <th className={cn(SECTION_LABEL, 'pb-2 font-medium text-right')}>Ratio</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {costVsCredits.map((row) => {
+                    const hot = row.ratio > DEFAULT_COST_ALARM_MULTIPLIER;
+                    return (
+                      <tr key={row.spaceId} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-2.5 pr-4">
+                          <a
+                            href={`/admin/spaces?q=${encodeURIComponent(row.spaceId)}`}
+                            className="font-mono text-xs text-primary hover:underline underline-offset-2 truncate block max-w-[200px] sm:max-w-xs"
+                            title={row.spaceId}
+                          >
+                            {row.spaceId}
+                          </a>
+                        </td>
+                        <td className="py-2.5 pr-4 text-xs">{planLabel(row.plan)}</td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums font-semibold">
+                          {fmtCost(row.costUsd)}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground">
+                          {fmtCost(row.budgetUsd)}
+                        </td>
+                        <td
+                          className={cn(
+                            'py-2.5 text-right tabular-nums font-semibold',
+                            hot ? 'text-amber-600 dark:text-amber-400' : '',
+                          )}
+                        >
+                          {row.ratio.toFixed(2)}×
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </SurfaceCard>
 
       {/* Tasks by Space */}
       <SurfaceCard>
