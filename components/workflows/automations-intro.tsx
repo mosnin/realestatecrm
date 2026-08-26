@@ -24,7 +24,7 @@ import { IntroDisclosure } from '@/components/ui/intro-disclosure';
  */
 const SEEN_KEY = 'chippi_automations_intro_seen';
 
-const STEPS = [
+export const AUTOMATIONS_INTRO_STEPS = [
   {
     title: 'Automations, on your terms',
     short_description: 'Workflows that work your book',
@@ -77,7 +77,7 @@ export function AutomationsIntro() {
       }}
       onComplete={markSeen}
       onSkip={markSeen}
-      steps={STEPS}
+      steps={AUTOMATIONS_INTRO_STEPS}
       featureId="automations-workflows"
       showProgressBar
     />
