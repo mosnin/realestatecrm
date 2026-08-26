@@ -117,9 +117,12 @@ function makeReq(body: unknown): NextRequest {
   });
 }
 
-function queueSuccessfulInsert() {
-  queueFor('Contact').push({ data: [], error: null });
-  queueFor('Contact').push({ data: [], error: null });
+function queueSuccessfulInsert(opts: { hasEmail?: boolean } = {}) {
+  // Email dedupe only runs when an email is present.
+  if (opts.hasEmail) {
+    queueFor('Contact').push({ data: [], error: null });
+  }
+  queueFor('Contact').push({ data: [], error: null }); // recent name+phone window
   queueFor('Contact').push({ data: [{ id: 'contact_1' }], error: null });
   queueFor('SpaceSetting').push({
     data: { privacyPolicyUrl: null, businessName: null, intakeConfirmationEmail: null },
@@ -138,7 +141,7 @@ beforeEach(() => {
 
 describe('POST /api/public/apply — contact step off', () => {
   it('accepts a submission with no name, email, or phone', async () => {
-    queueSuccessfulInsert();
+    queueSuccessfulInsert({ hasEmail: false });
     const res = await POST(
       makeReq({
         slug: 'acme',
@@ -156,7 +159,7 @@ describe('POST /api/public/apply — contact step off', () => {
   });
 
   it('still maps name/email/phone when those ids are present', async () => {
-    queueSuccessfulInsert();
+    queueSuccessfulInsert({ hasEmail: true });
     const res = await POST(
       makeReq({
         slug: 'acme',
