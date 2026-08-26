@@ -56,6 +56,9 @@ test('homepage proof band stays contained on a phone viewport', async ({ page })
   const boxes: Array<{ x: number; y: number; width: number; height: number }> = [];
   for (const value of values) {
     await expect(value).toBeVisible();
+    await expect
+      .poll(async () => value.boundingBox(), { timeout: 5_000 })
+      .not.toBeNull();
     const box = await value.boundingBox();
     expect(box, 'proof value should have a rendered box').toBeTruthy();
     expect(box!.x).toBeGreaterThanOrEqual(0);
