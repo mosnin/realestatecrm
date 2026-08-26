@@ -90,6 +90,8 @@ export async function GET() {
       .from('Space')
       .select('*')
       .eq('ownerId', user.id)
+      .order('createdAt', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (spaceError) throw spaceError;
     const space = spaceData as Space | null;
@@ -218,6 +220,8 @@ export async function POST(req: NextRequest) {
       .from('Space')
       .select('*')
       .eq('ownerId', user.id)
+      .order('createdAt', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (spaceError) throw spaceError;
     const space = spaceData as Space | null;
@@ -456,6 +460,8 @@ export async function POST(req: NextRequest) {
         .from('Space')
         .select('slug')
         .eq('ownerId', user.id)
+        .order('createdAt', { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (ownerError) throw ownerError;
       if (existingOwnerSpace) return NextResponse.json({ success: true, slug: existingOwnerSpace.slug });
@@ -484,7 +490,12 @@ export async function POST(req: NextRequest) {
       if (spaceInsertErr) {
         // Check if user already owns a space (race condition)
         const { data: ownerSpace } = await supabase
-          .from('Space').select('slug').eq('ownerId', user.id).maybeSingle();
+          .from('Space')
+          .select('slug')
+          .eq('ownerId', user.id)
+          .order('createdAt', { ascending: true })
+          .limit(1)
+          .maybeSingle();
         if (ownerSpace) return NextResponse.json({ success: true, slug: ownerSpace.slug });
 
         const errMsg = spaceInsertErr.message || '';

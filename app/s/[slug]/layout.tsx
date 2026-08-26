@@ -107,9 +107,12 @@ export default async function DashboardLayout({
   }
   if (!space) notFound();
 
-  // Security: ensure the authenticated user actually owns this workspace.
-  // Without this check any logged-in user could visit /s/<other-user-slug>.
-  if (!dbUser.space || dbUser.space.id !== space.id) notFound();
+  // Security: owner or invited member. Without this check any logged-in
+  // user could visit /s/<other-user-slug>.
+  const canEnter =
+    dbUser.accessibleSpaceIds?.includes(space.id) ||
+    dbUser.space?.id === space.id;
+  if (!canEnter) notFound();
 
   // ── Subscription gate — redirect to standalone pages ────────────────
   // Exempt billing and settings pages so users can manage their subscription.

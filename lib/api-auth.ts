@@ -144,8 +144,10 @@ export function canAccessWorkspace(args: {
 }
 
 /**
- * Verifies the calling user owns the given workspace slug, OR is a
- * broker_owner/broker_admin of the brokerage that manages this space.
+ * Verifies the caller can operate this workspace: they own THIS space
+ * (a person may own more than one business), they hold a seat on it, or
+ * they are a broker_owner/broker_admin of a brokerage that manages it.
+ * Billing and delete stay on {@link requireSpaceAccountOwner}.
  * Returns { userId, space } or a 4xx NextResponse.
  */
 export async function requireSpaceOwner(
@@ -162,7 +164,7 @@ export async function requireSpaceOwner(
   ]);
   if (!space) return NextResponse.json({ error: 'Space not found' }, { status: 404 });
 
-  // Direct owner check
+  // Direct owner of THIS space (a person can own more than one business).
   if (userSpace && space.id === userSpace.id) {
     return { userId, space };
   }
@@ -175,6 +177,20 @@ export async function requireSpaceOwner(
     .maybeSingle();
 
   if (dbUser) {
+    const { data: ownsThis } = await supabase
+      .from('Space')
+      .select('id')
+      .eq('id', space.id)
+      .eq('ownerId', dbUser.id)
+      .maybeSingle();
+    if (ownsThis) return { userId, space };
+
+    const { data: seat } = await tenantTable(supabase, 'SpaceMembership', { spaceId: space.id })
+      .select('id')
+      .eq('userId', dbUser.id)
+      .maybeSingle();
+    if (seat) return { userId, space };
+
     // Check if the space belongs to a brokerage the user is admin/owner of.
     // Fetch ALL broker-level memberships rather than .maybeSingle() — a user
     // who owns/admins more than one brokerage would otherwise make
@@ -213,6 +229,31 @@ export async function requireSpaceOwner(
   }
 
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+}
+
+/**
+ * The person who owns the business — not an invited teammate — pays for it
+ * and can cancel it. Invited seats can work in the book; they cannot open
+ * Stripe checkout or the customer portal.
+ */
+export async function requireSpaceAccountOwner(
+  slug: string,
+): Promise<{ userId: string; space: Space } | NextResponse> {
+  const result = await requireSpaceOwner(slug);
+  if (result instanceof NextResponse) return result;
+
+  const { data: dbUser } = await supabase
+    .from('User')
+    .select('id')
+    .eq('clerkId', result.userId)
+    .maybeSingle();
+  if (!dbUser || dbUser.id !== result.space.ownerId) {
+    return NextResponse.json(
+      { error: 'Only the workspace owner can manage billing for this business.' },
+      { status: 403 },
+    );
+  }
+  return result;
 }
 
 /**

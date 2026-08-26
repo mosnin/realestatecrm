@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, pickSpacePriceId } from '@/lib/stripe';
 import { supabase } from '@/lib/supabase';
-import { hasCurrentSubscription, requireSpaceOwner } from '@/lib/api-auth';
+import { hasCurrentSubscription, requireSpaceAccountOwner } from '@/lib/api-auth';
 import { getBrokerContext } from '@/lib/permissions';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { PLANS, addonSeatsForPlan, isAnnualAvailable } from '@/lib/plans';
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     // refusal happens after auth (below) to keep auth-first ordering.
     const cadence = resolveCadence(body?.cadence);
 
-    const auth = await requireSpaceOwner(slug);
+    const auth = await requireSpaceAccountOwner(slug);
     if (auth instanceof NextResponse) return auth;
     const { userId, space } = auth;
 
