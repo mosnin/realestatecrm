@@ -127,6 +127,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
   it('records an outbound InboxMessage (tied to the draft + contact) and a ContactActivity on a successful email send', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'email', subject: 'Tour times', content: 'original body', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
@@ -163,6 +164,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
   it('records the EDITED body that was actually sent, not the original', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'email', subject: 'Hi', content: 'original body', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
@@ -186,6 +188,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
   it('maps an SMS send to channel sms + ContactActivity type note (no sms activity type)', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'sms', subject: null, content: 'short sms', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Bob', email: null, phone: '+15551234' }, error: null });
@@ -224,6 +227,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
     // Draft tied to a deal but no contact — a thread needs a contact, so skip.
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: null, dealId: 'deal_1', channel: 'email', subject: 'Hi', content: 'body', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     // No Contact row is fetched when contactId is null; sendDraft still runs.
@@ -241,6 +245,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
   it('still returns success when the inbox record throws (best-effort)', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'email', subject: 'Hi', content: 'body', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
@@ -259,6 +264,7 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
   it('still returns success when the ContactActivity insert throws (best-effort)', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'email', subject: 'Hi', content: 'body', outcome: null }, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
       { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
@@ -271,6 +277,20 @@ describe('PATCH /api/agent/drafts/[id] — Phase 2 inbox + activity wire-in', ()
     expect(res.status).toBe(200);
     const json = (await res.json()) as { deliveryResult: { sent: boolean } };
     expect(json.deliveryResult.sent).toBe(true);
+  });
+
+  it('does not send when a concurrent approve already claimed the draft', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', dealId: null, channel: 'email', subject: 'Hi', content: 'body', outcome: null }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+
+    const res = await PATCH(makeReq({ status: 'approved' }), params('d1'));
+    expect(res.status).toBe(409);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+    expect(inboxMessage()).toBeUndefined();
+    expect(inserts.find((i) => i.table === 'ContactActivity')).toBeUndefined();
   });
 
   it('does not record anything on a dismissed draft', async () => {
