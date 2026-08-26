@@ -152,10 +152,11 @@ export function SidebarUserMenu({
     // rows directly underneath — no Portal, no Sheet-modal collision.
     return (
       <div className="p-2">
-        <button
+          <button
           type="button"
           onClick={() => setDrawerExpanded((v) => !v)}
           aria-expanded={drawerExpanded}
+          title={email ?? displayName}
           className="group w-full flex items-center gap-2.5 h-12 pl-1.5 pr-2 rounded-md hover:bg-foreground/[0.04] transition-colors duration-150 text-left"
         >
           {avatarBlock}
@@ -163,11 +164,6 @@ export function SidebarUserMenu({
             <p className="text-[13px] font-medium text-foreground truncate leading-tight">
               {displayName}
             </p>
-            {email && (
-              <p className="text-[11px] text-muted-foreground/80 truncate leading-tight mt-0.5">
-                {email}
-              </p>
-            )}
           </div>
           <ChevronDown
             size={14}
@@ -227,6 +223,7 @@ export function SidebarUserMenu({
         <PopoverTrigger asChild>
           <button
             type="button"
+            title={email ?? displayName}
             className="group w-full flex items-center gap-2.5 h-12 pl-1.5 pr-2 rounded-md hover:bg-foreground/[0.04] transition-colors duration-150 text-left"
           >
             {avatarBlock}
@@ -234,11 +231,6 @@ export function SidebarUserMenu({
               <p className="text-[13px] font-medium text-foreground truncate leading-tight">
                 {displayName}
               </p>
-              {email && (
-                <p className="text-[11px] text-muted-foreground/80 truncate leading-tight mt-0.5">
-                  {email}
-                </p>
-              )}
             </div>
             <MoreHorizontal
               size={14}
