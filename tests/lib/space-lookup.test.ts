@@ -13,6 +13,10 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { from: (...args: unknown[]) => fromMock(...args) },
 }));
 
+vi.mock('@/lib/supabase-guard', () => ({
+  unscoped: (q: unknown) => q,
+}));
+
 import {
   loadDashboardUser,
   querySpaceBySlug,
@@ -47,6 +51,24 @@ function userLookup(result: { data: unknown; error: unknown }) {
       eq: vi.fn(() => ({
         maybeSingle: vi.fn(async () => result),
       })),
+    })),
+  };
+}
+
+function ownedSpacesLookup(rows: Array<{ id: string }>) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        order: vi.fn(() => Promise.resolve({ data: rows, error: null })),
+      })),
+    })),
+  };
+}
+
+function membershipLookup(rows: Array<{ spaceId: string }>) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => Promise.resolve({ data: rows, error: null })),
     })),
   };
 }
@@ -111,7 +133,8 @@ describe('loadDashboardUser', () => {
           error: null,
         }),
       )
-      .mockReturnValueOnce(userLookup({ data: { id: 'space-1' }, error: null }));
+      .mockReturnValueOnce(ownedSpacesLookup([{ id: 'space-1' }]))
+      .mockReturnValueOnce(membershipLookup([]));
 
     await expect(loadDashboardUser('clerk_1')).resolves.toEqual({
       id: 'user-1',
@@ -119,6 +142,7 @@ describe('loadDashboardUser', () => {
       onboard: true,
       isPlatformAdmin: false,
       space: { id: 'space-1' },
+      accessibleSpaceIds: ['space-1'],
     });
   });
 
@@ -133,12 +157,14 @@ describe('loadDashboardUser', () => {
       .mockReturnValueOnce(
         userLookup({ data: { id: 'user-1', onboard: true, name: 'Ada' }, error: null }),
       )
-      .mockReturnValueOnce(userLookup({ data: { id: 'space-1' }, error: null }));
+      .mockReturnValueOnce(ownedSpacesLookup([{ id: 'space-1' }]))
+      .mockReturnValueOnce(membershipLookup([]));
 
     await expect(loadDashboardUser('clerk_1')).resolves.toMatchObject({
       id: 'user-1',
       isPlatformAdmin: false,
       space: { id: 'space-1' },
+      accessibleSpaceIds: ['space-1'],
     });
     expect(fromMock.mock.results[1].value.select).toHaveBeenCalledWith('id, onboard, name');
   });

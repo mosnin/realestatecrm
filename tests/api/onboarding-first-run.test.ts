@@ -58,6 +58,8 @@ vi.mock('@/lib/supabase', () => ({
       const chain: Record<string, unknown> = {};
       chain.select = vi.fn(() => chain);
       chain.eq = vi.fn(() => chain);
+      chain.order = vi.fn(() => chain);
+      chain.limit = vi.fn(() => chain);
       chain.update = vi.fn((values: Record<string, unknown>) => {
         if (table === 'User') userUpdates.push(values);
         return chain;
