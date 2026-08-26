@@ -78,7 +78,17 @@ Rules:
 const EXPLICIT_DRAFT =
   /\b(draft|compose|prepare|write(?:\s+me)?)\b[\s\S]{0,80}\b(email|text|sms|message|reply)\b/i;
 const EXPLICIT_SEND =
-  /\b(send|email(?:s|ed|ing)?|text(?:s|ed|ing)?|sms|reply|forward)\b|\bmessage(?:s|d|ing)?\s+(?:a|the|this|that|my|our|all|every|each|new|lead|client|contact|buyer|seller|prospect|them|him|her)\b|\b(?:autonomous(?:ly)?|automatic(?:ally)?)\s+follow[\s-]?ups?\b|\bfollow[\s-]?up\s+(?:with|after|automatically|autonomously)\b|\b(?:automatically|autonomously)\b[\s\S]{0,40}\bfollow[\s-]?up\b/i;
+  /\b(send|email(?:s|ed|ing)?|text(?:s|ed|ing)?|sms|reply|forward)\b|\bmessage(?:s|d|ing)?\s+(?:a|the|this|that|my|our|all|every|each|new|lead|client|contact|buyer|seller|prospect|them|him|her)\b|\b(?:autonomous(?:ly)?|automatic(?:ally)?)\s+follow[\s-]?ups?\b|\bfollow[\s-]?up\s+(?:with|after|automatically|autonomously)\b|\b(?:automatically|autonomously)\b[\s\S]{0,40}\bfollow[\s-]?up\b|\b(?:work|run|operate|act)\s+autonomous(?:ly)?\b|\b(?:can you|could you|are you able to|do you)\b[\s\S]{0,50}\b(?:autonomous(?:ly)?|automatic(?:ally)?|on\s+autopilot)\b/i;
+const CAPABILITY_ONLY =
+  /\b(?:can you|could you|are you able to|do you)\b[\s\S]{0,50}\b(?:autonomous(?:ly)?|automatic(?:ally)?|on\s+autopilot)\b|\b(?:work|run|operate|act)\s+autonomous(?:ly)?\b|\b(?:autonomous(?:ly)?|automatic(?:ally)?)\s+follow[\s-]?ups?\b/i;
+
+export function isExplicitAutomationSend(description: string): boolean {
+  return !EXPLICIT_DRAFT.test(description) && EXPLICIT_SEND.test(description);
+}
+
+export function isAutonomyCapabilityAsk(description: string): boolean {
+  return !EXPLICIT_DRAFT.test(description) && CAPABILITY_ONLY.test(description);
+}
 
 /** Exported for tests. "in 2 days" → 2880. Immediate words win. */
 export function requestedDelayMinutes(description: string): number {
@@ -191,10 +201,74 @@ function forceExecutionSemantics(
         return action;
       })
     : raw.actions;
-  const actions = Array.isArray(mapped)
+  let actions = Array.isArray(mapped)
     ? foldHaltedDelayActions(mapped, parsedDelay, explicitSend)
     : mapped;
+  const hasSend =
+    Array.isArray(actions) &&
+    actions.some(
+      (candidate) =>
+        !!candidate &&
+        typeof candidate === 'object' &&
+        (candidate as { type?: unknown }).type === 'schedule_message',
+    );
+  if (isAutonomyCapabilityAsk(description) && !hasSend) {
+    actions = [
+      {
+        type: 'schedule_message',
+        config: {
+          channel: 'sms',
+          instruction: 'Send a short, personal follow-up.',
+          delayMinutes: parsedDelay,
+        },
+      },
+    ];
+    if (!raw.trigger || typeof raw.trigger !== 'object') {
+      raw.trigger = { type: 'lead_created', config: {} };
+    }
+  }
   return { ...raw, actions, autonomy: 'auto' };
+}
+
+const DEFAULT_GENERATE_SEND = {
+  type: 'schedule_message',
+  channel: 'sms',
+  instruction: 'Send a short, personal follow-up.',
+};
+
+/**
+ * Builder AI output is a loose form-state blob, not a persisted definition.
+ * Drop halted `delay` steps and honor explicit send / autonomy wording so the
+ * composer does not open as a draft-only or dead-wait workflow.
+ */
+export function sanitizeGeneratedWorkflowForm(prompt: string, parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== 'object') return parsed;
+  const form = { ...(parsed as Record<string, unknown>) };
+  const delayMinutes = String(requestedDelayMinutes(prompt));
+  const send = isExplicitAutomationSend(prompt) || isAutonomyCapabilityAsk(prompt);
+  const rawActions = Array.isArray(form.actions) ? form.actions : [];
+  const actions: Record<string, unknown>[] = [];
+  for (const candidate of rawActions) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const action = { ...(candidate as Record<string, unknown>) };
+    if (action.type === 'delay') continue;
+    if (send && action.type === 'draft_message') {
+      action.type = 'schedule_message';
+      if (action.delayMinutes == null || action.delayMinutes === '' || action.delayMinutes === '0') {
+        action.delayMinutes = delayMinutes;
+      }
+    }
+    actions.push(action);
+  }
+  if (send && !actions.some((action) => action.type === 'schedule_message')) {
+    actions.push({ ...DEFAULT_GENERATE_SEND, delayMinutes });
+    if (!form.trigger || typeof form.trigger !== 'object') {
+      form.trigger = { type: 'lead_created' };
+    }
+  }
+  form.actions = actions;
+  if (send) form.autonomy = 'auto';
+  return form;
 }
 
 export async function createWorkflowFromDescription(input: {

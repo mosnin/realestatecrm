@@ -44,7 +44,7 @@ async def manage_routines(
     # ── update only ──
     enabled: bool | None = None,
 ) -> dict[str, Any]:
-    """Manage realtor routines (standing scheduled instructions that DRAFT, never send)."""
+    """Manage daily/hourly draft-only routines. Do not use this for autonomous follow-ups or standing sends — those are create_automation."""
     # list: returns all routines.
     # create: needs instruction; cadence hourly|daily|weekdays (default daily); hour 0-23 UTC (default 13).
     # update: needs routine_id + any of instruction/cadence/hour/enabled.

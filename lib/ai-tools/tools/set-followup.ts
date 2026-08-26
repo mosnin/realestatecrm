@@ -106,7 +106,7 @@ export const setFollowupTool = defineTool<typeof parameters, SetFollowupResult>(
   name: 'set_followup',
   riskLevel: 'low',
   description:
-    "Schedule a follow-up on a contact. Accepts ISO date or 'today'/'tomorrow'/weekday/'next <weekday>'. Prompts for approval first.",
+    "Set a one-off follow-up date on one contact. Not for standing, automatic, or autonomous follow-ups — those use create_automation.",
   parameters,
   requiresApproval: true,
   rateLimit: { max: 200, windowSeconds: 3600 },

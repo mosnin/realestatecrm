@@ -262,14 +262,18 @@ describe('toolsets — per-turn selection', () => {
       'I want automatic follow-ups',
     ])('loads create_automation for standing follow-up asks: %s', (message) => {
       expect(selectToolsets(message)).toContain('automations');
-      expect(getChatTools(message).map((tool) => tool.name)).toContain('create_automation');
+      const chatNames = getChatTools(message).map((tool) => tool.name);
+      expect(chatNames).toContain('create_automation');
+      expect(chatNames).not.toContain('set_followup');
       const tools = getChatTools(message, { workMode: true });
       expect(tools.map((tool) => tool.name)).toContain('create_automation');
+      expect(tools.map((tool) => tool.name)).not.toContain('set_followup');
       expect(selectDirectExecutionToolNames(message, tools)).toEqual(['create_automation']);
     });
 
     it('does not treat a one-off follow-up date as an automation', () => {
       const message = 'Set a follow-up for Jane tomorrow';
+      expect(getChatTools(message).map((tool) => tool.name)).toContain('set_followup');
       expect(selectDirectExecutionToolNames(message, getChatTools(message, { workMode: true }))).not.toEqual(
         ['create_automation'],
       );

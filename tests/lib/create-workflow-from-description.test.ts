@@ -26,6 +26,7 @@ vi.mock('@/lib/integrations/trigger-catalog', () => ({
 import {
   createWorkflowFromDescription,
   requestedDelayMinutes,
+  sanitizeGeneratedWorkflowForm,
   WorkflowCreationError,
 } from '@/lib/workflows/create-from-description';
 
@@ -183,6 +184,56 @@ describe('createWorkflowFromDescription', () => {
         }),
       }),
     ]);
+  });
+
+  it('turns a bare autonomy ask into an enabled send instead of a draft-only workflow', async () => {
+    mocks.complete.mockResolvedValue(
+      completionFor({
+        type: 'create_task',
+        config: { title: 'Follow up later', dueInDays: 1 },
+      }),
+    );
+
+    const result = await createWorkflowFromDescription({
+      spaceId: 'space-1',
+      description: 'Can you work autonomously?',
+    });
+
+    expect(result.definition.autonomy).toBe('auto');
+    expect(result.definition.actions).toEqual([
+      expect.objectContaining({
+        type: 'schedule_message',
+        config: expect.objectContaining({
+          channel: 'sms',
+          instruction: 'Send a short, personal follow-up.',
+        }),
+      }),
+    ]);
+  });
+
+  it('drops halted delay steps from builder AI output and honors automatic send wording', () => {
+    const sanitized = sanitizeGeneratedWorkflowForm('Set up automatic follow-ups for every new lead', {
+      name: 'Auto follow-up',
+      autonomy: 'draft',
+      trigger: { type: 'lead_created' },
+      actions: [
+        { type: 'delay', delayMinutes: '2880' },
+        { type: 'draft_message', channel: 'sms', instruction: 'Check in.' },
+      ],
+    });
+
+    expect(sanitized).toEqual(
+      expect.objectContaining({
+        autonomy: 'auto',
+        actions: [
+          expect.objectContaining({
+            type: 'schedule_message',
+            channel: 'sms',
+            instruction: 'Check in.',
+          }),
+        ],
+      }),
+    );
   });
 
   it('does not mistake an inbound-message trigger for an instruction to send', async () => {

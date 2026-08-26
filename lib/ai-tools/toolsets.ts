@@ -455,6 +455,10 @@ export function getChatTools(
     wanted.delete('send_sms');
     wanted.delete('send_property_packet');
     wanted.delete('add_person');
+    // One-off CRM reminder dates compete with standing automations on the
+    // same "follow-up" wording. Keep set_followup off this turn.
+    wanted.delete('set_followup');
+    wanted.delete('clear_followup');
   }
 
   if (capabilities.workMode) {
