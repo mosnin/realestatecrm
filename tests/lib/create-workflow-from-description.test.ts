@@ -25,6 +25,7 @@ vi.mock('@/lib/integrations/trigger-catalog', () => ({
 
 import {
   createWorkflowFromDescription,
+  DEFAULT_AUTO_FOLLOW_UP_BODY,
   requestedDelayMinutes,
   sanitizeGeneratedWorkflowForm,
   WorkflowCreationError,
@@ -205,10 +206,34 @@ describe('createWorkflowFromDescription', () => {
         type: 'schedule_message',
         config: expect.objectContaining({
           channel: 'sms',
-          instruction: 'Send a short, personal follow-up.',
+          instruction: DEFAULT_AUTO_FOLLOW_UP_BODY,
         }),
       }),
     ]);
+    // processAuto sends instruction verbatim — never an agent "Send/Draft…" command.
+    expect(DEFAULT_AUTO_FOLLOW_UP_BODY).not.toMatch(/^(send|draft|write|compose)\b/i);
+  });
+
+  it('uses the same client-facing body when the builder has no send action', () => {
+    const sanitized = sanitizeGeneratedWorkflowForm('Can you work autonomously?', {
+      name: 'Autonomy',
+      autonomy: 'draft',
+      actions: [{ type: 'create_task', title: 'Follow up later' }],
+    });
+
+    expect(sanitized).toEqual(
+      expect.objectContaining({
+        autonomy: 'auto',
+        trigger: { type: 'lead_created' },
+        actions: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'schedule_message',
+            channel: 'sms',
+            instruction: DEFAULT_AUTO_FOLLOW_UP_BODY,
+          }),
+        ]),
+      }),
+    );
   });
 
   it('drops halted delay steps from builder AI output and honors automatic send wording', () => {
