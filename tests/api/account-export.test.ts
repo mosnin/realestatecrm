@@ -124,6 +124,8 @@ describe('GET /api/account/export', () => {
     };
 
     expect(res.status).toBe(200);
+    expect(getSpaceForUserMock).toHaveBeenCalledTimes(1);
+    expect(getSpaceForUserMock).toHaveBeenCalledWith('clerk_1');
     expect(exportSpaceDataMock).toHaveBeenCalledTimes(1);
     expect(exportSpaceDataMock).toHaveBeenCalledWith('sp_session');
     expect(payload.spaceId).toBe('sp_session');

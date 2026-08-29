@@ -179,6 +179,7 @@ describe('POST /api/public/apply — email is not an identity', () => {
     expect(res.status).toBe(200);
     expect(body.id).toBe('contact_prior');
     expect(body.applicationRef).toBe('ref_alice');
+    expect(body).not.toHaveProperty('statusPortalToken');
     expect(observed.inserts).toHaveLength(0);
     expect(observed.eqs).toContainEqual({ table: 'Contact', column: 'spaceId', value: 'space_1' });
   });
@@ -214,9 +215,9 @@ describe('POST /api/public/apply — email is not an identity', () => {
     expect(contactInsert?.row.applicationRef).toBe(body.applicationRef);
   });
 
-  it('escapes ILIKE wildcards in the email so a_b@example.com cannot match aXb', async () => {
-    // `%` is not a valid email local-part under the Zod `.email()` gate, but
-    // `_` is — and without escapeLike it is a single-character ILIKE wildcard.
+  it('passes the email through escapeLike before the Contact ILIKE lookup', async () => {
+    // Proves the route applies escapeLike at the call site. The mock does not
+    // evaluate ILIKE; wildcard safety of the helper is in tests/lib/escape-like.test.ts.
     queueFor('Contact').push({
       data: [{ id: 'contact_prior', name: 'Jane Doe', applicationRef: 'ref_1' }],
       error: null,

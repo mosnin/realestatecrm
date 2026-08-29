@@ -40,7 +40,11 @@ const {
   hardDeleteEnabledMock: vi.fn(() => false),
   checkDeletionBlockersMock: vi.fn(async () => null),
   hardDeleteSpaceAndUserMock: vi.fn(async () => undefined),
-  dbState: { userRow: { id: 'user_db_1' } as { id: string } | null },
+  dbState: {
+    userRow: { id: 'user_db_1' } as { id: string } | null,
+    userEqs: [] as Array<{ column: string; value: unknown }>,
+    fromTables: [] as string[],
+  },
 }));
 
 vi.mock('@/lib/api-auth', () => ({ requireAuth: requireAuthMock }));
@@ -56,14 +60,18 @@ vi.mock('@/lib/account-deletion', () => ({
   hardDeleteSpaceAndUser: hardDeleteSpaceAndUserMock,
 }));
 vi.mock('@/lib/supabase', () => {
-  function chain(): Record<string, unknown> {
+  function chain(table: string): Record<string, unknown> {
+    dbState.fromTables.push(table);
     const c: Record<string, unknown> = {};
     c.select = () => c;
-    c.eq = () => c;
+    c.eq = (column: string, value: unknown) => {
+      dbState.userEqs.push({ column, value });
+      return c;
+    };
     c.maybeSingle = async () => ({ data: dbState.userRow, error: null });
     return c;
   }
-  return { supabase: { from: () => chain() } };
+  return { supabase: { from: (table: string) => chain(table) } };
 });
 
 import { POST } from '@/app/api/account/delete/route';
@@ -82,6 +90,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.CLERK_SECRET_KEY = 'sk_test_x';
   dbState.userRow = { id: 'user_db_1' };
+  dbState.userEqs.length = 0;
+  dbState.fromTables.length = 0;
   requireAuthMock.mockResolvedValue({ userId: 'clerk_1' });
   getSpaceForUserMock.mockResolvedValue({
     id: 'sp_session',
@@ -195,6 +205,10 @@ describe('POST /api/account/delete — Clerk then gated sweep', () => {
     expect(res.status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.pendingDataDeletion).toBe(true);
+    expect(getSpaceForUserMock).toHaveBeenCalledTimes(1);
+    expect(getSpaceForUserMock).toHaveBeenCalledWith('clerk_1');
+    expect(dbState.fromTables).toEqual(['User']);
+    expect(dbState.userEqs).toContainEqual({ column: 'clerkId', value: 'clerk_1' });
     expect(deleteUserMock).toHaveBeenCalledTimes(1);
     expect(deleteUserMock).toHaveBeenCalledWith('clerk_1');
     expect(hardDeleteSpaceAndUserMock).not.toHaveBeenCalled();
@@ -223,6 +237,9 @@ describe('POST /api/account/delete — Clerk then gated sweep', () => {
       userDbId: 'user_db_1',
       spaceId: 'sp_session',
     });
+    expect(deleteUserMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hardDeleteSpaceAndUserMock.mock.invocationCallOrder[0],
+    );
 
     expect(auditMock).toHaveBeenCalledTimes(2);
     expect(auditMock.mock.calls[0][0]).toMatchObject({
