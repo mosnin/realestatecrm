@@ -41,6 +41,10 @@ import type {
   ConversationTurnAttachment,
   ConversationTurnRecord,
 } from '@/lib/chat/turn-control';
+import {
+  restorePendingApprovalIfIdle,
+  type RestoredPendingApproval,
+} from '@/lib/chat/restore-pending-approval';
 
 export interface UiMessage {
   id: string;
@@ -1092,7 +1096,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       { cache: 'no-store' },
     );
     if (!response.ok) throw new Error('Could not load queued work.');
-    const payload = (await response.json()) as { turns?: ConversationTurnRecord[] };
+    const payload = (await response.json()) as {
+      turns?: ConversationTurnRecord[];
+      pendingApproval?: RestoredPendingApproval | null;
+    };
     const turns = Array.isArray(payload.turns) ? payload.turns : [];
     // The accepted turn can still read as `pending` for a moment while its
     // stream is claiming the lease. It is already rendered in the transcript,
@@ -1103,6 +1110,16 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     setQueuedMessages(visible);
     const active = turns.find((turn) => turn.status === 'running' || turn.status === 'paused');
     activeTurnIdRef.current = active?.id ?? null;
+    const restored = restorePendingApprovalIfIdle({
+      current: pendingApprovalRef.current,
+      restored: payload.pendingApproval ?? null,
+      streaming: isStreamingRef.current,
+      loadedConversationId: conversationId,
+      activeConversationId: conversationIdRef.current,
+    });
+    if (restored && restored !== pendingApprovalRef.current) {
+      setPendingApproval(restored);
+    }
     return turns;
   }, [durableTurnQueueEnabled]);
   refreshDurableQueueRef.current = loadDurableTurns;
