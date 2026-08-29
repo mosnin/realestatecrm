@@ -70,13 +70,23 @@ vi.mock('@/lib/supabase', () => {
       updateValues = values;
       return chain;
     });
-    chain.maybeSingle = vi.fn(() => Promise.resolve(terminal));
-    chain.single = vi.fn(() => Promise.resolve(terminal));
-    // Update returns a chain that's awaitable on `.eq(...).eq(...)`.
-    chain.then = (resolve: (v: Terminal) => unknown, reject?: (e: unknown) => unknown) => {
+    const recordUpdate = () => {
       if (isUpdate) {
         updateCalls.push({ table, values: updateValues, eq: eqs });
+        isUpdate = false;
       }
+    };
+    chain.maybeSingle = vi.fn(() => {
+      recordUpdate();
+      return Promise.resolve(terminal);
+    });
+    chain.single = vi.fn(() => {
+      recordUpdate();
+      return Promise.resolve(terminal);
+    });
+    // Update returns a chain that's awaitable on `.eq(...).eq(...)`.
+    chain.then = (resolve: (v: Terminal) => unknown, reject?: (e: unknown) => unknown) => {
+      recordUpdate();
       try {
         return Promise.resolve(terminal).then(resolve, reject);
       } catch (e) {
@@ -174,6 +184,20 @@ describe('POST /api/agent/drafts/batch-approve', () => {
     expect(mockSendDraft).not.toHaveBeenCalled();
   });
 
+  it('does not send when a concurrent approve already claimed the draft', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'hi' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+
+    const res = await POST(makeReq({ draftIds: ['d1'] }));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { results: Array<{ draftId: string; ok: boolean; error?: string }> };
+    expect(json.results).toEqual([{ draftId: 'd1', ok: false, error: 'already_claimed' }]);
+    expect(mockSendDraft).not.toHaveBeenCalled();
+  });
+
   it('returns already_<status> for a non-pending draft (skipped, not failed)', async () => {
     queueFor('AgentDraft').push({
       data: { id: 'd1', status: 'sent', contactId: 'c1', channel: 'email', subject: 's', content: 'hi' },
@@ -188,16 +212,18 @@ describe('POST /api/agent/drafts/batch-approve', () => {
   });
 
   it('sends all drafts on happy path and returns ok=true per item', async () => {
-    // Two drafts. For each: one AgentDraft read, one Contact read, one update.
+    // Two drafts. For each: read, claim pending→approved, then flip to sent.
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's1', content: 'hello 1' }, error: null },
-      { data: null, error: null }, // update terminal for d1
+      { data: { id: 'd1', status: 'approved' }, error: null },
+      { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
 
     queueFor('AgentDraft').push(
       { data: { id: 'd2', status: 'pending', contactId: 'c2', channel: 'sms', subject: null, content: 'hello 2' }, error: null },
-      { data: null, error: null }, // update terminal for d2
+      { data: { id: 'd2', status: 'approved' }, error: null },
+      { data: { id: 'd2', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Bob', email: null, phone: '+15551234' }, error: null });
 
@@ -214,24 +240,27 @@ describe('POST /api/agent/drafts/batch-approve', () => {
     expect(json.results[1]).toMatchObject({ draftId: 'd2', ok: true, status: 'sent' });
     expect(mockSendDraft).toHaveBeenCalledTimes(2);
 
-    // Each draft generated one update with status='sent'.
     const updates = updateCalls.filter((u) => u.table === 'AgentDraft');
-    expect(updates).toHaveLength(2);
-    for (const u of updates) {
-      expect((u.values as { status: string }).status).toBe('sent');
-    }
+    expect(updates.map((u) => (u.values as { status: string }).status)).toEqual([
+      'approved',
+      'sent',
+      'approved',
+      'sent',
+    ]);
+    expect(updates.filter((u) => u.eq.some(([col, val]) => col === 'status' && val === 'pending'))).toHaveLength(2);
   });
 
   it('keeps other items running when one delivery fails', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's1', content: 'hi' }, error: null },
-      { data: null, error: null }, // update terminal for d1
+      { data: { id: 'd1', status: 'approved' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
 
     queueFor('AgentDraft').push(
       { data: { id: 'd2', status: 'pending', contactId: 'c2', channel: 'email', subject: 's2', content: 'hi' }, error: null },
-      { data: null, error: null }, // update terminal for d2
+      { data: { id: 'd2', status: 'approved' }, error: null },
+      { data: { id: 'd2', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Bob', email: 'b@x.test', phone: null }, error: null });
 
@@ -255,7 +284,8 @@ describe('POST /api/agent/drafts/batch-approve', () => {
   it('de-dupes repeated draftIds in the input', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'note', subject: null, content: 'note' }, error: null },
-      { data: null, error: null }, // update terminal
+      { data: { id: 'd1', status: 'approved' }, error: null },
+      { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: null, phone: null }, error: null });
 
@@ -273,7 +303,8 @@ describe('POST /api/agent/drafts/batch-approve', () => {
   it('sends the realtor-edited content when an edit is provided', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'original body' }, error: null },
-      { data: null, error: null }, // update terminal
+      { data: { id: 'd1', status: 'approved' }, error: null },
+      { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
     mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
@@ -300,7 +331,8 @@ describe('POST /api/agent/drafts/batch-approve', () => {
   it('falls back to stored content when no edit is provided for a draft', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'stored body' }, error: null },
-      { data: null, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
+      { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
     mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
@@ -322,7 +354,8 @@ describe('POST /api/agent/drafts/batch-approve', () => {
   it('does not flag a whitespace-only edit as edited_and_approved', async () => {
     queueFor('AgentDraft').push(
       { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 's', content: 'hello there' }, error: null },
-      { data: null, error: null },
+      { data: { id: 'd1', status: 'approved' }, error: null },
+      { data: { id: 'd1', status: 'sent' }, error: null },
     );
     queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
     mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });

@@ -8,6 +8,7 @@ import { sendDraft, type DeliveryResult } from '@/lib/delivery';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { normalizedLevenshtein } from '@/lib/draft-feedback';
+import { claimPendingAgentDraft, markClaimedDraftSent } from '@/lib/agent/claim-pending-draft';
 
 /**
  * Batch-approve pending agent drafts in one tap.
@@ -151,6 +152,25 @@ export async function POST(req: NextRequest) {
       // stored draft. The edit was validated (non-empty string) up-front.
       const finalContent: string = edits.get(draftId) ?? existing.content;
 
+      // Server-side edit labelling — same whitespace-normalized comparison the
+      // single PATCH route uses. A no-op edit (whitespace only) is NOT recorded
+      // as 'edited_and_approved'.
+      const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
+      const contentChanged = serverEditDistance > 0;
+
+      const claimPatch: Record<string, unknown> = {
+        status: 'approved',
+        feedback_action: contentChanged ? 'edited_and_approved' : 'approved',
+        edit_distance: contentChanged ? serverEditDistance : 0,
+      };
+      if (contentChanged) claimPatch.content = finalContent;
+
+      const claimed = await claimPendingAgentDraft(space.id, draftId, claimPatch);
+      if (!claimed) {
+        results.push({ draftId, ok: false, error: 'already_claimed' });
+        continue;
+      }
+
       const deliveryResult: DeliveryResult = await sendDraft(
         { channel: existing.channel, subject: existing.subject, content: finalContent },
         contact,
@@ -158,38 +178,11 @@ export async function POST(req: NextRequest) {
         { spaceId: space.id, userId },
       );
 
-      // sent=true → "sent"; sent=false → "approved" (human reviewed,
-      // delivery unconfigured/failed). Matches the single PATCH semantics.
+      // sent=true → flip claimed 'approved' to 'sent'. sent=false keeps
+      // 'approved' (human reviewed, delivery unconfigured/failed).
       const finalStatus: 'sent' | 'approved' = deliveryResult.sent ? 'sent' : 'approved';
-
-      // Server-side edit labelling — same whitespace-normalized comparison the
-      // single PATCH route uses. A no-op edit (whitespace only) is NOT recorded
-      // as 'edited_and_approved'.
-      const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
-      const contentChanged = serverEditDistance > 0;
-
-      const updatePatch: Record<string, unknown> = {
-        status: finalStatus,
-        updatedAt: new Date().toISOString(),
-        feedback_action: contentChanged ? 'edited_and_approved' : 'approved',
-        edit_distance: contentChanged ? serverEditDistance : 0,
-      };
-      if (contentChanged) updatePatch.content = finalContent;
-
-      const { error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
-        .update(updatePatch)
-        .eq('id', draftId);
-
-      if (updateError) {
-        // Delivery may have already happened — surface the DB error to the
-        // realtor but mark the result as failed so they re-check.
-        results.push({
-          draftId,
-          ok: false,
-          error: `update_failed: ${updateError.message}`,
-          deliveryResult,
-        });
-        continue;
+      if (deliveryResult.sent) {
+        await markClaimedDraftSent(space.id, draftId);
       }
 
       void audit({

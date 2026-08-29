@@ -10,6 +10,7 @@ import { logger } from '@/lib/logger';
 import { LEVENSHTEIN_CAP, normalizedLevenshtein } from '@/lib/draft-feedback';
 import type { InboxChannel } from '@/lib/types';
 import { tenantTable } from '@/lib/tenant-db';
+import { claimPendingAgentDraft, markClaimedDraftSent } from '@/lib/agent/claim-pending-draft';
 
 /**
  * Pulls feedback fields from the PATCH body and validates them server-side.
@@ -93,11 +94,10 @@ export async function PATCH(
 
   const { editDistance, decisionMs } = readFeedbackFields(body);
 
-  // ── Dismissed: simple status update ──────────────────────────────────────
+  // ── Dismissed: claim pending so a concurrent Approve cannot also send ──
   if (newStatus === 'dismissed') {
     const dismissPatch: Record<string, unknown> = {
       status: 'dismissed',
-      updatedAt: new Date().toISOString(),
       feedback_action: 'rejected',
     };
     if (decisionMs !== null) dismissPatch.decision_ms = decisionMs;
@@ -105,13 +105,13 @@ export async function PATCH(
       dismissPatch.outcome = 'no_response';
       dismissPatch.outcomeDetectedAt = new Date().toISOString();
     }
-    const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
-      .update(dismissPatch)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
+    const updated = await claimPendingAgentDraft(space.id, id, dismissPatch);
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Draft is already claimed' },
+        { status: 409 },
+      );
+    }
 
     void audit({
       actorClerkId: userId,
@@ -125,7 +125,10 @@ export async function PATCH(
     return NextResponse.json(updated);
   }
 
-  // ── Approved: attempt delivery, then set final status ────────────────────
+  // ── Approved: claim first, then deliver ─────────────────────────────────
+  // The claim is the duplicate-send lock. Two concurrent Approves both see
+  // pending; only one wins the pending→approved flip. The loser 409s and
+  // never calls sendDraft.
 
   // Fetch contact info needed for delivery (email / phone)
   let contact = { name: 'Contact', email: null as string | null, phone: null as string | null };
@@ -137,21 +140,10 @@ export async function PATCH(
     if (contactRow) contact = contactRow;
   }
 
-  const deliveryResult: DeliveryResult = await sendDraft(
-    { channel: existing.channel, subject: existing.subject, content: finalContent },
-    contact,
-    space.name,
-    { spaceId: space.id, userId },
-  );
-
-  // sent=true → "sent"; sent=false → "approved" (human reviewed, delivery unconfigured/failed)
-  const finalStatus = deliveryResult.sent ? 'sent' : 'approved';
-
-  const patch: Record<string, unknown> = {
-    status: finalStatus,
-    updatedAt: new Date().toISOString(),
+  const claimPatch: Record<string, unknown> = {
+    status: 'approved',
   };
-  if (finalContent !== existing.content) patch.content = finalContent;
+  if (finalContent !== existing.content) claimPatch.content = finalContent;
 
   // Server-side feedback labelling. The client can pass editDistance, but the
   // action label ('approved' vs. 'edited_and_approved') is decided here so a
@@ -164,19 +156,34 @@ export async function PATCH(
   // 'edited_and_approved' on rows where the realtor literally just hit Approve.
   const serverEditDistance = normalizedLevenshtein(existing.content, finalContent);
   const contentChanged = serverEditDistance > 0;
-  patch.feedback_action = contentChanged ? 'edited_and_approved' : 'approved';
-  patch.edit_distance = contentChanged
+  claimPatch.feedback_action = contentChanged ? 'edited_and_approved' : 'approved';
+  claimPatch.edit_distance = contentChanged
     ? (editDistance ?? serverEditDistance)
     : 0;
-  if (decisionMs !== null) patch.decision_ms = decisionMs;
+  if (decisionMs !== null) claimPatch.decision_ms = decisionMs;
 
-  const { data: updated, error: updateError } = await tenantTable(supabase, 'AgentDraft', { spaceId: space.id })
-    .update(patch)
-    .eq('id', id)
-    .select()
-    .single();
+  const claimed = await claimPendingAgentDraft(space.id, id, claimPatch);
+  if (!claimed) {
+    return NextResponse.json(
+      { error: 'Draft is already claimed' },
+      { status: 409 },
+    );
+  }
 
-  if (updateError) throw updateError;
+  const deliveryResult: DeliveryResult = await sendDraft(
+    { channel: existing.channel, subject: existing.subject, content: finalContent },
+    contact,
+    space.name,
+    { spaceId: space.id, userId },
+  );
+
+  // sent=true → flip claimed 'approved' to 'sent'. sent=false keeps
+  // 'approved' (human reviewed, delivery unconfigured/failed).
+  const finalStatus = deliveryResult.sent ? 'sent' : 'approved';
+  let updated = claimed;
+  if (deliveryResult.sent) {
+    updated = (await markClaimedDraftSent(space.id, id)) ?? claimed;
+  }
 
   // ── Record the sent message on the contact's inbox thread + timeline ──────
   // Only on a genuine send (sent=true). A draft marked 'approved' because
@@ -249,8 +256,8 @@ export async function PATCH(
       contentEdited: contentChanged,
       deliverySent: deliveryResult.sent,
       deliveryError: deliveryResult.error,
-      feedbackAction: patch.feedback_action,
-      editDistance: patch.edit_distance,
+      feedbackAction: claimPatch.feedback_action,
+      editDistance: claimPatch.edit_distance,
       decisionMs: decisionMs ?? undefined,
     },
   });
