@@ -43,7 +43,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { from: vi.fn((table: string) => makeChain(table)) },
 }));
 
-import { getClientPortalData } from '@/lib/client-portal-data';
+import { clientOwnsContact, getClientPortalData } from '@/lib/client-portal-data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -70,6 +70,27 @@ describe('getClientPortalData — email wildcard injection', () => {
       table: 'Tour',
       method: 'ilike',
       column: 'guestEmail',
+      value: '\\%@gmail.com',
+    });
+  });
+});
+
+describe('clientOwnsContact — email wildcard injection', () => {
+  it('escapes % and _ on Contact.email before the ownership read', async () => {
+    seed('Contact', { data: { id: 'c1' } });
+
+    await expect(clientOwnsContact('%@gmail.com', 'c1')).resolves.toBe(true);
+
+    expect(filterCalls).toContainEqual({
+      table: 'Contact',
+      method: 'eq',
+      column: 'id',
+      value: 'c1',
+    });
+    expect(filterCalls).toContainEqual({
+      table: 'Contact',
+      method: 'ilike',
+      column: 'email',
       value: '\\%@gmail.com',
     });
   });
