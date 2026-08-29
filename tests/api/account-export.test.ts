@@ -19,8 +19,8 @@ const {
   exportSpaceDataMock,
   dbState,
 } = vi.hoisted(() => ({
-  requireAuthMock: vi.fn(async () => ({ userId: 'clerk_1' })),
-  getSpaceForUserMock: vi.fn(async () => ({
+  requireAuthMock: vi.fn(async (): Promise<unknown> => ({ userId: 'clerk_1' })),
+  getSpaceForUserMock: vi.fn(async (): Promise<unknown> => ({
     id: 'sp_session',
     slug: 'acme',
     name: 'Acme Realty',
@@ -29,8 +29,8 @@ const {
     createdAt: '2026-01-01T00:00:00.000Z',
     brokerageId: null,
   })),
-  checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
-  auditMock: vi.fn(async () => undefined),
+  checkRateLimitMock: vi.fn(async (..._args: unknown[]) => ({ allowed: true })),
+  auditMock: vi.fn(async (..._args: unknown[]) => undefined),
   exportSpaceDataMock: vi.fn(async () => ({ Contact: [{ id: 'c1', email: 'a@b.com' }] })),
   dbState: {
     ownerRow: {

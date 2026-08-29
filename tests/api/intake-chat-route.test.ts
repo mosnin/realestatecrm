@@ -17,8 +17,8 @@ const {
   hasLLMKeyMock,
   createMock,
 } = vi.hoisted(() => ({
-  checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
-  getSpaceFromSlugMock: vi.fn(async () => ({
+  checkRateLimitMock: vi.fn(async (_key: string) => ({ allowed: true })),
+  getSpaceFromSlugMock: vi.fn(async (): Promise<unknown> => ({
     id: 'space_1',
     slug: 'acme',
     name: 'Acme Realty',

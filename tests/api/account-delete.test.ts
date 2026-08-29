@@ -27,18 +27,18 @@ const {
   hardDeleteSpaceAndUserMock,
   dbState,
 } = vi.hoisted(() => ({
-  requireAuthMock: vi.fn(async () => ({ userId: 'clerk_1' })),
-  getSpaceForUserMock: vi.fn(async () => ({
+  requireAuthMock: vi.fn(async (): Promise<unknown> => ({ userId: 'clerk_1' })),
+  getSpaceForUserMock: vi.fn(async (): Promise<unknown> => ({
     id: 'sp_session',
     slug: 'acme',
     name: 'Acme Realty',
     ownerId: 'user_db_1',
   })),
-  checkRateLimitMock: vi.fn(async () => ({ allowed: true })),
-  auditMock: vi.fn(async () => undefined),
+  checkRateLimitMock: vi.fn(async (..._args: unknown[]) => ({ allowed: true })),
+  auditMock: vi.fn(async (..._args: unknown[]) => undefined),
   deleteUserMock: vi.fn(async () => undefined),
   hardDeleteEnabledMock: vi.fn(() => false),
-  checkDeletionBlockersMock: vi.fn(async () => null),
+  checkDeletionBlockersMock: vi.fn(async (): Promise<string | null> => null),
   hardDeleteSpaceAndUserMock: vi.fn(async () => undefined),
   dbState: {
     userRow: { id: 'user_db_1' } as { id: string } | null,
@@ -296,7 +296,10 @@ describe('POST /api/account/delete — Clerk then gated sweep', () => {
     expect(hardDeleteSpaceAndUserMock).toHaveBeenCalledTimes(1);
     // No completion audit — the durable "erased" row must not claim success.
     expect(
-      auditMock.mock.calls.filter((c) => c[0]?.metadata?.phase === 'completed'),
+      auditMock.mock.calls.filter((c) => {
+        const arg = c[0] as { metadata?: { phase?: string } } | undefined;
+        return arg?.metadata?.phase === 'completed';
+      }),
     ).toHaveLength(0);
   });
 });
