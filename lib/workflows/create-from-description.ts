@@ -90,6 +90,15 @@ export function isAutonomyCapabilityAsk(description: string): boolean {
   return !EXPLICIT_DRAFT.test(description) && CAPABILITY_ONLY.test(description);
 }
 
+/**
+ * Default SMS body for capability-only autonomy asks ("can you work
+ * autonomously?"). `processAuto` in scheduled-dispatch.ts sends `instruction`
+ * verbatim to the contact — this MUST be client-facing copy, never an agent
+ * directive like "Send a short, personal follow-up."
+ */
+export const DEFAULT_AUTO_FOLLOW_UP_BODY =
+  'Hi — just wanted to introduce myself. How can I help?';
+
 /** Exported for tests. "in 2 days" → 2880. Immediate words win. */
 export function requestedDelayMinutes(description: string): number {
   if (/\b(immediately|right\s+away|at\s+once|instantly)\b/i.test(description)) return 0;
@@ -218,7 +227,7 @@ function forceExecutionSemantics(
         type: 'schedule_message',
         config: {
           channel: 'sms',
-          instruction: 'Send a short, personal follow-up.',
+          instruction: DEFAULT_AUTO_FOLLOW_UP_BODY,
           delayMinutes: parsedDelay,
         },
       },
@@ -233,7 +242,7 @@ function forceExecutionSemantics(
 const DEFAULT_GENERATE_SEND = {
   type: 'schedule_message',
   channel: 'sms',
-  instruction: 'Send a short, personal follow-up.',
+  instruction: DEFAULT_AUTO_FOLLOW_UP_BODY,
 };
 
 /**
