@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
@@ -5,9 +6,11 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { audit } from '@/lib/audit';
 import { sendDraft, type DeliveryResult } from '@/lib/delivery';
+import { recordOutboundMessageSafe } from '@/lib/inbox';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { normalizedLevenshtein } from '@/lib/draft-feedback';
+import type { InboxChannel } from '@/lib/types';
 
 /**
  * Batch-approve pending agent drafts in one tap.
@@ -190,6 +193,55 @@ export async function POST(req: NextRequest) {
           deliveryResult,
         });
         continue;
+      }
+
+      // Same inbox + timeline wire-in as PATCH /api/agent/drafts/[id].
+      // Batch-approve previously sent via Resend/Telnyx and then stopped, so
+      // the contact thread and timeline stayed empty after a real send.
+      // Best-effort: a transcript miss must not flip a successful send.
+      if (deliveryResult.sent) {
+        const channel = existing.channel as InboxChannel;
+        await recordOutboundMessageSafe(
+          {
+            spaceId: space.id,
+            contactId: existing.contactId,
+            channel,
+            body: finalContent,
+            subject: existing.subject,
+            agentDraftId: existing.id,
+            metadata: {
+              source: 'approved_draft',
+              method: deliveryResult.method,
+              ...(deliveryResult.fallback ? { fallback: true } : {}),
+              batch: true,
+            },
+          },
+          { route: 'agent/drafts/batch-approve', draftId: existing.id, spaceId: space.id },
+        );
+
+        if (existing.contactId) {
+          try {
+            await tenantTable(supabase, 'ContactActivity', { spaceId: space.id }).insert({
+              id: crypto.randomUUID(),
+              spaceId: space.id,
+              contactId: existing.contactId,
+              type: channel === 'email' ? 'email' : 'note',
+              content:
+                channel === 'email'
+                  ? `[Agent] Email sent: ${existing.subject ?? ''}`
+                  : `[Agent] ${channel === 'sms' ? 'SMS' : 'Message'} sent: ${finalContent.slice(0, 140)}${finalContent.length > 140 ? '…' : ''}`,
+              metadata: {
+                channel,
+                source: 'approved_draft',
+                draftId: existing.id,
+                batch: true,
+                ...(channel === 'sms' ? { via: 'sms' } : {}),
+              },
+            });
+          } catch (err) {
+            logger.error('[batch-approve] activity log failed (non-fatal)', { draftId: existing.id }, err);
+          }
+        }
       }
 
       void audit({
