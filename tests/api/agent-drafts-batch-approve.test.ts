@@ -34,6 +34,10 @@ vi.mock('@/lib/delivery', () => ({
   sendDraft: vi.fn(),
 }));
 
+vi.mock('@/lib/inbox', () => ({
+  recordOutboundMessageSafe: vi.fn(async () => ({ threadId: 't1', messageId: 'm1', deduped: false })),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -45,6 +49,7 @@ vi.mock('@/lib/logger', () => ({
 type Terminal = { data?: unknown; error?: unknown };
 const queues: Record<string, Terminal[]> = {};
 const updateCalls: Array<{ table: string; values: unknown; eq: Array<[string, unknown]> }> = [];
+const inserts: Array<{ table: string; values: unknown }> = [];
 
 function queueFor(table: string) {
   if (!queues[table]) queues[table] = [];
@@ -56,6 +61,7 @@ vi.mock('@/lib/supabase', () => {
     const q = queueFor(table);
     const terminal = q.shift() ?? { data: null, error: null };
     let isUpdate = false;
+    let isInsert = false;
     let updateValues: unknown = undefined;
     const eqs: Array<[string, unknown]> = [];
 
@@ -70,12 +76,20 @@ vi.mock('@/lib/supabase', () => {
       updateValues = values;
       return chain;
     });
+    chain.insert = vi.fn((values: unknown) => {
+      isInsert = true;
+      inserts.push({ table, values });
+      return chain;
+    });
     chain.maybeSingle = vi.fn(() => Promise.resolve(terminal));
     chain.single = vi.fn(() => Promise.resolve(terminal));
     // Update returns a chain that's awaitable on `.eq(...).eq(...)`.
     chain.then = (resolve: (v: Terminal) => unknown, reject?: (e: unknown) => unknown) => {
       if (isUpdate) {
         updateCalls.push({ table, values: updateValues, eq: eqs });
+      }
+      if (isInsert && terminal.error) {
+        return reject ? reject(terminal) : Promise.reject(terminal);
       }
       try {
         return Promise.resolve(terminal).then(resolve, reject);
@@ -94,11 +108,13 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { sendDraft } from '@/lib/delivery';
+import { recordOutboundMessageSafe } from '@/lib/inbox';
 
 const mockRequireAuth = vi.mocked(requireAuth);
 const mockGetSpaceForUser = vi.mocked(getSpaceForUser);
 const mockCheckRateLimit = vi.mocked(checkRateLimit);
 const mockSendDraft = vi.mocked(sendDraft);
+const mockRecordOutbound = vi.mocked(recordOutboundMessageSafe);
 
 function makeReq(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/agent/drafts/batch-approve', {
@@ -114,6 +130,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   for (const k of Object.keys(queues)) delete queues[k];
   updateCalls.length = 0;
+  inserts.length = 0;
   mockRequireAuth.mockResolvedValue({ userId: 'user_1' });
   mockGetSpaceForUser.mockResolvedValue(SPACE as never);
   mockCheckRateLimit.mockResolvedValue({ allowed: true });
@@ -346,5 +363,113 @@ describe('POST /api/agent/drafts/batch-approve', () => {
     const res = await POST(makeReq({ draftIds: ['d1'], edits: { d1: '   ' } }));
     expect(res.status).toBe(400);
     expect(mockSendDraft).not.toHaveBeenCalled();
+  });
+
+  // ── Inbox + timeline after a real send (parity with single-draft PATCH) ──
+
+  it('records inbox transcript and ContactActivity when a send actually goes out', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 'Tour times', content: 'see you Thursday' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    queueFor('ContactActivity').push({ data: null, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    const res = await POST(makeReq({ draftIds: ['d1'] }));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { results: Array<{ ok: boolean; status?: string }> };
+    expect(json.results[0]).toMatchObject({ ok: true, status: 'sent' });
+
+    expect(mockRecordOutbound).toHaveBeenCalledTimes(1);
+    expect(mockRecordOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spaceId: 'space_1',
+        contactId: 'c1',
+        channel: 'email',
+        body: 'see you Thursday',
+        subject: 'Tour times',
+        agentDraftId: 'd1',
+        metadata: expect.objectContaining({ source: 'approved_draft', method: 'email', batch: true }),
+      }),
+      expect.objectContaining({ route: 'agent/drafts/batch-approve', draftId: 'd1' }),
+    );
+
+    const activity = inserts.find((i) => i.table === 'ContactActivity');
+    expect(activity).toBeDefined();
+    const v = activity!.values as {
+      type: string;
+      contactId: string;
+      content: string;
+      metadata: Record<string, unknown>;
+    };
+    expect(v.type).toBe('email');
+    expect(v.contactId).toBe('c1');
+    expect(v.content).toContain('Tour times');
+    expect(v.metadata).toMatchObject({ channel: 'email', source: 'approved_draft', draftId: 'd1', batch: true });
+  });
+
+  it('records the edited body that was actually sent, not the stored draft', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 'Hi', content: 'original body' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    queueFor('ContactActivity').push({ data: null, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    const res = await POST(makeReq({ draftIds: ['d1'], edits: { d1: 'the realtor rewrote this' } }));
+    expect(res.status).toBe(200);
+
+    expect(mockRecordOutbound.mock.calls[0][0]).toMatchObject({ body: 'the realtor rewrote this' });
+  });
+
+  it('does not record inbox or activity when delivery did not send', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'email', subject: 'Hi', content: 'body' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Alice', email: 'a@x.test', phone: null }, error: null });
+    mockSendDraft.mockResolvedValueOnce({ sent: false, method: 'email', error: 'not_configured' });
+
+    const res = await POST(makeReq({ draftIds: ['d1'] }));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { results: Array<{ status?: string; deliveryResult?: { sent: boolean } }> };
+    expect(json.results[0].status).toBe('approved');
+    expect(json.results[0].deliveryResult?.sent).toBe(false);
+    expect(mockRecordOutbound).not.toHaveBeenCalled();
+    expect(inserts.find((i) => i.table === 'ContactActivity')).toBeUndefined();
+  });
+
+  it('skips ContactActivity when the draft has no contact, but still returns ok', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: null, channel: 'email', subject: 'Hi', content: 'body' }, error: null },
+      { data: null, error: null },
+    );
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'email' });
+
+    const res = await POST(makeReq({ draftIds: ['d1'] }));
+    expect(res.status).toBe(200);
+    expect(mockRecordOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: null }),
+      expect.anything(),
+    );
+    expect(inserts.find((i) => i.table === 'ContactActivity')).toBeUndefined();
+  });
+
+  it('still returns ok when ContactActivity insert throws (best-effort)', async () => {
+    queueFor('AgentDraft').push(
+      { data: { id: 'd1', status: 'pending', contactId: 'c1', channel: 'sms', subject: null, content: 'short sms' }, error: null },
+      { data: null, error: null },
+    );
+    queueFor('Contact').push({ data: { name: 'Bob', email: null, phone: '+15551234' }, error: null });
+    queueFor('ContactActivity').push({ data: null, error: { message: 'activity boom' } });
+    mockSendDraft.mockResolvedValueOnce({ sent: true, method: 'sms' });
+
+    const res = await POST(makeReq({ draftIds: ['d1'] }));
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { results: Array<{ ok: boolean; status?: string }> };
+    expect(json.results[0]).toMatchObject({ ok: true, status: 'sent' });
+    expect(mockRecordOutbound).toHaveBeenCalledTimes(1);
   });
 });
