@@ -3,10 +3,12 @@
  *
  * DESTRUCTIVE. Delegates to merge_contacts() so every FK is re-pointed, blank
  * fields are filled, tags/properties are unioned, and the duplicate is deleted
- * inside ONE transaction. The previous hand-rolled path only moved
- * ContactActivity / Tour / DealContact, then deleted the row — Postgres
- * cascaded the rest (application messages, client docs, inbox, drip
- * enrollments, drafts, …). A mid-step failure also left a partial merge.
+ * inside ONE transaction. InboxThread is folded (not blindly re-pointed) so
+ * two messaged contacts do not trip UNIQUE(spaceId, contactId). The previous
+ * hand-rolled path only moved ContactActivity / Tour / DealContact, then
+ * deleted the row — Postgres cascaded the rest (application messages, client
+ * docs, inbox, drip enrollments, drafts, …). A mid-step failure also left a
+ * partial merge.
  *
  * Approval-gated with an explicit summariseCall — the realtor sees
  * "Merge Sam Chen → keep Jane Chen (deletes Sam Chen)" before any row moves.

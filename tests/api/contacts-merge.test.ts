@@ -6,7 +6,9 @@
  *     (survivor wins; blanks filled from dupe), tag UNION, and per-table
  *     reference counts.
  *   - COMMIT (commit:true) calls the transactional merge_contacts RPC with the
- *     survivor + present duplicate ids + space id.
+ *     survivor + present duplicate ids + space id. InboxThread / InboxMessage
+ *     refs are counted on preview so the realtor sees transcript rows that
+ *     the RPC will fold (UNIQUE space+contact — not a blind UPDATE).
  *   - REFUSES cross-space ids (a requested duplicate that exists in another
  *     space → 400, RPC never called).
  *   - Idempotent: a duplicate id that no longer exists anywhere is skipped; a
@@ -137,6 +139,8 @@ describe('POST /api/contacts/merge — preview', () => {
     // Reference counts: queue a couple non-zero, rest default 0.
     queueFor('DealContact#count').push({ count: 2, error: null });
     queueFor('Tour#count').push({ count: 1, error: null });
+    queueFor('InboxThread#count').push({ count: 1, error: null });
+    queueFor('InboxMessage#count').push({ count: 4, error: null });
 
     const res = await POST(makeReq({ slug: 'acme', survivorId: 's', duplicateIds: ['d1'] }));
     const body = await res.json();
@@ -156,9 +160,12 @@ describe('POST /api/contacts/merge — preview', () => {
     // Tag union.
     expect((body.merged.tags as string[]).sort()).toEqual(['buyer', 'vip']);
 
-    // Reference counts surfaced.
+    // Reference counts surfaced — including inbox threads/messages, which
+    // merge_contacts folds instead of a unique-constraint-colliding UPDATE.
     expect(body.references['DealContact.contactId']).toBe(2);
     expect(body.references['Tour.contactId']).toBe(1);
+    expect(body.references['InboxThread.contactId']).toBe(1);
+    expect(body.references['InboxMessage.contactId']).toBe(4);
   });
 });
 

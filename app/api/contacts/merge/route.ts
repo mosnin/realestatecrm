@@ -49,6 +49,8 @@ const REFERENCE_TABLES: ReadonlyArray<{ table: string; column: string }> = [
   { table: 'ClientDocument', column: 'contactId' },
   { table: 'CallLog', column: 'contactId' },
   { table: 'SignatureRequest', column: 'contactId' },
+  { table: 'InboxThread', column: 'contactId' },
+  { table: 'InboxMessage', column: 'contactId' },
 ];
 
 const TEXT_FILL_FIELDS = [
