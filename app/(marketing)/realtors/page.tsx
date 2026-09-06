@@ -149,18 +149,18 @@ function LoopIllustration() {
       {/* Inbox */}
       <div className="absolute left-3 top-4 w-[46%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-5 sm:top-5">
         <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">INBOX</span>
+          <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">INBOX</span>
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-green-500/70" />
-            <span className="text-[9px] text-green-600">3 new</span>
+            <span className="text-xs text-green-600">3 new</span>
           </span>
         </div>
         <div className="space-y-1.5 p-2">
-          <div className="flex items-center gap-2 text-[9px] text-neutral-700 sm:text-[10px]">
+          <div className="flex items-center gap-2 text-xs text-neutral-700 sm:text-xs">
             <span className="h-2 w-2 flex-shrink-0 rounded bg-blue-500" />
             <span className="truncate">Maya · 14 Oak St</span>
           </div>
-          <div className="flex items-center gap-2 text-[9px] text-neutral-700 sm:text-[10px]">
+          <div className="flex items-center gap-2 text-xs text-neutral-700 sm:text-xs">
             <span className="h-2 w-2 flex-shrink-0 rounded bg-yellow-500" />
             <span className="truncate">Tom · refi question</span>
           </div>
@@ -176,21 +176,21 @@ function LoopIllustration() {
       {/* Sent reply */}
       <div className="absolute right-3 top-12 w-[44%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:right-5">
         <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">SENT</span>
-          <span className="text-[9px] text-emerald-600">Delivered</span>
+          <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">SENT</span>
+          <span className="text-xs text-emerald-600">Delivered</span>
         </div>
         <div className="space-y-2 p-2">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
             <div className="min-w-0 flex-1">
-              <div className="mb-0.5 text-[9px] text-neutral-500">Chippi · your voice</div>
+              <div className="mb-0.5 text-xs text-neutral-500">Chippi · your voice</div>
               <div className="space-y-1 rounded-lg bg-black/5 px-2 py-1.5">
                 <div className="h-1 w-full rounded bg-neutral-300" />
                 <div className="h-1 w-4/5 rounded bg-neutral-300" />
               </div>
             </div>
           </div>
-          <div className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+          <div className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
             Delivery recorded
           </div>
         </div>
@@ -204,13 +204,13 @@ function LoopIllustration() {
       {/* Booked */}
       <div className="absolute bottom-4 left-1/2 w-[64%] -translate-x-1/2 rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-          <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">BOOKED</span>
+          <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">BOOKED</span>
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-green-500/70" />
-            <span className="text-[9px] text-green-600">Confirmed</span>
+            <span className="text-xs text-green-600">Confirmed</span>
           </span>
         </div>
-        <div className="flex items-center justify-between p-2 text-[9px] sm:text-[10px]">
+        <div className="flex items-center justify-between p-2 text-xs sm:text-xs">
           <span className="flex items-center gap-1.5 text-neutral-700">
             <CalendarCheck className="h-3 w-3 flex-shrink-0 text-[#ff4b29]" />
             Tour · Sat 2:00
@@ -235,8 +235,8 @@ function StackIllustration() {
     <div className="rounded-3xl bg-white/70 p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.18)] ring-1 ring-black/5 backdrop-blur sm:p-5">
       <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-[10px] tracking-widest text-neutral-500">CONNECTED</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-black/5 bg-white/90 px-2 py-0.5 text-[9px] text-neutral-700">
+          <span className="text-xs tracking-widest text-neutral-500">CONNECTED</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-black/5 bg-white/90 px-2 py-0.5 text-xs text-neutral-700">
             <span className="h-1.5 w-1.5 rounded-full bg-green-500/80" />
             OAuth · live
           </span>
@@ -252,8 +252,8 @@ function StackIllustration() {
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#ff4b29]/10">
                 <Icon className="h-3.5 w-3.5 text-[#ff4b29]" />
               </div>
-              <span className="text-[11px] font-semibold text-zinc-950">{label}</span>
-              <span className="ml-auto truncate pl-2 text-[10px] text-neutral-500">{note}</span>
+              <span className="text-xs font-semibold text-zinc-950">{label}</span>
+              <span className="ml-auto truncate pl-2 text-xs text-neutral-500">{note}</span>
             </div>
           ))}
         </div>
@@ -265,8 +265,8 @@ function StackIllustration() {
         <div className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 px-3 py-2.5 shadow-sm">
           <span className="h-7 w-7 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
           <div className="min-w-0">
-            <div className="text-[11px] font-semibold text-zinc-950">Chippi</div>
-            <div className="text-[10px] text-neutral-500">Reaches for each tool as it works</div>
+            <div className="text-xs font-semibold text-zinc-950">Chippi</div>
+            <div className="text-xs text-neutral-500">Reaches for each tool as it works</div>
           </div>
           <ShieldCheck className="ml-auto h-4 w-4 flex-shrink-0 text-[#ff4b29]" />
         </div>
@@ -346,7 +346,7 @@ export default function RealtorsPage() {
             </div>
 
             {/* Illustration, pastel frame, white glass card */}
-            <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+            <div className="relative rounded-[36px] marketing-feature-frame p-5">
               <article
                 className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
                 style={{
@@ -360,7 +360,7 @@ export default function RealtorsPage() {
                     <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">
                       The follow-up loop
                     </h3>
-                    <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                       <ShieldCheck className="h-4 w-4 text-[#ff4b29]" />
                       On the record
                     </span>
@@ -421,7 +421,7 @@ export default function RealtorsPage() {
                   <p className="text-[clamp(2.25rem,5vw,3.5rem)] font-semibold leading-none tracking-tight text-white">
                     {s.value}
                   </p>
-                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
                     {s.label}
                   </p>
                 </StaggerItem>

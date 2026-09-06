@@ -54,7 +54,7 @@ function ImageSlot({ name }: { name: string }) {
     >
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-neutral-600">
           Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
@@ -67,7 +67,7 @@ function ImageSlot({ name }: { name: string }) {
  *  frame, the same vocabulary as ChippiAtWork. */
 function BioPreview() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] marketing-feature-frame p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -78,7 +78,7 @@ function BioPreview() {
         <div className="p-6 sm:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">The link, live</h3>
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
               <Link2 className="h-4 w-4 text-[#ff4b29]" />
               chip.bio/you
             </span>
@@ -91,13 +91,13 @@ function BioPreview() {
               <div className="mx-auto mt-3 h-2.5 w-24 rounded bg-neutral-900" />
               <div className="mx-auto mt-2 h-2 w-32 rounded bg-neutral-200" />
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-medium text-[#ff4b29]">
+                <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-xs font-medium text-[#ff4b29]">
                   Brooklyn
                 </span>
-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-600">
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
                   Queens
                 </span>
-                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-600">
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
                   First-time buyers
                 </span>
               </div>
@@ -107,17 +107,17 @@ function BioPreview() {
             <div className="mt-3 space-y-2">
               <div className="flex items-center gap-2 rounded-xl bg-[#ff4b29] px-3 py-2.5 shadow-sm">
                 <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0 text-white" />
-                <span className="text-[11px] font-semibold text-white">Book a tour</span>
+                <span className="text-xs font-semibold text-white">Book a tour</span>
                 <ArrowRight className="ml-auto h-3 w-3 text-white/80" />
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-black/5 bg-white/90 px-3 py-2.5 shadow-sm">
                 <Home className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
-                <span className="text-[11px] font-medium text-neutral-700">Active listings</span>
+                <span className="text-xs font-medium text-neutral-700">Active listings</span>
                 <ArrowRight className="ml-auto h-3 w-3 text-neutral-300" />
               </div>
               <div className="flex items-center gap-2 rounded-xl border border-black/5 bg-white/90 px-3 py-2.5 shadow-sm">
                 <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
-                <span className="text-[11px] font-medium text-neutral-700">Ask a question</span>
+                <span className="text-xs font-medium text-neutral-700">Ask a question</span>
                 <ArrowRight className="ml-auto h-3 w-3 text-neutral-300" />
               </div>
             </div>
@@ -141,7 +141,7 @@ function BioPreview() {
             </div>
 
             {/* Capture trail */}
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[9px] text-neutral-400">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs text-neutral-600">
               <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Tap</span>
               <span aria-hidden>&rarr;</span>
               <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Scored lead</span>
@@ -281,7 +281,7 @@ export default function BioPage() {
           </div>
 
           {/* Pastel frame, white glass card, skeleton bio page */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] marketing-feature-frame p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -292,7 +292,7 @@ export default function BioPage() {
               <div className="p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                   <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Your page</h3>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                     <Link2 className="h-4 w-4 text-[#ff4b29]" />
                     One link
                   </span>
@@ -307,15 +307,15 @@ export default function BioPage() {
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2 rounded-lg bg-[#ff4b29]/10 px-2.5 py-2">
                         <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0 text-[#ff4b29]" />
-                        <span className="text-[10px] font-semibold text-zinc-950">Book a tour</span>
+                        <span className="text-xs font-semibold text-zinc-950">Book a tour</span>
                       </div>
                       <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 ring-1 ring-black/5">
                         <Home className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
-                        <span className="text-[10px] font-medium text-neutral-700">Active listings</span>
+                        <span className="text-xs font-medium text-neutral-700">Active listings</span>
                       </div>
                       <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-2.5 py-2 ring-1 ring-black/5">
                         <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-neutral-500" />
-                        <span className="text-[10px] font-medium text-neutral-700">Ask a question</span>
+                        <span className="text-xs font-medium text-neutral-700">Ask a question</span>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -324,7 +324,7 @@ export default function BioPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[9px] text-neutral-400">
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs text-neutral-600">
                     <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Tap</span>
                     <span aria-hidden>→</span>
                     <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Scored lead</span>

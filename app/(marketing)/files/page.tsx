@@ -155,7 +155,7 @@ export default function FilesPage() {
           </div>
 
           {/* Pastel frame, white glass card, filing + search illustration */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] marketing-feature-frame p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -166,7 +166,7 @@ export default function FilesPage() {
               <div className="p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                   <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Find anything</h3>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                     <FolderOpen className="h-4 w-4 text-[#ff4b29]" />
                     Auto-filed
                   </span>
@@ -176,14 +176,14 @@ export default function FilesPage() {
                 <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">INCOMING</span>
-                      <span className="text-[10px] text-neutral-400">Inbox</span>
+                      <span className="text-xs tracking-widest text-neutral-500">INCOMING</span>
+                      <span className="text-xs text-neutral-400">Inbox</span>
                     </div>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[10px] text-neutral-700">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-neutral-700">
                       <Mail className="h-3 w-3 flex-shrink-0 text-neutral-400" />
                       <span>disclosure-14-oak.pdf</span>
                       <ArrowRight className="h-3 w-3 text-neutral-300" />
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-medium text-[#ff4b29]">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-xs font-medium text-[#ff4b29]">
                         <FolderOpen className="h-3 w-3" />
                         14 Oak St
                       </span>
@@ -193,27 +193,27 @@ export default function FilesPage() {
                   <div className="mt-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center gap-2 rounded-lg bg-neutral-100 px-2.5 py-2">
                       <Search className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
-                      <span className="text-[10px] text-neutral-700">14 Oak St disclosure</span>
+                      <span className="text-xs text-neutral-700">14 Oak St disclosure</span>
                     </div>
                     <div className="mt-2.5 space-y-1.5">
                       <div className="flex items-center gap-2 rounded-lg bg-emerald-50/60 px-2 py-1.5 ring-1 ring-emerald-100">
                         <FileText className="h-3 w-3 flex-shrink-0 text-emerald-600" />
-                        <span className="text-[10px] font-medium text-neutral-800">Disclosure.pdf</span>
-                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                        <span className="text-xs font-medium text-neutral-800">Disclosure.pdf</span>
+                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                           Top match
                         </span>
                       </div>
                       <div className="flex items-center gap-2 px-2 py-1">
                         <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
-                        <span className="text-[10px] text-neutral-600">Purchase agreement.pdf</span>
-                        <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] text-neutral-600">
+                        <span className="text-xs text-neutral-600">Purchase agreement.pdf</span>
+                        <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                           14 Oak St
                         </span>
                       </div>
                       <div className="flex items-center gap-2 px-2 py-1">
                         <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
-                        <span className="text-[10px] text-neutral-600">Inspection report.pdf</span>
-                        <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] text-neutral-600">
+                        <span className="text-xs text-neutral-600">Inspection report.pdf</span>
+                        <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                           14 Oak St
                         </span>
                       </div>
@@ -301,7 +301,7 @@ export default function FilesPage() {
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ff4b29]/10">
                       <d.icon className="h-4 w-4 text-[#ff4b29]" />
                     </div>
-                    <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
+                    <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
                       {d.kicker}
                     </p>
                     <h3 className="mt-2 text-lg font-semibold tracking-tight text-zinc-950">

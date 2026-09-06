@@ -112,7 +112,7 @@ function ImageSlot({ name }: { name: string }) {
     >
       <div className="flex flex-col items-center gap-2 text-center">
         <ImagePlus className="h-5 w-5 text-neutral-300" />
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-neutral-600">
           Image placeholder, <span className="font-medium text-neutral-500">{name}</span>
         </p>
       </div>
@@ -123,7 +123,7 @@ function ImageSlot({ name }: { name: string }) {
 /** A floating STEP pill, how-it-works style. */
 function StepPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="absolute -top-3.5 left-6 inline-flex items-center rounded-full border border-neutral-200 bg-white px-3.5 py-1 text-[11px] font-medium tracking-tight text-neutral-700">
+    <span className="absolute -top-3.5 left-6 inline-flex items-center rounded-full border border-neutral-200 bg-white px-3.5 py-1 text-xs font-medium tracking-tight text-neutral-700">
       {children}
     </span>
   );
@@ -242,7 +242,7 @@ export default function CapturePage() {
           </div>
 
           {/* Pastel frame, white glass card, form → scored lead flow */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] marketing-feature-frame p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -253,7 +253,7 @@ export default function CapturePage() {
               <div className="p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                   <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">The loop</h3>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                     <Zap className="h-4 w-4 text-[#ff4b29]" />
                     Live
                   </span>
@@ -263,14 +263,14 @@ export default function CapturePage() {
                 <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">INTAKE FORM</span>
-                      <span className="text-[10px] text-neutral-400">Your site · your page</span>
+                      <span className="text-xs tracking-widest text-neutral-500">INTAKE FORM</span>
+                      <span className="text-xs text-neutral-600">Your site · your page</span>
                     </div>
                     <div className="mt-2.5 space-y-2">
                       <div className="h-6 rounded-lg bg-neutral-100" />
                       <div className="h-6 rounded-lg bg-neutral-100" />
                       <div className="flex justify-end">
-                        <span className="inline-flex h-6 items-center rounded-full bg-[#ff4b29] px-3 text-[9px] font-semibold text-white">
+                        <span className="inline-flex h-6 items-center rounded-full bg-[#ff4b29] px-3 text-xs font-semibold text-white">
                           Request a tour
                         </span>
                       </div>
@@ -278,13 +278,13 @@ export default function CapturePage() {
                   </div>
 
                   <div className="my-3 flex justify-center">
-                    <ArrowDown className="h-4 w-4 text-neutral-400" />
+                    <ArrowDown className="h-4 w-4 text-neutral-600" />
                   </div>
 
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">NEW LEAD</span>
-                      <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-semibold text-[#ff4b29]">
+                      <span className="text-xs tracking-widest text-neutral-500">NEW LEAD</span>
+                      <span className="rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-xs font-semibold text-[#ff4b29]">
                         Hot · 86
                       </span>
                     </div>
@@ -296,19 +296,19 @@ export default function CapturePage() {
                       </div>
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                         Reply drafted
                       </span>
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                         Tour times proposed
                       </span>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700">
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                         Awaiting your tap
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[9px] text-neutral-400">
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-xs text-neutral-600">
                     <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Lands</span>
                     <span aria-hidden>→</span>
                     <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-black/5">Scored</span>
@@ -399,7 +399,7 @@ export default function CapturePage() {
                 <StepMock>
                   <div className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
                     <div className="mb-2.5 flex items-center justify-between border-b border-neutral-100 pb-2">
-                      <span className="text-[9px] tracking-widest text-neutral-500">INTAKE</span>
+                      <span className="text-xs tracking-widest text-neutral-500">INTAKE</span>
                       <Inbox className="h-3.5 w-3.5 text-[#ff4b29]" />
                     </div>
                     <div className="space-y-2">
@@ -427,12 +427,12 @@ export default function CapturePage() {
                         <div className="h-2 w-20 rounded bg-neutral-900/80" />
                         <div className="mt-1.5 h-2 w-28 rounded bg-neutral-200" />
                       </div>
-                      <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[9px] font-semibold text-[#ff4b29]">
+                      <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-xs font-semibold text-[#ff4b29]">
                         <Gauge className="h-3 w-3" />
                         Hot
                       </span>
                     </div>
-                    <div className="mt-2.5 rounded-lg bg-black/[0.03] px-2.5 py-1.5 text-[9px] text-neutral-600 ring-1 ring-black/5">
+                    <div className="mt-2.5 rounded-lg bg-black/[0.03] px-2.5 py-1.5 text-xs text-neutral-600 ring-1 ring-black/5">
                       Why: pre-approved, touring this week
                     </div>
                   </div>
@@ -446,7 +446,7 @@ export default function CapturePage() {
                 <StepMock>
                   <div className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
                     <div className="mb-2.5 flex items-center justify-between border-b border-neutral-100 pb-2">
-                      <span className="text-[9px] tracking-widest text-neutral-500">DRAFT · YOUR VOICE</span>
+                      <span className="text-xs tracking-widest text-neutral-500">DRAFT · YOUR VOICE</span>
                       <PenLine className="h-3.5 w-3.5 text-[#ff4b29]" />
                     </div>
                     <div className="space-y-1.5">

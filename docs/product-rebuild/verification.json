@@ -2,7 +2,7 @@
   "repository": "mosnin/realestatecrm",
   "branch": "codex/autonomous-product-rebuild",
   "base_sha": "75113c0d68f40df0999d2dd470b831ffde3c3665",
-  "verified_at_utc": "2026-09-06T21:47:06.862505+00:00",
+  "verified_at_utc": "2026-09-06T21:59:17.989195+00:00",
   "local_checks": {
     "unit_tests": {
       "status": "pass",
@@ -28,10 +28,10 @@
     "git_diff_check": "pass"
   },
   "log_sha256": {
-    "unit_tests": "2baffd95ef25242a8f59b160481cf9022d7044c4998b3b87ffccd9a07fff40a6",
+    "unit_tests": "5b9615f6e621533c5cd25870c5a64ebe240c30cd820151ca89dc7e9bf8cf1e55",
     "typecheck": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "lint": "e22d7cdec5c59fdcaf404e854841560be1c1d201a74f22d15f46d0ddf5962071",
-    "build": "9f71e98e75a3e9bdf7137bcc3c2d2ed2a775fb3f0b58a136820a60f8d1b36113",
+    "build": "1e5b99d7c01230648d317a0c8e4f2fb77770ad944da89307addb634262b0e95c",
     "contracts": "ba42df99fa21b975a0294745b4c94a58fc251106994cac43990e32dcb019c5da"
   },
   "environment_recovery": "One build retry failed with ENOSPC. Only this isolated checkout's generated .next directory was removed; the clean retry passed.",
@@ -49,5 +49,16 @@
     "staging or production migration application",
     "customer messaging"
   ],
-  "visual_reference": "today-concept.png is a generated concept, not a rendered product screenshot"
+  "visual_reference": "today-concept.png is a generated concept, not a rendered product screenshot",
+  "review_followup": "Marketing illustration labels raised to at least 12px, flagged bio/capture label contrast corrected, and repeated frame token shared. Full unit suite, typecheck, lint, and production build rerun successfully after the follow-up. Rendered acceptance remains outstanding.",
+  "remote_checks": {
+    "verified_sha": "40e7b8af5e4255ae37e99b06940c29ba13e5eba1",
+    "github_ci": "passed including unit tests, E2E tests, contract tests and production build",
+    "public_browser_smoke_tests": "passed",
+    "python_agent_tests": "passed",
+    "live_agent_evals": "skipped",
+    "chippi_preview": "canceled by the configured ignored-build command, despite a green GitHub status",
+    "chippistaging_preview": "resource provisioning failed before compilation",
+    "scope": "Remote checks above cover the core rebuild commit. The marketing follow-up is covered by the refreshed local checks; its remote checks require a new run."
+  }
 }

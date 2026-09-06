@@ -98,7 +98,7 @@ export function FeaturesSplit() {
         </div>
 
         {/* Diagram, pastel-gradient frame, white glass card */}
-        <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
+        <div className="relative rounded-[36px] marketing-feature-frame p-5">
           <article
             className="group relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl transition-shadow hover:shadow-md"
             style={{
@@ -110,7 +110,7 @@ export function FeaturesSplit() {
             <div className="p-6 sm:p-10">
               <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <h3 className="font-display text-2xl font-semibold tracking-tight text-zinc-950">Chippi Workflows</h3>
-                <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                   <Users className="h-4 w-4 text-[#ff4b29]" />
                   Live sync
                 </span>
@@ -121,28 +121,28 @@ export function FeaturesSplit() {
                 {/* Deal board */}
                 <div className="absolute left-3 top-4 h-[52%] w-[70%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-6 sm:top-6">
                   <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">DEAL BOARD</span>
+                    <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">DEAL BOARD</span>
                     <div className="flex items-center gap-1">
                       <div className="h-3 w-3 rounded-full bg-green-500/70" />
-                      <span className="text-[10px] text-green-600">Active</span>
+                      <span className="text-xs text-green-600">Active</span>
                     </div>
                   </div>
                   <div className="space-y-1.5 p-2">
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                    <div className="flex items-center justify-between text-xs sm:text-xs">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded bg-blue-500" />
                         <span className="text-neutral-700">Maya · 14 Oak St</span>
                       </div>
                       <span className="text-blue-600">Tour Sat 2:00</span>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                    <div className="flex items-center justify-between text-xs sm:text-xs">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded bg-green-400" />
                         <span className="text-neutral-700">Tom · refi question</span>
                       </div>
                       <span className="text-green-600">Replied</span>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                    <div className="flex items-center justify-between text-xs sm:text-xs">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 rounded bg-yellow-500" />
                         <span className="text-neutral-700">Dana · browsing</span>
@@ -155,15 +155,15 @@ export function FeaturesSplit() {
                 {/* Chippi log */}
                 <div className="absolute right-4 top-5 h-[68%] w-[38%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:right-6 sm:top-7">
                   <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">CHIPPI LOG</span>
+                    <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">CHIPPI LOG</span>
                     <div className="h-2 w-2 rounded-full bg-green-500" />
                   </div>
                   <div className="space-y-2 p-2">
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
                       <div className="min-w-0">
-                        <div className="mb-0.5 text-[9px] text-neutral-500">Chippi</div>
-                        <div className="rounded-lg bg-black/5 px-2 py-1 text-[9px] text-neutral-700">
+                        <div className="mb-0.5 text-xs text-neutral-500">Chippi</div>
+                        <div className="rounded-lg bg-black/5 px-2 py-1 text-xs text-neutral-700">
                           Drafted 3 replies
                         </div>
                       </div>
@@ -171,8 +171,8 @@ export function FeaturesSplit() {
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full bg-gradient-to-r from-green-400 to-green-600" />
                       <div className="min-w-0">
-                        <div className="mb-0.5 text-[9px] text-neutral-500">You</div>
-                        <div className="rounded-lg bg-black/5 px-2 py-1 text-[9px] text-neutral-700">
+                        <div className="mb-0.5 text-xs text-neutral-500">You</div>
+                        <div className="rounded-lg bg-black/5 px-2 py-1 text-xs text-neutral-700">
                           Approved · sent
                         </div>
                       </div>
@@ -183,8 +183,8 @@ export function FeaturesSplit() {
                 {/* Progress */}
                 <div className="absolute bottom-10 left-6 h-[28%] w-[55%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:bottom-12 sm:left-12">
                   <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-                    <span className="text-[10px] tracking-widest text-neutral-500 sm:text-xs">TODAY</span>
-                    <span className="text-[10px] text-green-600">78%</span>
+                    <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">TODAY</span>
+                    <span className="text-xs text-green-600">78%</span>
                   </div>
                   <div className="p-2">
                     <div className="h-2 overflow-hidden rounded-full bg-black/10">
@@ -193,7 +193,7 @@ export function FeaturesSplit() {
                         style={{ width: '78%' }}
                       />
                     </div>
-                    <div className="mt-1 flex justify-between text-[9px] text-neutral-500">
+                    <div className="mt-1 flex justify-between text-xs text-neutral-500">
                       <span>9 leads worked</span>
                       <span>2 sent this hour</span>
                     </div>

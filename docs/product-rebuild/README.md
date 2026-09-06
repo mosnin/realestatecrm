@@ -59,11 +59,15 @@ The migration passed on an isolated PostgreSQL 18.4 cluster with a minimal fixtu
 | Mobile follows the same priorities | Stacked grid and five labeled navigation destinations | Outstanding |
 | Real task entry rather than a sample result | Existing Work handoff and execution lifecycle | Outstanding |
 
+The automated PR review also surfaced existing 9–11px labels and a low-contrast label in the affected marketing illustrations. Those illustrations now use at least 12px labels, the flagged bio/capture secondary text uses a darker neutral, and their repeated gradient frame uses one shared token. This is source-verified; responsive wrapping and visual fidelity still need browser inspection.
+
 Local browser control exposed no browser in this session. A temporary, development-only fixture route returned HTTP 200 and was removed before the production build. Server-render tests cover Today navigation, section content and failure states. They do not substitute for authenticated desktop/mobile visual inspection.
 
 ## Verification and release boundary
 
 Local checks passed: **6,566 tests in 752 files**, typecheck, lint (with warnings), the Next.js production build, 52 script contract tests, and the tenant-scope audit. Seven live-model eval cases are skipped. See [verification.json](verification.json) for the results and their scope. Tests mock provider calls; the optional live-model eval cases remain skipped. The existing public-browser CI job now fails normally rather than soft-failing. Agent Evals uses the primary TS/OpenRouter runtime and the correct secret, while retaining its explicit enable/manual-run condition. Neither is authenticated provider acceptance.
+
+The core rebuild at `40e7b8af` passed the complete GitHub CI job, the public browser suite and Python agent tests. Direct Vercel inspection found that its `chippi` preview was canceled by the configured ignored-build command (even though GitHub displayed success), while `chippistaging` failed during resource provisioning before compilation. Neither result is a working preview. The marketing review follow-up passed the refreshed local checks and requires its own remote run.
 
 Before a production release, exercise a controlled staging workspace through:
 

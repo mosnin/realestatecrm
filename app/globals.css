@@ -76,6 +76,7 @@
 :root {
   --radius: 0.75rem;
   --card-radius: 0.75rem;
+  --marketing-feature-frame: linear-gradient(135deg, #e8eef8, #dbe7fa, #ffc4dd);
 
   /* Historical marketing names resolve to the same three faces.
      Display / accent were Inter Tight + Instrument Serif via next/font,
@@ -1550,3 +1551,8 @@
 /* Product typography: upright text throughout, including imported rich content.
    Legacy font tokens remain aliases so older surfaces stay consistent. */
 html body, html body * { font-style: normal !important; }
+
+/* Shared frame for marketing feature illustrations. */
+.marketing-feature-frame {
+  background-image: var(--marketing-feature-frame);
+}
