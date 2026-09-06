@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BriefDashboard,
-  TODAY_DASHBOARD_SOURCE,
   buildBriefDashboardViewModel,
   buildGroundedWorkExamples,
   daysSince,
@@ -146,34 +145,22 @@ describe('BriefDashboard Today view model', () => {
 
   });
 
-  it('renders the pinned source hierarchy responsively with one atmosphere and four live metrics', () => {
+  it('renders real work, appointments and working destination links', () => {
     const html = renderToStaticMarkup(
       createElement(BriefDashboard, { slug: 'oak', data: dashboard() }),
     );
 
-    const atmospheres = html.match(/data-chippi-atmosphere="ascii-field"/g) ?? [];
-    const metrics = html.match(/data-outcome-metric=/g) ?? [];
-
-    expect(TODAY_DASHBOARD_SOURCE).toEqual({
-      repository: 'mosnin/Sicarii',
-      commit: 'b235cdbd590ae3652e2603a2187b838a8a204b8f',
-      file: 'src/components/dashboard/dashboard-overview.tsx',
-    });
-    expect(html).toContain(
-      'data-design-source="mosnin/Sicarii@b235cdbd590ae3652e2603a2187b838a8a204b8f:src/components/dashboard/dashboard-overview.tsx"',
-    );
-    expect(html).toContain('CHIPPI // TODAY');
+    expect(html).toContain('Needs you');
+    expect(html).toContain('Work completed');
+    expect(html).toContain('Upcoming tours');
     expect(html).toContain('data-work-entry="today"');
-    expect(html).toContain('grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4');
-    expect(html).toContain('lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.8fr)]');
-    expect(atmospheres).toHaveLength(1);
-    expect(metrics).toHaveLength(4);
+    expect(html.indexOf('Needs you')).toBeLessThan(html.indexOf('Work completed'));
     expect(html).toContain('href="/s/oak/leads"');
     expect(html).toContain('href="/s/oak/follow-ups"');
     expect(html).toContain('href="/s/oak/inbox"');
     expect(html).toContain('href="/s/oak/deals"');
     expect(html).toContain('href="/s/oak/chippi/activity"');
-    expect(html).toContain('2 drafts ready for review');
+    expect(html).toContain('drafts awaiting your decision');
     expect(html).toContain('href="/s/oak/calendar"');
     expect(html).toContain('href="/s/oak/contacts/contact-1"');
     expect(html).not.toContain('Series A');
@@ -215,10 +202,10 @@ describe('BriefDashboard Today view model', () => {
     });
     const html = renderToStaticMarkup(createElement(BriefDashboard, { slug: 'oak', data: emptyData }));
 
-    expect(html).toContain('Your workspace is ready.');
-    expect(html).toContain('Add your first contact');
-    expect(html).toContain('Connect your inbox');
+    expect(html).toContain('No completed actions recorded');
+    expect(html).toContain('Set up work for Chippi');
+    expect(html).toContain('Connect your inbox and calendar');
     expect(html).not.toContain('data-outcome-metric=');
-    expect(html).not.toContain('data-verified-activity');
+    expect(html).toContain('data-verified-activity');
   });
 });

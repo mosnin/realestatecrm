@@ -47,7 +47,7 @@ export function Serif({
   return (
     <Tag
       style={{
-        fontFamily: 'var(--font-serif-display), "Times New Roman", Times, serif',
+        fontFamily: 'var(--font-sans)',
       }}
       className={cn('font-light tracking-[-0.02em]', className)}
     >

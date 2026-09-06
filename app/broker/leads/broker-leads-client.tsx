@@ -340,7 +340,7 @@ function LeadNotes({ contactId }: { contactId: string }) {
         </div>
       )}
       {loaded && noteEntries.length === 0 && (
-        <p className="text-[11px] text-muted-foreground/60 italic">No notes yet.</p>
+        <p className="text-[11px] text-muted-foreground/60 not-italic">No notes yet.</p>
       )}
     </div>
   );

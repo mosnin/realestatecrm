@@ -105,7 +105,7 @@ const PORTFOLIO: { addr: string; source: string; status: keyof typeof STATUS_TON
 /** Skeleton "portfolio window", many listings, many sources, one board. */
 function PortfolioWindow() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -122,7 +122,7 @@ function PortfolioWindow() {
             </span>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
             {/* Column header */}
             <div className="flex items-center gap-3 px-1 pb-2 text-[9px] uppercase tracking-widest text-neutral-400">
               <span className="flex-1">Property</span>
@@ -136,7 +136,7 @@ function PortfolioWindow() {
                   key={row.addr}
                   className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm"
                 >
-                  <div className="h-9 w-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                  <div className="h-9 w-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                   <div className="min-w-0 flex-1">
                     <div className="text-[11px] font-medium text-neutral-800">{row.addr}</div>
                     <div className={`mt-1.5 h-1.5 ${row.w} rounded bg-neutral-200`} />
@@ -246,7 +246,7 @@ export default function PropertiesPage() {
           </div>
 
           {/* Pastel frame, white glass card, skeleton property record */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -264,7 +264,7 @@ export default function PropertiesPage() {
                 </div>
 
                 {/* One record: listing, media & docs, showings */}
-                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
                       <span className="text-[10px] tracking-widest text-neutral-500">PROPERTY</span>
@@ -273,7 +273,7 @@ export default function PropertiesPage() {
                       </span>
                     </div>
                     <div className="mt-2.5 flex items-center gap-3">
-                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                       <div className="min-w-0 flex-1">
                         <div className="h-2 w-24 rounded bg-neutral-900" />
                         <div className="mt-1.5 h-2 w-32 rounded bg-neutral-200" />

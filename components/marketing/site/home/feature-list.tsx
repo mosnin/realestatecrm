@@ -11,7 +11,7 @@ import { CheckCheck, ChevronRight } from 'lucide-react';
 import { TwoTone } from './two-tone';
 
 const TAGS = [
-  { label: 'Drafting', tone: 'bg-[#fff0e8] text-[#ff4b29] ring-[#ffd9c9]' },
+  { label: 'Drafting', tone: 'bg-[#eff6ff] text-[#ff4b29] ring-[#dbeafe]' },
   { label: 'Scheduling', tone: 'bg-[#eef0ff] text-indigo-600 ring-indigo-200' },
   { label: 'Pipeline', tone: 'bg-[#eafaf0] text-emerald-600 ring-emerald-200' },
 ];

@@ -67,7 +67,7 @@ describe('broker premium dashboard contract', () => {
     }
   });
 
-  it('shares the warm dashboard canvas and composes the canonical panel primitives', () => {
+  it('shares the dashboard canvas and composes the canonical panel primitives', () => {
     const layout = read('app/broker/layout.tsx');
     const premium = read('components/broker/premium.ts');
 
@@ -79,17 +79,6 @@ describe('broker premium dashboard contract', () => {
     expect(premium).toContain('bg-[var(--dashboard-paper)]');
     expect(premium).toContain('bg-[var(--dashboard-paper-muted)]');
     expect(premium).not.toContain('gradient');
-  });
-
-  it('uses the accepted Today atmosphere for both brokerage roles', () => {
-    for (const file of ['app/broker/brief/page.tsx', 'app/broker/member-dashboard.tsx']) {
-      const source = read(file);
-      expect(source).toContain('BROKER_HERO');
-      expect(source).toContain('AsciiField');
-      expect(source).toContain('data-chippi-atmosphere="ascii-field"');
-      expect(source).not.toMatch(/(?:from|to)-(?:red|amber|yellow|green|blue|purple)-/);
-    }
-    expect(read('app/broker/brief/page.tsx')).toContain('href="/broker/chippi"');
   });
 
   it('keeps loading and error boundaries in the same premium system', () => {

@@ -149,7 +149,7 @@ function StepRow({ step }: { step: Step }) {
                 </div>
               )}
               {!step.inputSummary && !step.outputSummary && (
-                <p className="text-xs text-muted-foreground italic">No details available.</p>
+                <p className="text-xs text-muted-foreground not-italic">No details available.</p>
               )}
             </div>
           </motion.div>

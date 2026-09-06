@@ -67,7 +67,7 @@ function ImageSlot({ name }: { name: string }) {
  *  frame, the same vocabulary as ChippiAtWork. */
 function BioPreview() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -84,7 +84,7 @@ function BioPreview() {
             </span>
           </div>
 
-          <div className="mx-auto w-full max-w-[280px] rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+          <div className="mx-auto w-full max-w-[280px] rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
             {/* Avatar + name + markets */}
             <div className="rounded-xl border border-black/5 bg-white/90 p-4 text-center shadow-sm">
               <div className="mx-auto h-14 w-14 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
@@ -125,7 +125,7 @@ function BioPreview() {
             {/* Listing tiles */}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="overflow-hidden rounded-xl border border-black/5 bg-white/90 shadow-sm">
-                <div className="h-12 bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                <div className="h-12 bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                 <div className="space-y-1 p-2">
                   <div className="h-1.5 w-12 rounded bg-neutral-900/80" />
                   <div className="h-1.5 w-16 rounded bg-neutral-200" />
@@ -281,7 +281,7 @@ export default function BioPage() {
           </div>
 
           {/* Pastel frame, white glass card, skeleton bio page */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -299,7 +299,7 @@ export default function BioPage() {
                 </div>
 
                 {/* Phone-shaped skeleton of the public page */}
-                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="mx-auto w-full max-w-[240px] rounded-2xl border border-black/5 bg-white/90 p-4 shadow-sm">
                     <div className="mx-auto h-12 w-12 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
                     <div className="mx-auto mt-3 h-2 w-20 rounded bg-neutral-900" />
@@ -319,7 +319,7 @@ export default function BioPage() {
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div className="h-12 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="h-12 rounded-lg bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                       <div className="h-12 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
                     </div>
                   </div>

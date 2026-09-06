@@ -48,7 +48,7 @@ import { FEATURE_ICONS, type FeatureIconName } from './icons';
 import { AnimatedGradientText } from '@/components/ui/animated-gradient-text';
 
 const MONO = { fontFamily: 'var(--font-mono)' } as const;
-const SERIF = { fontFamily: 'var(--font-serif-display), "Times New Roman", Times, serif' } as const;
+const SERIF = { fontFamily: 'var(--font-sans)' } as const;
 
 export type DashVariant = 'deals' | 'inbox' | 'floor' | 'chippi' | 'integrations';
 

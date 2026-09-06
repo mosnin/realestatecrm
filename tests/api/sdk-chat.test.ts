@@ -329,8 +329,8 @@ describe('POST /api/ai/task — reserved-title conversationId is not reused (iso
       mode: 'chat',
     };
     await POST(makeRequest({ message: 'what is a cap rate?', conversationId: 'chat_conv_1', mode: 'work' }));
-    expect(directStreamMock).toHaveBeenCalledTimes(1);
-    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
   });
 });
 
@@ -475,12 +475,12 @@ describe('POST /api/ai/task — agent branch (in-process TS is the default)', ()
 
 // ── Dual-path router (active in BOTH runtimes) ────────────────────────────
 describe('POST /api/ai/task — dual-path router', () => {
-  it('routes generic Q&A messages to the direct path (no Modal hop, no agent)', async () => {
+  it('routes generic Q&A messages through the tool-capable runtime', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     await POST(makeRequest({ message: "what's a CMA?" }));
-    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(tsStreamMock).not.toHaveBeenCalled();
   });
 
   it('routes action verbs to the agent path (in-process TS by default)', async () => {
@@ -491,7 +491,7 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('routes attachments without action verbs to the direct path', async () => {
+  it('routes attachments without action verbs through the tool-capable runtime', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     await POST(
       makeRequest({
@@ -503,7 +503,8 @@ describe('POST /api/ai/task — dual-path router', () => {
     // the message text alone. "summarize this document" is a read with no
     // action verb and no workspace-data noun (contrast "show my pipeline"),
     // so it stays on the fast direct path.
-    expect(directStreamMock).toHaveBeenCalledTimes(1);
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -519,13 +520,13 @@ describe('POST /api/ai/task — dual-path router', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('explicit mode:chat keeps pure Q&A on the direct path', async () => {
+  it('explicit mode:chat keeps pure Q&A tool-capable', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
     // No action verb, no workspace noun → heuristic says direct, and
     // mode:chat agrees. Fast path should be taken.
     await POST(makeRequest({ message: 'what is a cap rate?', mode: 'chat' }));
-    expect(directStreamMock).toHaveBeenCalledTimes(1);
-    expect(tsStreamMock).not.toHaveBeenCalled();
+    expect(tsStreamMock).toHaveBeenCalledTimes(1);
+    expect(directStreamMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -553,13 +554,13 @@ describe('POST /api/ai/task — dual-path router', () => {
 
   it('passes the resolved chat model into the direct streamer', async () => {
     delete process.env.CHIPPI_CHAT_RUNTIME;
-    await POST(makeRequest({ message: 'what is a CMA?' }));
+    await POST(makeRequest({ message: 'hello' }));
     const call = directStreamMock.mock.calls[0]?.[0] as unknown as {
       model: string;
       userMessage: string;
     };
     expect(typeof call.model).toBe('string');
     expect(call.model.length).toBeGreaterThan(0);
-    expect(call.userMessage).toBe('what is a CMA?');
+    expect(call.userMessage).toBe('hello');
   });
 });

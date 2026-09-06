@@ -162,7 +162,7 @@ function TourDetail({
               <p>{tour.duration} min tour</p>
             )}
             {tour.notes && (
-              <p className="italic">{tour.notes}</p>
+              <p className="not-italic">{tour.notes}</p>
             )}
           </div>
 

@@ -70,6 +70,7 @@ export default async function AuthRedirectPage({
     // New user — check if they have a pending invitation before sending to setup.
     // This handles the case where Clerk's forceRedirectUrl didn't work and the
     // user ended up here after signing up for a brokerage invitation.
+    let inviteToken: string | null = null;
     try {
       const clerkUser = await currentUser();
       const email = clerkUser?.emailAddresses?.[0]?.emailAddress?.trim().toLowerCase();
@@ -84,12 +85,14 @@ export default async function AuthRedirectPage({
           .limit(1)
           .maybeSingle();
         if (pendingInvite?.token) {
-          redirect(`/invite/${pendingInvite.token}`);
+          inviteToken = pendingInvite.token;
         }
       }
     } catch {
       // Non-blocking — fall through to setup if invite check fails
     }
+    // Next redirects throw; keep them outside the recoverable lookup catch.
+    if (inviteToken) redirect(`/invite/${inviteToken}`);
     // Preserve broker intent across the redirect: a brand-new user who signed in
     // via the broker entry point goes to the broker onboarding flow
     // (/setup?type=broker collects brokerage data) instead of the realtor quick

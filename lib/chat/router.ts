@@ -1,24 +1,8 @@
 /**
- * Dual-path router — Phase 4.
- *
- * Decides whether a chat turn goes through the fast direct LLM path
- * (`lib/chat/direct-llm.ts`) or the full Modal agent path (`/api/ai/task`'s
- * existing Modal proxy). Direct serves generic Q&A, multimodal summaries,
- * help; agent serves anything that needs to MUTATE state (create contact,
- * send email, schedule tour, etc.) or call a connected integration.
- *
- * Heuristic: regex on imperative action verbs. If the message looks like
- * "add Preston as a contact" or "send the follow-up", we route 'agent'
- * because direct can't run tools. Everything else — questions, summaries,
- * "what's a CMA?" — goes direct.
- *
- * Attachments + no action verb → direct. Multimodal Q&A ("summarize this
- * listing", "what's wrong with this MLS sheet?") is exactly what the direct
- * path is for; routing it through the full agent would add latency for no
- * benefit.
- *
- * Errors default to 'agent' so a router bug can never silently drop a real
- * action. Safer to over-route to the full agent than miss an action.
+ * Keep tool access stable across phrasing, attachments and follow-up turns.
+ * Only an explicitly self-contained greeting uses the toolless shortcut.
+ * Everything else reaches the tool-capable runtime, which can answer without
+ * calling a tool when none is needed. Unknown intent must not remove access.
  */
 
 /**
@@ -36,130 +20,35 @@
  *   - Other: remind (when imperative: "remind me", "remind her")
  *
  * Not on the list: review, look, find, search, get, show, tell, list, what,
- * how, why, who, when — those are READS. Reads go direct.
+ * how, why, who, when are absent from this legacy verb catalog.
+ * Routing no longer depends on the catalog; workspace reads keep tool access.
  */
 const ACTION_VERBS_RE =
   /\b(add|create|set|update|change|edit|archive|mark|log|save|delete|remove|send|text|sms|email|reply|forward|draft|write|ping|dm|reach|contact|follow|followup|nudge|call|schedule|book|cancel|reschedule|move|assign|reassign|unassign|route|qualify|advance|close|win|lose|remind|notify|fire|ship|invite|approve|reject|connect|disconnect|link|integrate|sync)\b/i;
 
-/**
- * Workspace-DATA queries that READ the realtor's book of business. These are
- * not mutations, but they still REQUIRE tools (find_person, find_property,
- * pipeline_summary, find_quiet_hot_persons, …) — the toolless direct path
- * cannot answer "show my pipeline" or "find my hottest leads", it can only
- * deflect. So any message that references the realtor's data (a read verb
- * paired with, or just a mention of, a workspace noun) routes to the agent.
- *
- * This is the fix for the "Chippi has no access to anything" failure: read
- * phrasings like "show today's pipeline", "find hot leads", "who's overdue",
- * "plan my day" must reach the tools, not the generic LLM.
- */
-const WORKSPACE_QUERY_RE =
-  /\b(show|find|search|look\s?up|lookup|list|see|view|pull|display|surface|who(?:'?s| is| are)?|which|whose|overdue|hottest|hot|warm|cold|stuck|stalled|quiet|pipeline|deals?|leads?|contacts?|people|person|clients?|prospects?|buyers?|sellers?|listings?|propert(?:y|ies)|tours?|showings?|follow[\s-]?ups?|calendar|agenda|schedule|today|tomorrow|this week|inbox|drafts?|offers?|commissions?|stages?|scores?|plan my|my day|my week|my pipeline|my leads|my deals|my contacts|my schedule|my calendar)\b/i;
-
-/**
- * Integration-shaped messages. Reading email / checking a connected app needs
- * the agent's integration tools — there is no native read-email tool, so the
- * toolless direct path can only deflect ("I don't have access to your email"),
- * which realtors with Gmail connected experience as Chippi losing their
- * integrations. Nouns cover the connected-app surface (gmail, outlook, slack,
- * hubspot, calendar/email/messages) and meta-questions about connections
- * ("is my gmail connected?", "what integrations do I have?").
- */
-const INTEGRATION_QUERY_RE =
-  /\b(e-?mails?|gmail|outlook|mail(?:box)?|inbox|messages?|texts?|slack|hubspot|whatsapp|integrations?|connected|composio)\b/i;
-
 export type RouteDecision = 'direct' | 'agent';
-
-/**
- * Broker-domain reads. The shared WORKSPACE_QUERY_RE was curated from realtor
- * traffic; broker questions ("team health", "at-risk agents", "audit response
- * times", "who's unassigned") matched nothing and fell through to the broker
- * direct path — whose snapshot prompt is INSTRUCTED to say it doesn't have
- * the answer. The "Chippi says it has no tools" complaint on the broker
- * surface was manufactured by that fallthrough. These nouns cover the broker
- * tool catalog's natural-language surface (team/roster/performance/revenue/
- * routing/reviews/briefing).
- */
-const BROKER_QUERY_RE =
-  /\b(team|roster|members?|realtors?|agents?|brokerage|floor|unassigned|reassignments?|routing|response times?|at[\s-]?risk|flight[\s-]?risk|performance|production|leaderboard|rankings?|revenue|volume|gci|splits?|review queue|reviews?|briefing|brief|health|coverage|sla)\b/i;
 
 export interface RouteAttachment {
   id?: string;
   mimeType?: string;
 }
 
-/**
- * Decide which path this turn takes.
- *
- *   - Empty/whitespace-only message → 'direct' (nothing to act on).
- *   - Contains an action verb → 'agent'.
- *   - Has attachments AND no action verb → 'direct' (multimodal Q&A).
- *   - Default → 'direct' (Q&A, summaries, "what does X mean").
- *
- * Errors → 'agent' (safe default).
- */
 export function decideRoute(
   userMessage: string,
   attachments: RouteAttachment[] = [],
 ): RouteDecision {
-  try {
-    const text = (userMessage ?? '').trim();
-    if (!text) {
-      // Empty message with attachments only — direct can still summarize.
-      return 'direct';
-    }
-    if (ACTION_VERBS_RE.test(text)) {
-      return 'agent';
-    }
-    // Attachments without an action verb are the direct path's sweet spot
-    // (multimodal vision summary) — keep them fast even if the caption
-    // mentions a workspace noun like "listing".
-    if (attachments.length > 0) {
-      return 'direct';
-    }
-    // Text reads of the realtor's own data still need tools — route them to
-    // the agent so "show my pipeline" / "find hot leads" / "who's overdue"
-    // reach the read tools instead of the toolless direct path (which can
-    // only deflect). The file's own philosophy: better to over-route to the
-    // tool-capable agent than answer a data question with a toolless LLM that
-    // has no access to the workspace.
-    if (WORKSPACE_QUERY_RE.test(text)) {
-      return 'agent';
-    }
-    // Integration reads ("do I have any new emails?", "is my gmail
-    // connected?") need the agent's integration tools for the same reason.
-    if (INTEGRATION_QUERY_RE.test(text)) {
-      return 'agent';
-    }
-    return 'direct';
-  } catch {
-    // Bug in the regex / inputs → fall back to the full agent. Direct
-    // can't run tools, so over-routing to agent is the conservative choice.
-    return 'agent';
-  }
+  const text = (userMessage ?? '').trim();
+  if (attachments.length > 0) return 'agent';
+  if (!text || /^(?:hi(?: there)?|hello(?: there)?|hey(?: there)?|thanks|thank you)[!.\s]*$/i.test(text)) return 'direct';
+  return 'agent';
 }
 
-/**
- * Broker-surface routing: everything decideRoute knows, plus the broker
- * noun set. The broker direct path serves only a 5-field aggregate snapshot
- * — any question about specific realtors, routing, performance, or reviews
- * needs the broker tool catalog on the agent path.
- */
+/** Broker conversations use the same capability-preserving routing rule. */
 export function decideBrokerRoute(
   userMessage: string,
   attachments: RouteAttachment[] = [],
 ): RouteDecision {
-  try {
-    const base = decideRoute(userMessage, attachments);
-    if (base === 'agent') return 'agent';
-    const text = (userMessage ?? '').trim();
-    if (text && attachments.length === 0 && BROKER_QUERY_RE.test(text)) {
-      return 'agent';
-    }
-    return base;
-  } catch {
-    return 'agent';
-  }
+  return decideRoute(userMessage, attachments);
 }
 
 // ── Escalation detection ────────────────────────────────────────────────────
@@ -216,8 +105,6 @@ export function shouldEscalate(directResponse: string): boolean {
   return false;
 }
 
-// Exported for tests + documentation. Keeping the regex visible so a reader
-// of router.ts knows EXACTLY what triggers an agent route without having to
-// step through the function.
+// Compatibility export for callers that classify action wording. This catalog
+// does not decide whether a conversation can access tools.
 export const ACTION_VERBS_REGEX = ACTION_VERBS_RE;
-export const ESCALATION_REGEXES = ESCALATION_PHRASES;

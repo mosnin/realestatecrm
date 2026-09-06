@@ -185,7 +185,7 @@ function ImageSlot({ name }: { name: string }) {
 /** Skeleton kanban illustration, three columns + the plain-language log. */
 function PipelineSketch() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -204,7 +204,7 @@ function PipelineSketch() {
           </div>
 
           {/* The board, three columns */}
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {COLUMNS.map((col) => (
                 <div key={col.name}>
@@ -276,7 +276,7 @@ function StageLadder() {
                 </span>
               </div>
               {/* Active deal card */}
-              <div className="rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fdf4ee] p-3 shadow-sm ring-1 ring-inset ring-black/5">
+              <div className="rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#f5f7fb] p-3 shadow-sm ring-1 ring-inset ring-black/5">
                 <div className="flex items-center gap-2">
                   <div
                     className={`h-7 w-7 flex-shrink-0 rounded-full ${

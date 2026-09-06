@@ -6,13 +6,13 @@
  * The page is a tinted canvas; content lives in big rounded color-blocked
  * cards that alternate and build rhythm (white paper, soft tint, signal
  * vermillion, true black). Display type is Times (--font-display / --font-title),
- * the accent flourish is Times italic (--font-accent), and the
+ * the accent flourish is Times not-italic (--font-accent), and the
  * signal color does real brand work, eyebrow glyphs, kickers, stats, CTAs.
  *
  * Exports (API stable so every page rides the system):
  * - <Section tone>, plain | card (paper) | tint | brand (vermillion) | dark
  * - <SectionHeader>, ✦ chip eyebrow → big display headline → sub
- * - <Accent>, italic serif accent span inside a headline
+ * - <Accent>, not-italic serif accent span inside a headline
  * - <FeatureGrid>, tinted feature cells: kicker → title → body
  * - <StatStrip>, the giant-number cells row (92% / +30% / 500k style)
  * - <DarkStatBand>, black card with display stats
@@ -112,7 +112,7 @@ export function Parallax({
 /** Italic serif accent inside a display headline, the "Revolutionize" move. */
 export function Accent({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <em className={cn('font-accent font-normal italic tracking-normal', className)}>{children}</em>
+    <em className={cn('font-accent font-normal not-italic tracking-normal', className)}>{children}</em>
   );
 }
 
@@ -148,9 +148,9 @@ type Tone = 'plain' | 'card' | 'tint' | 'brand' | 'dark';
 
 const TONE_SURFACE: Record<Exclude<Tone, 'plain'>, string> = {
   // Paper card on the canvas, the default content surface.
-  card: 'bg-white text-[#141414] dark:bg-[#151517] dark:text-[#f5f5f4] shadow-[0_1px_2px_rgba(20,16,12,0.04),0_12px_40px_-18px_rgba(20,16,12,0.12)]',
+  card: 'bg-white text-[#141414] dark:bg-[#151517] dark:text-[#f4f4f5] shadow-[0_1px_2px_rgba(20,16,12,0.04),0_12px_40px_-18px_rgba(20,16,12,0.12)]',
   // A half-step off the canvas, quiet grouping.
-  tint: 'bg-[#e9e9ee] text-[#141414] dark:bg-[#141416] dark:text-[#f5f5f4]',
+  tint: 'bg-[#e9e9ee] text-[#141414] dark:bg-[#141416] dark:text-[#f4f4f5]',
   // The signal block, vermillion doing brand work.
   brand: 'bg-[#ff4b29] text-white',
   // The contrast band.

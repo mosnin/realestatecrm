@@ -287,7 +287,7 @@ function MemberRow({
             {member.role ? <span className={CAPTION}>{member.role}</span> : null}
             <span className={cn(BODY_MUTED, 'mt-1 block leading-snug')}>{member.task}</span>
             {status === 'running' && thinking ? (
-              <span className={cn(CAPTION, 'mt-1 block italic')}>{thinking}</span>
+              <span className={cn(CAPTION, 'mt-1 block not-italic')}>{thinking}</span>
             ) : null}
           </span>
           {member.output ? (

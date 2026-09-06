@@ -98,7 +98,7 @@ export function FeaturesSplit() {
         </div>
 
         {/* Diagram, pastel-gradient frame, white glass card */}
-        <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+        <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
           <article
             className="group relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl transition-shadow hover:shadow-md"
             style={{
@@ -117,7 +117,7 @@ export function FeaturesSplit() {
               </div>
 
               {/* Illustration */}
-              <div className="relative mb-8 h-56 rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] ring-1 ring-inset ring-black/5 sm:h-64">
+              <div className="relative mb-8 h-56 rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] ring-1 ring-inset ring-black/5 sm:h-64">
                 {/* Deal board */}
                 <div className="absolute left-3 top-4 h-[52%] w-[70%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-6 sm:top-6">
                   <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">

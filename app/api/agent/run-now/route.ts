@@ -1,24 +1,11 @@
-/**
- * POST /api/agent/run-now
- *
- * Triggers an on-demand agent run for the caller's space.
- *
- * If MODAL_WEBHOOK_URL is configured, calls the Modal web endpoint directly.
- * Otherwise falls back to pushing a trigger into Redis — the agent will
- * process it on the next heartbeat (within 15 minutes).
- *
- * Set MODAL_WEBHOOK_URL after deploying with:
- *   modal deploy agent/modal_app.py
- * The URL is printed in the deploy output as the web_endpoint URL.
- */
-
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { checkRateLimit } from '@/lib/rate-limit';
 
-const AGENT_INTERNAL_SECRET = process.env.AGENT_INTERNAL_SECRET ?? '';
-const MODAL_WEBHOOK_URL = process.env.MODAL_WEBHOOK_URL ?? '';
+import { supabase } from '@/lib/supabase';
+import { tenantTable } from '@/lib/tenant-db';
+import { recordDispatch, markInFlight, markFailed } from '@/lib/agent/run-ledger';
 
 export async function POST() {
   const authResult = await requireAuth();
@@ -39,6 +26,13 @@ export async function POST() {
     );
   }
 
+  const { data: settings, error: settingsError } = await tenantTable(supabase, 'AgentSettings', { spaceId: space.id })
+    .select('enabled').maybeSingle();
+  if (settingsError) return NextResponse.json({ triggered: false, reason: 'Settings unavailable' }, { status: 503 });
+  if (!settings?.enabled) return NextResponse.json({ triggered: false, reason: 'Background review is paused' }, { status: 409 });
+
+  const modalUrl = process.env.MODAL_WEBHOOK_URL;
+  const secret = process.env.AGENT_INTERNAL_SECRET;
   const kvUrl = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
 
@@ -67,37 +61,37 @@ export async function POST() {
     }
   }
 
-  // Fast path — fire the Modal webhook so the run starts now instead of at the
-  // next heartbeat. Fire-and-forget (a Modal run takes minutes); a rejection
-  // is harmless because the trigger above is already durably queued.
-  // user_id is the caller's Clerk userId — the entity whose Composio
-  // connections the autonomous run uses. Passing it explicitly removes the
-  // silent-null path on the Modal side.
-  if (MODAL_WEBHOOK_URL && AGENT_INTERNAL_SECRET) {
-    fetch(MODAL_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        space_id: space.id,
-        secret: AGENT_INTERNAL_SECRET,
-        user_id: userId,
-      }),
-    }).catch((err) => {
-      console.error('[agent/run-now] Modal webhook background error', err);
-    });
-    return NextResponse.json({ triggered: true, method: 'modal' }, { status: 202 });
+  async function dispatch() {
+    const runId = await recordDispatch(space!.id, 'run_now');
+    try {
+      const res = await fetch(modalUrl!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ space_id: space!.id, secret, user_id: userId, run_id: runId }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.ok) {
+        await markInFlight(runId);
+        return 'accepted' as const;
+      }
+      await markFailed(runId, `Executor returned HTTP ${res.status}; check activity before retrying.`);
+      return 'rejected' as const;
+    } catch {
+      // A lost acknowledgement does not prove the run never started. Keep the
+      // dispatch unresolved and never retry this request automatically.
+      return 'unknown' as const;
+    }
   }
 
   if (queued) {
-    return NextResponse.json({
-      triggered: true,
-      method: 'queued',
-      note: 'Will run at next heartbeat (≤15 min)',
-    });
+    if (modalUrl && secret) after(async () => { await dispatch(); });
+    return NextResponse.json({ triggered: true, method: 'queued', note: 'Request queued. Check Activity for the completed work.' }, { status: 202 });
   }
-
-  return NextResponse.json(
-    { triggered: false, reason: 'Neither Modal webhook nor Redis is configured' },
-    { status: 503 },
-  );
+  if (modalUrl && secret) {
+    const outcome = await dispatch();
+    if (outcome === 'accepted') return NextResponse.json({ triggered: true, method: 'modal', note: 'Run request accepted. Check Activity for the result.' }, { status: 202 });
+    if (outcome === 'unknown') return NextResponse.json({ triggered: false, method: 'unknown', note: 'Start could not be confirmed. Check Activity before trying again.' }, { status: 202 });
+    return NextResponse.json({ triggered: false, note: 'The background service could not accept this run. Check Activity before trying again.' }, { status: 503 });
+  }
+  return NextResponse.json({ triggered: false, note: 'Background review is unavailable. Your saved automations have separate schedules.' }, { status: 503 });
 }

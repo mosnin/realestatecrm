@@ -12,7 +12,6 @@ import {
 } from '@/components/chippi/persistent-chippi-voice';
 import {
   ChippiPromptBox,
-  ChatWorkModeSwitch,
   type MentionItem,
   type SkillItem,
   type SentAttachmentMeta,
@@ -192,17 +191,6 @@ export function planHistoryLoad(input: {
   return { action: 'fetch', clearFirst };
 }
 
-/**
- * Whether the top-of-page Chat/Work mode switch should render for a given
- * chat surface variant. The main Chippi surface (`/api/ai/task`) owns the
- * durable Work runtime. Broker chat can accept a legacy mode hint, but it
- * does not expose the same Work tools or lifecycle yet, so rendering the
- * switch there would overpromise product parity.
- */
-export function shouldShowModeSwitch(variant: 'realtor' | 'broker'): boolean {
-  return variant === 'realtor';
-}
-
 /** A conversation's type is chosen before its first user message and then fixed. */
 export function isConversationModeLocked(
   messages: ReadonlyArray<{ role: string }>,
@@ -228,12 +216,14 @@ function chatModeStorageKey(conversationId: string | null): string {
 
 /** Reads both the new value and the old `agent` value for seamless migration. */
 export function readStoredChatMode(conversationId: string | null): ChatMode {
-  if (typeof window === 'undefined') return 'chat';
+  if (!conversationId) return 'work';
+  if (typeof window === 'undefined') return conversationId ? 'chat' : 'work';
   try {
     const value = window.sessionStorage.getItem(chatModeStorageKey(conversationId));
-    return value === 'work' || value === 'agent' ? 'work' : 'chat';
+    if (value === 'chat') return 'chat';
+    return value === 'work' || value === 'agent' || !conversationId ? 'work' : 'chat';
   } catch {
-    return 'chat';
+    return conversationId ? 'chat' : 'work';
   }
 }
 
@@ -358,7 +348,7 @@ export function ChippiWorkspace({
   const [activeConversationId, setActiveConversationId] = useState<string | null>(
     initialConversationId,
   );
-  const [chatMode, setChatMode] = useState<ChatMode>('chat');
+  const [chatMode, setChatMode] = useState<ChatMode>(initialConversationId || isBroker ? 'chat' : 'work');
   const [draftWorkExecutionMode, setDraftWorkExecutionMode] =
     useState<WorkExecutionMode>(() =>
       parseWorkExecutionMode(
@@ -376,7 +366,7 @@ export function ChippiWorkspace({
   useEffect(() => {
     setChatMode(
       storedConversationMode(initialConversations, activeConversationId)
-      ?? (isConversationModeLocked(initialMessages) ? 'chat' : readStoredChatMode(activeConversationId)),
+      ?? (isConversationModeLocked(initialMessages) || isBroker ? 'chat' : readStoredChatMode(activeConversationId)),
     );
     // Hydration restore only. Conversation changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -400,10 +390,6 @@ export function ChippiWorkspace({
     setChatMode(readStoredChatMode(activeConversationId));
     // Carry-forward needs the current selection but must fire only on id change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeConversationId]);
-  const selectChatMode = useCallback((mode: ChatMode) => {
-    setChatMode(mode);
-    writeStoredChatMode(activeConversationId, mode);
   }, [activeConversationId]);
   // Server-driven loading: pending during the soft-nav so we can show the
   // "One moment" placeholder instead of the previous conversation's
@@ -1028,7 +1014,7 @@ export function ChippiWorkspace({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...endpoints.conversationCreatePayload,
-          ...(!isBroker ? { executionMode: workExecutionMode } : {}),
+          ...(!isBroker ? { mode: 'work', executionMode: workExecutionMode } : {}),
         }),
       });
       if (!res.ok) {
@@ -1711,7 +1697,7 @@ export function ChippiWorkspace({
         prefill={prefill ?? undefined}
         skills={skills}
         chatMode={chatMode}
-        onModeChange={conversationModeLocked ? undefined : selectChatMode}
+        onModeChange={undefined}
         modeLocked={conversationModeLocked}
         onVoiceStart={
           realtimeVoiceEnabled && !isBroker
@@ -1769,18 +1755,6 @@ export function ChippiWorkspace({
           className="relative flex flex-col h-full overflow-hidden min-w-0"
           style={{ width: effectiveIsSplit ? `${leftWidthPercent}%` : '100%' }}
         >
-      {shouldShowModeSwitch(variant)
-        && !conversationModeLocked
-        && !historyReloading
-        && !isLoadingConversation && (
-        <div className="absolute left-1/2 top-1.5 z-20 hidden -translate-x-1/2 sm:top-2 sm:block">
-          <ChatWorkModeSwitch
-            mode={chatMode}
-            onChange={selectChatMode}
-            disabled={pendingConfirmation !== null || rateLimitSeconds > 0}
-          />
-        </div>
-      )}
       {/* Floating control cluster — top-right, no top bar chrome.
           Four affordances + one menu trigger. The composer below is the
           focal element on this surface; this row stays a small calm

@@ -175,7 +175,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 /** Skeleton contact-record illustration, score with the reason + timeline. */
 function ContactRecordSketch() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -195,7 +195,7 @@ function ContactRecordSketch() {
             </span>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
             {/* The person, scored, with the reason */}
             <div className="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-3">
@@ -240,7 +240,7 @@ function ContactRecordSketch() {
 function ContactRoster() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
-      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
         {/* List head, a sort, the way you'd actually triage */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
@@ -284,7 +284,7 @@ function ContactRoster() {
 function SegmentsSketch() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
-      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
         {/* List head, segments stay current on their own */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">

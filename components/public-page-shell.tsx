@@ -192,7 +192,7 @@ export function PublicPageShell({
             <p className="text-base text-muted-foreground mt-2 max-w-xl">{pageIntro}</p>
           )}
           {customization?.bio && (
-            <p className="text-sm text-muted-foreground/80 mt-2 max-w-xl italic">{customization.bio}</p>
+            <p className="text-sm text-muted-foreground/80 mt-2 max-w-xl not-italic">{customization.bio}</p>
           )}
           {/* Trust line — sits with the intro, not buried in chrome */}
           <p className={`${BODY_MUTED} mt-3 max-w-xl`}>{trustLine}</p>

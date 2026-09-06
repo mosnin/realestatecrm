@@ -181,7 +181,7 @@ function PropertyCard({
               />
             </span>
           ) : (
-            <span className="text-sm italic text-muted-foreground">Price TBD</span>
+            <span className="text-sm not-italic text-muted-foreground">Price TBD</span>
           )}
 
           {expandable ? (

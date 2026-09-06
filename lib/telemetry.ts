@@ -6,11 +6,8 @@
  * so the team can measure time-from-signup-to-first-useful-agent-action.
  * Until those land every conversion hypothesis is fiction.
  *
- * Storage today is the `TelemetryEvent` Supabase table — no PostHog / Mixpanel
- * SDK is wired into the app and we don't want to take that dependency just to
- * ship telemetry. The team's analytics layer (Metabase / dbt / etc.) reads
- * this table directly. Future migration to a real provider is a swap of
- * `emit()`'s body; the signature stays the same so call sites don't move.
+ * Canonical outcome events are persisted to TelemetryEvent alongside the
+ * existing client analytics. Product retention reads these server receipts.
  *
  * Hard rules:
  *   - emit() NEVER throws — analytics must not break the user flow.
@@ -21,6 +18,7 @@
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { after } from 'next/server';
+import { createHash } from 'node:crypto';
 
 export type TelemetryEventName =
   | 'signup_completed'
@@ -30,7 +28,8 @@ export type TelemetryEventName =
   // tool name + reasoning sentence (the assistant text immediately
   // before the tool call) + the arg snapshot. Used to debug tool-pick
   // regressions and to feed the eval harness with real-traffic samples.
-  | 'agent_tool_called';
+  | 'agent_tool_called'
+  | 'agent_action_result';
 
 export interface EmitArgs {
   event: TelemetryEventName;
@@ -66,16 +65,26 @@ function capPayload(payload: Record<string, unknown>): Record<string, unknown> {
  * detach explicitly, but callers SHOULD treat it as fire-and-forget — never
  * gate user-visible behavior on the result.
  */
+export function firstActionId(spaceId: string): string {
+  const hex = createHash('sha256').update(`chippi:first-action:${spaceId}`).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 async function persistTelemetry(args: EmitArgs): Promise<void> {
   try {
     const { error } = await supabase.from('TelemetryEvent').insert({
-      id: crypto.randomUUID(),
+      // Deterministic primary key prevents parallel tool completions from
+      // recording two first-value events. Existing historical rows are checked
+      // by hasEmitted. No new database constraint or destructive cleanup needed.
+      id: args.event === 'agent_first_action_completed' && args.spaceId
+        ? firstActionId(args.spaceId)
+        : crypto.randomUUID(),
       spaceId: args.spaceId ?? null,
       userId: args.userId ?? null,
       event: args.event,
       payload: capPayload(args.payload ?? {}),
     });
-    if (error) {
+    if (error && error.code !== '23505') {
       logger.warn('[telemetry] emit failed', { event: args.event }, error);
     }
   } catch (err) {
@@ -170,6 +179,16 @@ export function secondsBetween(from: Date | null, to: Date): number | null {
  * represent the agent doing something for the user.
  */
 export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
+  'add_person',
+  'set_followup',
+  'note_on_person',
+  'note_on_deal',
+  'log_call',
+  'log_meeting',
+  'update_deal_value',
+  'update_deal_close_date',
+  'send_property_packet',
+  'create_automation',
   // Legacy in-process tools (lib/ai-tools/tools/*)
   'add_checklist_item',
   'advance_deal_stage',
@@ -181,8 +200,6 @@ export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
   'update_contact',
   // Modal sandbox tools (agent/tools/*)
   'add_property',
-  'create_draft_message',
-  'send_or_draft',
   'update_contact_type',
   'update_contact_brief',
   'tag_contact',
@@ -191,9 +208,7 @@ export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
   'update_deal_notes',
   'set_contact_follow_up',
   'set_deal_follow_up',
-  'create_goal',
   'update_goal_status',
-  'record_outcome',
   // Forward-compat names referenced in the Phase 2 brief but not yet wired
   // — keeping them in the set means the moment they ship the metric works
   // without a code change here.
@@ -205,11 +220,19 @@ export const SIDE_EFFECTING_TOOLS: ReadonlySet<string> = new Set([
  * sites; checks `hasEmitted` first so it fires exactly once per space.
  * Fire-and-forget — never blocks the turn.
  */
-export async function maybeEmitFirstAction(input: {
+type FirstActionInput = {
   spaceId: string;
   userId?: string | null;
   toolName: string;
-}): Promise<void> {
+};
+
+export async function maybeEmitFirstAction(input: FirstActionInput): Promise<void> {
+  const task = persistFirstAction(input);
+  try { after(() => task); } catch { /* Workers and tests await directly. */ }
+  await task;
+}
+
+async function persistFirstAction(input: FirstActionInput): Promise<void> {
   const { spaceId, userId, toolName } = input;
   if (!SIDE_EFFECTING_TOOLS.has(toolName)) return;
   try {

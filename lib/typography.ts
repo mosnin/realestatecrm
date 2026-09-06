@@ -28,18 +28,18 @@
 /** Shared stacks — keep Clerk, CSS, and Tailwind on the same three faces. */
 export const FONT_SANS_STACK =
   '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif';
-export const FONT_SERIF_STACK =
-  '"Times New Roman MT", "Times New Roman", Times, serif';
+/** Compatibility alias: Chippi uses sans-serif for every display face. */
+export const FONT_SERIF_STACK = FONT_SANS_STACK;
 export const FONT_MONO_STACK =
   '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
 /** Page-level h1 — serif Times, the screen's headline. */
-export const H1 = 'font-title text-3xl tracking-tight text-foreground';
+export const H1 = 'font-title font-semibold text-3xl tracking-tight text-foreground';
 /** Inline style — apply with style={{ fontFamily: 'var(--font-title)' }} */
 export const TITLE_FONT = { fontFamily: 'var(--font-title)' } as const;
 
 /** Focal stat number — same scale as H1 but treated as data. Use serif. */
-export const STAT_NUMBER = 'font-title text-3xl tracking-tight text-foreground tabular-nums';
+export const STAT_NUMBER = 'font-title font-semibold text-3xl tracking-tight text-foreground tabular-nums';
 /** Compact stat (when 4+ are in a row). 25px = H1 × 1/1.2. */
 export const STAT_NUMBER_COMPACT =
   'font-title text-[25px] leading-tight tracking-tight text-foreground tabular-nums';
@@ -135,14 +135,14 @@ export const PRIMARY_PILL =
  * Those stay PRIMARY_PILL. The warmth is the brand's punctuation —
  * if everything has it, nothing has it.
  *
- * Importing this constant counts as a deliberate brand-orange use
+ * Importing this constant counts as a deliberate brand-blue use
  * for the stray-orange lint rule (Phase 2). Call sites don't need
  * to wrap the class themselves.
  */
 export const CHIPPI_PILL =
   'inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium ' +
   'bg-foreground text-background ' +
-  'hover:bg-gradient-to-r hover:from-foreground hover:via-foreground hover:to-orange-500/90 ' +
+  'hover:bg-brand ' +
   'active:scale-[0.98] transition-all duration-150 focus-visible:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 ' +
   'focus-visible:ring-offset-background';

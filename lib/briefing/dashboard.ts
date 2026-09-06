@@ -23,6 +23,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
+import { endOfLocalDay } from '@/lib/calendar/local-day';
 import { composeBrief } from './compose';
 import {
   composePipelineSummary,
@@ -78,6 +79,7 @@ export interface NeedsYou {
   /** Inbox threads with at least one unread inbound message — clients whose
    *  last word is still sitting unanswered on the realtor's desk. */
   clientsWaiting: number;
+  failedActions?: number;
 }
 
 /**
@@ -92,7 +94,12 @@ export interface ReputationStat {
   clicked: number;
 }
 
+export type DashboardSource = 'brief' | 'newLeads' | 'followUpsDue' | 'pendingDrafts' | 'clientsWaiting' | 'pipeline' | 'overnight' | 'hotLeads' | 'tours' | 'reputation' | 'reactivations' | 'referrers' | 'ownerName' | 'failedActions';
+
 export interface BriefDashboard {
+  /** Missing sources never count as evidence of an empty workspace. */
+  unavailable?: DashboardSource[];
+  checkedAt?: string;
   /** The realtor's first name for the greeting, or null. */
   ownerName: string | null;
   /** The full composed 7am brief — cards (ON DECK), tip, momentum, tomorrow. */
@@ -120,12 +127,14 @@ const TOURS_SHOWN = 4;
  * brokerage-routed rows (those live on the brokerage's desk, not this
  * realtor's), matching every other realtor-facing follow-up surface.
  */
-async function countFollowUpsDue(spaceId: string): Promise<number> {
-  // End-of-today boundary so a follow-up dated "today" counts as due.
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-  const cutoff = endOfToday.toISOString();
+async function fetchDayEnd(spaceId: string): Promise<string> {
+  const { data, error } = await tenantTable(supabase, 'SpaceSetting', { spaceId })
+    .select('timezone').maybeSingle();
+  if (error) throw new Error('Workspace time zone unavailable');
+  return endOfLocalDay(new Date(), data?.timezone || 'America/New_York').toISOString();
+}
 
+async function countFollowUpsDue(spaceId: string, cutoff: string): Promise<number> {
   const [contactsRes, dealsRes] = await Promise.all([
     tenantTable(supabase, 'Contact', { spaceId })
       .select('id', { count: 'exact', head: true })
@@ -139,24 +148,27 @@ async function countFollowUpsDue(spaceId: string): Promise<number> {
       .lte('followUpAt', cutoff),
   ]);
 
+  if (contactsRes.error || dealsRes.error) throw new Error('Follow-ups unavailable');
   return (contactsRes.count ?? 0) + (dealsRes.count ?? 0);
 }
 
 /** Untouched new leads — tagged `new-lead`, not brokerage-routed. Same
  *  predicate the /leads page uses to surface "N new since you last checked". */
 async function countNewLeads(spaceId: string): Promise<number> {
-  const { count } = await tenantTable(supabase, 'Contact', { spaceId })
+  const { count, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id', { count: 'exact', head: true })
     .is('brokerageId', null)
     .contains('tags', ['new-lead']);
+  if (error) throw new Error('Count unavailable');
   return count ?? 0;
 }
 
 /** Pending AgentDraft rows — the same count the Inbox surface shows. */
 async function countPendingDrafts(spaceId: string): Promise<number> {
-  const { count } = await tenantTable(supabase, 'AgentDraft', { spaceId })
+  const { count, error } = await tenantTable(supabase, 'AgentDraft', { spaceId })
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending');
+  if (error) throw new Error('Count unavailable');
   return count ?? 0;
 }
 
@@ -168,9 +180,18 @@ async function countPendingDrafts(spaceId: string): Promise<number> {
  * isolation without standing up the whole dashboard compose.
  */
 export async function countClientsWaiting(spaceId: string): Promise<number> {
-  const { count } = await tenantTable(supabase, 'InboxThread', { spaceId })
+  const { count, error } = await tenantTable(supabase, 'InboxThread', { spaceId })
     .select('id', { count: 'exact', head: true })
     .gt('unreadCount', 0);
+  if (error) throw new Error('Count unavailable');
+  return count ?? 0;
+}
+
+async function countFailedActions(spaceId: string): Promise<number> {
+  const { count, error } = await tenantTable(supabase, 'AgentActivityLog', { spaceId })
+    .select('id', { count: 'exact', head: true }).eq('outcome', 'failed')
+    .gte('createdAt', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString());
+  if (error) throw new Error('Failed actions unavailable');
   return count ?? 0;
 }
 
@@ -182,12 +203,13 @@ export async function countClientsWaiting(spaceId: string): Promise<number> {
  */
 async function composePipelineStat(spaceId: string): Promise<PipelineStat | null> {
   const [summary, valueRes] = await Promise.all([
-    composePipelineSummary(spaceId),
+    composePipelineSummary(spaceId, true),
     tenantTable(supabase, 'Deal', { spaceId })
       .select('value')
       .eq('status', 'active'),
   ]);
 
+  if (valueRes.error) throw new Error('Pipeline value unavailable');
   if (!summary) return null;
 
   let openValue = 0;
@@ -209,7 +231,7 @@ async function composePipelineStat(spaceId: string): Promise<PipelineStat | null
  * top; capped to a short list for the bento cell.
  */
 async function fetchHotLeads(spaceId: string): Promise<HotLead[]> {
-  const { data } = await tenantTable(supabase, 'Contact', { spaceId })
+  const { data, error } = await tenantTable(supabase, 'Contact', { spaceId })
     .select('id, name, leadScore, lastContactedAt, scoreLabel, scoringStatus')
     .is('brokerageId', null)
     .eq('scoringStatus', 'scored')
@@ -217,6 +239,7 @@ async function fetchHotLeads(spaceId: string): Promise<HotLead[]> {
     .order('leadScore', { ascending: false })
     .limit(HOT_LEADS_SHOWN);
 
+  if (error) throw new Error('Leads unavailable');
   return ((data ?? []) as HotLead[]).map((c) => ({
     id: c.id,
     name: c.name,
@@ -230,19 +253,18 @@ async function fetchHotLeads(spaceId: string): Promise<HotLead[]> {
  * calendar signal source reads (now → end of local day, excluding
  * cancelled). Named + time-stamped for the bento's "today's tours" cell.
  */
-async function fetchToursToday(spaceId: string): Promise<TourToday[]> {
+async function fetchToursToday(spaceId: string, cutoff: string): Promise<TourToday[]> {
   const now = new Date();
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
 
-  const { data } = await tenantTable(supabase, 'Tour', { spaceId })
+  const { data, error } = await tenantTable(supabase, 'Tour', { spaceId })
     .select('id, startsAt, guestName, propertyAddress, contactId, status')
     .gte('startsAt', now.toISOString())
-    .lte('startsAt', endOfDay.toISOString())
+    .lte('startsAt', cutoff)
     .neq('status', 'cancelled')
     .order('startsAt', { ascending: true })
     .limit(TOURS_SHOWN);
 
+  if (error) throw new Error('Tours unavailable');
   type Row = {
     id: string;
     startsAt: string;
@@ -281,6 +303,7 @@ async function composeReputationStat(spaceId: string): Promise<ReputationStat | 
       .gte('createdAt', since),
   ]);
 
+  if (requestedRes.error || clickedRes.error) throw new Error('Reviews unavailable');
   const requested = requestedRes.count ?? 0;
   if (requested === 0) return null;
   return { requested, clicked: clickedRes.count ?? 0 };
@@ -312,12 +335,18 @@ export async function composeBriefDashboard(
   spaceId: string,
   ownerId: string,
 ): Promise<BriefDashboard> {
+  const unavailable: DashboardSource[] = [];
+  async function read<T>(key: DashboardSource, query: Promise<T>, fallback: T): Promise<T> {
+    try { return await query; } catch { unavailable.push(key); return fallback; }
+  }
+  const dayEnd = fetchDayEnd(spaceId);
   const [
     composed,
     newLeads,
     followUpsDue,
     pendingDrafts,
     clientsWaiting,
+    failedActions,
     pipeline,
     overnight,
     hotLeads,
@@ -327,19 +356,20 @@ export async function composeBriefDashboard(
     referrers,
     ownerName,
   ] = await Promise.all([
-    composeBrief(spaceId).catch(() => null),
-    countNewLeads(spaceId).catch(() => 0),
-    countFollowUpsDue(spaceId).catch(() => 0),
-    countPendingDrafts(spaceId).catch(() => 0),
-    countClientsWaiting(spaceId).catch(() => 0),
-    composePipelineStat(spaceId).catch(() => null),
-    composeOvernight(spaceId).catch(() => null),
-    fetchHotLeads(spaceId).catch(() => []),
-    fetchToursToday(spaceId).catch(() => []),
-    composeReputationStat(spaceId).catch(() => null),
-    computeReactivations(spaceId).catch(() => []),
-    topReferrers(spaceId).catch(() => []),
-    fetchOwnerName(ownerId).catch(() => null),
+    read('brief', composeBrief(spaceId), null),
+    read('newLeads', countNewLeads(spaceId), 0),
+    read('followUpsDue', dayEnd.then(cutoff => countFollowUpsDue(spaceId, cutoff)), 0),
+    read('pendingDrafts', countPendingDrafts(spaceId), 0),
+    read('clientsWaiting', countClientsWaiting(spaceId), 0),
+    read('failedActions', countFailedActions(spaceId), 0),
+    read('pipeline', composePipelineStat(spaceId), null),
+    read('overnight', composeOvernight(spaceId, true), null),
+    read('hotLeads', fetchHotLeads(spaceId), []),
+    read('tours', dayEnd.then(cutoff => fetchToursToday(spaceId, cutoff)), []),
+    read('reputation', composeReputationStat(spaceId), null),
+    read('reactivations', computeReactivations(spaceId), []),
+    read('referrers', topReferrers(spaceId), []),
+    read('ownerName', fetchOwnerName(ownerId), null),
   ]);
 
   // When the full compose failed (rare — every gatherer inside it is already
@@ -357,9 +387,11 @@ export async function composeBriefDashboard(
   };
 
   return {
+    unavailable,
+    checkedAt: new Date().toISOString(),
     ownerName,
     brief,
-    needsYou: { newLeads, followUpsDue, pendingDrafts, clientsWaiting },
+    needsYou: { newLeads, followUpsDue, pendingDrafts, clientsWaiting, failedActions },
     pipeline,
     overnight,
     hotLeads,

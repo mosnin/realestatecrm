@@ -15,11 +15,9 @@
  * agent's draft tools (lib/ai-tools/tools/draft-*.ts) write AgentDraft rows as
  * side effects DURING the run — those drafts are the output.
  *
- * Autonomy posture — CRITICAL: this is UNATTENDED. There is no human to tap
- * "Send". If the run pauses for approval (a gated send), we DO NOT auto-approve.
- * The draft-producing tools have already run; the gated send stays pending and
- * unexecuted. This matches the product's "Chippi never sends without a tap"
- * rule: background runs DRAFT ONLY.
+ * Automatic workflows execute the owner's stored instruction under an exact
+ * native-tool grant. Review workflows retain approval gates. Pending approval
+ * is an exception, never a completed run or evidence of delivery.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -29,6 +27,10 @@ import type { MessageBlock } from '@/lib/ai-tools/blocks';
 import { runChatTurn } from '@/lib/ai-tools/sdk-chat';
 import { saveAssistantMessage } from '@/lib/ai-tools/persistence';
 import { mapSdkEvent, type SdkStreamEventLike } from '@/lib/ai-tools/sdk-event-mapper';
+import { sumSdkTurnUsage, type SdkResultUsageLike } from '@/lib/ai-tools/turn-usage';
+import { recordChatUsage } from '@/lib/usage/record-chat-usage';
+import { recordActivityOutcome } from '@/lib/ai-tools/outcomes';
+import { resolveChatModel } from '@/lib/llm';
 import { ALL_TOOLS } from '@/lib/ai-tools/tools';
 
 /** Default wall-clock budget for one headless run when the caller passes no
@@ -106,12 +108,16 @@ export interface RunAutonomousInstructionInput {
   signal?: AbortSignal;
   /** Workspace chat model slug. Resolved to the active provider downstream. */
   model?: string;
+  /** Derived from the saved workflow policy, never an inbound event. */
+  executionMode?: 'review' | 'autonomous';
+  authorizedInstruction?: string;
 }
 
 export interface RunAutonomousInstructionResult {
   /** The run completed without throwing (it may have left drafts and/or
    *  pending approvals). */
   ok: boolean;
+  outcome?: 'completed' | 'drafted' | 'needs_attention' | 'failed' | 'no_action';
   /** The agent run actually started (a ctx was resolved and runChatTurn fired). */
   ran: boolean;
   /** Present when ok is false. */
@@ -139,11 +145,11 @@ export async function runAutonomousInstruction(
 ): Promise<RunAutonomousInstructionResult> {
   // Use the caller's signal when given; otherwise own an AbortController with a
   // sensible wall-clock budget so a stalled run can't park forever.
-  const ownController = input.signal ? null : new AbortController();
-  const signal = input.signal ?? ownController!.signal;
-  const timeoutTimer = ownController
-    ? setTimeout(() => ownController.abort(), DEFAULT_RUN_TIMEOUT_MS)
-    : null;
+  const ownController = new AbortController();
+  const signal = input.signal ? AbortSignal.any([input.signal, ownController.signal]) : ownController.signal;
+  const timeoutTimer = setTimeout(() => ownController.abort(), DEFAULT_RUN_TIMEOUT_MS);
+  let usageResult: SdkResultUsageLike | undefined;
+  const usageId = crypto.randomUUID();
 
   try {
     const ctx = await buildHeadlessToolContext(input.spaceId, signal);
@@ -156,6 +162,13 @@ export async function runAutonomousInstruction(
       };
     }
 
+    const outcomes: import('@/lib/ai-tools/outcomes').ToolOutcome[] = [];
+    ctx.backgroundRun = true;
+    ctx.workMode = input.executionMode === 'autonomous';
+    ctx.workExecutionMode = input.executionMode ?? 'review';
+    ctx.backgroundAuthorizedInstruction = input.authorizedInstruction;
+    ctx.onToolOutcome = ({ outcome }) => outcomes.push(outcome);
+
     // Headless: no resultSink (we don't surface rich cards to a UI), no history
     // (a background instruction is self-contained).
     const { result } = await runChatTurn({
@@ -166,6 +179,7 @@ export async function runAutonomousInstruction(
     });
 
     const sdkResult = result as unknown as SdkResultLike;
+    usageResult = result as unknown as SdkResultUsageLike;
 
     // Accumulate the assistant's text so the run leaves a transcript, mirroring
     // the stream path. We only need text here — no rich tool-card persistence,
@@ -189,10 +203,7 @@ export async function runAutonomousInstruction(
     // yet never resolve `completed`.
     await withIdleTimeout(sdkResult.completed, signal);
 
-    // Pause path: an unattended run NEVER auto-approves. The draft tools have
-    // already run (drafts persisted as side effects); the gated send stays
-    // pending and unexecuted. Record that the run completed with approvals
-    // outstanding and stop cleanly.
+    // Any remaining approval requires an exception; it is never auto-approved.
     const paused = !!(sdkResult.interruptions && sdkResult.interruptions.length > 0);
 
     // Persist the assistant text so the background run leaves a transcript, the
@@ -214,18 +225,29 @@ export async function runAutonomousInstruction(
       }
     }
 
+    const failed = outcomes.some(value => value === 'failed' || value === 'uncertain');
+    const outcome = paused ? 'needs_attention' : failed ? 'failed'
+      : outcomes.includes('completed') ? 'completed'
+      : outcomes.includes('drafted') ? 'drafted' : 'no_action';
+    if (paused || failed) await recordActivityOutcome({ spaceId: input.spaceId, name: 'background_run', outcome: 'failed', callId: usageId });
     return {
-      ok: true,
+      ok: !paused && !failed,
       ran: true,
-      summary: paused
-        ? 'Run completed with pending approvals (drafts created; gated sends left unexecuted).'
-        : 'Run completed.',
+      outcome,
+      ...(paused ? { error: 'approval_required' } : failed ? { error: 'tool_failed' } : {}),
+      summary: paused ? 'Needs your attention: an action requires additional authority and was not executed.'
+        : failed ? 'A tool could not complete the work. Check the activity before retrying.'
+        : outcome === 'drafted' ? 'Draft prepared. No delivery confirmed.'
+        : outcome === 'completed' ? 'Work completed with tool receipts.'
+        : 'Run finished without a confirmed action.',
     };
   } catch (err) {
+    ownController.abort();
+    await recordActivityOutcome({ spaceId: input.spaceId, name: 'background_run', outcome: 'failed', callId: usageId });
     const aborted = (err as { name?: string })?.name === 'AbortError';
     if (aborted) {
       logger.warn('[agent/run-instruction] run aborted (timeout or cancel)', { spaceId: input.spaceId });
-      return { ok: false, ran: true, error: 'aborted', summary: 'Run aborted before completion.' };
+      return { ok: false, ran: true, outcome: 'failed', error: 'aborted', summary: 'Run aborted before completion.' };
     }
     logger.error('[agent/run-instruction] run failed', { spaceId: input.spaceId }, err);
     return {
@@ -235,6 +257,11 @@ export async function runAutonomousInstruction(
       summary: 'Run failed.',
     };
   } finally {
+    if (usageResult) await recordChatUsage({
+      spaceId: input.spaceId, model: resolveChatModel(input.model),
+      ...sumSdkTurnUsage(usageResult), route: 'agent', runtime: 'ts',
+      idempotencyKey: `background:${usageId}`,
+    });
     if (timeoutTimer) clearTimeout(timeoutTimer);
   }
 }

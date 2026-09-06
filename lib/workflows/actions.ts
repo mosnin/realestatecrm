@@ -248,16 +248,19 @@ async function runDraftMessage(
 async function runChippi(
   action: Extract<WorkflowAction, { type: 'run_chippi' }>,
   context: WorkflowContext,
-  spaceId: string,
+  opts: ExecuteActionOptions,
 ): Promise<ActionStepResult> {
   const result = await runAutonomousInstruction({
-    spaceId,
+    spaceId: opts.spaceId,
+    executionMode: opts.autonomy === 'auto' ? 'autonomous' : 'review',
+    authorizedInstruction: action.config.instruction,
     instruction: resolveTokens(action.config.instruction, context),
   });
   return {
     status: result.ok ? 'ok' : 'failed',
     detail: {
       ran: result.ran,
+      outcome: result.outcome,
       summary: result.summary,
       ...(result.error ? { error: result.error } : {}),
     },
@@ -349,11 +352,11 @@ async function runScheduleMessage(
     runId: opts.runId ?? null,
     channel,
     recipientContactId,
-    instruction,
+    instruction: resolveTokens(instruction, context),
     sendAt,
     autonomy: opts.autonomy,
     status: 'pending',
-    detail: null,
+    detail: action.config.contentMode ? { contentMode: action.config.contentMode } : null,
     createdAt: nowIso,
     updatedAt: nowIso,
   });
@@ -1114,7 +1117,7 @@ export async function executeAction(
       case 'draft_message':
         return await runDraftMessage(action, context, opts.spaceId);
       case 'run_chippi':
-        return await runChippi(action, context, opts.spaceId);
+        return await runChippi(action, context, opts);
       case 'create_task':
         return await runCreateTask(action, context, opts.spaceId);
       case 'schedule_message':

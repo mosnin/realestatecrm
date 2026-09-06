@@ -333,6 +333,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
       .object({
         channel: channelSchema,
         instruction: instructionField,
+        contentMode: z.enum(['literal', 'instruction']).optional(),
         delayMinutes: z.number().int().min(0),
       })
       .strict(),

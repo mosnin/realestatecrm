@@ -1,66 +1,30 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it, vi } from 'vitest';
+import { MobileNav } from '@/components/dashboard/mobile-nav';
+const path = vi.hoisted(() => ({ current: '/s/oak/chippi/brief' }));
+vi.mock('next/navigation', () => ({ usePathname: () => path.current }));
+vi.stubGlobal('React', React);
 
-const read = (path: string) => readFileSync(path, 'utf8');
-
-describe('dashboard reference aesthetic contract', () => {
-  it('uses warm paper tokens, precise hairlines, and shallow card elevation', () => {
-    const globals = read('app/globals.css');
-    const surfaces = read('components/ui/surface-card.tsx');
-
-    expect(globals).toContain('--background: #f7f7f5;');
-    expect(globals).toContain('--surface: #f1f1ef;');
-    expect(globals).toContain('--card: #fbfbfa;');
-    expect(globals).toContain('--border: #dededb;');
-
-    expect(surfaces).toContain(
-      "chippi-dashboard-panel rounded-[1.75rem] border border-transparent",
-    );
-    expect(globals).toContain('0 16px 40px -32px');
-    expect(surfaces).not.toContain('bg-gradient-to-br from-[#FF9500]');
+describe('Daily mobile navigation', () => {
+  it('keeps Today visible and selected on the daily screen with visible labels', () => {
+    path.current = '/s/oak/chippi/brief';
+    const html = renderToStaticMarkup(React.createElement(MobileNav, { slug: 'oak' }));
+    for (const label of ['Today', 'People', 'Deals', 'Calendar', 'Settings']) expect(html).toContain(`>${label}</span>`);
+    expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/s\/oak\/chippi\/brief"/);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
-
-  it('keeps selected sidebar rows light, legible, and rounded', () => {
-    const nav = read('components/dashboard/sidebar-nav-item.tsx');
-    const sidebar = read('components/dashboard/sidebar.tsx');
-    const mobileNav = read('components/dashboard/mobile-nav.tsx');
-    const type = read('lib/typography.ts');
-
-    expect(nav).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70',
-    );
-    expect(nav).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/60',
-    );
-    expect(sidebar).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70',
-    );
-    expect(nav).not.toContain('bg-foreground text-background font-medium');
-    expect(sidebar).not.toContain('bg-foreground text-background font-medium');
-    expect(mobileNav).toContain('bg-foreground text-background');
-    expect(type).toContain('inline-flex items-center gap-1.5 rounded-full');
+  it('lets the chat composer own the bottom edge only on the chat root', () => {
+    path.current = '/s/oak/chippi';
+    expect(renderToStaticMarkup(React.createElement(MobileNav, { slug: 'oak' }))).toBe('');
+    path.current = '/s/oak/chippi/activity';
+    expect(renderToStaticMarkup(React.createElement(MobileNav, { slug: 'oak' }))).toContain('>Today</span>');
   });
-
-  it('preserves the real daily-brief outcomes in the new editorial hierarchy', () => {
-    const brief = read('components/chippi/brief-dashboard.tsx');
-
-    for (const surface of [
-      'Hero',
-      'NeedsYouPanel',
-      'ActivityPanel',
-      'ToursPanel',
-      'HotLeadsPanel',
-      'EmptyTodayOrientation',
-    ]) {
-      expect(brief).toContain(surface);
-    }
-    expect(brief).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4');
-    expect(brief).toContain('lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.8fr)]');
-    expect(brief).toContain('data-chippi-atmosphere="ascii-field"');
-    expect(brief).toContain('pendingDrafts');
-    expect(brief).toContain("import { Button } from '@/components/ui/button'");
-    expect(brief).toContain('variant="ghost"');
-    expect(brief).toContain('has-[>svg]:px-0');
-    expect(brief).toContain('active:scale-100');
+  it('gives brokerages labeled lead and team destinations', () => {
+    path.current = '/broker/brief';
+    const html = renderToStaticMarkup(React.createElement(MobileNav, { slug: 'oak', isBroker: true }));
+    expect(html).toContain('href="/broker/leads"');
+    expect(html).toContain('>Team</span>');
+    expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/broker\/brief"/);
   });
 });

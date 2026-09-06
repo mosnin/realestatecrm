@@ -680,7 +680,7 @@ export function ToursClient({ slug, spaceId, initialTours, hasGoogleCalendar, bo
                       >
                         <div className="space-y-2 pt-2">
                           {tour.notes && (
-                            <p className="text-xs text-muted-foreground/80 italic">{tour.notes}</p>
+                            <p className="text-xs text-muted-foreground/80 not-italic">{tour.notes}</p>
                           )}
                           {tour.Contact && (
                             <a

@@ -1,0 +1,13 @@
+{
+  "database": "postgres (PostgreSQL) 18.4 (Homebrew)",
+  "scope": "isolated temporary cluster, minimal post-removal AgentSettings fixture; no production connection",
+  "migration": "supabase/migrations/20260918000000_restore_sequence_sending_policy.sql",
+  "checks": {
+    "applies_after_column_removal": "pass",
+    "idempotent_reapply": "pass",
+    "preserves_existing_autonomous_choice": "pass",
+    "preserves_disabled_review": "pass",
+    "new_rows_default_to_review": "pass",
+    "invalid_policy_rejected": "pass"
+  }
+}

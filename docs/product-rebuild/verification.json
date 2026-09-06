@@ -1,0 +1,53 @@
+{
+  "repository": "mosnin/realestatecrm",
+  "branch": "codex/autonomous-product-rebuild",
+  "base_sha": "75113c0d68f40df0999d2dd470b831ffde3c3665",
+  "verified_at_utc": "2026-09-06T21:47:06.862505+00:00",
+  "local_checks": {
+    "unit_tests": {
+      "status": "pass",
+      "files": 752,
+      "passed": 6566,
+      "skipped": 7,
+      "skipped_scope": "live model evals"
+    },
+    "typecheck": "pass",
+    "lint": "pass with warnings",
+    "next_production_build": "pass with bundler warnings; isolated committed fixture environment, no provider credentials",
+    "script_contract_tests": {
+      "status": "pass",
+      "passed": 52
+    },
+    "tenant_scope_audit": {
+      "status": "pass",
+      "files_scanned": 929,
+      "registered_tables": 124
+    },
+    "migration": "pass in isolated PostgreSQL 18.4 with minimal AgentSettings fixture; see migration-verification.json",
+    "temporary_preview": "HTTP 200 from a development-only fixture; route removed before final build",
+    "git_diff_check": "pass"
+  },
+  "log_sha256": {
+    "unit_tests": "2baffd95ef25242a8f59b160481cf9022d7044c4998b3b87ffccd9a07fff40a6",
+    "typecheck": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "lint": "e22d7cdec5c59fdcaf404e854841560be1c1d201a74f22d15f46d0ddf5962071",
+    "build": "9f71e98e75a3e9bdf7137bcc3c2d2ed2a775fb3f0b58a136820a60f8d1b36113",
+    "contracts": "ba42df99fa21b975a0294745b4c94a58fc251106994cac43990e32dcb019c5da"
+  },
+  "environment_recovery": "One build retry failed with ENOSPC. Only this isolated checkout's generated .next directory was removed; the clean retry passed.",
+  "not_verified": [
+    "authenticated desktop/mobile rendering",
+    "real OpenRouter task completion",
+    "live email/SMS provider acknowledgements",
+    "live calendar persistence and reminders",
+    "production/staging schema and scheduler state",
+    "live checkout and seat reconciliation",
+    "actual effect on churn"
+  ],
+  "not_performed": [
+    "production deployment",
+    "staging or production migration application",
+    "customer messaging"
+  ],
+  "visual_reference": "today-concept.png is a generated concept, not a rendered product screenshot"
+}

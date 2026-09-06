@@ -107,7 +107,7 @@ export function SwarmAgentCard({
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-muted-foreground/60 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-muted-foreground" />
               </span>
-              <p className={cn(CAPTION, 'italic leading-snug')}>{thinkingMessage}</p>
+              <p className={cn(CAPTION, 'not-italic leading-snug')}>{thinkingMessage}</p>
             </div>
           </motion.div>
         )}

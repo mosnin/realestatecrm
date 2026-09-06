@@ -32,7 +32,7 @@ const columns = {
 export function SiteFooter() {
   return (
     <footer className="px-3 pb-3 pt-16 sm:px-4 sm:pb-4 sm:pt-24">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-[#fff3ea] to-[#ffe2d2] text-[#16161a] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-white via-[#f4f7fb] to-[#e7effa] text-[#16161a] ring-1 ring-black/5 sm:rounded-[2.75rem]">
         <div className="px-5 py-14 sm:px-10 sm:py-16 lg:px-14">
           {/* Sign-off + CTA */}
           <div className="flex flex-col gap-8 border-b border-black/10 pb-12 lg:flex-row lg:items-end lg:justify-between">

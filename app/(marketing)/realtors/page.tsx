@@ -145,7 +145,7 @@ function ImageSlot({ name }: { name: string }) {
 
 function LoopIllustration() {
   return (
-    <div className="relative h-64 rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] ring-1 ring-inset ring-black/5 sm:h-72">
+    <div className="relative h-64 rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] ring-1 ring-inset ring-black/5 sm:h-72">
       {/* Inbox */}
       <div className="absolute left-3 top-4 w-[46%] rounded-2xl border border-black/5 bg-white/90 shadow-sm backdrop-blur sm:left-5 sm:top-5">
         <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
@@ -233,7 +233,7 @@ const STACK_ROWS: { icon: typeof Inbox; label: string; note: string }[] = [
 function StackIllustration() {
   return (
     <div className="rounded-3xl bg-white/70 p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.18)] ring-1 ring-black/5 backdrop-blur sm:p-5">
-      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
         <div className="mb-4 flex items-center justify-between">
           <span className="text-[10px] tracking-widest text-neutral-500">CONNECTED</span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-black/5 bg-white/90 px-2 py-0.5 text-[9px] text-neutral-700">
@@ -346,7 +346,7 @@ export default function RealtorsPage() {
             </div>
 
             {/* Illustration, pastel frame, white glass card */}
-            <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+            <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
               <article
                 className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
                 style={{
@@ -476,7 +476,7 @@ export default function RealtorsPage() {
           stack. Honest: the catalog is the tools you already pay for. */}
       <section className="mt-24 px-4 sm:mt-32 sm:px-6">
         <FadeUp>
-          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+          <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#f8fafc] to-[#eef3fb] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
             <div className="relative grid items-center gap-12 px-6 py-14 sm:px-10 sm:py-20 lg:grid-cols-2 lg:px-14">

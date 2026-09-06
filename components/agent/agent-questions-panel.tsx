@@ -84,7 +84,7 @@ function QuestionRow({ question, onAnswered }: { question: AgentQuestion; onAnsw
 
       {/* Context */}
       {question.context && (
-        <p className="mt-1.5 text-[12px] text-muted-foreground italic leading-relaxed">
+        <p className="mt-1.5 text-[12px] text-muted-foreground not-italic leading-relaxed">
           {question.context}
         </p>
       )}

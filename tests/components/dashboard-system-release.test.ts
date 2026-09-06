@@ -35,29 +35,4 @@ describe('Today dashboard system release contract', () => {
     expect(read('docs/ui/STYLESHEET.md')).toContain('The live **Today** page');
   });
 
-  it('uses the supplied dark WebGL Aurora only for the accepted Today Work launch', () => {
-    const effect = read('components/effects/aurora-glow.tsx');
-    const today = read('components/chippi/brief-dashboard.tsx');
-    const workspace = read('components/chippi/chippi-workspace.tsx');
-
-    expect(effect).toContain("alpha: false");
-    expect(effect).toContain("powerPreference: 'high-performance'");
-    expect(effect).toContain('uTime * -4.9');
-    expect(effect).toContain('ripple + delta * 0.52');
-    expect(effect).toContain("prefers-reduced-motion: reduce");
-    expect(effect).toContain('destroy()');
-    expect(today).toContain('data-work-launch="aurora"');
-    expect(today).toContain('data-aura-origin');
-    expect(today).toContain('stageWorkDraftHandoff');
-    expect(today).toContain(
-      'Starts in Work mode. Chippi runs the goal and keeps you updated.',
-    );
-    expect(today).not.toContain('as a draft');
-    expect(workspace).toContain(
-      "handleSendRef.current(handoff.text, [], undefined, 'work')",
-    );
-    expect(workspace).toContain(
-      'if (!accepted) setPrefill({ text: handoff.text, nonce: Date.now() })',
-    );
-  });
 });

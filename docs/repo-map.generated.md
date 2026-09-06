@@ -10,7 +10,7 @@
 - **Page routes:** 223
 - **API endpoints:** 440
 - **Cron jobs:** 3
-- **DB tables:** 153  ·  **RPCs:** 66  ·  **migrations:** 270
+- **DB tables:** 153  ·  **RPCs:** 66  ·  **migrations:** 271
 - **Agent tools — TS (lib/ai-tools):** 82 declared, 82 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 63 declared
 
@@ -1100,7 +1100,7 @@ the runtimes diverge — this table makes the drift visible.
 
 **RPCs (66):** `accept_workspace_launch`, `accept_workspace_run_task_launch`, `append_agent_run_event`, `book_tour_atomic`, `broker_routine_set_next_run`, `cancel_workspace_run_and_session`, `cancel_workspace_run_task`, `charge_credits_for_chat_usage`, `claim_agent_job`, `claim_schedule_occurrence`, `claim_schedule_occurrence_step`, `claim_work_session_phase`, `claim_workspace_launch`, `claim_workspace_run_task_launch`, `cleanup_agent_data`, `count_runs_per_workflow`, `create_brokerage_with_owner`, `create_space_with_defaults`, `current_user_internal_id`, `drip_sequence_set_updated_at`, `enqueue_reserved_workspace_run_task_with_plan`, `enqueue_workspace_run_task`, `enqueue_workspace_run_task_with_plan`, `enqueue_workspace_run_task_with_program`, `ensure_agent_settings_for_space`, `fail_empty_work_session_artifact`, `fail_stale_accepted_workspace_launch`, `finish_agent_job`, `finish_schedule_occurrence`, `finish_schedule_occurrence_step`, `finish_workspace_run_and_session`, `finish_workspace_run_task`, `grant_credits`, `heartbeat_agent_job`, `heartbeat_schedule_occurrence`, `heartbeat_schedule_occurrence_step`, `list_workspace_run_recovery_candidates`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `materialize_schedule_occurrence`, `merge_contacts`, `normalize_invite_code`, `offboard_brokerage_member`, `patch_work_session_phase`, `public`, `purge_credit_rows_for_account`, `record_workspace_launch_receipt`, `record_workspace_run_event`, `record_workspace_run_task_event`, `redeem_invite_code_atomic`, `refund_credit_txn`, `release_workspace_run_task_plan`, `reorder_deal`, `reserve_workspace_run_task_plan`, `resolve_billing_account_for_space`, `routine_next_run_at`, `routine_set_next_run`, `scheduled_message_set_updated_at`, `search_knowledge_docs`, `spend_credits`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`, `validate_agent_job_child`, `workflow_set_updated_at`
 
-**Migrations:** 270 (latest: `20260917000000_deal_contract_dates.sql`)
+**Migrations:** 271 (latest: `20260918000000_restore_sequence_sending_policy.sql`)
 
 ## External services
 

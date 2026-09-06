@@ -144,7 +144,6 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
         // Brief and Reviews are real broker routes; "History" points at the
         // chat home (/broker), where the conversation-history drawer lives.
         children: [
-          { href: '/broker/brief', label: 'Today' },
           { href: '/broker/reviews', label: 'Inbox' },
           { href: '/broker/chippi', label: 'History', exact: true },
         ],
@@ -152,12 +151,10 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       // The Floor — the single command view (who's reachable, what's waiting,
       // what's stalled, who's asking for judgement). First stop of the day;
       // every deeper surface is one link away from it or one disclosure down.
-      { href: '/broker/floor', label: 'The Floor', icon: Radar, exact: false, adminOnly: false },
       { href: '/broker/brief', label: 'Today', icon: LayoutDashboard, exact: false, adminOnly: false },
       { href: '/broker/leads', label: 'Leads', icon: PhoneIncoming, exact: false, adminOnly: false },
+      { href: '/broker/realtors', label: 'Team', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/deals', label: 'Deals', icon: Briefcase, exact: false, adminOnly: false },
-      { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
-      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
       {
         href: '/broker/settings',
         label: 'Settings',
@@ -182,6 +179,10 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
   {
     label: 'More',
     items: [
+      { href: '/broker/floor', label: 'The Floor', icon: Radar, exact: false, adminOnly: false },
+      { href: '/broker/pipeline', label: 'Pipeline', icon: BarChart3, exact: false, adminOnly: false },
+      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
+      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
       // Command surfaces demoted from the main rail by the Focus Update —
       // still one disclosure away; the Floor's KPI tiles deep-link into the
       // daily ones (Reviews, Leads, Deals) so the rail stays five-ish rows.
@@ -194,7 +195,6 @@ export const brokerAdminNavSections: BrokerNavSection[] = [
       { href: '/broker/integrations', label: 'Plugins', icon: Plug, exact: false, adminOnly: false },
       { href: '/broker/routines', label: 'Routines', icon: CalendarClock, exact: false, adminOnly: true },
       { href: '/broker/members', label: 'Members', icon: Users, exact: false, adminOnly: false },
-      { href: '/broker/realtors', label: 'Real estate agents', icon: UserCircle, exact: false, adminOnly: false },
       { href: '/broker/templates', label: 'Templates', icon: FileText, exact: false, adminOnly: false },
       { href: '/broker/leaderboard', label: 'Leaderboard', icon: Trophy, exact: false, adminOnly: false },
       { href: '/broker/analytics', label: 'Analytics', icon: BarChart3, exact: false, adminOnly: false },
@@ -214,7 +214,6 @@ export const brokerMemberNavSections: BrokerNavSection[] = [
     items: [
       { href: '/broker/brief', label: 'Today', icon: LayoutDashboard, exact: true, adminOnly: false },
       { href: '/broker/my-leads', label: 'My leads', icon: PhoneIncoming, exact: false, adminOnly: false },
-      { href: '/broker/messages', label: 'Messages', icon: MessagesSquare, exact: false, adminOnly: false },
     ],
   },
   {
@@ -970,7 +969,7 @@ export function BrokerSidebarConversations({
 //   • MORE — everything else, one collapsed disclosure below the core.
 //     Collapsed by default; auto-opens when the active route lives inside it;
 //     the user's manual choice is remembered (localStorage).
-const CORE_HREFS = new Set<string>(['/chippi/brief', '/contacts', '/deals']);
+const CORE_HREFS = new Set<string>(['/chippi/brief', '/contacts', '/deals', '/calendar']);
 const MORE_STORAGE_KEY = 'sidebar:more-open';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1456,12 +1455,13 @@ function RealtorNav({
         {/* Always visible — top-pinned AI items (Chippi + future AI rows).
             No header above this bucket: Chippi is the brand mark; it
             doesn't need a category to belong to. */}
-        {aiItems.map(renderItem)}
+
 
         {/* CORE — the daily doors: Today, People, Deals (+ Messages for
             brokerage members). No section header; five rows don't need a
             category. This IS the sidebar; everything below is disclosure. */}
         {coreItems.map(renderItem)}
+        {aiItems.map(renderItem)}
 
         {/* MORE — every other capability, one disclosure down. Nothing was
             removed from the product; it just stopped being a decision the
@@ -1609,7 +1609,10 @@ export function Sidebar({
   );
   const brokerCoreItems = brokerPrimaryItems.filter(
     (item) => item.href !== '/broker/settings',
-  );
+  ).sort((a, b) => {
+    const order = ['/broker/brief', '/broker/leads', '/broker/realtors', '/broker/deals', '/broker/chippi'];
+    return order.indexOf(a.href) - order.indexOf(b.href);
+  });
   const brokerSecondaryItems = brokerSections
     .slice(1)
     .flatMap((section) => section.items)

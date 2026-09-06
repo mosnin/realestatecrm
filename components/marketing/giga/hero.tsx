@@ -48,7 +48,7 @@ export function Hero({ lang = 'en' }: { lang?: Lang }) {
         <BlurRise trigger="load" delay={0.15}>
           <h1
             style={{
-              fontFamily: 'var(--font-serif-display), "Times New Roman", Times, serif',
+              fontFamily: 'var(--font-sans)',
               fontSize: 'clamp(2.5rem, 7vw, 5.75rem)',
             }}
             className="mt-7 text-balance font-light leading-[1.04] tracking-[-0.025em] text-white"

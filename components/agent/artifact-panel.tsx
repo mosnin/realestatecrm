@@ -112,7 +112,7 @@ function ArtifactCard({
       {preview ? (
         <p className="text-xs text-muted-foreground leading-relaxed flex-1">{preview}</p>
       ) : (
-        <p className="text-xs text-muted-foreground italic flex-1">No preview available.</p>
+        <p className="text-xs text-muted-foreground not-italic flex-1">No preview available.</p>
       )}
 
       {/* View button */}

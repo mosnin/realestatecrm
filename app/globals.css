@@ -16,14 +16,14 @@
   --color-lead-hot: var(--lead-hot);
   --color-lead-warm: var(--lead-warm);
   --color-lead-cold: var(--lead-cold);
-  /* Three faces for the whole product. Alias every historical token to
+  /* Upright sans-serif for the product, with monospace for code and data. Alias every historical token to
      one of these so marketing, auth, and the dashboard cannot drift.
-     UI / section headings: system sans. Page titles: Times. Data: mono. */
+     UI, section headings and page titles: system sans. Data: mono. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
   --font-brand: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif;
-  --font-title: "Times New Roman MT", "Times New Roman", Times, serif;
-  --font-serif: "Times New Roman MT", "Times New Roman", Times, serif;
+  --font-title: var(--font-sans);
+  --font-serif: var(--font-sans);
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* Rainbow-button color stops (marketing CTA flourish). */
@@ -79,7 +79,7 @@
 
   /* Historical marketing names resolve to the same three faces.
      Display / accent were Inter Tight + Instrument Serif via next/font,
-     which the app never loads — they share the Times title face. */
+     which the app never loads — they now share the sans title face. */
   --font-serif-display: var(--font-title);
   --font-mono-display: var(--font-mono);
   --font-display: var(--font-title);
@@ -92,7 +92,7 @@
   --color-4: 28 100% 58%;
   --color-5: 45 100% 64%;
 
-  /* Neutral-first palette. Orange is demoted to --brand for rare moments. */
+  /* Cool neutral surfaces with blue for actions and active navigation. */
   --background: #ffffff;
   --surface: #fafafa;
   --foreground: #111113;
@@ -126,24 +126,24 @@
 
   /* Brand — reserved for logo, Chip widget, and the rare "new" flag.
      Do NOT use as a default UI color. */
-  --brand: #ff964f;
+  --brand: #2563eb;
   --brand-foreground: #ffffff;
-  --brand-subtle: #fff4eb;
+  --brand-subtle: #eff6ff;
 
   /* Authenticated dashboard foundation: open warm canvas + quiet paper
      surfaces. Chippi orange remains an atmosphere/action accent, not chrome. */
-  --dashboard-canvas: #f8f7f3;
-  --dashboard-paper: #fffefa;
-  --dashboard-paper-muted: #f3f0ea;
+  --dashboard-canvas: #f6f8fb;
+  --dashboard-paper: #ffffff;
+  --dashboard-paper-muted: #f1f4f8;
   --dashboard-divider: rgba(17, 17, 19, 0.09);
-  --dashboard-atmosphere-opacity: 0.15;
+  --dashboard-atmosphere-opacity: 0;
 
   /* Charts: orange demoted to chart-5. Default chart-1 is neutral. */
   --chart-1: #111113;
   --chart-2: #3b82f6;
   --chart-3: #a16207;
   --chart-4: #b91c1c;
-  --chart-5: #ff964f;
+  --chart-5: #2563eb;
 
   /* Lead tier — mustard instead of amber to stop collision with brand. */
   --lead-hot: #b91c1c;
@@ -190,24 +190,24 @@
   --input: #27272a;
   --ring: rgba(241, 243, 245, 0.15);
 
-  --brand: #ff964f;
+  --brand: #2563eb;
   --brand-foreground: #ffffff;
-  --brand-subtle: #2a1f17;
+  --brand-subtle: #172554;
 
   --dashboard-canvas: #0c0c0d;
   --dashboard-paper: #151517;
-  --dashboard-paper-muted: #1c1b1a;
+  --dashboard-paper-muted: #1e2531;
   --dashboard-divider: rgba(241, 243, 245, 0.1);
-  --dashboard-atmosphere-opacity: 0.2;
+  --dashboard-atmosphere-opacity: 0;
 
   --chart-1: #f1f3f5;
   --chart-2: #94a3b8;
-  --chart-3: #c2935c;
+  --chart-3: #94a3b8;
   --chart-4: #f87171;
-  --chart-5: #ff964f;
+  --chart-5: #2563eb;
 
   --lead-hot: #f87171;
-  --lead-warm: #c2935c;
+  --lead-warm: #94a3b8;
   --lead-cold: #94a3b8;
 
   --sidebar: #151517;
@@ -222,11 +222,11 @@
 
 /* ── App theme: warm paper canvas, inset surfaces, neutral accents ── */
 .app-theme {
-  --background: #f7f7f5;
-  --surface: #f1f1ef;
+  --background: #ffffff;
+  --surface: #f1f4f8;
   --foreground: #111113;
 
-  --card: #fbfbfa;
+  --card: #f8fafc;
   --card-foreground: #111113;
 
   --popover: #ffffff;
@@ -235,38 +235,38 @@
   --primary: #111113;
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f1ef;
+  --secondary: #f1f4f8;
   --secondary-foreground: #111113;
 
-  --muted: #f1f1ef;
+  --muted: #f1f4f8;
   --muted-foreground: #6b6f76;
 
-  --accent: #f1f1ef;
+  --accent: #f1f4f8;
   --accent-foreground: #111113;
 
   --destructive: #b91c1c;
 
-  --border: #dededb;
-  --input: #dededb;
+  --border: #e2e7ef;
+  --input: #e2e7ef;
   --ring: rgba(17, 17, 19, 0.12);
 
-  --brand: #ff964f;
+  --brand: #2563eb;
   --brand-foreground: #ffffff;
-  --brand-subtle: #fff4eb;
+  --brand-subtle: #eff6ff;
 
-  --dashboard-canvas: #f8f7f3;
-  --dashboard-paper: #fffefa;
-  --dashboard-paper-muted: #f3f0ea;
+  --dashboard-canvas: #f6f8fb;
+  --dashboard-paper: #ffffff;
+  --dashboard-paper-muted: #f1f4f8;
   --dashboard-divider: rgba(17, 17, 19, 0.09);
-  --dashboard-atmosphere-opacity: 0.15;
+  --dashboard-atmosphere-opacity: 0;
 
-  --sidebar: #fbfbfa;
+  --sidebar: #f8fafc;
   --sidebar-foreground: #111113;
   --sidebar-primary: #111113;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f1ef;
+  --sidebar-accent: #f1f4f8;
   --sidebar-accent-foreground: #111113;
-  --sidebar-border: #dededb;
+  --sidebar-border: #e2e7ef;
   --sidebar-ring: rgba(17, 17, 19, 0.12);
 }
 .dark .app-theme,
@@ -299,15 +299,15 @@
   --input: #27272a;
   --ring: rgba(241, 243, 245, 0.15);
 
-  --brand: #ff964f;
+  --brand: #2563eb;
   --brand-foreground: #ffffff;
-  --brand-subtle: #2a1f17;
+  --brand-subtle: #172554;
 
   --dashboard-canvas: #0c0c0d;
   --dashboard-paper: #151517;
-  --dashboard-paper-muted: #1c1b1a;
+  --dashboard-paper-muted: #1e2531;
   --dashboard-divider: rgba(241, 243, 245, 0.1);
-  --dashboard-atmosphere-opacity: 0.2;
+  --dashboard-atmosphere-opacity: 0;
 
   --sidebar: #151517;
   --sidebar-foreground: #f1f3f5;
@@ -796,7 +796,7 @@
   justify-content: center;
   width: 8rem;
   height: 8rem;
-  font-family: var(--font-title), serif;
+  font-family: var(--font-sans);
 }
 .ai-loader-letter {
   display: inline-block;
@@ -1009,7 +1009,7 @@
   border-left: 2px solid var(--border);
   padding-left: 0.875rem;
   color: var(--muted-foreground);
-  font-style: italic;
+  font-style: normal;
 }
 .ProseMirror code {
   background: var(--muted);
@@ -1069,7 +1069,7 @@
 .prose ul { list-style: disc; padding-left: 1.25rem; }
 .prose ol { list-style: decimal; padding-left: 1.25rem; }
 .prose li { margin: 0.25em 0; }
-.prose blockquote { border-left: 2px solid var(--border); padding-left: 0.875rem; color: var(--muted-foreground); font-style: italic; }
+.prose blockquote { border-left: 2px solid var(--border); padding-left: 0.875rem; color: var(--muted-foreground); font-style: normal; }
 .prose code { background: var(--muted); border-radius: calc(var(--radius) - 4px); padding: 0.125rem 0.375rem; font-family: var(--font-mono); font-size: 0.85em; }
 .prose pre { background: var(--muted); border-radius: calc(var(--radius) - 2px); padding: 0.75rem 1rem; font-family: var(--font-mono); font-size: 0.85em; overflow-x: auto; }
 .prose pre code { background: transparent; padding: 0; }
@@ -1109,7 +1109,7 @@
  * (dashboard, agent chat, broker app) does NOT use any of this. It stays on
  * the paper-flat neutral system above. Everything here is opt-in via a class
  * (`.font-brand`, `.text-gradient-brand`, etc.) so it can't leak into product
- * chrome. Brand orange is Chippi's #ff964f (var --brand), not fortitudo's
+ * chrome. Brand orange is Chippi's #2563eb (var --brand), not fortitudo's
  * #F97316. Works in both light and dark because it leans on the semantic
  * tokens (--background / --foreground / --border) for surfaces and reserves
  * orange for the signature glyphs + headline flourish.
@@ -1121,28 +1121,10 @@
   letter-spacing: 0.01em;
 }
 
-/* ── Giga marketing shell — dark, cinematic redesign (ROOT-CAUSE FIX) ────────
- *
- * The marketing route-group layout (app/(marketing)/layout.tsx) marks its root
- * with `data-marketing-shell`. Two things are scoped here so the redesign can't
- * be undone by global rules elsewhere in this file:
- *
- *  1. HEADLINE FONT. Page titles in the product use Times (`--font-title`).
- *     The shell does the same: every heading inside it uses the Times stack
- *     (`--font-serif-display` aliases `--font-title`). This selector
- *     out-specifies the bare `h2..h6` heading-sans rule, so it always wins.
- *
- *  2. EYEBROWS stay monospace via the .eyebrow-mono helper / inline var;
- *     `--font-mono-display` aliases the product `--font-mono`. No webfonts.
- *
- * Scoped to the shell so the product (dashboard/app) is completely untouched. */
+/* Marketing and product share the same upright sans-serif type system.
+ * Keep historical display tokens as aliases so old routes cannot reintroduce
+ * serif fonts. Monospace remains available for code and compact data. */
 [data-marketing-shell] {
-  /* Marketing headlines use the SAME fonts as the product dashboard so the
-     logged-out site and the app read as one brand: the serif --font-title
-     (Times) for headlines and --font-mono for eyebrows. The component-level
-     --font-serif-display / --font-mono-display vars are re-pointed at the
-     dashboard fonts here, so every inline reference resolves to them without
-     editing each component. */
   --font-serif-display: var(--font-title);
   --font-mono-display: var(--font-mono);
 }
@@ -1153,10 +1135,10 @@
 [data-marketing-shell] h5,
 [data-marketing-shell] h6,
 [data-marketing-shell] .font-serif-display {
-  font-family: var(--font-title), "Times New Roman", Times, serif;
+  font-family: var(--font-sans);
   letter-spacing: -0.02em;
 }
-/* Eyebrow labels: uppercase monospace, set apart from the serif headings. */
+/* Eyebrow labels: uppercase monospace, set apart from the sans headings. */
 [data-marketing-shell] .font-mono-display {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
 }
@@ -1174,9 +1156,9 @@
   font-family: var(--font-title);
 }
 
-/* Orange gradient text: the headline accent word. Tuned to Chippi's #ff964f. */
+/* Orange gradient text: the headline accent word. Tuned to Chippi's #2563eb. */
 .text-gradient-brand {
-  background: linear-gradient(135deg, #ff964f, #ffb27a, #ffc994);
+  background: linear-gradient(135deg, #2563eb, #ffb27a, #ffc994);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1564,3 +1546,7 @@
     opacity: 1;
   }
 }
+
+/* Product typography: upright text throughout, including imported rich content.
+   Legacy font tokens remain aliases so older surfaces stay consistent. */
+html body, html body * { font-style: normal !important; }

@@ -242,7 +242,7 @@ export default function CapturePage() {
           </div>
 
           {/* Pastel frame, white glass card, form → scored lead flow */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] bg-gradient-to-br from-[#e8eef8] via-[#dbe7fa] to-[#ffc4dd] p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -260,7 +260,7 @@ export default function CapturePage() {
                 </div>
 
                 {/* Form → scored lead */}
-                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
                       <span className="text-[10px] tracking-widest text-neutral-500">INTAKE FORM</span>
@@ -511,7 +511,7 @@ export default function CapturePage() {
 
       {/* Pastel CTA card */}
       <section className="mt-24 px-4 sm:mt-32">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#f8fafc] to-[#eef3fb] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />
           <FadeUp className="relative mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
