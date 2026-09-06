@@ -28,7 +28,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // (select.eq.lte.order.limit) resolves to `dueRows.value`; the Contact lookup
 // (select.eq.eq.maybeSingle) resolves to `contactRow.value`; the SpaceSetting
 // lookup resolves to `spaceSettingRow.value`.
-const { calls, dueRows, contactRow, spaceSettingRow, claimRows, recentSentCount } = vi.hoisted(() => ({
+const { calls, dueRows, contactRow, spaceSettingRow, claimRows, recentSentCount, workflowRow } = vi.hoisted(() => ({
+  workflowRow: { data: { enabled: true, autonomy: 'auto' } as Record<string, unknown> | null, error: null as Record<string, unknown> | null },
   calls: [] as Array<{ table: string; op: 'insert' | 'update' | 'count'; payload: unknown; filters?: Array<[string, unknown]> }>,
   dueRows: { value: [] as unknown[] },
   contactRow: { value: null as unknown },
@@ -97,7 +98,7 @@ vi.mock('@/lib/supabase', () => {
           order: () => chain,
           limit: () => chain,
           maybeSingle: () =>
-            Promise.resolve({
+            table === 'Workflow' ? Promise.resolve(workflowRow) : Promise.resolve({
               data:
                 table === 'Contact'
                   ? contactRow.value
@@ -118,6 +119,9 @@ vi.mock('@/lib/supabase', () => {
   };
   return { supabase: { from: (table: string) => makeBuilder(table) } };
 });
+
+const { composeMessageMock } = vi.hoisted(() => ({ composeMessageMock: vi.fn() }));
+vi.mock('@/lib/workflows/compose-message', () => ({ composeScheduledMessage: composeMessageMock }));
 
 // ── headless agent runner mock ───────────────────────────────────────────────
 const { runAutonomousInstructionMock } = vi.hoisted(() => ({
@@ -171,6 +175,8 @@ import { executeAction } from '@/lib/workflows/actions';
 import type { WorkflowAction } from '@/lib/workflows/schema';
 
 beforeEach(() => {
+  composeMessageMock.mockReset();
+  composeMessageMock.mockResolvedValue({ subject: 'Your next step', body: 'Hi Jane, when would you like to tour?' });
   calls.length = 0;
   dueRows.value = [];
   contactRow.value = null;
@@ -178,7 +184,8 @@ beforeEach(() => {
   claimRows.value = [{ id: 'claimed' }]; // default: the claim succeeds (one row flipped).
   recentSentCount.value = 0; // default: under the cap.
   runAutonomousInstructionMock.mockReset();
-  runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, summary: 'drafted' });
+  workflowRow.data = { enabled: true, autonomy: 'auto' }; workflowRow.error = null;
+  runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, outcome: 'drafted', summary: 'drafted' });
   sendSMSMock.mockReset();
   sendSMSMock.mockResolvedValue(true);
   sendDraftMock.mockReset();
@@ -317,8 +324,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
 
     const updates = statusUpdates();
-    expect(updates).toHaveLength(1);
-    expect(updates[0].status).toBe('drafted');
+    expect(updates.map(u => u.status)).toEqual(['sending', 'drafted']);
     expect(summary).toMatchObject({ due: 1, drafted: 1, sent: 0 });
   });
 
@@ -338,7 +344,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
     expect(sendDraftMock).not.toHaveBeenCalled();
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
 
-    expect(statusUpdates()[0].status).toBe('drafted');
+    expect(statusUpdates().at(-1)?.status).toBe('drafted');
     expect(summary).toMatchObject({ drafted: 1, sent: 0 });
   });
 
@@ -476,7 +482,7 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
 
     const updates = statusUpdates();
     const byStatus = updates.map((u) => u.status).sort();
-    expect(byStatus).toEqual(['drafted', 'failed']);
+    expect(byStatus).toEqual(['drafted', 'failed', 'sending']);
     // The second row still drafted despite the first failing.
     expect(runAutonomousInstructionMock).toHaveBeenCalledTimes(1);
   });
@@ -593,5 +599,64 @@ describe('dispatchDueScheduledMessages: autonomy enforcement', () => {
 
     expect(summary).toMatchObject({ failed: 1, sent: 0 });
     expect(notifyAutoSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Scheduled message composition', () => {
+  it('sends the composed message, not the automation instruction', async () => {
+    contactRow.value = CONTACT;
+    dueRows.value = [{ id: 'composed-1', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'Ask about a tour', autonomy: 'auto', detail: { contentMode: 'instruction' } }];
+    const result = await dispatchDueScheduledMessages();
+    expect(result.sent).toBe(1);
+    expect(composeMessageMock).toHaveBeenCalledOnce();
+    expect(sendSMSMock).toHaveBeenCalledWith(expect.objectContaining({ body: 'Hi Jane, when would you like to tour?' }));
+  });
+  it('never sends raw instructions when composition fails', async () => {
+    contactRow.value = CONTACT;
+    dueRows.value = [{ id: 'composed-2', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'Ask about a tour', autonomy: 'auto', detail: { contentMode: 'instruction' } }];
+    composeMessageMock.mockRejectedValue(new Error('provider down'));
+    const result = await dispatchDueScheduledMessages();
+    expect(result.failed).toBe(1);
+    expect(sendSMSMock).not.toHaveBeenCalled();
+  });
+  it('does not compose or send after losing the atomic claim', async () => {
+    contactRow.value = CONTACT;
+    claimRows.value = [];
+    dueRows.value = [{ id: 'composed-3', spaceId: 'space-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'Ask about a tour', autonomy: 'auto', detail: { contentMode: 'instruction' } }];
+    await dispatchDueScheduledMessages();
+    expect(composeMessageMock).not.toHaveBeenCalled();
+    expect(sendSMSMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Queued work follows current policy', () => {
+  const scheduled = { id: 'queued', spaceId: 'space-1', workflowId: 'workflow-1', channel: 'sms', recipientContactId: 'contact-1', instruction: 'hi', autonomy: 'auto' };
+  it('cancels a due message when the automation was paused', async () => {
+    workflowRow.data = { enabled: false, autonomy: 'auto' }; dueRows.value = [scheduled];
+    expect((await dispatchDueScheduledMessages()).skipped).toBe(1);
+    expect(statusUpdates().at(-1)?.status).toBe('canceled');
+    expect(sendSMSMock).not.toHaveBeenCalled();
+  });
+  it('uses review when sending permission was reduced after scheduling', async () => {
+    workflowRow.data = { enabled: true, autonomy: 'draft' }; dueRows.value = [scheduled];
+    expect((await dispatchDueScheduledMessages()).drafted).toBe(1);
+    expect(sendSMSMock).not.toHaveBeenCalled();
+  });
+  it('defers when current permissions cannot be checked', async () => {
+    workflowRow.error = { message: 'unavailable' }; dueRows.value = [scheduled];
+    expect((await dispatchDueScheduledMessages()).deferred).toBe(1);
+    expect(sendSMSMock).not.toHaveBeenCalled();
+    expect(runAutonomousInstructionMock).not.toHaveBeenCalled();
+  });
+  it('does not claim a draft was saved when the agent only responded', async () => {
+    dueRows.value = [{ ...scheduled, autonomy: 'draft' }];
+    runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true, outcome: 'no_action' });
+    expect((await dispatchDueScheduledMessages()).failed).toBe(1);
+    expect(notifyDraftReadyMock).not.toHaveBeenCalled();
+  });
+  it('does not run duplicate drafts after losing a claim', async () => {
+    dueRows.value = [{ ...scheduled, autonomy: 'draft' }]; claimRows.value = [];
+    expect((await dispatchDueScheduledMessages()).skipped).toBe(1);
+    expect(runAutonomousInstructionMock).not.toHaveBeenCalled();
   });
 });

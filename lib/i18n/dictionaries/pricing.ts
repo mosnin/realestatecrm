@@ -102,11 +102,11 @@ const en = {
     items: [
       {
         q: 'Is there a free plan?',
-        a: 'No. But you get 7 days free. We ask for a card to start. We do not charge you until day 7. Cancel before then and you pay nothing.',
+        a: 'You can create a workspace with 100 signup credits without a card. Paid plans offer a 7-day trial with a card. Cancel before it ends to avoid a charge.',
       },
       {
         q: 'What is a credit?',
-        a: 'One credit is one job Chippi does for you. Like booking a showing, writing your daily update, or ranking a new lead. Small jobs cost little or nothing. Credits you do not use wait 30 days.',
+        a: 'Credits pay for Chippi\'s work. Different jobs have different costs. Ranking a lead costs 1 credit. A daily brief costs 10 and booking a tour costs 15. Chat costs depend on how much work it runs. Unused monthly credits roll over for 30 days. Check Billing for your balance.',
       },
       {
         q: 'What if I run out?',
@@ -209,11 +209,11 @@ const es: PricingDict = {
     items: [
       {
         q: '¿Hay un plan gratis?',
-        a: 'No. Pero tienes 7 días gratis. Te pedimos una tarjeta para empezar. No te cobramos hasta el día 7. Cancela antes y no pagas nada.',
+        a: 'Puedes crear tu cuenta con 100 créditos iniciales sin tarjeta. Los planes de pago ofrecen 7 días gratis con tarjeta. Cancela antes de que termine la prueba para evitar el cobro.',
       },
       {
         q: '¿Qué es un crédito?',
-        a: 'Un crédito es un trabajo que Chippi hace por ti. Como agendar una visita, escribir tu resumen del día o calificar un lead nuevo. Los trabajos pequeños cuestan poco o nada. Los créditos que no uses te esperan 30 días.',
+        a: 'Cada trabajo tiene su precio. Calificar un lead cuesta 1 crédito. Un resumen diario cuesta 10 y agendar una visita cuesta 15. El chat cobra según el trabajo que realiza. Los créditos mensuales que no uses se conservan 30 días.',
       },
       {
         q: '¿Y si se me acaban?',
@@ -312,11 +312,11 @@ const ru: PricingDict = {
     items: [
       {
         q: 'Есть бесплатный план?',
-        a: 'Нет. Но у вас есть 7 дней бесплатно. Для старта нужна карта. Мы не списываем деньги до 7-го дня. Отмените раньше — не заплатите ничего.',
+        a: 'Можно создать аккаунт со 100 стартовыми кредитами без карты. Платные планы предлагают 7 дней бесплатно с картой. Отмените до конца пробного периода, чтобы избежать списания.',
       },
       {
         q: 'Что такое кредит?',
-        a: 'Кредит — это одна работа, которую Chippi делает за вас. Например, запись на показ, сводка за день или оценка нового лида. Мелкие работы стоят мало или ничего. Неиспользованные кредиты ждут 30 дней.',
+        a: 'У каждой работы своя цена. Оценка лида стоит 1 кредит. Сводка дня стоит 10, а запись на показ — 15. Стоимость чата зависит от выполненной работы. Неиспользованные месячные кредиты переносятся на 30 дней.',
       },
       {
         q: 'А если кредиты закончатся?',

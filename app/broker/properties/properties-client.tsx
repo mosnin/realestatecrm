@@ -760,7 +760,7 @@ export function BrokerPropertiesClient() {
                         {formatCurrency(property.listPrice)}
                       </p>
                     ) : (
-                      <p className="text-xs text-muted-foreground italic">
+                      <p className="text-xs text-muted-foreground not-italic">
                         No price
                       </p>
                     )}

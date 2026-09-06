@@ -8,20 +8,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   isConversationModeLocked,
-  shouldShowModeSwitch,
+  readStoredChatMode,
 } from '@/components/chippi/chippi-workspace';
 
-describe('shouldShowModeSwitch', () => {
-  it('shows the mode switch for the realtor surface (unchanged behavior)', () => {
-    expect(shouldShowModeSwitch('realtor')).toBe(true);
-  });
-
-  it('does not advertise Work on broker before its runtime reaches parity', () => {
-    expect(shouldShowModeSwitch('broker')).toBe(false);
-  });
-
-  it('keeps the capability boundary explicit', () => {
-    expect(shouldShowModeSwitch('realtor')).not.toBe(shouldShowModeSwitch('broker'));
+describe('New task defaults', () => {
+  it('starts a fresh task with work capability without reclassifying old conversations', () => {
+    expect(readStoredChatMode(null)).toBe('work');
+    expect(readStoredChatMode('legacy-conversation')).toBe('chat');
   });
 });
 

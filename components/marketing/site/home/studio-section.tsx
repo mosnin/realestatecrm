@@ -26,7 +26,7 @@ const CHIPS = ['Image', 'Video', 'Edit & upscale', 'On-brand'];
 export function StudioSection() {
   return (
     <section className="px-3 sm:px-4">
-      <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] p-7 ring-1 ring-black/5 sm:rounded-[2.75rem] sm:p-12">
+      <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-b from-white via-[#f8fafc] to-[#eef3fb] p-7 ring-1 ring-black/5 sm:rounded-[2.75rem] sm:p-12">
         <FadeUp className="mx-auto max-w-2xl text-center">
           <EyebrowChip className="justify-center">Content studio</EyebrowChip>
           <h2 className="mt-5 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl">

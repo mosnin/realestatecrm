@@ -81,7 +81,7 @@ function DemoLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#fff3ea] p-5 shadow-[0_2px_14px_rgba(80,40,15,0.06)] ring-1 ring-black/5 md:p-6">
+    <section className="group relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#f4f7fb] p-5 shadow-[0_2px_14px_rgba(80,40,15,0.06)] ring-1 ring-black/5 md:p-6">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/40 to-transparent" />
       {children}
     </section>
@@ -106,7 +106,7 @@ const COLLAB_AVATARS = [
 export function FeaturesDark() {
   return (
     <section id="features" className="relative z-10 mx-auto max-w-7xl px-4 pb-16">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#f8fafc] to-[#eef3fb] shadow-[0_24px_70px_-30px_rgba(120,55,20,0.25)] ring-1 ring-black/5 sm:rounded-[2.75rem]">
         {/* Pastel decor orbs */}
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#ffb054]/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-[#ff4b29]/15 blur-3xl" />

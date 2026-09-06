@@ -200,7 +200,7 @@ export function ActivityFeed({ slug }: { slug: string }) {
                             <span className="font-medium text-foreground">{targetName}</span>
                           )
                         ) : (
-                          <span className="text-muted-foreground italic">a contact</span>
+                          <span className="text-muted-foreground not-italic">a contact</span>
                         )}
                       </span>
                       <StateIcon
@@ -218,7 +218,7 @@ export function ActivityFeed({ slug }: { slug: string }) {
                       </span>
                     </div>
                     {entry.reasoning && (
-                      <p className="text-xs text-muted-foreground italic line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-xs text-muted-foreground not-italic line-clamp-2 mt-1 leading-relaxed">
                         {entry.reasoning}
                       </p>
                     )}

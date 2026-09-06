@@ -265,7 +265,7 @@ export default async function AdminBillingPage() {
           {
             label: 'Churned',
             value: statusCounts.canceled,
-            sub: totalSpaces > 0 ? `${Math.round((statusCounts.canceled / totalSpaces) * 100)}% churn` : '—',
+            sub: totalSpaces > 0 ? `${Math.round((statusCounts.canceled / totalSpaces) * 100)}% currently canceled` : '—',
             alert: statusCounts.canceled > 0,
           },
         ]}

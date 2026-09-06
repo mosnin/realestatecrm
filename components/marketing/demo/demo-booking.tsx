@@ -31,7 +31,7 @@ export function DemoBooking() {
               loading="lazy"
             />
           ) : (
-            <div className="flex aspect-[4/3] flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white via-[#fff7f1] to-[#ffeddd] text-center ring-1 ring-inset ring-black/5">
+            <div className="flex aspect-[4/3] flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white via-[#f8fafc] to-[#eef3fb] text-center ring-1 ring-inset ring-black/5">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#ff4b29] ring-1 ring-black/5">
                 <CalendarRange className="h-5 w-5" />
               </span>

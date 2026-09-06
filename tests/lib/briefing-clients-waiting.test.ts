@@ -91,3 +91,8 @@ describe('countClientsWaiting', () => {
     expect(opsFor('InboxThread').length).toBeGreaterThan(0);
   });
 });
+
+it('reports an unavailable count when Supabase returns an error', async () => {
+  queueFor('InboxThread').push({ count: null, error: { message: 'database unavailable' } });
+  await expect(countClientsWaiting('space_1')).rejects.toThrow('Count unavailable');
+});

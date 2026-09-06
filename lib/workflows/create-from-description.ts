@@ -61,7 +61,7 @@ TRIGGERS (type to config):
 - schedule to { "cadence": "daily" | "weekdays" | "hourly", "hour": <0-23, optional> }
 
 ACTIONS (1-5, in order; type to config):
-- schedule_message to { "channel": "sms" | "email", "instruction": "<what to say>", "delayMinutes": <number, use 0 for immediate> }
+- schedule_message to { "channel": "sms" | "email", "instruction": "<what to say>", "contentMode": "instruction", "delayMinutes": <number, use 0 for immediate> }
 - draft_message to { "channel": "sms" | "email", "instruction": "<what to draft>" }
 - create_task to { "title": "<task title>", "dueInDays": <number, optional> }
 - run_chippi to { "instruction": "<what the AI should do>" }
@@ -266,7 +266,9 @@ export function sanitizeGeneratedWorkflowForm(prompt: string, parsed: unknown): 
       form.trigger = { type: 'lead_created' };
     }
   }
-  form.actions = actions;
+  form.actions = actions.map((action) => action.type === 'schedule_message'
+    ? { ...action, config: { ...(action.config && typeof action.config === 'object' ? action.config : {}), contentMode: 'instruction' } }
+    : action);
   if (send) form.autonomy = 'auto';
   return form;
 }

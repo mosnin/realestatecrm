@@ -185,7 +185,7 @@ function ImageSlot({ name }: { name: string }) {
 /** Skeleton kanban illustration, three columns + the plain-language log. */
 function PipelineSketch() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] marketing-feature-frame p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -197,22 +197,22 @@ function PipelineSketch() {
         <div className="p-6 sm:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Pipeline</h3>
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Up to date
             </span>
           </div>
 
           {/* The board, three columns */}
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {COLUMNS.map((col) => (
                 <div key={col.name}>
                   <div className="flex items-center justify-between px-1 pb-2">
-                    <span className="text-[9px] tracking-widest text-neutral-500 sm:text-[10px]">
+                    <span className="text-xs tracking-widest text-neutral-500 sm:text-xs">
                       {col.name}
                     </span>
-                    <span className="text-[9px] text-neutral-400">{col.cards.length}</span>
+                    <span className="text-xs text-neutral-400">{col.cards.length}</span>
                   </div>
                   <div className="space-y-2">
                     {col.cards.map((card) => (
@@ -223,7 +223,7 @@ function PipelineSketch() {
                         <div className="h-1.5 w-3/4 rounded bg-neutral-900/70" />
                         <div className="mt-1.5 h-1.5 w-1/2 rounded bg-neutral-200/80" />
                         <span
-                          className={`mt-2 inline-flex rounded-full px-1.5 py-0.5 text-[8px] font-medium sm:text-[9px] ${card.tone}`}
+                          className={`mt-2 inline-flex rounded-full px-1.5 py-0.5 text-[8px] font-medium sm:text-xs ${card.tone}`}
                         >
                           {card.chip}
                         </span>
@@ -238,10 +238,10 @@ function PipelineSketch() {
           {/* The log, plain language */}
           <div className="mt-4 rounded-2xl border border-black/5 bg-white/90 shadow-sm">
             <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-              <span className="text-[10px] tracking-widest text-neutral-500">CHIPPI LOG</span>
+              <span className="text-xs tracking-widest text-neutral-500">CHIPPI LOG</span>
               <span className="h-2 w-2 rounded-full bg-gradient-to-r from-[#ff7a47] to-[#ff4b29]" />
             </div>
-            <div className="space-y-2 p-3 text-[10px] text-neutral-600 sm:text-xs">
+            <div className="space-y-2 p-3 text-xs text-neutral-600 sm:text-xs">
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#ff4b29]" />
                 <span>Moved Maya to Touring, tour booked for Saturday</span>
@@ -268,15 +268,15 @@ function StageLadder() {
             <div key={stage.name} className="flex flex-col">
               {/* Column head */}
               <div className="flex items-center justify-between px-1 pb-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
                   {stage.name}
                 </span>
-                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
+                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-500">
                   {stage.count}
                 </span>
               </div>
               {/* Active deal card */}
-              <div className="rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#fdf4ee] p-3 shadow-sm ring-1 ring-inset ring-black/5">
+              <div className="rounded-2xl border border-black/5 bg-gradient-to-b from-white to-[#f5f7fb] p-3 shadow-sm ring-1 ring-inset ring-black/5">
                 <div className="flex items-center gap-2">
                   <div
                     className={`h-7 w-7 flex-shrink-0 rounded-full ${
@@ -286,14 +286,14 @@ function StageLadder() {
                     }`}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] font-semibold text-zinc-950">
+                    <div className="truncate text-xs font-semibold text-zinc-950">
                       {stage.deal}
                     </div>
-                    <div className="truncate text-[10px] text-neutral-500">{stage.meta}</div>
+                    <div className="truncate text-xs text-neutral-500">{stage.meta}</div>
                   </div>
                 </div>
                 <span
-                  className={`mt-2.5 inline-flex rounded-full px-2 py-0.5 text-[9px] font-medium ${stage.tone}`}
+                  className={`mt-2.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${stage.tone}`}
                 >
                   {stage.pill}
                 </span>

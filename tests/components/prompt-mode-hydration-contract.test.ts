@@ -1,18 +1,18 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-
-const promptSource = readFileSync('components/ui/chippi-prompt-box.tsx', 'utf8');
-const workspaceSource = readFileSync('components/chippi/chippi-workspace.tsx', 'utf8');
-
-describe('Chippi prompt mode hydration contract', () => {
-  it('restores the sticky mode after the deterministic Chat render', () => {
-    expect(workspaceSource).toContain(
-      "const [chatMode, setChatMode] = useState<ChatMode>('chat')",
-    );
-    expect(workspaceSource).toContain('setChatMode(readStoredChatMode(activeConversationId))');
-    expect(workspaceSource).not.toMatch(
-      /useState<ChatMode>\(\(\) =>\s*readStoredChatMode/,
-    );
-    expect(promptSource).toContain("chatMode = 'chat'");
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readStoredChatMode } from '@/components/chippi/chippi-workspace';
+afterEach(() => vi.unstubAllGlobals());
+describe('Restoring conversation capability', () => {
+  it('preserves an explicit saved choice and migrates the old agent value', () => {
+    const getItem = vi.fn(() => 'chat');
+    vi.stubGlobal('window', { sessionStorage: { getItem } });
+    expect(readStoredChatMode('existing')).toBe('chat');
+    expect(readStoredChatMode(null)).toBe('work');
+    getItem.mockReturnValue('agent');
+    expect(readStoredChatMode('existing')).toBe('work');
+  });
+  it('keeps a fresh task usable when browser storage is unavailable', () => {
+    vi.stubGlobal('window', { sessionStorage: { getItem: () => { throw new Error('unavailable'); } } });
+    expect(readStoredChatMode(null)).toBe('work');
+    expect(readStoredChatMode('existing')).toBe('chat');
   });
 });

@@ -105,7 +105,7 @@ const PORTFOLIO: { addr: string; source: string; status: keyof typeof STATUS_TON
 /** Skeleton "portfolio window", many listings, many sources, one board. */
 function PortfolioWindow() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] marketing-feature-frame p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -116,15 +116,15 @@ function PortfolioWindow() {
         <div className="p-6 sm:p-8">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">Your portfolio</h3>
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
               <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
               4 sources synced
             </span>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
             {/* Column header */}
-            <div className="flex items-center gap-3 px-1 pb-2 text-[9px] uppercase tracking-widest text-neutral-400">
+            <div className="flex items-center gap-3 px-1 pb-2 text-xs uppercase tracking-widest text-neutral-400">
               <span className="flex-1">Property</span>
               <span className="hidden sm:inline">Source</span>
               <span className="w-16 text-right">Status</span>
@@ -136,17 +136,17 @@ function PortfolioWindow() {
                   key={row.addr}
                   className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm"
                 >
-                  <div className="h-9 w-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                  <div className="h-9 w-12 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-medium text-neutral-800">{row.addr}</div>
+                    <div className="text-xs font-medium text-neutral-800">{row.addr}</div>
                     <div className={`mt-1.5 h-1.5 ${row.w} rounded bg-neutral-200`} />
                   </div>
-                  <span className="hidden items-center gap-1 text-[9px] text-neutral-500 sm:inline-flex">
+                  <span className="hidden items-center gap-1 text-xs text-neutral-500 sm:inline-flex">
                     <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
                     {row.source}
                   </span>
                   <span
-                    className={`w-16 rounded-full px-2 py-0.5 text-center text-[9px] font-medium ${STATUS_TONE[row.status]}`}
+                    className={`w-16 rounded-full px-2 py-0.5 text-center text-xs font-medium ${STATUS_TONE[row.status]}`}
                   >
                     {row.status}
                   </span>
@@ -156,8 +156,8 @@ function PortfolioWindow() {
 
             {/* Footer, one window summary */}
             <div className="mt-3 flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 ring-1 ring-inset ring-black/5">
-              <span className="text-[10px] text-neutral-600">All listings · one window</span>
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-700">
+              <span className="text-xs text-neutral-600">All listings · one window</span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Up to date
               </span>
@@ -246,7 +246,7 @@ export default function PropertiesPage() {
           </div>
 
           {/* Pastel frame, white glass card, skeleton property record */}
-          <div className="relative rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+          <div className="relative rounded-[36px] marketing-feature-frame p-5">
             <article
               className="relative overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
               style={{
@@ -257,28 +257,28 @@ export default function PropertiesPage() {
               <div className="p-6 sm:p-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                   <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">14 Oak St</h3>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
                     <RefreshCw className="h-4 w-4 text-[#ff4b29]" />
                     Live sync
                   </span>
                 </div>
 
                 {/* One record: listing, media & docs, showings */}
-                <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
+                <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-4 ring-1 ring-inset ring-black/5 sm:p-5">
                   <div className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">PROPERTY</span>
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                      <span className="text-xs tracking-widest text-neutral-500">PROPERTY</span>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                         Active
                       </span>
                     </div>
                     <div className="mt-2.5 flex items-center gap-3">
-                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#ffe3cf] to-[#ffc4dd]" />
+                      <div className="h-10 w-14 flex-shrink-0 rounded-lg bg-gradient-to-br from-[#e8eef8] to-[#ffc4dd]" />
                       <div className="min-w-0 flex-1">
                         <div className="h-2 w-24 rounded bg-neutral-900" />
                         <div className="mt-1.5 h-2 w-32 rounded bg-neutral-200" />
                       </div>
-                      <span className="inline-flex items-center gap-1 text-[9px] text-neutral-500">
+                      <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
                         <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
                         kvCORE
                       </span>
@@ -287,8 +287,8 @@ export default function PropertiesPage() {
 
                   <div className="mt-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">PHOTOS &amp; DOCS</span>
-                      <span className="text-[10px] text-neutral-400">Attached</span>
+                      <span className="text-xs tracking-widest text-neutral-500">PHOTOS &amp; DOCS</span>
+                      <span className="text-xs text-neutral-400">Attached</span>
                     </div>
                     <div className="mt-2.5 grid grid-cols-3 gap-2">
                       <div className="h-10 rounded-lg bg-gradient-to-b from-[#f6f6f8] to-white ring-1 ring-black/5" />
@@ -299,14 +299,14 @@ export default function PropertiesPage() {
                       <div className="flex items-center gap-2">
                         <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
                         <div className="h-1.5 w-24 rounded bg-neutral-200" />
-                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                           Filed
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
                         <div className="h-1.5 w-32 rounded bg-neutral-200" />
-                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700">
+                        <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                           Filed
                         </span>
                       </div>
@@ -315,24 +315,24 @@ export default function PropertiesPage() {
 
                   <div className="mt-3 rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm">
                     <div className="flex items-center justify-between border-b border-black/5 pb-2">
-                      <span className="text-[10px] tracking-widest text-neutral-500">SHOWINGS</span>
-                      <span className="text-[10px] text-neutral-400">This week</span>
+                      <span className="text-xs tracking-widest text-neutral-500">SHOWINGS</span>
+                      <span className="text-xs text-neutral-400">This week</span>
                     </div>
-                    <div className="mt-2.5 flex items-center justify-between text-[10px]">
+                    <div className="mt-2.5 flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 text-neutral-700">
                         <CalendarCheck className="h-3 w-3 text-[#ff4b29]" />
                         Buyer tour · Sat 2:00
                       </span>
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-medium text-blue-700">
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                         On calendar
                       </span>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <div className="mt-1.5 flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5 text-neutral-700">
                         <CalendarCheck className="h-3 w-3 text-neutral-400" />
                         Open house · Sun 1–3
                       </span>
-                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-600">
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
                         Scheduled
                       </span>
                     </div>

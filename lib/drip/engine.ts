@@ -204,18 +204,8 @@ async function hasRepliedSince(
   return { replied, indeterminate: false };
 }
 
-/**
- * Map the space's earned autonomy onto the drip-scheduled ScheduledMessage
- * row, the same "earned, not configured" posture lib/trust-ladder.ts
- * documents. "AgentSettings.autonomyLevel" is the realtor-facing dial
- * (app/api/agent/settings): 'autonomous' has earned hands-off sending, so
- * drip steps go out via the dispatcher's 'auto' path; every other level
- * ('draft_required', 'suggest_only' — or no row yet, which is the same as
- * never having graduated) is DRAFT-only, the safe default. FOLLOW-UP: a
- * dedicated per-sequence autonomy override (draft/notify/auto, matching
- * Workflow's granularity) would let a realtor graduate drip independently of
- * the general agent dial — flagged, not built, to stay in scope this pass.
- */
+/** Resolve the owner's saved policy for follow-up sequences. Only an explicit
+ * autonomous setting authorizes automatic sending; missing/failed reads draft. */
 async function resolveAutonomy(spaceId: string): Promise<WorkflowAutonomy> {
   const { data, error } = await tenantTable(supabase, 'AgentSettings', { spaceId })
     .select('autonomyLevel')
@@ -357,6 +347,7 @@ async function processEnrollment(
     status: 'pending',
     detail: {
       source: 'drip',
+      contentMode: 'instruction',
       sequenceId: enrollment.sequenceId,
       enrollmentId: enrollment.id,
       step: enrollment.currentStep,

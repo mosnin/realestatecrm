@@ -1,26 +1,9 @@
 name: Agent Evals
 
-# Runs the chat-agent eval suite. The suite makes real OpenAI calls
-# (~$0.30 a run, ~30s) so it stays gated behind RUN_EVALS=1.
-#
-# Three triggers:
-#   - Nightly cron — catches model-side drift (gpt-5-mini behavior change
-#     without a prompt change on our side).
-#   - PR — gated to PRs that touch the prompt assembly surface (the
-#     primary regression risk on our side). Cost-bounded by the path
-#     filter; non-prompt PRs don't trigger.
-#   - Manual workflow_dispatch — ad-hoc runs after a prompt change.
-#
-# Failures are signal, not enforcement. The workflow is allowed to fail
-# without blocking PRs; the point is the alert when tool-pick judgment
-# drifts. Treat it like a smoke alarm.
-#
-# KNOWN GAP: this eval runs the TypeScript in-process runtime (the chat
-# fallback path, lib/ai-tools/sdk-chat.ts). It does NOT cover the Python
-# Modal runtime which is what production actually runs. The Python eval
-# harness is a separate, larger build — for now this catches TS-fallback
-# regressions and gives early signal on prompt-shape changes that affect
-# both runtimes (system prompt copy, tool descriptions).
+# TS is the primary chat runtime. These evals use the real OpenRouter model
+# with fixture CRM data; they do not prove live mail/calendar delivery.
+# Enable AGENT_EVALS_ENABLED for nightly/PR model runs. Missing credentials
+# on an enabled run fail explicitly; a skipped run is not release evidence.
 
 on:
   schedule:
@@ -39,6 +22,9 @@ on:
       - 'lib/ai-tools/tools/**'
       - 'lib/ai-tools/sdk-chat.ts'
       - 'lib/ai-tools/sdk-bridge.ts'
+      - 'lib/chat/**'
+      - 'lib/agent/**'
+      - 'lib/workflows/**'
       - 'tests/evals/**'
       - '.github/workflows/agent-evals.yml'
   workflow_dispatch:
@@ -57,8 +43,6 @@ jobs:
   eval:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Skip the run if OPENAI_API_KEY isn't configured on the repo — better
-    # to no-op than fail with a misleading "auth error" message.
     if: ${{ vars.AGENT_EVALS_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
 
     steps:
@@ -74,13 +58,16 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run agent evals
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           RUN_EVALS: '1'
-        run: pnpm eval
+        run: |
+          test -n "$OPENROUTER_API_KEY" || { echo "::error::OPENROUTER_API_KEY is required for enabled agent evals"; exit 1; }
+          set -o pipefail
+          pnpm eval 2>&1 | tee eval-output.log
 
       - name: Upload eval log on failure
         if: failure()

@@ -14,12 +14,12 @@ const OPTIONS: Array<{
 }> = [
   {
     value: 'review',
-    title: 'Review',
+    title: 'Review changes',
     description: 'Chippi pauses before it changes data or acts outside Chippi.',
   },
   {
     value: 'autonomous',
-    title: 'Fully autonomous',
+    title: 'Run requested actions',
     description: 'Chippi completes explicitly requested actions. Irreversible actions still require permission.',
   },
 ];
@@ -52,7 +52,7 @@ export function WorkExecutionModeMenu({
         <div className="px-2 pb-2 pt-1">
           <p className="text-[13px] font-medium text-foreground">How Chippi works</p>
           <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
-            This changes execution, not what Chippi drafts when you explicitly ask for a draft.
+            Applies to this task. Asking for a draft still creates a draft.
           </p>
         </div>
         <div role="radiogroup" aria-label="Work execution mode" className="space-y-1">
@@ -95,7 +95,7 @@ export function WorkExecutionModeMenu({
         </div>
         {value === 'autonomous' && (
           <p className="mx-2 mb-1 mt-2 border-t border-border/60 pt-2 text-[10.5px] leading-4 text-muted-foreground">
-            Autonomous work can send messages and update your CRM when your request is explicit. You remain responsible for the result.
+            Autonomous work can send messages and update your CRM when your request is explicit.
           </p>
         )}
       </PopoverContent>

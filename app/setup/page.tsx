@@ -2,8 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
-import { OnboardingRealtor } from '@/components/onboarding/onboarding-realtor';
-import { OnboardingRealtorV2 } from '@/components/onboarding/onboarding-realtor-v2';
+import { OnboardingQuick } from '@/components/onboarding/onboarding-quick';
 import { ensureOnboardingBackfill } from '@/lib/onboarding';
 
 export const metadata = { title: 'Create your workspace — Chippi' };
@@ -13,18 +12,11 @@ export default async function SetupPage({
 }: {
   searchParams?: Promise<{ type?: string; legacy?: string }>;
 }) {
-  const { type, legacy } = (await searchParams) ?? {};
+  const { type } = (await searchParams) ?? {};
   // Realtor (default) gets the one-screen quick path. Brokers and agents-
   // joining-a-brokerage get the longer flow that collects brokerage data
   // via ?type=broker. The quick path itself links over to ?type=broker.
   const useQuickPath = type !== 'broker';
-
-  // V2 storytelling is the live onboarding. Two escape hatches:
-  //   - `?legacy=1` forces V1 for a single request (per-realtor rollback)
-  //   - NEXT_PUBLIC_ONBOARDING_V2=false forces V1 deploy-wide (incident rollback)
-  // V1 stays as that rollback path until V2 proves out — DO NOT refactor it.
-  const useV2Onboarding =
-    legacy !== '1' && process.env.NEXT_PUBLIC_ONBOARDING_V2 !== 'false';
 
   const { userId } = await auth();
   if (!userId) redirect('/login/realtor');
@@ -46,11 +38,12 @@ export default async function SetupPage({
     if (error) throw error;
 
     if (row) {
-      const { data: spaceRow } = await supabase
+      const { data: spaceRow, error: spaceError } = await supabase
         .from('Space')
         .select('id, slug, name')
         .eq('ownerId', row.id)
         .maybeSingle();
+      if (spaceError) throw spaceError;
       dbUser = {
         ...row,
         space: spaceRow ? { id: spaceRow.id as string, slug: spaceRow.slug as string, name: spaceRow.name as string } : null,
@@ -104,7 +97,7 @@ export default async function SetupPage({
         redirect('/broker');
       }
     }
-    redirect(`/s/${dbUser.space.slug}/chippi`);
+    redirect(`/s/${dbUser.space.slug}/chippi/brief`);
   }
 
   // Create user record if missing.
@@ -170,7 +163,7 @@ export default async function SetupPage({
 
   // Check again after upsert — user may already have a space
   if (resolvedUser?.space?.slug) {
-    redirect(`/s/${resolvedUser.space.slug}/chippi`);
+    redirect(`/s/${resolvedUser.space.slug}/chippi/brief`);
   }
 
   // If the user has a broker_admin membership (e.g. accepted an admin invitation),
@@ -205,9 +198,7 @@ export default async function SetupPage({
   void email;
 
   if (useQuickPath) {
-    return useV2Onboarding
-      ? <OnboardingRealtorV2 defaultName={resolvedUser?.name ?? ''} />
-      : <OnboardingRealtor defaultName={resolvedUser?.name ?? ''} />;
+    return <OnboardingQuick defaultName={resolvedUser?.name ?? ''} />;
   }
 
   return (

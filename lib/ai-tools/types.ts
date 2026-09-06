@@ -65,6 +65,12 @@ export interface ToolContext {
    *  the idle watchdog and the thinking indicator from this callback so a
    *  waiting `delegate_task` does not look stalled. */
   onProgress?: (label: string) => void;
+  /** Server-only execution observer; never populated from model arguments. */
+  onToolOutcome?: (receipt: { name: string; outcome: import('./outcomes').ToolOutcome }) => void;
+  backgroundRun?: boolean;
+  /** Unexpanded workflow instruction saved by the workspace owner. Recipient
+   * names/event payloads may provide data, never execution authority. */
+  backgroundAuthorizedInstruction?: string;
   /** Mid-turn approval for a nested specialist. The parent stream is still
    *  open, so the pump emits `permission_required` without pausing the
    *  parent ConversationTurn. */

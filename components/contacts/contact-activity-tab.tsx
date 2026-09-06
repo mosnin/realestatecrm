@@ -266,7 +266,7 @@ export function ContactActivityTab({ contactId, contactCreatedAt }: { contactId:
                         <span className="text-xs text-muted-foreground">{timeAgo(entry.createdAt)}</span>
                       </div>
                       {entry.content && (
-                        <p className={cn('text-sm mt-0.5 leading-relaxed whitespace-pre-wrap', isSystem ? 'text-muted-foreground/80 italic' : 'text-muted-foreground')}>
+                        <p className={cn('text-sm mt-0.5 leading-relaxed whitespace-pre-wrap', isSystem ? 'text-muted-foreground/80 not-italic' : 'text-muted-foreground')}>
                           {entry.content}
                         </p>
                       )}

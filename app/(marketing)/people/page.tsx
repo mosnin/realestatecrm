@@ -175,7 +175,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 /** Skeleton contact-record illustration, score with the reason + timeline. */
 function ContactRecordSketch() {
   return (
-    <div className="rounded-[36px] bg-gradient-to-br from-[#ffe3cf] via-[#ffd2b3] to-[#ffc4dd] p-5">
+    <div className="rounded-[36px] marketing-feature-frame p-5">
       <div
         className="overflow-hidden rounded-3xl shadow-xl backdrop-blur-xl"
         style={{
@@ -189,13 +189,13 @@ function ContactRecordSketch() {
             <h3 className="text-2xl font-semibold tracking-tight text-zinc-950">
               Contact record
             </h3>
-            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-[10px] text-neutral-700 sm:text-xs">
+            <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-2.5 py-1 text-xs text-neutral-700 sm:text-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Live
             </span>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+          <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
             {/* The person, scored, with the reason */}
             <div className="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-sm sm:p-4">
               <div className="flex items-center gap-3">
@@ -204,12 +204,12 @@ function ContactRecordSketch() {
                   <div className="h-2 w-24 rounded bg-neutral-900/80" />
                   <div className="mt-1.5 h-2 w-16 rounded bg-neutral-200/80" />
                 </div>
-                <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-[10px] font-medium text-[#ff4b29]">
+                <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[#ff4b29]/10 px-2 py-0.5 text-xs font-medium text-[#ff4b29]">
                   <Gauge className="h-3 w-3" />
                   Hot
                 </span>
               </div>
-              <div className="mt-3 rounded-lg bg-black/[0.03] px-2.5 py-1.5 text-[10px] text-neutral-600 ring-1 ring-black/5 sm:text-xs">
+              <div className="mt-3 rounded-lg bg-black/[0.03] px-2.5 py-1.5 text-xs text-neutral-600 ring-1 ring-black/5 sm:text-xs">
                 Why: pre-approved, touring this week, replies within the hour
               </div>
             </div>
@@ -217,14 +217,14 @@ function ContactRecordSketch() {
             {/* The timeline, every touch */}
             <div className="mt-3 rounded-2xl border border-black/5 bg-white/90 shadow-sm">
               <div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
-                <span className="text-[10px] tracking-widest text-neutral-500">TIMELINE</span>
-                <span className="text-[10px] text-neutral-400">every touch</span>
+                <span className="text-xs tracking-widest text-neutral-500">TIMELINE</span>
+                <span className="text-xs text-neutral-400">every touch</span>
               </div>
               <div className="space-y-2.5 p-3">
                 {TOUCHES.map((t) => (
                   <div key={t.text} className="flex items-center gap-2.5">
                     <t.icon className={`h-3.5 w-3.5 flex-shrink-0 ${t.tone}`} />
-                    <span className="text-[10px] text-neutral-600 sm:text-xs">{t.text}</span>
+                    <span className="text-xs text-neutral-600 sm:text-xs">{t.text}</span>
                   </div>
                 ))}
               </div>
@@ -240,13 +240,13 @@ function ContactRecordSketch() {
 function ContactRoster() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
-      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
         {/* List head, a sort, the way you'd actually triage */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
             People
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] text-neutral-500 ring-1 ring-black/5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-xs text-neutral-500 ring-1 ring-black/5">
             <Gauge className="h-3 w-3 text-[#ff4b29]" />
             Sorted by score
           </span>
@@ -257,7 +257,7 @@ function ContactRoster() {
               key={row.initials}
               className="flex items-center gap-3 rounded-xl border border-black/5 bg-white/90 p-2.5 shadow-sm"
             >
-              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[10px] font-semibold text-neutral-500">
+              <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-500">
                 {row.initials}
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${row.dot}`}
@@ -265,10 +265,10 @@ function ContactRoster() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className={`h-2 rounded bg-neutral-900/80 ${row.band}`} />
-                <div className="mt-1.5 text-[10px] text-neutral-500 sm:text-[11px]">{row.reason}</div>
+                <div className="mt-1.5 text-xs text-neutral-500 sm:text-xs">{row.reason}</div>
               </div>
               <span
-                className={`inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${row.tagTone}`}
+                className={`inline-flex flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${row.tagTone}`}
               >
                 {row.tag}
               </span>
@@ -284,13 +284,13 @@ function ContactRoster() {
 function SegmentsSketch() {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:rounded-[2.5rem] sm:p-6">
-      <div className="rounded-2xl bg-gradient-to-b from-white to-[#fff1e6] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
+      <div className="rounded-2xl bg-gradient-to-b from-white to-[#f4f7fb] p-3 ring-1 ring-inset ring-black/5 sm:p-4">
         {/* List head, segments stay current on their own */}
         <div className="flex items-center justify-between border-b border-black/5 px-1 pb-2.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">
             Segments
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] text-neutral-500 ring-1 ring-black/5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-xs text-neutral-500 ring-1 ring-black/5">
             <RefreshCw className="h-3 w-3 text-[#ff4b29]" />
             Re-sorted just now
           </span>
@@ -302,17 +302,17 @@ function SegmentsSketch() {
               className="rounded-xl border border-black/5 bg-white/90 p-3 shadow-sm"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-950">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-950">
                   <Users className="h-3 w-3 text-neutral-400" />
                   {seg.name}
                 </span>
                 <span
-                  className={`inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums ${seg.tone}`}
+                  className={`inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums ${seg.tone}`}
                 >
                   {seg.count}
                 </span>
               </div>
-              <div className="mt-2 text-[10px] text-neutral-500 sm:text-[11px]">{seg.rule}</div>
+              <div className="mt-2 text-xs text-neutral-500 sm:text-xs">{seg.rule}</div>
             </div>
           ))}
         </div>
@@ -412,7 +412,7 @@ export default function PeoplePage() {
             {PILLARS.map((p) => (
               <StaggerItem key={p.kicker} className="h-full">
                 <div className="h-full rounded-3xl bg-white p-7 shadow-[0_18px_60px_-24px_rgba(20,20,40,0.12)] ring-1 ring-black/5 sm:p-9">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#ff4b29]">
                     {p.kicker}
                   </p>
                   <h3 className="mt-3 text-xl font-semibold tracking-tight text-zinc-950 sm:text-2xl">

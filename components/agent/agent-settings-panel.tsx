@@ -1,289 +1,290 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Bot, Loader2, Play, CheckCircle2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/formatting';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface AgentSettings {
-  spaceId: string;
   enabled: boolean;
   dailyTokenBudget: number;
+  autonomyLevel: 'suggest_only' | 'draft_required' | 'autonomous';
 }
 
-interface AgentUsage {
-  used: number;
-  limit: number;
-  pct: number;
-  resetsAt: string;
-}
-
-interface AgentStatus {
-  lastRunAt: string | null;
-}
-
-const BUDGET_PRESETS = [
-  { label: '10k', value: 10_000, desc: '~40 runs/day' },
-  { label: '25k', value: 25_000, desc: '~100 runs/day' },
-  { label: '50k', value: 50_000, desc: '~200 runs/day' },
-  { label: '100k', value: 100_000, desc: '~400 runs/day' },
-] as const;
-
-function timeUntil(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  const hrs = Math.floor(diff / 3_600_000);
-  return hrs > 0 ? `${hrs}h` : 'soon';
-}
-
-interface Props { slug: string; }
-
-export function AgentSettingsPanel({ slug: _slug }: Props) {
+/** One place to see each sending policy. These settings have different scopes;
+ * no single toggle claims to stop jobs governed by another saved policy. */
+export function AgentSettingsPanel({ slug }: { slug: string }) {
   const [settings, setSettings] = useState<AgentSettings | null>(null);
-  const [usage, setUsage] = useState<AgentUsage | null>(null);
-  const [status, setStatus] = useState<AgentStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [firstTouch, setFirstTouch] = useState<boolean | null>(null);
+  const [lastActivity, setLastActivity] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savedField, setSavedField] = useState<string | null>(null);
-  const [triggeringRun, setTriggeringRun] = useState(false);
+  const [running, setRunning] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
-  const [showDisableConfirm, setShowDisableConfirm] = useState(false);
 
   const load = useCallback(async () => {
-    const [settingsRes, usageRes, activityRes] = await Promise.all([
-      fetch('/api/agent/settings'),
-      fetch('/api/agent/usage'),
-      fetch('/api/agent/activity?limit=1'),
-    ]);
-    if (settingsRes.ok) setSettings(await settingsRes.json());
-    if (usageRes.ok) setUsage(await usageRes.json());
-
-    let lastRunAt: string | null = null;
-    if (activityRes.ok) {
-      const activity = await activityRes.json();
-      lastRunAt = activity[0]?.createdAt ?? null;
+    setLoadError(false);
+    try {
+      const [agentRes, spaceRes, activityRes] = await Promise.all([
+        fetch('/api/agent/settings'),
+        fetch(`/api/spaces?slug=${encodeURIComponent(slug)}`),
+        fetch('/api/agent/activity?limit=1'),
+      ]);
+      if (!agentRes.ok) throw new Error('Settings unavailable');
+      setSettings(await agentRes.json());
+      if (spaceRes.ok) {
+        const space = await spaceRes.json();
+        setFirstTouch((space.settings ?? space).autoFirstTouchSend !== false);
+      } else setFirstTouch(null);
+      if (activityRes.ok) {
+        const activity = await activityRes.json();
+        setLastActivity(activity[0]?.createdAt ?? null);
+      }
+    } catch {
+      setLoadError(true);
     }
-    setStatus({ lastRunAt });
-    setLoading(false);
-  }, []);
+  }, [slug]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  useEffect(() => { void load(); }, [load]);
-
-  async function saveField(patch: Partial<AgentSettings>, fieldKey: string) {
-    if (!settings) return;
-    const previous = settings;
+  async function save(patch: Partial<AgentSettings>) {
     setSaving(true);
-    const merged = { ...settings, ...patch };
     try {
       const res = await fetch('/api/agent/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(merged),
+        body: JSON.stringify(patch),
       });
-      if (res.ok) {
-        setSettings(await res.json());
-        setSavedField(fieldKey);
-        setTimeout(() => setSavedField(null), 2000);
-      } else {
-        setSettings(previous);
-        toast.error("Couldn't save that. Try again.");
-      }
+      if (!res.ok) throw new Error('Save failed');
+      setSettings(await res.json());
+      toast.success('Sending policy saved');
     } catch {
-      setSettings(previous);
-      toast.error("I lost the connection. Try again.");
+      toast.error('Could not save. Your previous setting is still in place.');
     } finally {
       setSaving(false);
     }
   }
 
-  async function triggerRun() {
-    setTriggeringRun(true);
-    setRunResult(null);
+  async function saveFirstTouch(enabled: boolean) {
+    setSaving(true);
     try {
-      const res = await fetch('/api/agent/run-now', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json() as { triggered: boolean; method?: string; note?: string };
-        if (data.triggered) {
-          setRunResult(data.method === 'modal' ? 'On it.' : (data.note ?? 'Queued for the next sweep.'));
-          setTimeout(() => void load(), 3000);
-        } else {
-          setRunResult("Couldn't kick myself off. Check the Modal deployment.");
-        }
-      }
+      const res = await fetch('/api/spaces', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, autoFirstTouchSend: enabled }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setFirstTouch(enabled);
+      toast.success('First response policy saved');
     } catch {
-      setRunResult("I lost the connection.");
+      toast.error('Could not save. Your previous setting is still in place.');
     } finally {
-      setTriggeringRun(false);
-      setTimeout(() => setRunResult(null), 5000);
+      setSaving(false);
     }
   }
 
-  if (loading || !settings) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((n) => <div key={n} className="h-20 rounded-lg bg-muted/40 animate-pulse" />)}
-      </div>
-    );
+  async function runNow() {
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await fetch('/api/agent/run-now', { method: 'POST' });
+      const data = await res.json();
+      setRunResult(
+        data.note ??
+          (res.ok && data.triggered
+            ? 'Run request accepted. Check Activity for the result.'
+            : 'Could not start this run. Check Activity and your connections.'),
+      );
+    } catch {
+      setRunResult(
+        'Start could not be confirmed. Check Activity before trying again.',
+      );
+    } finally {
+      setRunning(false);
+    }
   }
 
-  return (
-    <div className="space-y-6 max-w-2xl">
-
-      {/* Status + Run Now */}
-      <div className="rounded-lg border border-border/70 bg-card p-4 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-              settings.enabled
-                ? 'bg-muted text-foreground'
-                : 'bg-muted text-muted-foreground',
-            )}>
-              <Bot size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm">Chippi</p>
-                <span className={cn(
-                  'text-[11px] font-semibold px-1.5 py-0.5 rounded-full',
-                  settings.enabled
-                    ? 'bg-foreground/[0.06] text-foreground'
-                    : 'bg-muted text-muted-foreground',
-                )}>
-                  {settings.enabled ? 'ACTIVE' : 'PAUSED'}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {status?.lastRunAt ? `Last run ${timeAgo(status.lastRunAt)}` : 'No runs yet'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="flex flex-col items-end gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs"
-                onClick={() => void triggerRun()}
-                disabled={triggeringRun || !settings.enabled}
-              >
-                {triggeringRun ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                Run now
-              </Button>
-              {runResult && (
-                <p className="text-[11px] text-muted-foreground">{runResult}</p>
-              )}
-            </div>
-            <Switch
-              checked={settings.enabled}
-              onCheckedChange={(checked) => {
-                if (!checked) {
-                  setShowDisableConfirm(true);
-                } else {
-                  setSettings({ ...settings, enabled: true });
-                  void saveField({ enabled: true }, 'enabled');
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Token usage meter */}
-        {usage && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                Today&apos;s usage — {usage.used.toLocaleString()} / {usage.limit.toLocaleString()} tokens
-              </span>
-              <span className={cn(
-                'font-medium',
-                usage.pct >= 90 ? 'text-destructive' : 'text-muted-foreground',
-              )}>
-                {usage.pct}% · resets in {timeUntil(usage.resetsAt)}
-              </span>
-            </div>
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-all',
-                  usage.pct >= 90 ? 'bg-destructive' : 'bg-foreground',
-                )}
-                style={{ width: `${usage.pct}%` }}
-              />
-            </div>
-          </div>
-        )}
+  if (loadError)
+    return (
+      <div role="alert" className="rounded-lg border border-border p-5 text-sm">
+        <p>
+          Could not load sending policies. Your saved preferences have not
+          changed.
+        </p>
+        <Button variant="outline" className="mt-3" onClick={() => void load()}>
+          Try again
+        </Button>
       </div>
+    );
+  if (!settings)
+    return (
+      <p role="status" className="py-6 text-sm text-muted-foreground">
+        Loading sending policies…
+      </p>
+    );
 
-      {/* Daily token budget */}
-      <div className="space-y-3">
-        <div>
-          <Label className="text-sm font-semibold">Daily token budget</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Caps OpenAI usage per day for this workspace. Resets at midnight UTC.
+  return (
+    <div className="max-w-2xl space-y-7">
+      <div>
+        <h2 className="text-xl font-semibold">What runs automatically</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Connect your inbox, choose the work you want handled, and review the
+          results in Activity.
+        </p>
+      </div>
+      <section className="divide-y divide-border rounded-lg border border-border px-5">
+        <div className="flex items-start justify-between gap-5 py-5">
+          <div>
+            <h3 className="text-sm font-semibold">
+              First response to new leads
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Send the first reply when a new lead arrives. When off, prepare it
+              for review.
+            </p>
+          </div>
+          {firstTouch === null ? (
+            <button className="text-sm text-brand" onClick={() => void load()}>
+              Reload policy
+            </button>
+          ) : (
+            <Switch
+              aria-label="Send first responses automatically"
+              disabled={saving}
+              checked={firstTouch}
+              onCheckedChange={(value) => void saveFirstTouch(value)}
+            />
+          )}
+        </div>
+        <div className="flex items-start justify-between gap-5 py-5">
+          <div>
+            <h3 className="text-sm font-semibold">Follow-up sequences</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Send due steps from your enrolled sequences. When off, save those
+              messages for review.
+            </p>
+            <Link
+              href={`/s/${slug}/automations`}
+              className="mt-2 inline-flex text-sm font-medium text-brand"
+            >
+              Manage follow-ups →
+            </Link>
+          </div>
+          <Switch
+            aria-label="Send sequence follow-ups automatically"
+            disabled={saving}
+            checked={settings.autonomyLevel === 'autonomous'}
+            onCheckedChange={(value) =>
+              void save({
+                autonomyLevel: value ? 'autonomous' : 'draft_required',
+              })
+            }
+          />
+        </div>
+        <div className="py-5">
+          <h3 className="text-sm font-semibold">Your saved automations</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Each automation follows its own sending policy and schedule. An
+            explicit send instruction runs automatically; an explicit draft
+            instruction creates a draft.
+          </p>
+          <Link
+            href={`/s/${slug}/automations#workflows`}
+            className="mt-2 inline-flex text-sm font-medium text-brand"
+          >
+            Review active automations →
+          </Link>
+        </div>
+        <div className="py-5">
+          <h3 className="text-sm font-semibold">Tasks you give Chippi</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Chippi carries out the actions you request. Use Review changes in a
+            task when you want to approve each change.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {BUDGET_PRESETS.map((preset) => (
-            <button
-              key={preset.value}
-              onClick={() => {
-                setSettings({ ...settings, dailyTokenBudget: preset.value });
-                void saveField({ dailyTokenBudget: preset.value }, 'budget');
-              }}
+      </section>
+      <section className="rounded-lg border border-border p-5">
+        <div className="flex items-start justify-between gap-5">
+          <div>
+            <h3 className="text-sm font-semibold">Background review</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Look for leads and follow-ups that need attention. This controls
+              the periodic review, separate from the sending policies above.
+            </p>
+          </div>
+          <Switch
+            aria-label="Enable periodic background review"
+            disabled={saving}
+            checked={settings.enabled}
+            onCheckedChange={(value) => void save({ enabled: value })}
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={running || !settings.enabled}
+            onClick={() => void runNow()}
+          >
+            {running ? (
+              <Loader2 size={14} className="mr-2 animate-spin" />
+            ) : (
+              <Play size={14} className="mr-2" />
+            )}
+            Review now
+          </Button>
+          <Link
+            href={`/s/${slug}/chippi/activity`}
+            className="text-sm font-medium text-brand"
+          >
+            Activity →
+          </Link>
+          {lastActivity && (
+            <span className="text-xs text-muted-foreground">
+              Last recorded activity {timeAgo(lastActivity)}
+            </span>
+          )}
+        </div>
+        {runResult && (
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            {runResult}
+          </p>
+        )}
+      </section>
+      <div className="flex flex-wrap gap-5 text-sm font-medium text-brand">
+        <Link href={`/s/${slug}/chippi/integrations`}>
+          Manage connected apps →
+        </Link>
+        <Link href={`/s/${slug}/chippi/inbox`}>Review waiting messages →</Link>
+      </div>
+      <details className="rounded-lg border border-border p-5">
+        <summary className="cursor-pointer text-sm font-medium">
+          Background review budget
+        </summary>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Daily token limit for the periodic review. Chat and saved automations
+          use your workspace credits.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[10000, 25000, 50000, 100000].map((value) => (
+            <Button
+              key={value}
+              variant={
+                settings.dailyTokenBudget === value ? 'default' : 'outline'
+              }
+              size="sm"
               disabled={saving}
-              className={cn(
-                'flex flex-col items-center px-4 py-2.5 rounded-lg border text-sm transition-all',
-                settings.dailyTokenBudget === preset.value
-                  ? 'border-foreground/30 bg-foreground/[0.06] text-foreground font-semibold'
-                  : 'border-border/70 bg-card text-foreground hover:bg-foreground/[0.04]',
-              )}
+              onClick={() => void save({ dailyTokenBudget: value })}
             >
-              <span className="font-bold">{preset.label}</span>
-              <span className="text-[11px] text-muted-foreground mt-0.5">{preset.desc}</span>
-            </button>
+              {value.toLocaleString()} tokens
+            </Button>
           ))}
         </div>
-        {savedField === 'budget' && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1"><CheckCircle2 size={11} /> Saved</p>
-        )}
-      </div>
-
-      <AlertDialog open={showDisableConfirm} onOpenChange={setShowDisableConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pause me?</AlertDialogTitle>
-            <AlertDialogDescription>
-              I&apos;ll stop everything I&apos;m doing on my own. Turn me back on whenever you want.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep enabled</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setSettings({ ...settings, enabled: false });
-                void saveField({ enabled: false }, 'enabled');
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Yes, pause
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      </details>
     </div>
   );
 }

@@ -837,7 +837,7 @@ function YourToursPanel({
                     <p className="text-xs text-muted-foreground">{tour.propertyAddress}</p>
                   )}
                   {tour.notes && (
-                    <p className="text-xs text-muted-foreground italic leading-relaxed">
+                    <p className="text-xs text-muted-foreground not-italic leading-relaxed">
                       {tour.notes}
                     </p>
                   )}

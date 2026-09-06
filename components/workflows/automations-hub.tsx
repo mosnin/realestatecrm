@@ -42,8 +42,8 @@ export function AutomationsHub() {
       <div role="tablist" aria-label="Automation type" className="flex items-center gap-6 border-b border-border/70">
         {(
           [
-            { value: 'when' as const, label: 'When something happens', hint: 'A lead, a reply, a deal moving' },
-            { value: 'schedule' as const, label: 'On a schedule', hint: 'Morning prep, weekday follow-up' },
+            { value: 'when' as const, label: 'Automations', hint: 'Leads, replies, deals and scheduled work' },
+            { value: 'schedule' as const, label: 'Scheduled reviews', hint: 'Existing routines that prepare work' },
           ] as const
         ).map((item) => {
           const active = tab === item.value;

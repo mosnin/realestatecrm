@@ -171,9 +171,10 @@ describe('runAutonomousInstruction', () => {
 
     const res = await runAutonomousInstruction({ spaceId: 'space_1', instruction: 'Email Jane' });
 
-    expect(res.ok).toBe(true);
+    expect(res.ok).toBe(false)
+    expect(res.outcome).toBe('needs_attention');
     expect(res.ran).toBe(true);
-    expect(res.summary).toMatch(/pending approvals/i);
+    expect(res.summary).toMatch(/needs your attention/i);
   });
 
   it('returns ok:false / ran:false when the space cannot be resolved', async () => {

@@ -24,8 +24,8 @@ import {
 } from '@/lib/typography';
 
 describe('typography — brand-orange exclusivity', () => {
-  it('puts orange ONLY on the Chippi pill among the action pills', () => {
-    expect(CHIPPI_PILL).toContain('orange');
+  it('uses the shared brand token on the Chippi action', () => {
+    expect(CHIPPI_PILL).toContain('brand');
     expect(PRIMARY_PILL).not.toContain('orange');
     expect(GHOST_PILL).not.toContain('orange');
     expect(QUIET_LINK).not.toContain('orange');
@@ -62,12 +62,12 @@ describe('typography — the ladder', () => {
     expect(BODY_COMPACT).toBe(BODY);
   });
 
-  it('puts page titles and stats on the serif face, section heads on the UI sans', () => {
+  it('uses sans-serif for titles, stats and section headings', () => {
     expect(H1).toContain('font-title');
     expect(STAT_NUMBER).toContain('font-title');
     expect(H2).toContain('font-heading');
     expect(H3).toContain('font-heading');
-    expect(FONT_SERIF_STACK).toMatch(/Times New Roman/);
+    expect(FONT_SERIF_STACK).toBe(FONT_SANS_STACK);
     expect(FONT_SANS_STACK).toMatch(/SF Pro Text|system-ui/);
   });
 });
