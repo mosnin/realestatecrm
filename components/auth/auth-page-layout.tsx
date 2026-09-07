@@ -52,7 +52,7 @@ export function AuthPageLayout({ children, heading, subheading, variant: _varian
 
         <Link href={localizedPath('/', lang)} className="relative z-10 flex items-center gap-2" aria-label="Chippi home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-white.png" alt="Chippi" className="h-7 w-auto" />
+          <img src="/brand/chippi-wordmark.png" alt="Chippi" className="brightness-0 invert h-7 w-auto" />
         </Link>
 
         <div className="relative z-10">

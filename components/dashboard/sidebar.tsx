@@ -318,7 +318,7 @@ function FlatNavItem({
   isActive: boolean;
   badge?: React.ReactNode;
   /**
-   * When true the item renders the chip avatar (chip-avatar.png) instead of
+   * When true the item uses a text-only Chippi label instead of
    * the icon — matches the realtor sidebar's top-pinned Chippi treatment.
    * Use for the broker's Chippi nav entry only.
    */
@@ -339,12 +339,8 @@ function FlatNavItem({
       style={{ willChange: 'transform' }}
     >
       {isAI ? (
-        /* Chip avatar — same 16×16 rounded-full as the realtor Chippi row */
-        <img
-          src="/chip-avatar.png"
-          alt=""
-          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-        />
+        /* Agent branding uses text only. */
+        null
       ) : (
         <Icon
           size={15}

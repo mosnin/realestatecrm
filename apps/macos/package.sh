@@ -10,9 +10,9 @@ cp Info.plist "$APP/Contents/Info.plist"
 ICONSET="$PWD/.build/Chippi.iconset"
 mkdir -p "$ICONSET"
 for SIZE in 16 32 128 256 512; do
-    sips -z "$SIZE" "$SIZE" ../../public/favicon.png --out "$ICONSET/icon_${SIZE}x${SIZE}.png" >/dev/null
+    sips -z "$SIZE" "$SIZE" ../../public/brand/chippi-cookie.png --out "$ICONSET/icon_${SIZE}x${SIZE}.png" >/dev/null
     DOUBLE=$((SIZE * 2))
-    sips -z "$DOUBLE" "$DOUBLE" ../../public/favicon.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
+    sips -z "$DOUBLE" "$DOUBLE" ../../public/brand/chippi-cookie.png --out "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Chippi.icns"
 # Local ad-hoc signature. Customer distribution requires Developer ID + notarization.

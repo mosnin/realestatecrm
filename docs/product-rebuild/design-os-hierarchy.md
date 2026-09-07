@@ -63,3 +63,18 @@ provider QA; a successful native build does not establish those outcomes.
   provider connections and distribution signing/notarization remain unverified.
 - No production deployment or backend changes in this pass. The Mac app uses the
   deployed website; this branch's UI appears there only after web deployment.
+
+## Brand asset follow-up
+
+At the user's request, brand placement now uses a text-only Chippi wordmark.
+Image edits derived a standalone wordmark and cookie from the original logo;
+`public/brand` holds those assets and a 1200×630 text-only social card. The cookie
+replaces the orange-bordered favicon, legacy avatar image and Mac bundle icon.
+Chippi chat rows and agent branding use text instead of the orb/avatar icon.
+
+This intentionally supersedes the earlier byte-for-byte marketing preservation
+receipt only for the requested logo images and social metadata. Marketing page
+composition, copy and styling remain otherwise unchanged. Open Graph and Twitter
+serve the same local PNG without remote font dependencies. The social route test,
+typecheck and targeted lint passed (existing image/ignored-file warnings remain).
+The Mac bundle was rebuilt and signature-verified with the updated icon.

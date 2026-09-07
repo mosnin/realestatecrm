@@ -192,7 +192,7 @@ export function SiteHeader({ lang = 'en' }: { lang?: Lang }) {
             >
               <Link href={homeHref} aria-label="Chippi home" className="flex items-center px-3 py-2.5" onClick={closeAll}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
+                <img src="/brand/chippi-wordmark.png" alt="Chippi" width={2055} height={765} className="brightness-0 invert h-5 w-auto" />
               </Link>
               <nav className="hidden items-center gap-0.5 lg:flex">
                 <NavTrigger menu="product" />
@@ -336,7 +336,7 @@ export function SiteHeader({ lang = 'en' }: { lang?: Lang }) {
               <div className="flex h-16 items-center justify-between px-5 pt-3">
                 <Link href={homeHref} className="flex items-center" onClick={closeAll}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="h-5 w-auto" />
+                  <img src="/brand/chippi-wordmark.png" alt="Chippi" width={2055} height={765} className="brightness-0 invert h-5 w-auto" />
                 </Link>
                 <button
                   type="button"

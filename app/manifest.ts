@@ -33,13 +33,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#0c0c0d',
     icons: [
       {
-        src: '/chip-avatar.png',
+        src: '/brand/chippi-cookie.png',
         sizes: 'any',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/chip-avatar.png',
+        src: '/brand/chippi-cookie.png',
         sizes: 'any',
         type: 'image/png',
         purpose: 'maskable',

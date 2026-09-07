@@ -22,10 +22,12 @@ export const metadata: Metadata = {
     title: 'Chippi — AI Lead Conversion Teammate for Real Estate',
     description: 'Turn more real estate leads into booked tours. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
     siteName: 'Chippi',
+    images: [{ url: '/brand/chippi-social.png', width: 1200, height: 630, alt: 'Chippi' }],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
+    images: ['/brand/chippi-social.png'],
     title: 'Chippi — AI Lead Conversion Teammate for Real Estate',
     description: 'Turn more real estate leads into booked tours. Chippi reads, ranks, drafts, books, and keeps your CRM current.',
   },
@@ -35,9 +37,9 @@ export const metadata: Metadata = {
     title: 'Chippi',
   },
   icons: {
-    icon: '/chip-avatar.png',
-    apple: '/chip-avatar.png',
-    shortcut: '/chip-avatar.png',
+    icon: '/brand/chippi-cookie.png',
+    apple: '/brand/chippi-cookie.png',
+    shortcut: '/brand/chippi-cookie.png',
   },
 };
 

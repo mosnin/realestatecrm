@@ -25,16 +25,10 @@ import {
   CalendarCheck,
   KanbanSquare,
 } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { CircuitBoard } from "@/components/ui/circuit-board";
 
-/* The core node is the Chippi brand mark itself (not a generic glyph) so the
-   diagram reads as "everything flows through Chippi" at a glance. The square
-   512×512 favicon is the mark; it keeps its own brand color inside the
-   otherwise-monochrome board. */
-const ChippiMark = () => (
-  // eslint-disable-next-line @next/next/no-img-element
-  <img src="/favicon.png" alt="Chippi" width={512} height={512} className="h-7 w-7 rounded-md" />
-);
+const ChippiMark = () => <BrandLogo className="h-4" />;
 
 const NODES = [
   // Inputs — where business actually arrives from.

@@ -8,9 +8,9 @@ export { default } from './opengraph-image';
 
 // Next.js statically analyzes metadata route config and cannot follow
 // re-exports for these fields. Keep the literals in this file so the Twitter
-// image uses the intended edge runtime without emitting a production-build
+// image uses the intended Node runtime without emitting a production-build
 // warning. A contract test keeps these values aligned with opengraph-image.
-export const runtime = 'edge';
-export const alt = 'Chippi · AI lead conversion teammate for real estate';
+export const runtime = 'nodejs';
+export const alt = 'Chippi';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';

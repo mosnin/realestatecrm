@@ -71,11 +71,7 @@ export function SidebarNavItem({
   const linkContent = (
     <>
       {item.isAI ? (
-        <img
-          src="/chip-avatar.png"
-          alt=""
-          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-        />
+        collapsed ? <span className="text-[9px] font-medium">Chippi</span> : null
       ) : (
         <Icon
           size={15}

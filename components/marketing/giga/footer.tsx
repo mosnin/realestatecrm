@@ -57,9 +57,9 @@ export function SiteFooter({ lang = 'en' }: { lang?: Lang }) {
                 the corresponding audit or attestation can be linked publicly. */}
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-black.png" alt="Chippi" width={512} height={171} className="h-5 w-auto dark:hidden" />
+              <img src="/brand/chippi-wordmark.png" alt="Chippi" width={2055} height={765} className="h-5 w-auto dark:hidden" />
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-white.png" alt="Chippi" width={512} height={171} className="hidden h-5 w-auto dark:block" />
+              <img src="/brand/chippi-wordmark.png" alt="Chippi" width={2055} height={765} className="brightness-0 invert hidden h-5 w-auto dark:block" />
               <span style={MONO} className="mt-6 flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-400 dark:text-white/40">
                 <span aria-hidden className="inline-block size-1.5 rounded-full bg-emerald-500" />
                 {copy.control}

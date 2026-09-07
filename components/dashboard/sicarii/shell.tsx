@@ -202,10 +202,10 @@ function DockNavButton({
             style={{ width: iconSize, height: iconSize }}
             className="flex"
           >
-            <Icon
+            {item.label === 'Chippi' ? <span className="self-center text-[10px] font-medium">Chippi</span> : <Icon
               className="h-full w-full"
               strokeWidth={item.accent ? 2.4 : 2}
-            />
+            />}
           </motion.span>
         </motion.span>
 
@@ -426,10 +426,10 @@ function SidebarItem({
           aria-current={active ? "page" : undefined}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Icon
+          {item.label !== 'Chippi' && <Icon
             className="h-[18px] w-[18px] shrink-0"
             strokeWidth={active ? 2.2 : 1.8}
-          />
+          />}
           <span className="truncate">{item.label}</span>
           {active && (
             <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
@@ -628,9 +628,9 @@ function MobileBottomNav({
                       : "text-muted-foreground",
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={item.accent ? 2.4 : 2} />
+                {item.label === 'Chippi' ? <span className="text-[10px] font-medium">Chippi</span> : <Icon className="h-5 w-5" strokeWidth={item.accent ? 2.4 : 2} />}
               </span>
-              <span className="text-[10px] font-medium text-muted-foreground">
+              <span className={item.label === 'Chippi' ? 'sr-only' : 'text-[10px] font-medium text-muted-foreground'}>
                 {item.label}
               </span>
             </Link>

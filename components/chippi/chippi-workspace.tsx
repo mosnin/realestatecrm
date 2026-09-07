@@ -30,7 +30,7 @@ import {
 import { Transcript } from '@/components/ai/blocks/transcript';
 import { SuggestedActions } from '@/components/ai/blocks/suggested-actions';
 import { ThinkingIndicator } from '@/components/ai/blocks/thinking-indicator';
-import { ThinkingOrb, type OrbState } from 'thinking-orbs';
+import { BrandLogo } from '@/components/brand-logo';
 import { useAgentTask, type UiMessage, type ChatMode } from '@/components/ai/hooks/use-agent-task';
 import { getTurn, consumeFinishedTurn, turnKey } from '@/components/ai/hooks/turn-runner';
 import { blocksFromLegacyContent, type MessageBlock, type ToolCallBlock } from '@/lib/ai-tools/blocks';
@@ -1584,17 +1584,6 @@ export function ChippiWorkspace({
     reduceMotion,
   });
 
-  // Live state for Chippi's orb avatar, read from what the turn is doing right
-  // now: running a tool or executing a plan reads as "solving" (energetic);
-  // streaming/reasoning with nothing concrete yet is "working" (the thinking
-  // read); idle between turns is "listening". Settled history rows freeze the
-  // orb via `paused`.
-  const orbState: OrbState = useMemo(() => {
-    if ((liveCallIds && liveCallIds.size > 0) || activePlan) return 'solving';
-    if (turnActive || recoveringTurn) return 'working';
-    return 'listening';
-  }, [liveCallIds, activePlan, turnActive, recoveringTurn]);
-
   // Reusable input — shared between the empty hero and the docked footer
   // so the focal point lives wherever it should. The `/` skills menu lives
   // inside ChippiPromptBox itself.
@@ -2016,14 +2005,7 @@ export function ChippiWorkspace({
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         >
-                          {/* mt-[3px] centers the 20px orb on the first text
-                              line (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
-                          <ThinkingOrb
-                            state={msg.streaming && turnActive ? orbState : 'listening'}
-                            paused={!(msg.streaming && turnActive)}
-                            size={20}
-                            className="mt-[3px]"
-                          />
+                          <BrandLogo className="mt-1 h-4" />
                           <div className="flex-1 min-w-0 pt-0.5 space-y-3">
                             {shouldShowInlineWorkActivity({
                               chatMode,
