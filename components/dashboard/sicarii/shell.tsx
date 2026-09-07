@@ -199,10 +199,10 @@ function DockNavButton({
           transition={MORPH_SPRING}
         >
           <motion.span
-            style={{ width: iconSize, height: iconSize }}
+            style={{ width: item.label === "Chippi" ? 36 : iconSize, height: iconSize }}
             className="flex"
           >
-            {item.label === 'Chippi' ? <span className="self-center text-[10px] font-medium">Chippi</span> : <Icon
+            {item.label === 'Chippi' ? <BrandLogo className="h-3 self-center" /> : <Icon
               className="h-full w-full"
               strokeWidth={item.accent ? 2.4 : 2}
             />}
@@ -430,7 +430,7 @@ function SidebarItem({
             className="h-[18px] w-[18px] shrink-0"
             strokeWidth={active ? 2.2 : 1.8}
           />}
-          <span className="truncate">{item.label}</span>
+          <span className="truncate">{item.label === "Chippi" ? <BrandLogo className="h-5" /> : item.label}</span>
           {active && (
             <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
           )}
@@ -628,7 +628,7 @@ function MobileBottomNav({
                       : "text-muted-foreground",
                 )}
               >
-                {item.label === 'Chippi' ? <span className="text-[10px] font-medium">Chippi</span> : <Icon className="h-5 w-5" strokeWidth={item.accent ? 2.4 : 2} />}
+                {item.label === 'Chippi' ? <BrandLogo className="h-3" /> : <Icon className="h-5 w-5" strokeWidth={item.accent ? 2.4 : 2} />}
               </span>
               <span className={item.label === 'Chippi' ? 'sr-only' : 'text-[10px] font-medium text-muted-foreground'}>
                 {item.label}
@@ -805,7 +805,7 @@ function Launchpad({ open, onClose }: { open: boolean; onClose: () => void }) {
                         </div>
                         <div>
                           <h3 className="font-brand text-2xl text-foreground">
-                            {tile.label}
+                            {tile.label === 'Chippi' ? <BrandLogo className="h-7" /> : tile.label}
                           </h3>
                           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                             {tile.description}

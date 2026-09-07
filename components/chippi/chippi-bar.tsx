@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Send, Square, X, ArrowUpRight, MessageCircle, Mic } from 'lucide-react';
+import { Send, Square, X, ArrowUpRight, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { countLabel } from '@/lib/formatting';
 import { CHIPPI_BAR_MAX } from '@/lib/geometry';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Transcript } from '@/components/ai/blocks/transcript';
-import { ThinkingOrb, type OrbState } from 'thinking-orbs';
+import { BrandLogo } from '@/components/brand-logo';
 import { ThinkingBar } from '@/components/ai/prompt-kit';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
 import { getAnyLiveTurn } from '@/components/ai/hooks/turn-runner';
@@ -257,12 +257,6 @@ export function ChippiBar({ slug }: Props) {
   // creation round-trip on a fresh thread. Same derivation as the workspace.
   const turnActive = isStreaming || Boolean(tailMessage?.streaming);
 
-  // Orb avatar state from what the mini-chat is doing (mirrors chippi-workspace).
-  const orbState: OrbState = useMemo(() => {
-    if (liveCallIds && liveCallIds.size > 0) return 'solving';
-    if (turnActive) return 'working';
-    return 'listening';
-  }, [liveCallIds, turnActive]);
   const showThinking =
     turnActive && tailMessage?.role === 'assistant' && tailMessage.blocks.length === 0;
 
@@ -302,8 +296,7 @@ export function ChippiBar({ slug }: Props) {
         >
           <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
-              Chippi
+              <BrandLogo className="h-4" />
             </div>
             <div className="flex items-center gap-1">
               <Link
@@ -344,14 +337,7 @@ export function ChippiBar({ slug }: Props) {
                 if (msg.role === 'assistant') {
                   return (
                     <div key={msg.id} className="flex gap-2.5">
-                      {/* mt-[3px] centers the 20px orb on the first text line
-                          (pt-0.5 + text-sm leading-relaxed ≈ 23px). */}
-                      <ThinkingOrb
-                        state={msg.streaming && turnActive ? orbState : 'listening'}
-                        paused={!(msg.streaming && turnActive)}
-                        size={20}
-                        className="mt-[3px]"
-                      />
+                      <BrandLogo className="mt-1 h-4" />
                       <div className="flex-1 min-w-0 pt-0.5">
                         <Transcript
                           blocks={msg.blocks}
@@ -389,7 +375,7 @@ export function ChippiBar({ slug }: Props) {
 
               {showThinking && (
                 <div className="flex items-center gap-2.5">
-                  <ThinkingOrb state={orbState} size={20} />
+                  <BrandLogo className="h-4" />
                   {/* Shimmering "Thinking…" line — same indicator the full
                       workspace uses, not blinking dots. */}
                   <ThinkingBar label="Thinking…" />
@@ -426,7 +412,7 @@ export function ChippiBar({ slug }: Props) {
           'pl-4 pr-1.5 py-1.5 shadow-lg',
         )}
       >
-        <MessageCircle size={13} className="text-muted-foreground/80 flex-shrink-0" />
+        <BrandLogo className="h-4" />
         <input
           ref={inputRef}
           id="chippi-bar-input"

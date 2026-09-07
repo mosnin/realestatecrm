@@ -78,3 +78,10 @@ composition, copy and styling remain otherwise unchanged. Open Graph and Twitter
 serve the same local PNG without remote font dependencies. The social route test,
 typecheck and targeted lint passed (existing image/ignored-file warnings remain).
 The Mac bundle was rebuilt and signature-verified with the updated icon.
+
+Brand placement completion: the shared text wordmark is now used in the main
+sidebar/header, Chippi navigation entries (sidebar, dock, mobile and Apps), full
+chat assistant rows, compact chat header/composer/assistant rows, agent controls,
+authentication/onboarding and existing marketing logo positions. The standalone
+cookie remains reserved for favicon/install/Mac icons. The social asset is used
+by the root metadata plus the marketing Open Graph/Twitter routes.
