@@ -157,12 +157,12 @@ function AssignControl({ property, members, onAssigned }: AssignControlProps) {
   return (
     <div
       className="flex items-center gap-1.5 flex-shrink-0"
-      onClick={(e) => e.stopPropagation()}
     >
       {saving && (
-        <Loader2 size={11} className="animate-spin text-muted-foreground" aria-hidden />
+        <Loader2 size={11} className="animate-spin motion-reduce:animate-none text-muted-foreground" aria-hidden />
       )}
       <select
+        onClick={(event) => event.stopPropagation()}
         value={property.assignedSpaceId ?? ''}
         onChange={handleChange}
         disabled={saving}
@@ -504,7 +504,7 @@ function AddPropertyForm({ members, onCreated, onCancel }: AddPropertyFormProps)
             size="sm"
             disabled={submitting || !v.address.trim()}
           >
-            {submitting && <Loader2 className="animate-spin" />}
+            {submitting && <Loader2 className="animate-spin motion-reduce:animate-none" />}
             Add to pool
           </Button>
         </div>

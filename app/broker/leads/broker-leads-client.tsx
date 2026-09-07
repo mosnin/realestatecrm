@@ -317,12 +317,14 @@ function LeadNotes({ contactId }: { contactId: string }) {
         <button
           type="button"
           disabled={saving}
+          aria-label={saving ? "Saving note" : "Save note"}
+          aria-busy={saving}
           onClick={() => {
             if (textareaRef.current) handleAddNote(textareaRef.current.value);
           }}
           className={cn(PRIMARY_PILL, 'self-end h-8 px-3 text-xs disabled:opacity-50')}
         >
-          {saving ? <Loader2 size={12} className="animate-spin" /> : 'Save'}
+          {saving ? <Loader2 size={12} className="animate-spin motion-reduce:animate-none" /> : 'Save'}
         </button>
       </div>
       <p className="text-[10px] text-muted-foreground">⌘+Enter to save</p>
@@ -690,7 +692,7 @@ function AssignedRow({
               disabled={unassigning}
               className={cn(PRIMARY_PILL, 'disabled:opacity-50')}
             >
-              {unassigning ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+              {unassigning ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <UserMinus size={14} />}
               Pull back
             </button>
           </DialogFooter>

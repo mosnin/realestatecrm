@@ -420,7 +420,15 @@ export default async function BrokerBriefPage() {
   );
 
   if (('error' in applicationCountRes && applicationCountRes.error) || ('error' in leadCountRes && leadCountRes.error)) {
-    return <div data-broker-premium-page="brief" role="alert">Lead ownership could not be checked. Refresh to load the team dashboard.</div>;
+    return (
+      <section data-broker-premium-page="brief" className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+        <div role="alert" className="rounded-xl border border-border bg-card p-6">
+          <h1 className="text-lg font-semibold">Lead ownership could not be checked</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Reload to try loading the team dashboard again.</p>
+          <a href="/broker/brief" className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Reload</a>
+        </div>
+      </section>
+    );
   }
 
   const pendingInvitations = (invitationsRes.data ?? []) as Array<{
@@ -531,7 +539,7 @@ export default async function BrokerBriefPage() {
             className="inline-flex items-center gap-1 text-sm font-medium text-foreground hover:underline"
           >
             Open settings
-            <ArrowRight size={12} />
+            <ArrowRight size={12} aria-hidden="true" />
           </Link>
         </section>
       )}
