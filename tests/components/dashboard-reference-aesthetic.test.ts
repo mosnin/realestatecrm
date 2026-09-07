@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceShell } from "@/components/dashboard/sicarii/workspace-shell";
 import { realtorNavItems } from "@/lib/nav-items";
+type SidebarEntry = {href:string;label:string;subItems?:SidebarEntry[]};
+const navigation = vi.hoisted(() => ({groups:[] as {label:string;items:SidebarEntry[]}[]}));
 const path = vi.hoisted(() => ({ current: "/s/oak/chippi/brief" }));
 vi.mock("next/navigation", () => ({ usePathname: () => path.current }));
 vi.stubGlobal("React", React);
@@ -13,15 +15,18 @@ vi.mock("@/components/theme-provider", () => ({
 // Inspect the adapter's rendered destinations independently of motion/browser layout.
 vi.mock("@/components/dashboard/sicarii/shell", () => ({
   SicariiShell: ({
+    sidebarGroups,
     items,
     allItems,
     children,
   }: {
+    sidebarGroups: {label:string;items:SidebarEntry[]}[];
     items: { href: string; label: string }[];
     allItems: { href: string; label: string }[];
     children: React.ReactNode;
-  }) =>
-    React.createElement(
+  }) => {
+    navigation.groups = sidebarGroups;
+    return React.createElement(
       React.Fragment,
       null,
       items.map((i) =>
@@ -35,7 +40,8 @@ vi.mock("@/components/dashboard/sicarii/shell", () => ({
         React.createElement("a", { key: i.href, href: i.href }, i.label),
       ),
       children,
-    ),
+    );
+  },
 }));
 function render(role?: string) {
   return renderToStaticMarkup(
@@ -78,4 +84,24 @@ describe("Sicarii navigation preserves Chippi features", () => {
     expect(html).not.toContain('href="/broker/billing"');
     expect(html).not.toContain('href="/broker/settings/auto-assignment"');
   });
+  it('groups every personal destination without duplicating top-level subpages', () => {
+    path.current = '/s/oak/chippi/brief'; render();
+    expect(navigation.groups.map(group=>group.label)).toEqual(['Daily work','Business','Workspace']);
+    const roots=navigation.groups.flatMap(group=>group.items);
+    const links=roots.flatMap(item=>[item,...(item.subItems??[])]);
+    for(const item of realtorNavItems){
+      expect(links.map(link=>link.href)).toContain(`/s/oak${item.href}`);
+      for(const child of item.children??[])expect(links.map(link=>link.href)).toContain(`/s/oak${child.href}`);
+    }
+    expect(roots[0]).toMatchObject({label:'Today',href:'/s/oak/chippi/brief'});
+    expect(roots.find(item=>item.label==='Chippi')?.subItems?.some(item=>item.href==='/s/oak/chippi/brief')).toBe(false);
+  });
+  it('gives brokerage Today its own canonical label and icon position', () => {
+    path.current='/broker/brief';render('broker_owner');
+    expect(navigation.groups[0].items[0]).toMatchObject({label:'Today',href:'/broker/brief'});
+    const links=navigation.groups.flatMap(group=>group.items.flatMap(item=>[item,...(item.subItems??[])]));
+    expect(links.filter(item=>item.href==='/broker/brief')).toHaveLength(1);
+    expect(links.some(item=>item.href==='/broker/settings/auto-assignment')).toBe(true);
+  });
+
 });

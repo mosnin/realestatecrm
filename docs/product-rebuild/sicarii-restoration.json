@@ -5,12 +5,12 @@
   "existing_authenticated_pages": 134,
   "missing_authenticated_pages": [],
   "sicarii_source_commit": "7922be8b22e6f7cd3e6041ddecfeceac8f0a4414",
-  "ascii_matches_source": true,
-  "browser_verification": "blocked: Mac locked; no visual fidelity claim",
+  "ascii_matches_source": false,
+  "browser_verification": "Passed bounded Chromium browser audit with synthetic APIs: eight screen components, desktop, dark mode and 390px mobile; live auth/providers unverified",
   "production_deployment": "not performed",
   "local_checks": {
     "vitest": {
-      "passed": 6604,
+      "passed": 6606,
       "skipped": 7,
       "files": 758
     },
@@ -18,7 +18,11 @@
     "lint": "pass with image warnings",
     "repository_contracts": 52,
     "tenant_scope_audit": "pass: 937 files, 127 tables",
-    "production_build": "pass using committed synthetic fixture environment; no provider verification",
+    "production_build": "Prior restoration fed234f9 passed with synthetic fixture credentials. Current follow-up verified by typecheck and runtime browser compilation; remote build pending.",
     "build_recovery": "final build first hit ENOSPC; removed only this checkout generated .next/cache and clean retry exited 0"
-  }
+  },
+  "ascii_source_adaptation": "Animation preserved; palette changed from blue to orange at user request",
+  "application_accent": "#ff964f",
+  "sidebar": "256px grouped navigation, daily work first, collapsible children, neutral background, compact account footer; desktop default with dock option",
+  "font_correction": "Replaced static heavy font files with actual Inter and Space Grotesk variable fonts"
 }

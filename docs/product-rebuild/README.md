@@ -1,4 +1,4 @@
-> UI correction: the simplified presentation and earlier screenshots are superseded by the [Sicarii source restoration](sicarii-restoration.md). Public pages are restored to `75113c0d`; rendered visual acceptance is still pending.
+> UI correction: the simplified presentation and earlier screenshots are superseded by the [Sicarii source restoration](sicarii-restoration.md). Public pages are restored to `75113c0d`; the orange sidebar and bounded browser audit are documented there; live provider acceptance remains pending.
 
 # Chippi: a daily desk that does the work
 

@@ -14,7 +14,7 @@ import {
   Gift,
   LifeBuoy,
 } from "lucide-react";
-import { SicariiShell, type SicariiNavItem } from "./shell";
+import { SicariiShell, type SidebarGroup, type SicariiNavItem } from "./shell";
 import {
   realtorNavItems,
   secondaryNavItems,
@@ -127,6 +127,9 @@ export function WorkspaceShell({
         .flatMap((s) => s.items)
         .filter((i) => !i.adminOnly || brokerAdmin)
     : [...realtorNavItems, ...secondaryNavItems];
+  const primaryCatalogHrefs = new Set(
+    catalog.map((item) => `${base}${item.href}`),
+  );
   const allItems: SicariiNavItem[] = [];
   for (const item of catalog) {
     const href = `${base}${item.href}`;
@@ -143,7 +146,10 @@ export function WorkspaceShell({
     if ("children" in item)
       for (const child of item.children ?? []) {
         const childHref = `${base}${child.href}`;
-        if (!allItems.some((i) => i.href === childHref))
+        if (
+          !primaryCatalogHrefs.has(childHref) &&
+          !allItems.some((i) => i.href === childHref)
+        )
           allItems.push({
             ...child,
             href: childHref,
@@ -224,13 +230,141 @@ export function WorkspaceShell({
     const item = allItems.find((i) => i.href === href);
     return item ? [item] : [];
   });
+  const parentItems: SicariiNavItem[] = catalog.map((item) => {
+    const parent = allItems.find((row) => row.href === `${base}${item.href}`)!;
+    const subItems = (item.children ?? [])
+      .filter((child) => !primaryCatalogHrefs.has(`${base}${child.href}`))
+      .map((child) => ({
+        ...child,
+        href: `${base}${child.href}`,
+        icon: item.icon,
+      }));
+    return { ...parent, subItems };
+  });
+  const group = (label: string, paths: string[]): SidebarGroup => ({
+    label,
+    items: paths.flatMap((path) =>
+      parentItems.filter((item) => item.href === `${base}${path}`),
+    ),
+  });
+  const sidebarGroups: SidebarGroup[] = broker
+    ? brokerAdmin
+      ? [
+          group("Daily work", [
+            "/broker/brief",
+            "/broker/chippi",
+            "/broker/floor",
+            "/broker/leads",
+            "/broker/deals",
+            "/broker/messages",
+          ]),
+          group("Team", [
+            "/broker/realtors",
+            "/broker/people",
+            "/broker/properties",
+            "/broker/templates",
+            "/broker/leaderboard",
+          ]),
+          group("Performance", [
+            "/broker/pipeline",
+            "/broker/forecast",
+            "/broker/analytics",
+            "/broker/profitability",
+          ]),
+          group("Workspace", [
+            "/broker/settings",
+            "/broker/agent-activity",
+            "/broker/routines",
+            "/broker/usage",
+            "/broker/import-export",
+          ]),
+        ]
+      : [
+          group("My work", [
+            "/broker/brief",
+            "/broker/my-leads",
+            "/broker/messages",
+          ]),
+          group("Team resources", ["/broker/templates", "/broker/leaderboard"]),
+        ]
+    : [
+        {
+          label: "Daily work",
+          items: primaryPaths
+            .filter((href) => !href.endsWith("/properties"))
+            .flatMap((href) =>
+              parentItems.filter((item) => item.href === href),
+            ),
+        },
+        {
+          label: "Business",
+          items: [
+            `${base}/properties`,
+            `${base}/follow-through`,
+            `${base}/automations`,
+            `${base}/files`,
+          ].flatMap((href) => {
+            const item =
+              parentItems.find((row) => row.href === href) ??
+              allItems.find((row) => row.href === href);
+            return item
+              ? [
+                  {
+                    ...item,
+                    label: href.endsWith("/follow-through")
+                      ? "Follow-through"
+                      : item.label,
+                  },
+                ]
+              : [];
+          }),
+        },
+        {
+          label: "Workspace",
+          items: parentItems
+            .filter((item) =>
+              ["/profile-page", "/intake", "/settings"].some(
+                (path) => item.href === `${base}${path}`,
+              ),
+            )
+            .map((item) =>
+              item.href === `${base}/settings`
+                ? {
+                    ...item,
+                    subItems: [
+                      ...(item.subItems ?? []),
+                      ...allItems.filter((row) =>
+                        ["/billing", "/affiliate", "/support"].some(
+                          (path) => row.href === `${base}${path}`,
+                        ),
+                      ),
+                    ],
+                  }
+                : item,
+            ),
+        },
+      ];
+  const groupedHrefs = new Set(
+    sidebarGroups.flatMap((section) => section.items.map((item) => item.href)),
+  );
+  const remainingItems = parentItems.filter(
+    (item) => !groupedHrefs.has(item.href),
+  );
+  if (remainingItems.length)
+    sidebarGroups.push({ label: "More tools", items: remainingItems });
+  const extraItems = allItems.filter(
+    (item) =>
+      ["/admin", "/broker"].includes(item.href) &&
+      !parentItems.some((parent) => parent.href === item.href),
+  );
+  if (extraItems.length)
+    sidebarGroups.push({ label: "Switch workspace", items: extraItems });
   const home = broker ? "/broker/brief" : `${base}/chippi/brief`;
   const utilities = (
     <>
-      <ConversationHistory slug={slug} broker={broker} />
       <div className="sicarii-workspace max-w-44 min-w-0">
         <WorkspaceSwitcher
-          currentName={spaceName}
+          currentName={broker ? brokerageMemberships[0]?.name ?? spaceName : spaceName}
           currentSubtitle={broker ? "Brokerage" : "Workspace"}
           currentIcon={broker ? Building2 : Home}
           slug={slug}
@@ -239,6 +373,7 @@ export function WorkspaceShell({
           isOnBrokerPage={broker}
         />
       </div>
+      <ConversationHistory slug={slug} broker={broker} />
       {!broker && (
         <button
           type="button"
@@ -278,6 +413,7 @@ export function WorkspaceShell({
   );
   return (
     <SicariiShell
+      sidebarGroups={sidebarGroups}
       items={items}
       allItems={allItems}
       home={home}

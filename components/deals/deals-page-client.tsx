@@ -512,17 +512,22 @@ function CreateFirstBoardCard({
   onCreated: (p: Pipeline) => void;
 }) {
   const [pending, setPending] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   async function handleCreate() {
     setPending(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/pipelines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, name: 'Pipeline', color: '#6366f1' }),
+        body: JSON.stringify({ slug, name: 'Pipeline', color: '#ff964f' }),
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('Could not create your board. Please try again.');
       const created: Pipeline = await res.json();
+      if (!created?.id || !created.name) throw new Error('Board creation could not be confirmed. Please try again.');
       onCreated(created);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not create your board. Please try again.');
     } finally {
       setPending(false);
     }
@@ -538,6 +543,7 @@ function CreateFirstBoardCard({
       <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
         A board of stages — make one and I&apos;ll start tracking your deals.
       </p>
+      {createError && <p role="alert" className="mb-4 max-w-sm text-sm text-destructive">{createError}</p>}
       <button
         type="button"
         onClick={handleCreate}

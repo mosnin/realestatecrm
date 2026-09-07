@@ -371,9 +371,9 @@ export function BriefDashboard({ slug, data }: Props) {
 function Hero({slug, data, model}: {slug: string; data: DashboardData; model: BriefDashboardViewModel}) {
   const greeting = data.ownerName ? `Good to see you, ${data.ownerName}.` : 'Good to see you.';
   return <>
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{background: 'radial-gradient(ellipse 70% 60% at 90% 110%, rgba(90,176,232,0.18) 0%, transparent 65%)'}} />
-    <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full opacity-20" style={{background:'radial-gradient(circle, rgba(90,176,232,0.35) 0%, transparent 70%)',filter:'blur(40px)'}} />
-    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px" style={{background:'linear-gradient(90deg, transparent, rgba(90,176,232,0.5) 50%, transparent)'}} />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{background: 'radial-gradient(ellipse 70% 60% at 90% 110%, rgba(255,150,79,0.18) 0%, transparent 65%)'}} />
+    <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full opacity-20" style={{background:'radial-gradient(circle, rgba(255,150,79,0.35) 0%, transparent 70%)',filter:'blur(40px)'}} />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-px" style={{background:'linear-gradient(90deg, transparent, rgba(255,150,79,0.5) 50%, transparent)'}} />
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 dark:hidden" style={{background:'radial-gradient(ellipse 80% 70% at 20% 60%, rgba(255,255,255,0.55) 0%, transparent 70%)'}} />
     <div className="relative z-10 flex h-full flex-col justify-between p-6 sm:p-8 lg:p-10">
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="font-brand text-xs uppercase tracking-[0.3em] text-primary">CHIPPI // TODAY</p><TodayDate /></div>

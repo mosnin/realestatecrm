@@ -7,14 +7,14 @@ import { useEffect, useRef } from "react";
  * being assembled. Rendered to canvas for performance; honours
  * prefers-reduced-motion (draws a single static frame).
  *
- * `gradient` paints the characters along a flowing blue→purple gradient
- * (used on the marketing site); otherwise it uses the baby-blue brand tone.
+ * `gradient` paints the characters along a flowing orange gradient; otherwise it uses
+ * Chippi's orange brand tone. The source animation is unchanged.
  */
 const GRADIENT_STOPS: [number, number, number][] = [
-  [90, 176, 232], // baby blue   #5AB0E8
-  [91, 141, 239], // blue        #5B8DEF
-  [124, 119, 240], // indigo     #7C77F0
-  [167, 139, 250], // purple     #A78BFA
+  [255, 150, 79], // Chippi orange
+  [251, 146, 60],
+  [249, 115, 22],
+  [255, 183, 131],
 ];
 
 function lerpStop(t: number): [number, number, number] {
@@ -92,7 +92,7 @@ export function AsciiField({
             ctx.fillStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
           } else {
             ctx.fillStyle =
-              v > 0.86 ? `rgba(143,204,242,${a.toFixed(3)})` : `rgba(90,176,232,${a.toFixed(3)})`;
+              v > 0.86 ? `rgba(255,183,131,${a.toFixed(3)})` : `rgba(255,150,79,${a.toFixed(3)})`;
           }
           ctx.fillText(ch, x * cw, y * cell);
         }

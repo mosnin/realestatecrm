@@ -49,6 +49,7 @@ import {
   ArrowUpRight,
   PanelLeft,
   PanelLeftClose,
+  ChevronDown,
   Settings,
   Gauge,
 } from "lucide-react";
@@ -82,9 +83,15 @@ type NavItem = {
 export type SicariiNavItem = NavItem & {
   description?: string;
   exact?: boolean;
+  subItems?: SicariiNavItem[];
   excludePaths?: string[];
 };
+export interface SidebarGroup {
+  label: string;
+  items: SicariiNavItem[];
+}
 interface ShellNavigation {
+  sidebarGroups?: SidebarGroup[];
   items: SicariiNavItem[];
   allItems: SicariiNavItem[];
   home: string;
@@ -108,10 +115,10 @@ function isActivePath(pathname: string, href: string) {
 
 type NavMode = "dock" | "sidebar";
 
-const SIDEBAR_WIDTH = 224; // px - the sidebar panel's own width
+const SIDEBAR_WIDTH = 256; // px - the sidebar panel's own width
 // When sidebar is floating (left-3 = 12px margin), content must shift by:
 //   sidebar width + left margin + gutter between sidebar edge and content
-const SIDEBAR_INSET = SIDEBAR_WIDTH + 12 + 16; // 252 px total
+const SIDEBAR_INSET = SIDEBAR_WIDTH + 12 + 16; // 284 px total
 const STORAGE_KEY = "chippi-sicarii-nav-mode";
 
 // ── Dock magnification constants ─────────────────────────────────────────────
@@ -388,6 +395,101 @@ function Dock({
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 
+function SidebarItem({
+  item,
+  pathname,
+}: {
+  item: SicariiNavItem;
+  pathname: string;
+}) {
+  const childActive = item.subItems?.some((child) =>
+    isActivePath(pathname, child.href),
+  );
+  const [expanded, setExpanded] = useState(Boolean(childActive));
+  useEffect(() => {
+    if (childActive) setExpanded(true);
+  }, [childActive]);
+  const active =
+    !childActive &&
+    (item.exact ? pathname === item.href : isActivePath(pathname, item.href)) &&
+    !item.excludePaths?.some((path) => pathname.startsWith(path));
+  const Icon = item.icon;
+  const groupId = `nav-${item.href.replace(/[^a-z0-9]/gi, "-")}`;
+  return (
+    <div>
+      <div
+        className={cn(
+          "flex items-center rounded-lg transition-colors",
+          active
+            ? "bg-primary/12 text-accent-foreground"
+            : childActive
+              ? "text-foreground"
+              : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+        )}
+      >
+        <Link
+          href={item.href}
+          aria-current={active ? "page" : undefined}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Icon
+            className="h-[18px] w-[18px] shrink-0"
+            strokeWidth={active ? 2.2 : 1.8}
+          />
+          <span className="truncate">{item.label}</span>
+          {active && (
+            <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          )}
+        </Link>
+        {!!item.subItems?.length && (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${item.label}`}
+            aria-expanded={expanded}
+            aria-controls={groupId}
+            className="mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
+          </button>
+        )}
+      </div>
+      {!!item.subItems?.length && expanded && (
+        <div
+          id={groupId}
+          className="ml-[21px] my-1 space-y-0.5 border-l border-border pl-3"
+        >
+          {item.subItems.map((child) => {
+            const selected = child.exact
+              ? pathname === child.href
+              : isActivePath(pathname, child.href);
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                aria-current={selected ? "page" : undefined}
+                className={cn(
+                  "block rounded-md px-3 py-1.5 text-[13px] focus-visible:ring-2 focus-visible:ring-ring",
+                  selected
+                    ? "bg-primary/12 font-medium text-accent-foreground"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                )}
+              >
+                {child.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sidebar({
   isStaff,
   onCloseSidebar,
@@ -401,7 +503,7 @@ function Sidebar({
 }) {
   void isStaff;
   const pathname = usePathname() ?? "";
-  const { items: NAV_ITEMS, allItems, home, utilities } = useShellNavigation();
+  const { allItems, sidebarGroups, home, utilities } = useShellNavigation();
 
   return (
     <motion.nav
@@ -414,8 +516,7 @@ function Sidebar({
       style={{ width: SIDEBAR_WIDTH }}
       aria-label="Primary sidebar"
     >
-      {/* ── ASCII background - absolute, behind nav content ── */}
-      <AsciiField className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.18] dark:opacity-40" />
+      {/* Keep navigation quiet; the dashboard hero owns the animated field. */}
 
       {/* All nav content sits on top of the ASCII field */}
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
@@ -427,54 +528,41 @@ function Sidebar({
               Chippi
             </span>
           </Link>
+          <button
+            type="button"
+            onClick={onCloseSidebar}
+            aria-label="Switch to dock navigation"
+            title="Switch to dock"
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
         </div>
 
         {/* ── Nav items ── */}
         <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto py-4 px-2">
-          {allItems.map((item, i) => {
-            const Icon = item.icon;
-            const active =
-              isActivePath(pathname, item.href) &&
-              !item.excludePaths?.some((p) => pathname.startsWith(p));
-            return (
-              <motion.div
-                key={item.href}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{
-                  ...MORPH_SPRING,
-                  delay: i * 0.035,
-                }}
+          {(sidebarGroups ?? [{ label: "Workspace", items: allItems }]).map(
+            (group) => (
+              <section
+                key={group.label}
+                aria-label={group.label}
+                className="mb-4 last:mb-0"
               >
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                    item.accent
-                      ? "bg-sicarii-orange/10 text-sicarii-orange hover:bg-sicarii-orange/15"
-                      : active
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                  )}
-                >
-                  <motion.span
-                    className="flex h-5 w-5 shrink-0"
-                    transition={MORPH_SPRING}
-                  >
-                    <Icon
-                      className="h-full w-full"
-                      strokeWidth={item.accent ? 2.4 : active ? 2.2 : 2}
+                <h2 className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
+                  {group.label}
+                </h2>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <SidebarItem
+                      key={item.href}
+                      item={item}
+                      pathname={pathname}
                     />
-                  </motion.span>
-                  <span>{item.label}</span>
-                  {active && !item.accent && (
-                    <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
-                  )}
-                </Link>
-              </motion.div>
-            );
-          })}
+                  ))}
+                </div>
+              </section>
+            ),
+          )}
         </div>
 
         {/* ── Bottom actions ── */}
@@ -497,19 +585,10 @@ function Sidebar({
             <span>Apps</span>
           </button>
 
-          {/* Collapse to dock */}
-          <button
-            type="button"
-            onClick={onCloseSidebar}
-            aria-label="Switch to dock navigation"
-            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground w-full"
-          >
-            <PanelLeftClose className="h-5 w-5 shrink-0" />
-            <span>Collapse</span>
-          </button>
-
           {/* User + workspace + theme */}
-          <div className="flex items-center gap-2 px-3 py-2">{utilities}</div>
+          <div className="sicarii-sidebar-utilities flex flex-wrap items-center gap-1 px-1 py-2">
+            {utilities}
+          </div>
         </div>
       </div>
     </motion.nav>
@@ -546,7 +625,7 @@ function MobileBottomNav({
               href={item.href}
               aria-label={item.label}
               aria-current={active ? "page" : undefined}
-              className="flex flex-1 items-center justify-center py-0.5"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 py-0.5"
             >
               <span
                 className={cn(
@@ -560,6 +639,9 @@ function MobileBottomNav({
               >
                 <Icon className="h-5 w-5" strokeWidth={item.accent ? 2.4 : 2} />
               </span>
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -571,7 +653,7 @@ function MobileBottomNav({
           aria-label="Open apps menu"
           aria-haspopup="dialog"
           aria-expanded={launchpadOpen}
-          className="flex flex-1 items-center justify-center py-0.5"
+          className="flex flex-1 flex-col items-center justify-center gap-0.5 py-0.5"
         >
           <span
             className={cn(
@@ -582,6 +664,9 @@ function MobileBottomNav({
             )}
           >
             <LayoutGrid className="h-5 w-5" />
+          </span>
+          <span className="text-[10px] font-medium text-muted-foreground">
+            Apps
           </span>
         </button>
       </div>
@@ -660,7 +745,7 @@ function Launchpad({ open, onClose }: { open: boolean; onClose: () => void }) {
             className="absolute inset-0 cursor-default bg-background/95 backdrop-blur-xl"
           />
           <AsciiField className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.15] dark:opacity-40" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_25%,rgba(90,176,232,0.12),transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_25%,rgba(255,150,79,0.12),transparent_60%)]" />
 
           <motion.div
             initial={{ opacity: 0, y: 24 }}
@@ -692,11 +777,14 @@ function Launchpad({ open, onClose }: { open: boolean; onClose: () => void }) {
               <div className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-10">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {allItems.map((tile, i) => {
-                    const active = isActivePath(pathname, tile.href);
+                    const active =
+                      isActivePath(pathname, tile.href) &&
+                      !tile.excludePaths?.some((p) => pathname.startsWith(p));
                     return (
                       <Link
                         key={tile.href}
                         href={tile.href}
+                        aria-current={active ? "page" : undefined}
                         onClick={onClose}
                         className={cn(
                           "group relative flex flex-col justify-between gap-8 overflow-hidden rounded-3xl border p-6 transition-all duration-300 hover:-translate-y-1",
@@ -748,6 +836,7 @@ function Launchpad({ open, onClose }: { open: boolean; onClose: () => void }) {
 // ── DashboardShell (main export) ─────────────────────────────────────────────
 
 export function SicariiShell({
+  sidebarGroups,
   items,
   allItems,
   home,
@@ -756,7 +845,7 @@ export function SicariiShell({
 }: ShellNavigation & { children: React.ReactNode }) {
   return (
     <ShellNavigationContext.Provider
-      value={{ items, allItems, home, utilities }}
+      value={{ items, allItems, home, utilities, sidebarGroups }}
     >
       <DashboardShell isStaff={false}>{children}</DashboardShell>
     </ShellNavigationContext.Provider>
@@ -775,7 +864,7 @@ function DashboardShell({
   const prefersReduced = useReducedMotion();
 
   // ── Nav mode - persisted, forced to dock on mobile ──────────────────────
-  const [mode, setMode] = useState<NavMode>("dock");
+  const [mode, setMode] = useState<NavMode>("sidebar");
   const [hydrated, setHydrated] = useState(false);
   const [launchpadOpen, setLaunchpadOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -816,7 +905,7 @@ function DashboardShell({
   const isSidebar = mode === "sidebar" && isDesktop && hydrated;
 
   // Content inset - slides right to make room for the floating sidebar.
-  // SIDEBAR_INSET = sidebar width (224) + left margin (12) + gutter (16) = 252px
+  // SIDEBAR_INSET = sidebar width (256) + left margin (12) + gutter (16) = 284px
   const contentPaddingLeft = isSidebar ? SIDEBAR_INSET : 0;
   const contentTransition = prefersReduced ? { duration: 0 } : INSET_SPRING;
 
