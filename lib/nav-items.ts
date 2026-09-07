@@ -100,7 +100,8 @@ const realtorNavCatalog: NavItem[] = [
     children: [
       { href: '/automations#workflows', label: 'Workflows' },
       { href: '/automations?new=1', label: 'New workflow' },
-      { href: '/automations/settings', label: 'Sending policies' },
+      { href: '/automations#routines', label: 'Routines' },
+      { href: '/automations/settings', label: 'Configuration' },
     ],
   },
   {
@@ -205,9 +206,9 @@ export const secondaryNavItems: { href: string; label: string; icon: LucideIcon 
  *  sidebar's core five: Today replaces Calendar (Calendar lives in More /
  *  behind Chippi — the prepared day already surfaces what's coming). */
 export const mobileNavItems = [
+  { href: '/chippi', label: 'Chippi', icon: MessageCircle },
   { href: '/chippi/brief', label: 'Today', icon: Sun },
   { href: '/contacts', label: 'People', icon: Users },
   { href: '/deals', label: 'Deals', icon: Briefcase },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

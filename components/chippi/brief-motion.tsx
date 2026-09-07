@@ -67,14 +67,14 @@ export function BriefCell({
         'min-w-0',
         surface !== 'none' && [
           'group/cell relative',
-          surface === 'muted' ? DASHBOARD_INSET : DASHBOARD_SURFACE,
+          surface === 'muted' ? 'rounded-3xl bg-muted' : 'rounded-3xl bg-card shadow-[0_2px_12px_-2px_rgba(0,0,0,0.07),0_1px_4px_-1px_rgba(0,0,0,0.05)]',
         ],
         className,
       )}
-      initial={motionOn ? { opacity: 0, y: 10 } : false}
+      initial={motionOn ? { opacity: 0, y: 22 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: motionOn ? delay : 0 }}
-      whileHover={interactive && motionOn ? { y: -2 } : undefined}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: motionOn ? delay : 0 }}
+      whileHover={interactive && motionOn ? { y: -4 } : undefined}
     >
       {children}
     </motion.div>

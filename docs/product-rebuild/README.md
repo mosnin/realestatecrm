@@ -1,3 +1,5 @@
+> UI correction: the simplified presentation and earlier screenshots are superseded by the [Sicarii source restoration](sicarii-restoration.md). Public pages are restored to `75113c0d`; rendered visual acceptance is still pending.
+
 # Chippi: a daily desk that does the work
 
 Baseline: `mosnin/realestatecrm` main at `75113c0d68f40df0999d2dd470b831ffde3c3665`. Implementation branch: `codex/autonomous-product-rebuild`.

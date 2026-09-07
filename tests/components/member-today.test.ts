@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.stubGlobal('React', React);
 const { compose, queries, workspace } = vi.hoisted(() => ({
   compose: vi.fn(),
   queries: [] as unknown[][],
@@ -24,7 +25,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
-      for (const method of ['select', 'eq', 'in', 'ilike', 'order', 'limit'])
+      for (const method of ['select', 'eq', 'in', 'ilike', 'order', 'limit', 'contains', 'not', 'gte', 'lte', 'is', 'neq'])
         chain[method] = (...args: unknown[]) => {
           queries.push([table, method, ...args]);
           return chain;
@@ -52,9 +53,9 @@ beforeEach(() => {
 describe('Member daily work', () => {
   it('uses the member workspace and limits announcements to the brokerage administrators', async () => {
     expect(renderToStaticMarkup(await MemberDashboard({ ctx }))).toContain(
-      'Daily desk: maya',
+      'Recent assigned leads',
     );
-    expect(compose).toHaveBeenCalledWith('my-space', 'my-user');
+    expect(queries).toContainEqual(['Contact', 'eq', 'spaceId', 'my-space']);
     expect(queries).toContainEqual(['Space', 'eq', 'ownerId', 'my-user']);
     expect(queries).toContainEqual(['Note', 'in', 'spaceId', ['admin-space']]);
   });

@@ -151,16 +151,16 @@ describe('BriefDashboard Today view model', () => {
     );
 
     expect(html).toContain('Needs you');
-    expect(html).toContain('Work completed');
-    expect(html).toContain('Upcoming tours');
+    expect(html).toContain('Verified moves');
+    expect(html).toContain('Tours');
     expect(html).toContain('data-work-entry="today"');
-    expect(html.indexOf('Needs you')).toBeLessThan(html.indexOf('Work completed'));
+    expect(html.indexOf('Needs you')).toBeLessThan(html.indexOf('Verified moves'));
     expect(html).toContain('href="/s/oak/leads"');
     expect(html).toContain('href="/s/oak/follow-ups"');
     expect(html).toContain('href="/s/oak/inbox"');
     expect(html).toContain('href="/s/oak/deals"');
     expect(html).toContain('href="/s/oak/chippi/activity"');
-    expect(html).toContain('drafts awaiting your decision');
+    expect(html).toContain('href="/s/oak/chippi/inbox"');
     expect(html).toContain('href="/s/oak/calendar"');
     expect(html).toContain('href="/s/oak/contacts/contact-1"');
     expect(html).not.toContain('Series A');
@@ -202,10 +202,10 @@ describe('BriefDashboard Today view model', () => {
     });
     const html = renderToStaticMarkup(createElement(BriefDashboard, { slug: 'oak', data: emptyData }));
 
-    expect(html).toContain('No completed actions recorded');
-    expect(html).toContain('Set up work for Chippi');
-    expect(html).toContain('Connect your inbox and calendar');
+    expect(html).toContain('Add your first contact');
+    expect(html).toContain('Ask Chippi');
+    expect(html).toContain('Connect your inbox');
     expect(html).not.toContain('data-outcome-metric=');
-    expect(html).toContain('data-verified-activity');
+    expect(html).toContain('aria-label="Get started"');
   });
 });

@@ -16,6 +16,7 @@ import {
   BODY,
   BODY_COMPACT,
   H1,
+  TITLE_FONT,
   H2,
   H3,
   STAT_NUMBER,
@@ -62,12 +63,13 @@ describe('typography — the ladder', () => {
     expect(BODY_COMPACT).toBe(BODY);
   });
 
-  it('uses sans-serif for titles, stats and section headings', () => {
+  it('keeps legacy public typography tokens available while app headings use scoped variables', () => {
     expect(H1).toContain('font-title');
     expect(STAT_NUMBER).toContain('font-title');
     expect(H2).toContain('font-heading');
     expect(H3).toContain('font-heading');
-    expect(FONT_SERIF_STACK).toBe(FONT_SANS_STACK);
+    expect(FONT_SERIF_STACK).toContain('serif');
+    expect(TITLE_FONT.fontFamily).toContain('--font-title');
     expect(FONT_SANS_STACK).toMatch(/SF Pro Text|system-ui/);
   });
 });

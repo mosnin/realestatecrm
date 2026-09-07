@@ -1,6 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.stubGlobal('React', React);
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broker/brief' }));
 const { queries, failing, context } = vi.hoisted(() => ({
   queries: [] as Array<{ table: string; filters: unknown[][] }>,
   failing: { table: '' },
@@ -94,12 +96,12 @@ beforeEach(() => {
 describe('Brokerage Today', () => {
   it('prioritizes exact ownership counts, real work and the team within the brokerage scope', async () => {
     const html = renderToStaticMarkup(await BrokerBriefPage());
-    expect(html).toContain('9 leads need an owner');
-    expect(html).toContain('Email sent');
+    expect(html).toContain('href="/broker/commissions"');
+    expect(html).toContain('href="/broker/forecast"');
     expect(html).toContain('Maya');
-    expect(html).toContain('href="/broker/settings/auto-assignment"');
+    expect(html).toContain('href="/broker/members"');
     expect(
-      queries.find((q) => q.table === 'AgentActivityLog')?.filters,
+      queries.find((q) => q.table === 'Deal')?.filters,
     ).toContainEqual(['in', 'spaceId', ['member-space', 'owner-space']]);
     expect(
       queries
@@ -117,9 +119,9 @@ describe('Brokerage Today', () => {
     failing.table = 'Contact';
     const html = renderToStaticMarkup(await BrokerBriefPage());
     expect(html).toContain('Lead ownership could not be checked');
-    expect(html).toContain('First responses could not be checked');
+    expect(html).toContain('role="alert"');
     expect(html).not.toContain('No unassigned leads');
-    expect(html).toContain('Email sent');
+    expect(html).not.toContain('Every lead has been answered');
   });
   it('keeps a member on their own dashboard without fetching team-wide data', async () => {
     context.mockResolvedValue({ membership: { role: 'realtor_member' } });

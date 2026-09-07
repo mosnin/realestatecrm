@@ -48,7 +48,6 @@ export function OnboardingQuick({ defaultName }: Props) {
   const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const checkSeq = useRef(0);
   useEffect(() => {
-    const seq = ++checkSeq.current;
     if (checkTimer.current) clearTimeout(checkTimer.current);
     if (!slug) {
       setSlugState({ kind: 'idle' });
@@ -59,6 +58,7 @@ export function OnboardingQuick({ defaultName }: Props) {
       return;
     }
     setSlugState({ kind: 'checking' });
+    const seq = ++checkSeq.current;
     checkTimer.current = setTimeout(async () => {
       try {
         const res = await fetch('/api/onboarding', {
@@ -72,7 +72,6 @@ export function OnboardingQuick({ defaultName }: Props) {
           return;
         }
         const data = await res.json();
-        if (seq !== checkSeq.current) return;
         if (data.reason === 'invalid') {
           setSlugState({ kind: 'invalid', message: 'Use 3+ lowercase letters, numbers, or dashes.' });
         } else if (data.available) {
@@ -121,8 +120,8 @@ export function OnboardingQuick({ defaultName }: Props) {
             action: 'create_space',
             slug,
             businessName: businessName.trim(),
-            intakePageTitle: 'Tell us what you are looking for',
-            intakePageIntro: 'Share your real estate goals so I can help with the next step.',
+            intakePageTitle: 'Rental Application',
+            intakePageIntro: 'Share a few details so I can review your rental fit faster.',
             // Plan picked on the marketing site → persisted on Space.plan.
             plan: readSignupPlan() ?? undefined,
           }),
@@ -144,10 +143,9 @@ export function OnboardingQuick({ defaultName }: Props) {
         if (!completeRes.ok) throw new Error('complete');
 
         toast.success("You're in. Here's your workspace.");
-        router.push(`/s/${slug}/chippi/integrations?setup=1`);
+        router.push(`/s/${slug}/chippi`);
       } catch {
         setSubmitError("Couldn't finish setup - usually temporary.");
-      } finally {
         setSubmitting(false);
       }
     },
@@ -163,19 +161,19 @@ export function OnboardingQuick({ defaultName }: Props) {
       <div className="w-full max-w-md space-y-10">
         <div className="space-y-3 text-center">
           <h1
-            className="text-3xl font-semibold tracking-tight text-foreground"
+            className="text-4xl tracking-tight text-foreground"
             style={{ fontFamily: 'var(--font-title)' }}
           >
-            Let’s get to work
+            I keep your day moving
           </h1>
           <p
-            className="text-base leading-relaxed text-muted-foreground"
+            className="text-3xl tracking-tight text-muted-foreground"
             style={{ fontFamily: 'var(--font-title)' }}
           >
-            Less follow-up to chase. More clients moving forward.
+            so you don&apos;t have to.
           </p>
           <p className="text-sm text-muted-foreground/80 pt-2">
-            Create your workspace, then connect your inbox and calendar.
+            Two questions to get started.
           </p>
         </div>
 
@@ -209,7 +207,7 @@ export function OnboardingQuick({ defaultName }: Props) {
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               disabled={submitting}
-              placeholder="Your real estate business"
+              placeholder="Park Slope Rentals"
               className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             />
 
@@ -271,7 +269,7 @@ export function OnboardingQuick({ defaultName }: Props) {
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <>
-                Create workspace
+                Get my intake link
                 <ArrowRight size={14} />
               </>
             )}

@@ -1,3 +1,5 @@
+import '@/components/dashboard/sicarii/theme.css';
+import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
@@ -246,7 +248,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="app-theme flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="app-theme min-h-screen bg-background text-foreground">
       {/* First-paint splash — greets the realtor by name (varied each open),
           shows a snapshot of what's new, then dissolves into the dashboard.
           Plays every time the app/PWA is opened. */}
@@ -270,18 +272,11 @@ export default async function DashboardLayout({
       {/* Collapse state is shared between the sidebar and the header's panel
           toggle, so the provider wraps both. */}
       <SidebarCollapseProvider>
-        <Suspense fallback={null}>
-          <Sidebar slug={slug} spaceName={space.name} accountName={dbUser.name} unreadLeadCount={unreadLeadCount} pendingDraftCount={pendingDraftCount ?? 0} overdueFollowUpCount={overdueFollowUpCount} activePropertyCount={activePropertyCount} activeWorkflowCount={activeWorkflowCount} isBroker={isBroker} brokerageName={brokerageName} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin} />
-        </Suspense>
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <WorkspaceShell slug={slug} spaceId={space.id} spaceName={space.name} isBroker={isBroker} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin}>
           <PlatformBanner />
-          <Header slug={slug} spaceId={space.id} spaceName={space.name} title={space.name} accountName={dbUser.name} isBroker={isBroker} brokerageName={brokerageName} isPlatformAdmin={dbUser.isPlatformAdmin} />
-          <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>
-            {children}
-          </LayoutShell>
-        </div>
+          <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>{children}</LayoutShell>
+        </WorkspaceShell>
       </SidebarCollapseProvider>
-      <MobileNav slug={slug} isBroker={isBroker} />
       {/* The Island — ambient pill for background work sessions, floating
           top-center. Hidden on the Chippi surface (the strip owns it there)
           and in ?embed=1 mode; renders null when nothing is running. */}

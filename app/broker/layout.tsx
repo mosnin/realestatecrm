@@ -1,3 +1,5 @@
+import '@/components/dashboard/sicarii/theme.css';
+import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { auth } from '@clerk/nextjs/server';
@@ -220,7 +222,7 @@ export default async function BrokerLayout({ children }: { children: React.React
 
   return (
     <div
-      className="app-theme chippi-dashboard-canvas flex h-screen overflow-hidden text-foreground"
+      className="app-theme min-h-screen text-foreground"
       data-broker-premium-shell="true"
     >
       {/* First-paint splash — greets the broker by name, shows a brokerage-wide
@@ -240,26 +242,10 @@ export default async function BrokerLayout({ children }: { children: React.React
           mirrors the realtor layout (app/s/[slug]/layout.tsx). */}
       <EmbedDetector />
       <SidebarCollapseProvider>
-        <Sidebar
-          slug={slug}
-          spaceName={spaceName}
-          accountName={brokerFullName}
-          unreadLeadCount={unreadLeadCount}
-          isBroker={true}
-          isBrokerOnly={isBrokerOnly}
-          brokerageName={ctx.brokerage.name}
-          brokerageRole={ctx.membership.role}
-          brokerageMemberships={[{ id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role }]}
-        />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <Header slug={slug} spaceName={spaceName} title={spaceName} accountName={brokerFullName} isBroker={true} isBrokerOnly={isBrokerOnly} brokerageName={ctx.brokerage.name} brokerageRole={ctx.membership.role} />
-          {/* Chat-vs-dashboard padding is decided client-side by usePathname()
-              inside BrokerMain — NOT by the fragile x-pathname header — so the
-              container is always correct and nothing touches the screen edge. */}
+        <WorkspaceShell slug={slug} spaceId={spaceRow?.id} spaceName={spaceName} isBroker brokerageRole={ctx.membership.role} brokerageMemberships={[{id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role}]} isPlatformAdmin={isPlatformAdmin}>
           <BrokerMain>{children}</BrokerMain>
-        </div>
+        </WorkspaceShell>
       </SidebarCollapseProvider>
-      <MobileNav slug={slug} isBroker={true} isBrokerOnly={isBrokerOnly} />
     </div>
   );
 }

@@ -7,7 +7,7 @@
 
 ## At a glance
 
-- **Page routes:** 223
+- **Page routes:** 224
 - **API endpoints:** 443
 - **Cron jobs:** 3
 - **DB tables:** 156  ·  **RPCs:** 71  ·  **migrations:** 273
@@ -246,7 +246,7 @@
 
 - `/research`
 
-**s** (98)
+**s** (99)
 
 - `/s/[slug]`
 - `/s/[slug]/affiliate`
@@ -297,6 +297,7 @@
 - `/s/[slug]/email`
 - `/s/[slug]/email/[id]`
 - `/s/[slug]/files`
+- `/s/[slug]/follow-through`
 - `/s/[slug]/follow-ups`
 - `/s/[slug]/form-analytics`
 - `/s/[slug]/inbox`

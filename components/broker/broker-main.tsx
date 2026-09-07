@@ -37,7 +37,7 @@ export function BrokerMain({ children }: { children: React.ReactNode }) {
       data-premium-dashboard
       className="chippi-dashboard-canvas flex-1 overflow-y-auto flex flex-col text-foreground"
     >
-      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-8 pb-28')}>
+      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0')}>
         <PageTransition>{children}</PageTransition>
       </div>
     </main>
