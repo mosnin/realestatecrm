@@ -54,6 +54,7 @@ vi.mock('@/lib/supabase', () => {
 });
 
 // Import AFTER mocks so the route picks up mocked supabase.
+vi.mock('@/lib/agent/routine-policy', () => ({ resolveRoutinePolicy: vi.fn().mockResolvedValue({ executionMode: 'review' }) }));
 import { GET } from '@/app/api/cron/routines/route';
 
 // ── Env helpers ─────────────────────────────────────────────────────────────
@@ -102,7 +103,9 @@ function buildFetchMock() {
       }
       const spaceId = (body as { space_id?: string } | null)?.space_id ?? '';
       modalCalls.push({ url, body });
-      return Promise.resolve(modalResponder(spaceId));
+      const response = await modalResponder(spaceId);
+      const receipt = await response.json().catch(() => null);
+      return receipt?.ok ? Response.json({ ...receipt, run_id: (body as { run_id?: string }).run_id }) : response;
     }
 
     return new Response('unmocked', { status: 599 });

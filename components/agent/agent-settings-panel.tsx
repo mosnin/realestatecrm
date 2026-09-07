@@ -6,6 +6,7 @@ import { Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { timeAgo } from '@/lib/formatting';
+import { OutcomeSummary } from './outcome-summary';
 import { toast } from 'sonner';
 
 interface AgentSettings {
@@ -285,6 +286,7 @@ export function AgentSettingsPanel({ slug }: { slug: string }) {
           ))}
         </div>
       </details>
+      <OutcomeSummary slug={slug} />
     </div>
   );
 }

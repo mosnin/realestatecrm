@@ -23,10 +23,10 @@ export const BROKER_PAGE_WIDE =
   'mx-auto min-h-full w-full max-w-[1500px] space-y-8 pb-12 text-foreground';
 
 export const BROKER_PAGE_HEADER =
-  'flex flex-col gap-7 border-b chippi-dashboard-divider pb-8 pt-2 sm:flex-row sm:items-end sm:justify-between sm:pb-10';
+  'flex flex-col gap-4 border-b chippi-dashboard-divider pb-5 pt-2 sm:flex-row sm:items-end sm:justify-between';
 
 export const BROKER_PAGE_TITLE =
-  'text-2xl tracking-tight text-foreground sm:text-3xl [font-family:var(--font-title)]';
+  'text-2xl tracking-tight text-foreground sm:text-2xl [font-family:var(--font-title)]';
 
 export const BROKER_PAGE_DESCRIPTION =
   'max-w-2xl text-[15px] leading-relaxed text-muted-foreground';
@@ -55,13 +55,13 @@ export const BROKER_DIVIDED_LIST =
   'divide-y divide-border/60';
 
 export const BROKER_CONTROL =
-  'inline-flex min-h-9 items-center justify-center rounded-full border border-border/80 bg-[var(--dashboard-paper)] px-4 text-sm font-medium text-foreground transition-colors hover:bg-[var(--dashboard-paper-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex min-h-9 items-center justify-center rounded-lg border border-border/80 bg-[var(--dashboard-paper)] px-4 text-sm font-medium text-foreground transition-colors hover:bg-[var(--dashboard-paper-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50';
 
 export const BROKER_CONTROL_QUIET =
-  'inline-flex min-h-8 items-center justify-center rounded-full px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--dashboard-paper-muted)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  'inline-flex min-h-8 items-center justify-center rounded-lg px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--dashboard-paper-muted)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 export const BROKER_STATUS =
-  'inline-flex items-center rounded-full border border-border/80 bg-[var(--dashboard-paper-muted)] px-2.5 py-0.5 text-[11px] font-medium text-foreground/75';
+  'inline-flex items-center rounded-lg border border-border/80 bg-[var(--dashboard-paper-muted)] px-2.5 py-0.5 text-[11px] font-medium text-foreground/75';
 
 /**
  * Route-family geometry. These intentionally describe different working
@@ -75,13 +75,13 @@ export const BROKER_COMMAND_HERO =
   'grid gap-8 border-b chippi-dashboard-divider pb-9 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)] lg:items-end';
 
 export const BROKER_FINANCE_HERO =
-  'grid gap-7 rounded-[2rem] bg-foreground px-6 py-7 text-background sm:px-9 sm:py-9 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end';
+  'grid gap-7 rounded-xl bg-foreground px-6 py-7 text-background sm:px-9 sm:py-9 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end';
 
 export const BROKER_DIRECTORY_SHELL =
-  'grid min-h-[34rem] overflow-hidden rounded-[1.75rem] bg-[var(--dashboard-paper)] shadow-[0_1px_2px_rgb(17_17_19/0.035),0_16px_40px_-32px_rgb(17_17_19/0.32)] lg:grid-cols-[15rem_minmax(0,1fr)]';
+  'grid min-h-[34rem] overflow-hidden rounded-xl bg-[var(--dashboard-paper)] border border-border lg:grid-cols-[15rem_minmax(0,1fr)]';
 
 export const BROKER_BOARD_SHELL =
-  'overflow-hidden rounded-[1.75rem] border chippi-dashboard-divider bg-[var(--dashboard-paper-muted)] p-3 sm:p-5';
+  'overflow-hidden rounded-xl border chippi-dashboard-divider bg-[var(--dashboard-paper-muted)] p-3 sm:p-5';
 
 export const BROKER_SETTINGS_SHELL =
   'grid items-start gap-10 lg:grid-cols-[14rem_minmax(0,1fr)]';

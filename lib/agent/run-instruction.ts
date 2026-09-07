@@ -103,6 +103,7 @@ export async function buildHeadlessToolContext(
 export interface RunAutonomousInstructionInput {
   spaceId: string;
   instruction: string;
+  onUsage?: (tokens: number) => Promise<void>;
   /** Caller-owned cancellation. When omitted we create one with a default
    *  timeout so a wedged run can't run forever. */
   signal?: AbortSignal;
@@ -259,6 +260,10 @@ export async function runAutonomousInstruction(
       summary: 'Run failed.',
     };
   } finally {
+    if (usageResult && input.onUsage) {
+      const usage = sumSdkTurnUsage(usageResult);
+      await input.onUsage(usage.promptTokens + usage.completionTokens).catch(error => logger.warn('[agent/run-instruction] budget accounting failed', { spaceId: input.spaceId }, error));
+    }
     if (usageResult) await recordChatUsage({
       spaceId: input.spaceId, model: resolveChatModel(input.model),
       ...sumSdkTurnUsage(usageResult), route: 'agent', runtime: 'ts',

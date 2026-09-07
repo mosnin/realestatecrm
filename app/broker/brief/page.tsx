@@ -29,8 +29,8 @@ import {
   draftStatsWindowStart,
   type DraftStatsRow,
 } from '@/lib/draft-stats';
+import { AssignmentHandoffs } from '@/components/broker/assignment-handoffs';
 import { MemberDashboard } from '../member-dashboard';
-import { AsciiField } from '@/components/dashboard/sicarii/ascii-field';
 import {
   BROKER_DIVIDED_LIST,
   BROKER_EMPTY,
@@ -470,13 +470,7 @@ export default async function BrokerBriefPage() {
           stats row inside the story handles the context numbers. No second
           muted line — two stat surfaces stacked read as noise. */}
       <BriefReveal delay={0.01} className={BROKER_HERO}>
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
+
         <header className="relative z-10">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -496,6 +490,9 @@ export default async function BrokerBriefPage() {
           </div>
         </header>
       </BriefReveal>
+
+      <AssignmentHandoffs brokerageId={ctx.brokerage.id} />
+
 
       {/* Chippi — the focal entry, and the view's ONE solid accent card.
           The broker's chief of staff is the home of this page, not its

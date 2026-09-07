@@ -82,11 +82,11 @@ body:has(.sicarii-shell) {
 .dark .app-theme,
 .dark body:has(.sicarii-shell),
 body.dark:has(.sicarii-shell) {
-  --background: #0a0a0a;
+  --background: #212121;
   --foreground: #f5f5f5;
-  --card: #141414;
+  --card: #212121;
   --card-foreground: #f5f5f5;
-  --popover: #141414;
+  --popover: #303030;
   --popover-foreground: #f5f5f5;
   --primary: #ff964f;
   --primary-foreground: #1c1c1c;
@@ -98,8 +98,8 @@ body.dark:has(.sicarii-shell) {
   --accent-foreground: #f5f5f5;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #2a2a2a;
-  --input: #2a2a2a;
+  --border: #333333;
+  --input: #444444;
   --ring: #ffb783;
   --success: #16a34a;
   --warning: #eab308;
@@ -134,7 +134,7 @@ body.dark:has(.sicarii-shell) {
 body:has(.sicarii-shell) {
   --font-sans: "Chippi Inter", Inter, ui-sans-serif, system-ui, sans-serif;
   --font-brand:
-    "Chippi Space Grotesk", "Space Grotesk", Inter, ui-sans-serif, system-ui,
+    "Chippi Inter", Inter, ui-sans-serif, system-ui,
     sans-serif;
   --font-serif: var(--font-brand);
   --font-serif-display: var(--font-brand);
@@ -149,7 +149,7 @@ body:has(.sicarii-shell) {
   --dashboard-paper-muted: var(--muted);
   --dashboard-divider: var(--border);
   --dashboard-atmosphere-opacity: 0.18;
-  --sidebar: var(--card);
+  --sidebar: #f7f7f7;
   --sidebar-foreground: var(--foreground);
   --sidebar-accent: var(--accent);
   --sidebar-border: var(--border);
@@ -176,16 +176,14 @@ body:has(.sicarii-shell) * {
 }
 .sicarii-shell [data-slot="card"],
 .sicarii-shell [data-slot="surface-card"] {
-  border-radius: 1.5rem;
+  border-radius: 0.75rem;
   background: var(--card);
-  border-color: transparent;
-  box-shadow:
-    0 2px 12px -2px rgba(0, 0, 0, 0.07),
-    0 1px 4px -1px rgba(0, 0, 0, 0.05);
+  border-color: var(--border);
+  box-shadow: none;
 }
 .sicarii-shell [data-slot="button"],
 .sicarii-shell .sicarii-utility {
-  border-radius: 9999px;
+  border-radius: 0.5rem;
 }
 .sicarii-utility {
   display: inline-flex;
@@ -264,4 +262,19 @@ body:has(.sicarii-shell) [data-page-chat-input] {
 .sicarii-sidebar-utilities .sicarii-utility {
   width: 32px;
   height: 32px;
+}
+
+.dark .app-theme { --sidebar: #111111; }
+.sicarii-sidebar-utilities [aria-label="Search workspace"] { display: none; }
+
+.sicarii-shell .chippi-dashboard-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: none;
+}
+.sicarii-shell .chippi-dashboard-panel-muted {
+  border-radius: 8px;
+  background: var(--muted);
+  box-shadow: none;
 }

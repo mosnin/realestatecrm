@@ -139,22 +139,16 @@ describe('GET /api/cron/agent-run-reconcile', () => {
     expect(supabaseCalls.map((c) => c.table)).not.toContain('AgentActivityLog');
   });
 
-  it('confirms via AgentDraft when trajectory + activity are absent (checks all three sources)', async () => {
+  it('does not use unrelated activity or drafts to confirm a run', async () => {
     supabaseQueue = [
-      { data: [{ runId: 'r1', spaceId: 'space_1', dispatchedAt: minsAgo(20) }], error: null },
-      { data: [], error: null }, // AgentTrajectory: none
-      { data: [], error: null }, // AgentActivityLog: none
-      { data: [{ id: 'draft_1' }], error: null }, // AgentDraft: hit
-      { data: null, error: null }, // ledger UPDATE
+      { data: [{ runId: 'r1', spaceId: 'space_1', dispatchedAt: minsAgo(20) }] },
+      { data: [] },
     ];
-
-    const res = await invoke('Bearer test-secret');
-    const body = await res.json();
-    expect(body).toMatchObject({ confirmed: 1, failed: 0 });
-    const tables = supabaseCalls.map((c) => c.table);
-    expect(tables).toEqual(
-      expect.arrayContaining(['AgentTrajectory', 'AgentActivityLog', 'AgentDraft']),
-    );
+    const response = await invoke('Bearer test-secret');
+    expect(await response.json()).toMatchObject({ confirmed: 0, pending: 1 });
+    expect(supabaseCalls.map(c => c.table)).toEqual(['AgentRunLedger', 'AgentTrajectory']);
+    const filters = supabaseCalls[1].chain.filter(([m]) => m === 'eq').map(([, args]) => args);
+    expect(filters).toEqual([['spaceId', 'space_1'], ['runId', 'r1'], ['status', 'completed']]);
   });
 
   it('marks failed (no_artifact) when nothing exists past the fail threshold', async () => {
@@ -162,8 +156,6 @@ describe('GET /api/cron/agent-run-reconcile', () => {
       // Dispatched 50 min ago (> 45 min fail threshold) with no artifacts.
       { data: [{ runId: 'r_old', spaceId: 'space_1', dispatchedAt: minsAgo(50) }], error: null },
       { data: [], error: null }, // AgentTrajectory: none
-      { data: [], error: null }, // AgentActivityLog: none
-      { data: [], error: null }, // AgentDraft: none
       { data: null, error: null }, // ledger UPDATE
     ];
 
@@ -183,8 +175,6 @@ describe('GET /api/cron/agent-run-reconcile', () => {
       // the 45-min fail threshold — not yet failable.
       { data: [{ runId: 'r_young', spaceId: 'space_1', dispatchedAt: minsAgo(20) }], error: null },
       { data: [], error: null }, // AgentTrajectory: none
-      { data: [], error: null }, // AgentActivityLog: none
-      { data: [], error: null }, // AgentDraft: none
       // No UPDATE expected.
     ];
 

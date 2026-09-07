@@ -29,10 +29,4 @@ describe('Today dashboard system release contract', () => {
     expect(globals).toContain('border-radius: 1.75rem');
   });
 
-  it('documents Today as the one realtor and brokerage visual source of truth', () => {
-    expect(read('DESIGN.md')).toContain('**Today** page');
-    expect(read('DESIGN.md')).toContain('collapsed: a true `56px` Scalar-style nav strip');
-    expect(read('docs/ui/STYLESHEET.md')).toContain('The live **Today** page');
-  });
-
 });

@@ -1,48 +1,15 @@
-/**
- * Routine dispatch — fires the Modal autonomous run for one routine.
- *
- * The Modal endpoint only returns once the whole run finishes, so a dispatch
- * timeout is the normal case here, not a failure: the request landed and the
- * run is in flight. Like every autonomous path, the run DRAFTS — it never
- * sends a message unattended.
- *
- * Shared by the hourly cron (/api/cron/routines) and the "Run now" button.
- *
- * Reliability (Fix #5): every dispatch writes an AgentRunLedger row so a fired
- * run is visible after the fact, and the outcome is recorded honestly:
- *   - 2xx response                  → ledger 'in_flight' (run accepted), return 'ok'.
- *   - timeout (AbortError)          → ledger 'in_flight' (run presumed live —
- *                                     Modal holds the connection for the whole
- *                                     run), return 'ok', and do NOT retry
- *                                     (retrying a live run double-runs → double-cost).
- *   - non-2xx OR non-timeout error  → GENUINE dispatch failure (the run never
- *                                     started): retry with exponential backoff;
- *                                     if all attempts fail → ledger 'failed', return 'error'.
- */
+/** Routine dispatch with correlated receipts and no ambiguous network retries. */
 
 import {
   recordDispatch,
-  markInFlight,
+  markConfirmed,
   markFailed,
   type AgentRunTrigger,
 } from '@/lib/agent/run-ledger';
+import { claimRoutineSlot } from '@/lib/agent/routine-budget';
+import { resolveRoutinePolicy } from '@/lib/agent/routine-policy';
+import { dispatchAgentRun } from '@/lib/agent/dispatch-run';
 import { runAutonomousInstruction } from '@/lib/agent/run-instruction';
-
-const DISPATCH_TIMEOUT_MS = 12_000;
-
-// Genuine dispatch failures (non-2xx / non-timeout network errors) are safe to
-// retry: the run never started, so a retry can't double-run. Timeouts are NOT
-// retried here — see fireRoutineRun's AbortError branch.
-const MAX_DISPATCH_ATTEMPTS = 3;
-
-// Exponential backoff base (ms) between retry attempts: base, base*2, base*4...
-// Read at call time so tests can set ROUTINE_DISPATCH_BACKOFF_MS=0 for instant
-// retries; defaults to 1s (→ 1s/2s/4s) in production.
-function dispatchBackoffMs(attempt: number): number {
-  const raw = Number(process.env.ROUTINE_DISPATCH_BACKOFF_MS);
-  const base = Number.isFinite(raw) && raw >= 0 ? raw : 1_000;
-  return base * 2 ** (attempt - 1);
-}
 
 export type RoutineRunStatus = 'ok' | 'error';
 
@@ -91,22 +58,27 @@ export async function fireRoutineRun(
   triggerSource?: TriggerSource,
   trigger: AgentRunTrigger = 'routine',
 ): Promise<RoutineRunStatus> {
+  // The TS runtime supports exact native-tool grants from saved instructions.
+  // Use it for automatic routines regardless of the optional Python deployment.
+  if (trigger === 'routine') {
+    try {
+      const policy = await resolveRoutinePolicy(spaceId, trigger, instruction);
+      if (!policy) return 'error';
+      if (policy.executionMode === 'autonomous') return fireInProcessRun(spaceId, instruction, trigger);
+    } catch {
+      return 'error';
+    }
+  }
   // Read env at call time, not module load — see /api/cron/agent-sweep for why.
   const url = process.env.MODAL_WEBHOOK_URL ?? '';
   const secret = process.env.AGENT_INTERNAL_SECRET ?? '';
   if (!url || !secret) {
     // Modal isn't configured — run the instruction IN-PROCESS instead of
-    // failing silently. The in-process runner drives the same TS agent the
-    // chat route uses; its draft tools create AgentDraft rows as side effects
-    // and gated sends stay pending (background runs DRAFT ONLY). We still write
-    // a ledger row so the run is visible after the fact, with the same
-    // in_flight/failed semantics the Modal path uses.
+    // failing silently. The same TS agent obeys the workspace's saved policy.
     return fireInProcessRun(spaceId, instruction, trigger);
   }
 
-  // Write the ledger row up front and forward the runId to Modal in the POST
-  // body. Modal ignores unknown fields today — this is forward-compatible for a
-  // future Modal-side run_id + completion callback (see run-ledger.ts header).
+  // Correlate the dispatch, worker result and trajectory with one run ID.
   const runId = await recordDispatch(spaceId, trigger);
 
   // user_id is the workspace owner's Clerk userId — the entity whose
@@ -124,79 +96,27 @@ export async function fireRoutineRun(
   if (userId) body.user_id = userId;
   if (triggerSource) body.trigger_source = triggerSource;
 
-  // Retry loop. Each iteration is one POST. We only LOOP on a genuine dispatch
-  // failure (non-2xx / non-timeout network error) — the run never started, so a
-  // retry is safe. A 2xx or a timeout returns immediately (no retry).
-  let lastFailure = 'unknown dispatch error';
-  for (let attempt = 1; attempt <= MAX_DISPATCH_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${secret}`,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (res.ok) {
-        // Accepted — the run is in flight (awaiting end-of-run artifact).
-        await markInFlight(runId);
-        return 'ok';
-      }
-      // Non-2xx: Modal refused the dispatch, so the run did NOT start. Safe to
-      // retry. Capture the status for the ledger if this was the last attempt.
-      lastFailure = `Modal returned ${res.status}`;
-    } catch (err) {
-      // AbortError: the POST was sent and the Modal endpoint just hasn't
-      // returned because the run is still going. The run is IN FLIGHT — record
-      // it honestly and DO NOT retry (a retry would double-run → double-cost).
-      if (err instanceof Error && err.name === 'AbortError') {
-        await markInFlight(runId);
-        return 'ok';
-      }
-      // A non-timeout network error means the request never landed — the run
-      // did not start. Safe to retry.
-      lastFailure = err instanceof Error ? err.message : String(err);
-      console.error('[routines] dispatch attempt failed', { attempt, spaceId }, err);
-    } finally {
-      clearTimeout(timer);
-    }
-
-    // Back off before the next attempt (skip the wait after the final attempt).
-    if (attempt < MAX_DISPATCH_ATTEMPTS) {
-      await sleep(dispatchBackoffMs(attempt));
-    }
-  }
-
-  // Every attempt was a genuine failure — the run never started. Record it.
-  await markFailed(runId, lastFailure);
-  return 'error';
+  return dispatchAgentRun(url, secret, body, runId);
 }
 
-/**
- * Modal-free fallback. Writes a ledger row, runs the instruction in-process,
- * and records the outcome with the same status vocabulary the Modal path uses:
- *   - run completed (ok)            → ledger 'in_flight', return 'ok'.
- *   - run failed / couldn't start   → ledger 'failed',    return 'error'.
- *
- * We mark 'in_flight' rather than a terminal 'confirmed' to stay consistent
- * with the Modal path's vocabulary (reconcile owns the terminal transition);
- * the run is done by the time we get here, but the ledger semantics match.
- * Best-effort like the rest of this module — ledger bookkeeping never throws.
- */
+/** Local execution uses the saved policy and records completion directly. */
 async function fireInProcessRun(
   spaceId: string,
   instruction: string,
   trigger: AgentRunTrigger,
 ): Promise<RoutineRunStatus> {
   const runId = await recordDispatch(spaceId, trigger);
+  let slot: Awaited<ReturnType<typeof claimRoutineSlot>> | undefined;
   try {
-    const result = await runAutonomousInstruction({ spaceId, instruction });
+    const policy = await resolveRoutinePolicy(spaceId, trigger, instruction);
+    if (!policy) {
+      await markFailed(runId, 'Agent is paused or settings are missing');
+      return 'error';
+    }
+    slot = await claimRoutineSlot(spaceId, runId, policy.dailyTokenBudget);
+    const result = await runAutonomousInstruction({ spaceId, instruction, executionMode: policy.executionMode, authorizedInstruction: policy.authorizedInstruction, onUsage: slot.recordUsage });
     if (result.ok) {
-      await markInFlight(runId);
+      await markConfirmed(runId);
       return 'ok';
     }
     await markFailed(runId, result.error ?? 'in-process run failed');
@@ -206,9 +126,7 @@ async function fireInProcessRun(
     // path anyway so a surprise never leaves the row stuck at 'dispatched'.
     await markFailed(runId, err instanceof Error ? err.message : String(err));
     return 'error';
+  } finally {
+    await slot?.release().catch(error => console.error('[routines] run lock release failed', error));
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

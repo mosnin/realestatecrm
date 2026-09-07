@@ -1,9 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { getSpaceByOwnerId } from '@/lib/space';
 import { notifyNewLead } from '@/lib/notify';
-import { normalizeLeadSource } from '@/lib/lead-source';
-import { unscoped } from '@/lib/supabase-guard';
-import { tenantTable } from '@/lib/tenant-db';
 
 
 export type AssignLeadResult =
@@ -26,152 +22,24 @@ export async function assignLeadToRealtor(params: {
 }): Promise<AssignLeadResult> {
   const { brokerage, assignedByUserId, contactId, realtorUserId } = params;
 
-  // ── Find the broker's space ────────────────────────────────────────────
-  const brokerSpace = await getSpaceByOwnerId(brokerage.ownerId);
-  if (!brokerSpace) {
-    return { ok: false, error: 'Broker space not found', status: 500 };
-  }
-
-  // ── Verify the contact belongs to this brokerage ───────────────────────
-  // Accept contacts in the broker owner's space (legacy path) OR contacts
-  // where brokerageId is explicitly set (modern intake path).
-  const { data: contactInSpace, error: contactError } = await supabase
-    .from('Contact')
-    .select('*')
-    .eq('id', contactId)
-    .eq('spaceId', brokerSpace.id)
-    .maybeSingle();
-  if (contactError) throw contactError;
-
-  let contact = contactInSpace;
-  let updateScope: { column: 'spaceId' | 'brokerageId'; value: string } = {
-    column: 'spaceId',
-    value: brokerSpace.id,
-  };
-  if (!contact) {
-    const { data: contactByBrokerageId, error: brokerageContactError } = await unscoped(supabase
-      .from('Contact'), 'broker: membership-proved cross-space access')
-      .select('*')
-      .eq('id', contactId)
-      .eq('brokerageId', brokerage.id)
-      .maybeSingle();
-    if (brokerageContactError) throw brokerageContactError;
-    contact = contactByBrokerageId;
-    updateScope = { column: 'brokerageId', value: brokerage.id };
-  }
-
-  if (!contact) {
-    return { ok: false, error: 'Contact not found in your brokerage space', status: 404 };
-  }
-
-  // ── Verify the realtor is a member of this brokerage ───────────────────
-  const { data: realtorMembership, error: memberError } = await supabase
-    .from('BrokerageMembership')
-    .select('id, role, userId')
-    .eq('brokerageId', brokerage.id)
-    .eq('userId', realtorUserId)
-    .maybeSingle();
-  if (memberError) throw memberError;
-  if (!realtorMembership) {
-    return { ok: false, error: 'User is not a member of this brokerage', status: 403 };
-  }
-
-  // ── Find the realtor's space ───────────────────────────────────────────
-  const realtorSpace = await getSpaceByOwnerId(realtorUserId);
-  if (!realtorSpace) {
-    return { ok: false, error: 'Member does not have a workspace yet', status: 404 };
-  }
-
-  // ── Fetch the realtor's name ───────────────────────────────────────────
-  const { data: realtorUser } = await supabase
-    .from('User')
-    .select('name, email')
-    .eq('id', realtorUserId)
-    .maybeSingle();
-  const realtorName = realtorUser?.name ?? realtorUser?.email ?? realtorUserId;
-
-  // ── Prevent double-assignment ──────────────────────────────────────────
-  const existingTags: string[] = contact.tags ?? [];
-  if (existingTags.includes('assigned')) {
-    return { ok: false, error: 'This lead has already been assigned', status: 409 };
-  }
-
-  // ── Clone the contact into the realtor's space ─────────────────────────
-  const newContactId = crypto.randomUUID();
-  const now = new Date().toISOString();
-
-  const { error: cloneError } = await tenantTable(supabase, 'Contact', { spaceId: realtorSpace.id }).insert({
-    id: newContactId,
-    spaceId: realtorSpace.id,
-    name: contact.name,
-    email: contact.email,
-    phone: contact.phone,
-    budget: contact.budget,
-    preferences: contact.preferences,
-    address: contact.address,
-    notes: contact.notes,
-    type: contact.type,
-    properties: contact.properties ?? [],
-    tags: ['assigned-by-broker', 'new-lead'],
-    scoringStatus: contact.scoringStatus,
-    leadScore: contact.leadScore,
-    scoreLabel: contact.scoreLabel,
-    scoreSummary: contact.scoreSummary,
-    scoreDetails: contact.scoreDetails,
-    sourceLabel: `brokerage: ${brokerage.name}`,
-    // Carry the original lead's structured source through the clone so
-    // attribution survives the broker assignment; fall back to 'referral'
-    // (the broker handed this lead over) when the source isn't a known value.
-    source: normalizeLeadSource(contact.source) ?? 'referral',
-    sourceDetail: contact.sourceDetail ?? null,
-    applicationData: contact.applicationData,
-    applicationRef: contact.applicationRef,
-    applicationStatus: contact.applicationStatus,
+  const { data, error } = await supabase.rpc('assign_broker_lead', {
+    p_brokerage_id: brokerage.id,
+    p_actor_id: assignedByUserId,
+    p_contact_id: contactId,
+    p_realtor_id: realtorUserId,
   });
-  if (cloneError) throw cloneError;
-
-  // ── Mark the original contact as assigned ──────────────────────────────
-  const assignmentNote = [
-    contact.notes,
-    `\nAssigned to: ${realtorName}`,
-    `--- Assigned to realtor (${realtorUserId}) on ${now} by ${assignedByUserId} ---`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const assignmentMeta = JSON.stringify({
-    assignedTo: realtorUserId,
-    assignedToName: realtorName,
-    assignedContactId: newContactId,
-    assignedSpaceId: realtorSpace.id,
-    assignedAt: now,
-  });
-
-  const { error: updateError } = await unscoped(supabase
-    .from('Contact'), 'broker: membership-proved cross-space access')
-    .update({
-      tags: [...existingTags.filter((t: string) => t !== 'new-lead'), 'assigned'],
-      notes: assignmentNote,
-      applicationStatus: 'assigned',
-      applicationStatusNote: assignmentMeta,
-      updatedAt: now,
-    })
-    .eq('id', contactId)
-    .eq(updateScope.column, updateScope.value);
-  if (updateError) throw updateError;
-
-  console.info('[assign-lead] lead assigned', {
-    contactId,
-    newContactId,
-    brokerageId: brokerage.id,
-    realtorUserId,
-    assignedBy: assignedByUserId,
-  });
-
+  if (error) throw error;
+  if (!data || typeof data.ok !== 'boolean') throw new Error('Assignment receipt missing');
+  if (!data.ok) return { ok: false, error: data.error, status: data.status };
+  const { newContactId, assignedToSpaceId } = data;
+  if (typeof newContactId !== 'string' || typeof assignedToSpaceId !== 'string') throw new Error('Invalid assignment receipt');
+  // A retried request returns the existing clone and never sends a duplicate notice.
+  if (data.replayed) return { ok: true, newContactId, assignedToSpaceId };
+  const contact = data.contact;
   // ── Notify the realtor (best-effort — never fail the assignment) ───────
   try {
     await notifyNewLead({
-      spaceId: realtorSpace.id,
+      spaceId: assignedToSpaceId,
       contactId: newContactId,
       name: contact.name,
       phone: contact.phone,
@@ -185,5 +53,5 @@ export async function assignLeadToRealtor(params: {
     console.error('[assign-lead] notification failed:', { newContactId, e });
   }
 
-  return { ok: true, newContactId, assignedToSpaceId: realtorSpace.id };
+  return { ok: true, newContactId, assignedToSpaceId: assignedToSpaceId };
 }

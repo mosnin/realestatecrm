@@ -109,6 +109,7 @@ def make_broker_agent(
     *,
     workspace_info: str | None = None,
     model: str | None = None,
+    unattended: bool = False,
 ) -> Agent:
     """Build the broker-variant Chippi agent.
 
@@ -153,8 +154,15 @@ def make_broker_agent(
         # (TEAM / PIPELINE / REVENUE / PERFORMANCE reads + the WRITE suite),
         # assembled in tools/broker/__init__.py. Adding a tool there flows
         # through here with no change required.
-        tools=list(BROKER_TOOLS),
-        input_guardrails=[pending_drafts_guardrail],
+        # A model-authored confirmed=True is not an interactive approval.
+        # Background routines may inspect the team and flag a deal for review.
+        tools=[tool for tool in BROKER_TOOLS if not unattended or tool.name in {
+            "team_health", "realtor_performance", "read_realtor_morning_story",
+            "find_stuck_deals", "find_unassigned_leads", "find_breached_leads",
+            "commission_report", "audit_response_times", "find_at_risk_agents",
+            "flag_deal_for_broker_review",
+        }],
+        input_guardrails=[] if unattended else [pending_drafts_guardrail],
     )
 
 

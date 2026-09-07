@@ -5,7 +5,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
-import { recordDispatch, markInFlight, markFailed } from '@/lib/agent/run-ledger';
+import { recordDispatch, markInFlight, markFailed, markConfirmed } from '@/lib/agent/run-ledger';
 
 export async function POST() {
   const authResult = await requireAuth();
@@ -70,12 +70,17 @@ export async function POST() {
         body: JSON.stringify({ space_id: space!.id, secret, user_id: userId, run_id: runId }),
         signal: AbortSignal.timeout(12_000),
       });
-      if (res.ok) {
-        await markInFlight(runId);
+      const receipt = await res.json().catch(() => null);
+      if (res.ok && receipt?.ok === true && receipt.run_id === runId) {
+        await markConfirmed(runId);
         return 'accepted' as const;
       }
-      await markFailed(runId, `Executor returned HTTP ${res.status}; check activity before retrying.`);
-      return 'rejected' as const;
+      if (receipt?.error || (res.status >= 400 && res.status < 500)) {
+        await markFailed(runId, String(receipt?.error ?? `Executor rejected request (${res.status})`));
+        return 'rejected' as const;
+      }
+      await markInFlight(runId);
+      return 'unknown' as const;
     } catch {
       // A lost acknowledgement does not prove the run never started. Keep the
       // dispatch unresolved and never retry this request automatically.

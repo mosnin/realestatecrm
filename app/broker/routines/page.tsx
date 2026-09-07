@@ -23,8 +23,8 @@ export default async function BrokerRoutinesPage() {
           <SplitReveal as="span" text="Standing instructions for Chippi" />
         </h1>
         <p className="text-sm text-muted-foreground">
-          Give Chippi a recurring beat for your brokerage. Every run drafts —
-          nothing is sent without your review.
+          Review team performance and flag deals on a schedule. Team-wide messages
+          and changes to members or routing require you in Chippi.
         </p>
       </header>
       <RoutinesManager apiBase="/api/broker/routines" />

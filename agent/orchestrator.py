@@ -401,7 +401,8 @@ async def run_agent_for_space(
     owner_clerk_id: str | None = None,
     trigger_source: dict | None = None,
     run_id: str | None = None,
-) -> None:
+    brokerage_id: str = "",
+) -> dict:
     """Execute one autonomous run for a space.
 
     Called from Modal `run_now_webhook` (manual "Run now", trigger-queue
@@ -441,7 +442,7 @@ async def run_agent_for_space(
     # header; an autonomous run must honour that.
     if not agent_settings.enabled:
         logger.bind(space_id=space.id, space_slug=space.slug).info("agent_run_skipped_disabled")
-        return
+        return {"ok": False, "error": "Agent is paused"}
 
     # One autonomous run per space at a time. Two concurrent runs would both
     # sweep the same stale leads and draft the same follow-ups — duplicate
@@ -458,15 +459,16 @@ async def run_agent_for_space(
     effective_run_id = supplied_run_id or str(uuid.uuid4())
     if not await acquire_run_lock(space.id, effective_run_id):
         logger.bind(space_id=space.id, run_id=effective_run_id).info("agent_run_skipped_concurrent")
-        return
+        return {"ok": False, "error": "Another run is in progress"}
     try:
-        await _run_locked(
+        return await _run_locked(
             space,
             agent_settings,
             effective_run_id,
             instruction,
             owner_clerk_id,
             trigger_source,
+            brokerage_id,
         )
     finally:
         await release_run_lock(space.id, effective_run_id)
@@ -479,7 +481,8 @@ async def _run_locked(
     instruction: str | None,
     owner_clerk_id: str | None = None,
     trigger_source: dict | None = None,
-) -> None:
+    brokerage_id: str = "",
+) -> dict:
     """Execute one autonomous run with the per-space run lock held.
 
     Always invoked by `run_agent_for_space`, which owns the lock's
@@ -495,13 +498,13 @@ async def _run_locked(
 
     if not await check_budget(space.id, agent_settings.daily_token_budget):
         log.warning("agent_run_skipped_budget_exhausted")
-        return
+        return {"ok": False, "error": "Daily token budget exhausted"}
 
     pruned = await prune_expired(space.id)
     if pruned:
         log.info("memories_pruned", count=pruned)
 
-    space_memories = await load_memories(
+    space_memories = [] if brokerage_id else await load_memories(
         space_id=space.id,
         entity_type="space",
         entity_id=space.id,
@@ -526,12 +529,14 @@ async def _run_locked(
         space_name=space.name,
         user_id=owner_clerk_id,
         trigger_source=trigger_source,
+        brokerage_id=brokerage_id,
+        broker_role="broker_owner" if brokerage_id else "",
         run_mode="unattended",
         run_policy_run_id=run_id,
     )
     # A routine run is scoped to its instruction — don't drain the trigger
     # queue out from under a trigger-driven run.
-    triggers = [] if instruction else await pop_triggers(space.id)
+    triggers = [] if instruction or brokerage_id else await pop_triggers(space.id)
     if triggers:
         log.info("triggers_found", count=len(triggers), events=[t.get("event") for t in triggers])
 
@@ -545,7 +550,7 @@ async def _run_locked(
 
     # Load AI profile for personalization
     db = await supabase()
-    ai_profile = await load_ai_profile(space.id, db)
+    ai_profile = "" if brokerage_id else await load_ai_profile(space.id, db)
 
     # Autonomous runs have no "current user" — the workspace OWNER's
     # Clerk userId is the entity whose Composio connections we use.
@@ -559,7 +564,7 @@ async def _run_locked(
     connected_toolkits: list[str] = []
     integration_tools: list = []
     try:
-        if owner_clerk_id:
+        if owner_clerk_id and not brokerage_id:
             connected_toolkits = await active_toolkits(space.id, owner_clerk_id)
             integration_tools = await load_integration_tools(
                 space.id, owner_clerk_id, toolkits=connected_toolkits
@@ -597,16 +602,25 @@ async def _run_locked(
         + _intake_line
     )
 
-    chippi = make_chippi_agent(
-        ai_profile_text=ai_profile,
-        extra_tools=integration_tools,
-        workspace_info=workspace_info,
-        model=resolve_chat_model(agent_settings.chat_model),
-        email_inbox_connected=any(
-            tk in ("gmail", "outlook") for tk in connected_toolkits
-        ),
-    )
-    prompt = _build_opening_prompt(space, memory_context, triggers, instruction)
+    if brokerage_id:
+        from chippi_broker import make_broker_agent
+        chippi = make_broker_agent(
+            unattended=True,
+            workspace_info=f"Brokerage: {brokerage_id}. Use only brokerage tools. This is an unattended run under saved policy.",
+            model=resolve_chat_model(agent_settings.chat_model),
+        )
+        prompt = f"AUTONOMOUS brokerage routine. Execute this standing instruction within your tool permissions:\n{instruction or 'Review team exceptions and report actionable findings.'}"
+    else:
+        chippi = make_chippi_agent(
+            ai_profile_text=ai_profile,
+            extra_tools=integration_tools,
+            workspace_info=workspace_info,
+            model=resolve_chat_model(agent_settings.chat_model),
+            email_inbox_connected=any(
+                tk in ("gmail", "outlook") for tk in connected_toolkits
+            ),
+        )
+        prompt = _build_opening_prompt(space, memory_context, triggers, instruction)
 
     # Reasoning effort — parity with the chat path. Default "low" (Phase 1
     # PR #155 stopped paying reasoning tokens on routine sweeps); escalate
@@ -734,7 +748,7 @@ async def _run_locked(
             tool_calls=trajectory_tool_calls,
             extra={"pending_drafts": pending},
         )
-        return
+        return {"ok": False, "error": "Run needs attention: pending draft limit"}
 
     except Exception as exc:
         log.exception("agent_run_failed")
@@ -772,7 +786,7 @@ async def _run_locked(
             tool_calls=trajectory_tool_calls,
             extra={"error": str(exc)[:500]},
         )
-        return
+        return {"ok": False, "error": "Agent execution failed"}
     finally:
         # Drain the fire-and-forget publish tasks so the realtor's activity
         # feed gets every tool event before the Modal container exits.
@@ -831,3 +845,5 @@ async def _run_locked(
         final_summary=final_summary,
     )
     log.info("agent_run_finished", total_tokens=total_tokens)
+
+    return {"ok": True, "run_id": run_id}

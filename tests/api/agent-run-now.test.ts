@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const { settings, afterTasks, fetchMock, markInFlight, markFailed } =
+const { settings, afterTasks, fetchMock, markInFlight, markFailed, markConfirmed } =
   vi.hoisted(() => ({
     settings: { enabled: true },
     afterTasks: [] as Array<() => Promise<void>>,
     fetchMock: vi.fn(),
     markInFlight: vi.fn(),
     markFailed: vi.fn(),
+    markConfirmed: vi.fn(),
   }));
 vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
@@ -34,6 +35,7 @@ vi.mock('@/lib/agent/run-ledger', () => ({
   recordDispatch: async () => 'run-1',
   markInFlight,
   markFailed,
+  markConfirmed,
 }));
 import { POST } from '@/app/api/agent/run-now/route';
 beforeEach(() => {
@@ -52,12 +54,22 @@ afterEach(() => {
 });
 describe('Background review dispatch receipts', () => {
   it('does not report an executor refusal as a started run', async () => {
-    fetchMock.mockResolvedValue(new Response('', { status: 503 }));
+    fetchMock.mockResolvedValue(Response.json({ error: 'Unauthorized' }, { status: 401 }));
     const res = await POST();
     expect(res.status).toBe(503);
     expect((await res.json()).triggered).toBe(false);
     expect(markInFlight).not.toHaveBeenCalled();
     expect(markFailed).toHaveBeenCalled();
+  });
+  it('requires a matching execution receipt before confirming', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ok: true, run_id: 'run-1' }));
+    expect((await (await POST()).json()).triggered).toBe(true);
+    expect(markConfirmed).toHaveBeenCalledWith('run-1');
+  });
+  it('rejects worker errors inside HTTP 200', async () => {
+    fetchMock.mockResolvedValue(Response.json({ error: 'space_id required' }));
+    expect((await (await POST()).json()).triggered).toBe(false);
+    expect(markConfirmed).not.toHaveBeenCalled();
   });
   it('preserves an ambiguous acknowledgement without dispatching twice', async () => {
     fetchMock.mockRejectedValue(new DOMException('timed out', 'TimeoutError'));

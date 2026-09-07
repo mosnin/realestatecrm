@@ -1,55 +1,11 @@
-/**
- * Broker routine dispatch — fires the Modal autonomous run for one broker
- * routine, scoped to a brokerage instead of a single space.
- *
- * Mirrors fireRoutineRun (lib/routines.ts) one-for-one, swapping spaceId for
- * brokerageId and dispatching a BROKER-MODE run: the POST body carries
- * { brokerage_id, mode: 'broker', secret, instruction, run_id }.
- *
- * NOTE: requires the Modal orchestrator to support webhook-triggered
- * broker-mode runs; execution depends on that backend. Until Modal handles
- * mode: 'broker' + brokerage_id, the dispatch will land but the run won't do
- * anything broker-scoped. The dispatch/ledger/retry semantics here are correct
- * and ready the moment the backend supports it.
- *
- * The Modal endpoint only returns once the whole run finishes, so a dispatch
- * timeout is the normal case here, not a failure: the request landed and the
- * run is in flight. Like every autonomous path, the run DRAFTS — it never
- * sends a message unattended.
- *
- * Shared by the hourly cron (/api/cron/broker-routines) and the "Run now"
- * button. Every dispatch writes an AgentRunLedger row so a fired run is visible
- * after the fact; the outcome is recorded honestly (see fireRoutineRun's header
- * for the 2xx / timeout / failure matrix — identical here).
- *
- * The run ledger is keyed by spaceId, so we resolve the brokerage owner's
- * Space.id and record the dispatch against it. The Modal side still receives
- * brokerage_id + mode:'broker' as the authoritative scope.
- */
+/** Brokerage runs use a verified owner workspace and the broker tool registry. */
 
 import { supabase } from '@/lib/supabase';
 import {
   recordDispatch,
-  markInFlight,
-  markFailed,
 } from '@/lib/agent/run-ledger';
+import { dispatchAgentRun } from '@/lib/agent/dispatch-run';
 import type { RoutineRunStatus } from '@/lib/routines';
-
-const DISPATCH_TIMEOUT_MS = 12_000;
-
-// Genuine dispatch failures (non-2xx / non-timeout network errors) are safe to
-// retry: the run never started, so a retry can't double-run. Timeouts are NOT
-// retried here — see the AbortError branch below.
-const MAX_DISPATCH_ATTEMPTS = 3;
-
-// Exponential backoff base (ms) between retry attempts. Read at call time so
-// tests can set ROUTINE_DISPATCH_BACKOFF_MS=0 for instant retries; defaults to
-// 1s (→ 1s/2s/4s) in production. Shares the realtor env var for parity.
-function dispatchBackoffMs(attempt: number): number {
-  const raw = Number(process.env.ROUTINE_DISPATCH_BACKOFF_MS);
-  const base = Number.isFinite(raw) && raw >= 0 ? raw : 1_000;
-  return base * 2 ** (attempt - 1);
-}
 
 /**
  * Resolve a spaceId to key the run-ledger row against. The ledger schema
@@ -109,14 +65,13 @@ export async function fireBrokerRoutineRun(
     return 'error';
   }
 
-  // Write the ledger row up front and forward the runId to Modal in the POST
-  // body. Modal ignores unknown fields today — forward-compatible for a future
-  // Modal-side run_id + completion callback.
+  // Correlate the dispatch, worker result and trajectory with one run ID.
   const runId = await recordDispatch(ledgerSpaceId, 'broker_routine');
 
   // Broker-mode dispatch body. brokerage_id + mode:'broker' are the
   // authoritative scope the Modal orchestrator must support.
   const body: Record<string, unknown> = {
+    space_id: ledgerSpaceId,
     brokerage_id: brokerageId,
     mode: 'broker',
     secret,
@@ -125,58 +80,5 @@ export async function fireBrokerRoutineRun(
   };
   if (userId) body.user_id = userId;
 
-  // Retry loop. Each iteration is one POST. We only LOOP on a genuine dispatch
-  // failure (non-2xx / non-timeout network error) — the run never started, so a
-  // retry is safe. A 2xx or a timeout returns immediately (no retry).
-  let lastFailure = 'unknown dispatch error';
-  for (let attempt = 1; attempt <= MAX_DISPATCH_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), DISPATCH_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${secret}`,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (res.ok) {
-        // Accepted — the run is in flight (awaiting end-of-run artifact).
-        await markInFlight(runId);
-        return 'ok';
-      }
-      // Non-2xx: Modal refused the dispatch, so the run did NOT start. Safe to
-      // retry. Capture the status for the ledger if this was the last attempt.
-      lastFailure = `Modal returned ${res.status}`;
-    } catch (err) {
-      // AbortError: the POST was sent and Modal just hasn't returned because the
-      // run is still going. IN FLIGHT — record it honestly and DO NOT retry (a
-      // retry would double-run → double-cost).
-      if (err instanceof Error && err.name === 'AbortError') {
-        await markInFlight(runId);
-        return 'ok';
-      }
-      // A non-timeout network error means the request never landed — the run
-      // did not start. Safe to retry.
-      lastFailure = err instanceof Error ? err.message : String(err);
-      console.error('[broker-routines] dispatch attempt failed', { attempt, brokerageId }, err);
-    } finally {
-      clearTimeout(timer);
-    }
-
-    // Back off before the next attempt (skip the wait after the final attempt).
-    if (attempt < MAX_DISPATCH_ATTEMPTS) {
-      await sleep(dispatchBackoffMs(attempt));
-    }
-  }
-
-  // Every attempt was a genuine failure — the run never started. Record it.
-  await markFailed(runId, lastFailure);
-  return 'error';
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return dispatchAgentRun(url, secret, body, runId);
 }

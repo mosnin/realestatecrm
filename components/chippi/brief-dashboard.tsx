@@ -24,7 +24,6 @@ import {
 import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion';
-import { AsciiField } from '@/components/dashboard/sicarii/ascii-field';
 import { Button } from '@/components/ui/button';
 import { DASHBOARD_ROW } from '@/components/ui/surface-card';
 import { AuroraGlow } from '@/components/effects/aurora-glow';
@@ -301,15 +300,9 @@ export function BriefDashboard({ slug, data }: Props) {
       <BriefCell
         span="w-full"
         delay={delay()}
-        className="overflow-hidden"
+        className="overflow-hidden border-b border-border"
+        surface="none"
       >
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
         <Hero slug={slug} data={data} model={model} />
       </BriefCell>
 
@@ -317,9 +310,9 @@ export function BriefDashboard({ slug, data }: Props) {
         <EmptyTodayOrientation slug={slug} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-outcome-grid>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border lg:grid-cols-4 [&>*]:border-border [&>*:nth-child(even)]:border-l [&>*:nth-child(n+3)]:border-t lg:[&>*:nth-child(n+2)]:border-l lg:[&>*:nth-child(n+3)]:border-t-0" data-outcome-grid>
             {model.metrics.map((metric) => (
-              <BriefCell key={metric.label} span="h-full" delay={delay()} interactive>
+              <BriefCell key={metric.label} span="h-full" delay={delay()} surface="none" interactive>
                 <MetricLink metric={metric} />
               </BriefCell>
             ))}
@@ -377,7 +370,7 @@ export function BriefDashboard({ slug, data }: Props) {
 
 function Hero({slug, data, model}: {slug: string; data: DashboardData; model: BriefDashboardViewModel}) {
   return (
-    <header className="relative z-10 p-5 sm:p-6">
+    <header className="relative z-10 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-brand text-2xl font-medium tracking-tight text-foreground sm:text-3xl">Today</h1>
         <TodayDate />

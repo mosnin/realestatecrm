@@ -266,15 +266,25 @@ async def run_now_webhook(item: dict) -> dict:
         if not sr.data or not spr.data:
             return {"error": f"space or agent settings not found: {space_id}"}
 
-        await run_agent_for_space(
+        brokerage_id = ""
+        if item.get("mode") == "broker":
+            from broker_run_scope import resolve_broker_run_owner
+            brokerage_id = item.get("brokerage_id") or ""
+            owner = await resolve_broker_run_owner(db, brokerage_id, space_id)
+            if not owner:
+                return {"error": "Brokerage owner workspace could not be verified", "run_id": run_id}
+            user_id = owner
+
+        outcome = await run_agent_for_space(
             Space(id=spr.data["id"], slug=spr.data["slug"], name=spr.data["name"]),
             AgentSettings.model_validate(sr.data),
             instruction=instruction or None,
             owner_clerk_id=user_id or None,
             trigger_source=trigger_source or None,
             run_id=run_id or None,
+            brokerage_id=brokerage_id,
         )
-        return {"ok": True, "space_id": space_id}
+        return {**outcome, "space_id": space_id, "run_id": run_id}
 
     except Exception as e:
         masked_error = mask_secrets(str(e))

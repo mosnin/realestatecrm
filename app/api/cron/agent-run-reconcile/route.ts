@@ -1,33 +1,6 @@
-/**
- * GET /api/cron/agent-run-reconcile
- *
- * Reconciles AgentRunLedger rows that are still 'dispatched'/'in_flight' against
- * the run artifacts the orchestrator writes, so the ledger reflects whether a
- * dispatched autonomous run actually ran. This is the OBSERVABILITY half of the
- * dispatch-reliability work (Fix #5): dispatch records the attempt + outcome;
- * this confirms (or flags) it after the fact.
- *
- * For each unconfirmed row past CONFIRM_AFTER_MS (the run had time to start +
- * leave a trace), we look for ANY run artifact for that space at/after the row's
- * dispatchedAt:
- *   - an AgentTrajectory (written at end-of-run) with startedAt/endedAt >= dispatchedAt
- *   - an AgentActivityLog for the space with createdAt >= dispatchedAt
- *   - an AgentDraft for the space with createdAt >= dispatchedAt
- * If found → mark 'confirmed' (stamp confirmedAt). If NOTHING appears after the
- * longer FAIL_AFTER_MS → mark 'failed' with reason 'no_artifact' for visibility.
- *
- * It deliberately does NOT auto-re-dispatch: artifact correlation here is by
- * (spaceId, time window), NOT by run_id, so two overlapping dispatches for one
- * space can't be told apart — re-dispatching a run that's actually live (or
- * already produced drafts) would double-run → double-cost. The ledger simply
- * surfaces failures for alerting. Precise per-run correlation + safe auto-retry
- * needs a Modal-side run_id echoed back via a completion callback (future — we
- * already forward run_id in the dispatch body so the wire is ready).
- *
- * Auth: Bearer ${CRON_SECRET} (same pattern as the other cron routes). An UNSET
- * CRON_SECRET returns 500 (a misconfiguration monitorCron surfaces to Sentry).
- * Disable: set CRON_RUN_RECONCILE_DISABLED=1.
- */
+/** Reconcile unresolved runs only against completed trajectories with the same
+ * workspace and run ID. Missing completion is surfaced for attention; this
+ * process never replays an action after an ambiguous acknowledgement. */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
@@ -102,13 +75,14 @@ async function handler(req: NextRequest) {
   let pending = 0; // still unconfirmed but not yet past the fail threshold
 
   for (const row of ledgerRows) {
-    const hasArtifact = await runArtifactExists(row.spaceId, row.dispatchedAt);
+    const hasArtifact = await runArtifactExists(row.spaceId, row.runId);
     if (hasArtifact) {
       const nowIso = new Date().toISOString();
       const { error: updErr } = await supabase
         .from('AgentRunLedger')
         .update({ status: 'confirmed', confirmedAt: nowIso, updatedAt: nowIso })
-        .eq('runId', row.runId);
+        .eq('runId', row.runId)
+        .in('status', ['dispatched', 'in_flight']);
       if (updErr) {
         logger.warn('[cron.agent-run-reconcile] confirm update failed', { runId: row.runId, err: updErr.message });
       } else {
@@ -125,7 +99,8 @@ async function handler(req: NextRequest) {
       const { error: updErr } = await supabase
         .from('AgentRunLedger')
         .update({ status: 'failed', failureReason: 'no_artifact', updatedAt: nowIso })
-        .eq('runId', row.runId);
+        .eq('runId', row.runId)
+        .in('status', ['dispatched', 'in_flight']);
       if (updErr) {
         logger.warn('[cron.agent-run-reconcile] fail update failed', { runId: row.runId, err: updErr.message });
       } else {
@@ -147,45 +122,15 @@ async function handler(req: NextRequest) {
   return NextResponse.json(summary);
 }
 
-/**
- * Does ANY autonomous-run artifact exist for this space at/after dispatchedAt?
- * Checks the three durable traces a run leaves — the AgentTrajectory written at
- * end-of-run is the strongest signal; AgentActivityLog / AgentDraft cover runs
- * that acted before finishing. A single hit is enough to confirm the run ran.
- *
- * Correlation is by (spaceId, time window), not run_id — see the route header
- * for why that's a confirmation-only (never auto-retry) signal.
- */
-async function runArtifactExists(spaceId: string, dispatchedAt: string): Promise<boolean> {
-  // 1) AgentTrajectory — materialized at end-of-run. startedAt is the run's own
-  //    clock; a trajectory whose run started at/after our dispatch is a match.
-  const traj = await supabase
+async function runArtifactExists(spaceId: string, runId: string): Promise<boolean> {
+  const trajectory = await supabase
     .from('AgentTrajectory')
     .select('id')
     .eq('spaceId', spaceId)
-    .gte('startedAt', dispatchedAt)
+    .eq('runId', runId)
+    .eq('status', 'completed')
     .limit(1);
-  if (!traj.error && (traj.data?.length ?? 0) > 0) return true;
-
-  // 2) AgentActivityLog — the run acted on something (created/updated a record).
-  const act = await supabase
-    .from('AgentActivityLog')
-    .select('id')
-    .eq('spaceId', spaceId)
-    .gte('createdAt', dispatchedAt)
-    .limit(1);
-  if (!act.error && (act.data?.length ?? 0) > 0) return true;
-
-  // 3) AgentDraft — the run drafted something (the sweep's whole point).
-  const draft = await supabase
-    .from('AgentDraft')
-    .select('id')
-    .eq('spaceId', spaceId)
-    .gte('createdAt', dispatchedAt)
-    .limit(1);
-  if (!draft.error && (draft.data?.length ?? 0) > 0) return true;
-
-  return false;
+  return !trajectory.error && (trajectory.data?.length ?? 0) > 0;
 }
 
 export const GET = monitorCron('agent-run-reconcile', { crontab: '*/15 * * * *' }, handler);

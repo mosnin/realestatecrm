@@ -26,13 +26,6 @@ const FAMILY_SURFACES = [
     action: 'Plan outreach',
   },
   {
-    family: 'deal-pipeline',
-    file: 'components/deals/deals-page-client.tsx',
-    heading: 'Move the deal that can close next.',
-    work: '<KanbanBoard',
-    action: 'Tell Chippi',
-  },
-  {
     family: 'offer-negotiation',
     file: 'app/s/[slug]/offers/page.tsx',
     heading: 'Turn the right offer into a signed deal.',

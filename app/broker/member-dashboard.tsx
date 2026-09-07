@@ -11,7 +11,6 @@ import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
 import { SplitReveal } from '@/components/motion';
-import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 import {
   BROKER_DIVIDED_LIST,
   BROKER_EMPTY,
@@ -251,13 +250,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
           Muted greeting → serif H1 → one-sentence status. Same shape
           every other broker page uses. ── */}
       <BriefReveal delay={0.01} className={BROKER_HERO}>
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
+
         <header className="relative z-10">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
             CHIPPI // TODAY
@@ -292,6 +285,10 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
         ))}
       </BriefReveal>
 
+      <Link href={`/s/${spaceSlug}/follow-through`} className="flex items-center justify-between rounded-lg border border-border px-5 py-4 text-sm">
+        <span><strong className="font-medium">Your handoffs</strong><span className="ml-2 text-muted-foreground">Accept assigned leads and record the first response.</span></span>
+        <ArrowRight className="h-4 w-4 shrink-0" />
+      </Link>
       {/* ── Two-column layout: Recent leads + Overdue follow-ups ── */}
       <BriefReveal delay={0.08} as="div" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent assigned leads */}

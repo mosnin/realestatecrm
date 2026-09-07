@@ -46,6 +46,7 @@ import {
   ChevronDown,
   Settings,
   Gauge,
+  Search,
 } from "lucide-react";
 
 // ── MobileNavContext ──────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ type NavMode = "dock" | "sidebar";
 const SIDEBAR_WIDTH = 256; // px - the sidebar panel's own width
 // When sidebar is floating (left-3 = 12px margin), content must shift by:
 //   sidebar width + left margin + gutter between sidebar edge and content
-const SIDEBAR_INSET = SIDEBAR_WIDTH + 12 + 16; // 284 px total
+const SIDEBAR_INSET = SIDEBAR_WIDTH; // Flush navigation, matching the supplied dashboard references.
 const STORAGE_KEY = "chippi-sicarii-nav-mode";
 
 // ── Dock magnification constants ─────────────────────────────────────────────
@@ -415,7 +416,7 @@ function SidebarItem({
         className={cn(
           "flex items-center rounded-lg transition-colors",
           active
-            ? "bg-primary/12 text-accent-foreground"
+            ? "bg-foreground/10 text-foreground"
             : childActive
               ? "text-foreground"
               : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
@@ -424,16 +425,14 @@ function SidebarItem({
         <Link
           href={item.href}
           aria-current={active ? "page" : undefined}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {item.label !== 'Chippi' && <Icon
             className="h-[18px] w-[18px] shrink-0"
             strokeWidth={active ? 2.2 : 1.8}
           />}
           <span className="truncate">{item.label === "Chippi" ? <BrandLogo className="h-5" /> : item.label}</span>
-          {active && (
-            <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-          )}
+
         </Link>
         {!!item.subItems?.length && (
           <button
@@ -470,7 +469,7 @@ function SidebarItem({
                 className={cn(
                   "block rounded-md px-3 py-1.5 text-[13px] focus-visible:ring-2 focus-visible:ring-ring",
                   selected
-                    ? "bg-primary/12 font-medium text-accent-foreground"
+                    ? "bg-foreground/10 font-medium text-foreground"
                     : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                 )}
               >
@@ -506,7 +505,7 @@ function Sidebar({
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -(SIDEBAR_WIDTH + 24), opacity: 0 }}
       transition={MORPH_SPRING}
-      className="fixed inset-y-3 left-3 z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-background/95 shadow-xl backdrop-blur-2xl dark:border-white/10 dark:bg-sicarii-charcoal/95"
+      className="fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden border-r border-border bg-[var(--sidebar)]"
       style={{ width: SIDEBAR_WIDTH }}
       aria-label="Primary sidebar"
     >
@@ -530,6 +529,18 @@ function Sidebar({
           </button>
         </div>
 
+        {!home.startsWith("/broker") && (
+          <button
+            type="button"
+            aria-label="Search workspace"
+            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }))}
+            className="mx-3 mt-3 flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Search className="h-4 w-4" />
+            <span>Search</span>
+            <kbd className="ml-auto text-xs">⌘ K</kbd>
+          </button>
+        )}
         {/* ── Nav items ── */}
         <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto py-4 px-2">
           {(sidebarGroups ?? [{ label: "Workspace", items: allItems }]).map(
@@ -904,7 +915,7 @@ function DashboardShell({
     <MobileNavContext.Provider value={{ navOpen: false }}>
       <LayoutGroup>
         <div
-          className="sicarii-shell min-h-screen bg-background dark:bg-sicarii-charcoal-dark"
+          className="sicarii-shell min-h-screen bg-background"
           data-chat={isChat}
         >
           {/* ── Floating top header ── */}

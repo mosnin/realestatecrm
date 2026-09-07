@@ -1,3 +1,4 @@
+vi.mock('@/lib/agent/routine-budget', () => ({ claimRoutineSlot: vi.fn().mockResolvedValue({ recordUsage: vi.fn(), release: vi.fn().mockResolvedValue(undefined) }) }));
 /**
  * End-to-end proof for the Modal-free routine → run wiring (the background path
  * that "never worked"). This is the in-process fallback in lib/routines'
@@ -10,7 +11,7 @@
  *
  * Asserts the two outcomes precisely:
  *   ok run    → returns 'ok',    runAutonomousInstruction got {spaceId,instruction},
- *               ledger recordDispatch fired THEN markInFlight (recorded → in_flight).
+ *               ledger recordDispatch fired THEN markConfirmed (recorded → confirmed).
  *   failed run → returns 'error', ledger markFailed fired with the reason.
  *
  * vi.hoisted holds the factory-referenced mocks so the vi.mock factories can
@@ -19,15 +20,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // ── run-ledger mock ───────────────────────────────────────────────────────────
-const { recordDispatchMock, markInFlightMock, markFailedMock } = vi.hoisted(() => ({
+const { recordDispatchMock, markConfirmedMock, markFailedMock } = vi.hoisted(() => ({
   recordDispatchMock: vi.fn<(spaceId: string, trigger: string, runId?: string) => Promise<string>>(),
-  markInFlightMock: vi.fn<(runId: string) => Promise<void>>(),
+  markConfirmedMock: vi.fn<(runId: string) => Promise<void>>(),
   markFailedMock: vi.fn<(runId: string, reason: string) => Promise<void>>(),
 }));
 
 vi.mock('@/lib/agent/run-ledger', () => ({
   recordDispatch: recordDispatchMock,
-  markInFlight: markInFlightMock,
+  markConfirmed: markConfirmedMock,
   markFailed: markFailedMock,
 }));
 
@@ -44,6 +45,7 @@ vi.mock('@/lib/agent/run-instruction', () => ({
   runAutonomousInstruction: runAutonomousInstructionMock,
 }));
 
+vi.mock('@/lib/agent/routine-policy', () => ({ resolveRoutinePolicy: vi.fn().mockResolvedValue({ executionMode: 'review' }) }));
 import { fireRoutineRun } from '@/lib/routines';
 
 const ENV_KEYS = ['MODAL_WEBHOOK_URL', 'AGENT_INTERNAL_SECRET'] as const;
@@ -58,7 +60,7 @@ beforeEach(() => {
   delete process.env.AGENT_INTERNAL_SECRET;
 
   recordDispatchMock.mockResolvedValue('run-inproc-id');
-  markInFlightMock.mockResolvedValue(undefined);
+  markConfirmedMock.mockResolvedValue(undefined);
   markFailedMock.mockResolvedValue(undefined);
 });
 
@@ -70,7 +72,7 @@ afterEach(() => {
 });
 
 describe('fireRoutineRun — in-process run (Modal unset)', () => {
-  it('drives the headless agent and books the run: ok → in_flight', async () => {
+  it('drives the headless agent and books the run: ok → confirmed', async () => {
     runAutonomousInstructionMock.mockResolvedValue({ ok: true, ran: true });
 
     const status = await fireRoutineRun('space_42', 'check on quiet deals');
@@ -80,19 +82,19 @@ describe('fireRoutineRun — in-process run (Modal unset)', () => {
 
     // (b) the agent ran with the right space + instruction.
     expect(runAutonomousInstructionMock).toHaveBeenCalledTimes(1);
-    expect(runAutonomousInstructionMock).toHaveBeenCalledWith({
+    expect(runAutonomousInstructionMock).toHaveBeenCalledWith(expect.objectContaining({
       spaceId: 'space_42',
-      instruction: 'check on quiet deals',
-    });
+      instruction: 'check on quiet deals', executionMode: 'review',
+    }));
 
-    // (c) the ledger recorded the dispatch, then marked it in_flight — in that
+    // (c) the ledger recorded the dispatch, then marked it confirmed — in that
     // order — keyed by the runId recordDispatch returned. A failed run was NOT
     // recorded.
     expect(recordDispatchMock).toHaveBeenCalledWith('space_42', 'routine');
-    expect(markInFlightMock).toHaveBeenCalledWith('run-inproc-id');
+    expect(markConfirmedMock).toHaveBeenCalledWith('run-inproc-id');
     expect(markFailedMock).not.toHaveBeenCalled();
     expect(recordDispatchMock.mock.invocationCallOrder[0]).toBeLessThan(
-      markInFlightMock.mock.invocationCallOrder[0],
+      markConfirmedMock.mock.invocationCallOrder[0],
     );
   });
 
@@ -108,7 +110,7 @@ describe('fireRoutineRun — in-process run (Modal unset)', () => {
     expect(status).toBe('error');
     // The run still got recorded up front; only the terminal mark differs.
     expect(recordDispatchMock).toHaveBeenCalledWith('space_42', 'routine');
-    expect(markInFlightMock).not.toHaveBeenCalled();
+    expect(markConfirmedMock).not.toHaveBeenCalled();
     expect(markFailedMock).toHaveBeenCalledTimes(1);
     expect(markFailedMock.mock.calls[0][0]).toBe('run-inproc-id');
     expect(markFailedMock.mock.calls[0][1]).toContain('space or owner not found');

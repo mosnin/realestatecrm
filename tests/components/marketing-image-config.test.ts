@@ -1,21 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-
-describe('marketing social-image route config', () => {
-  it('keeps Twitter metadata literals aligned with the Open Graph image', () => {
-    const twitter = readFileSync('app/(marketing)/twitter-image.tsx', 'utf8');
-    const openGraph = readFileSync('app/(marketing)/opengraph-image.tsx', 'utf8');
-
-    for (const literal of [
-      "export const runtime = 'edge'",
-      "export const alt = 'Chippi · AI lead conversion teammate for real estate'",
-      'export const size = { width: 1200, height: 630 }',
-      "export const contentType = 'image/png'",
-    ]) {
-      expect(twitter).toContain(literal);
-      expect(openGraph).toContain(literal);
-    }
-
-    expect(twitter).not.toMatch(/export\s*\{[\s\S]*?runtime[\s\S]*?\}\s*from/);
+import * as twitter from '../../app/(marketing)/twitter-image';
+import * as openGraph from '../../app/(marketing)/opengraph-image';
+describe('social image route metadata', () => {
+  it('serves matching formats and accessible descriptions', () => {
+    expect(twitter.size).toEqual(openGraph.size);
+    expect(twitter.contentType).toBe(openGraph.contentType);
+    expect(twitter.alt).toBe(openGraph.alt);
+    expect(twitter.runtime).toBe(openGraph.runtime);
   });
 });

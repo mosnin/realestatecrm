@@ -7,7 +7,11 @@ editor, table, or chat, but it may not introduce a different brand language.
 
 The authenticated shell uses the actual mosnin/Sicarii dashboard source, adapted
 to Chippi routes and an orange palette. See docs/product-rebuild/sicarii-restoration.md.
-The current hierarchy specification is docs/product-rebuild/design-os-hierarchy.md.
+The current refinement follows the owner's ten OpenAI dashboard screenshots in
+Google Drive's `openai_dash` folder. See docs/product-rebuild/execution-2026-09-07.md.
+Use a flush 256px sidebar, neutral selection, visible workspace search, compact
+toolbars, and content divided by hairlines. Keep existing feature routes and the
+Chippi wordmark; the screenshots guide hierarchy, not product branding.
 
 ## Product principles
 
@@ -31,18 +35,17 @@ The current hierarchy specification is docs/product-rebuild/design-os-hierarchy.
 ## Canonical frame
 
 - Canvas ceiling: `1500px` (`PAGE_MAX`).
-- Desktop gutters: `48px`; tablet `40px`; mobile `16px`.
+- Desktop gutters: `32px`; tablet `24px`; mobile `16px`.
 - Section rhythm: `20–32px`; compact orientation regions keep work near the top.
-- Panel radius: `28px` (`rounded-[1.75rem]`).
-- Row radius: `12px`; controls remain rounded pills.
-- Panels are neutral white or charcoal with the shared shallow editorial shadow.
-- At most one low-opacity shared `AsciiField` atmosphere is allowed on a
-  dashboard view, behind its orientation region only.
+- Panel radius: `12px`; inset radius: `8px`.
+- Controls use `8px` corners; reserve pills for status badges.
+- Panels use white or charcoal surfaces, visible hairline borders, and no decorative shadow.
+- Dashboard orientation is typographic. Do not add animated decorative backgrounds.
 
 ## Type
 
 - Product chrome and body copy use Inter.
-- Page titles and section headlines use Space Grotesk through `TITLE_FONT`.
+- Page titles and section headlines also use Inter through the shared type variables.
 - All application text is upright sans-serif; serif and italic styling is prohibited.
 - Default page titles are 24–30px. Reserve larger type for exceptional content,
   not greetings or repetitive KPI cards.
