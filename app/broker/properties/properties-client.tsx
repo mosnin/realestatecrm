@@ -22,6 +22,7 @@
  *   PATCH /api/broker/properties/[id]/assign -> Property
  */
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { Building2, Plus, Loader2, X, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -99,7 +100,7 @@ function OwnershipBadge({ member }: OwnershipBadgeProps) {
         'bg-muted/60 text-muted-foreground border border-dashed border-border/60',
       )}
     >
-      Available
+      Unassigned
     </span>
   );
 }
@@ -543,6 +544,8 @@ export function BrokerPropertiesClient() {
   const [loading, setLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [query, setQuery] = useState('');
+  const [assignment, setAssignment] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -630,6 +633,10 @@ export function BrokerPropertiesClient() {
     );
   }
 
+  const visibleProperties = properties.filter(property =>
+    `${formatPropertyAddress(property)} ${property.mlsNumber ?? ''}`.toLowerCase().includes(query.toLowerCase()) &&
+    (assignment === 'all' || (assignment === 'unassigned' ? !property.assignedSpaceId : property.assignedSpaceId === assignment))
+  );
   const count = properties.length;
   const statusSentence =
     count === 0
@@ -668,6 +675,14 @@ export function BrokerPropertiesClient() {
         />
       )}
 
+      <div className="flex flex-wrap gap-2">
+        <Input aria-label="Search pool properties" placeholder="Search address or MLS number" value={query} onChange={event => setQuery(event.target.value)} className="basis-full sm:basis-auto flex-1" />
+        <select aria-label="Filter property assignment" value={assignment} onChange={event => setAssignment(event.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm">
+          <option value="all">All assignments</option><option value="unassigned">Unassigned</option>
+          {members.map(member => <option key={member.id} value={member.id}>{member.ownerName || member.name}</option>)}
+        </select>
+      </div>
+      {properties.length > 0 && visibleProperties.length === 0 && <p role="status" className="text-sm">No properties match this search and assignment.</p>}
       {/* Empty state */}
       {properties.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-12 text-center">
@@ -698,7 +713,7 @@ export function BrokerPropertiesClient() {
              - OwnershipBadge (in the facts line, after status/type)
              - AssignControl (rightmost column, hidden on mobile) */
         <StaggerList stagger={0.03} className="divide-y divide-border/60">
-          {properties.map((property) => {
+          {visibleProperties.map((property) => {
             const addr = formatPropertyAddress(property);
             const facts = formatPropertyFacts(property);
             const cover = property.photos?.[0];
@@ -708,7 +723,7 @@ export function BrokerPropertiesClient() {
 
             return (
               <StaggerItem key={property.id}>
-                <div className="flex items-center gap-4 py-4 -mx-2 px-2 rounded-md hover:bg-foreground/[0.04] transition-colors">
+                <div className="flex flex-wrap items-center gap-4 py-4 -mx-2 px-2 rounded-md hover:bg-foreground/[0.04] transition-colors">
                   {/* Thumbnail — 128px wide, 4:3 aspect, matches realtor page */}
                   <div className="w-[128px] aspect-[4/3] rounded-md bg-muted overflow-hidden flex-shrink-0">
                     {cover ? (
@@ -729,9 +744,7 @@ export function BrokerPropertiesClient() {
                   {/* Facts column — address, specs line, status badge,
                       property type, and ownership badge */}
                   <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {addr}
-                    </p>
+                    <Link href={`/broker/properties/${property.id}`} className="block text-sm font-medium text-foreground hover:underline">{addr}</Link>
                     {facts && (
                       <p className="text-xs text-muted-foreground truncate">
                         {facts}
@@ -754,7 +767,7 @@ export function BrokerPropertiesClient() {
 
                   {/* Price column — tabular nums, right-aligned, hidden on
                       narrow screens so the row never wraps awkwardly */}
-                  <div className="hidden sm:block flex-shrink-0 text-right">
+                  <div className="shrink-0 text-right">
                     {property.listPrice != null ? (
                       <p className="text-sm font-semibold tabular-nums text-foreground">
                         {formatCurrency(property.listPrice)}
@@ -770,8 +783,7 @@ export function BrokerPropertiesClient() {
                       stopped at this div so the row hover does not misread
                       as a navigation intent. */}
                   <div
-                    className="hidden sm:block"
-                    onClick={(e) => e.stopPropagation()}
+                    className="w-full sm:w-auto"
                   >
                     <AssignControl
                       property={property}

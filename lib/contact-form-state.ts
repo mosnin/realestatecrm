@@ -20,6 +20,7 @@ export type ContactFormFieldValues = {
   preferences: string;
   address: string;
   notes: string;
+  leadType: 'buyer' | 'seller' | 'rental' | '';
   type: ContactFormType;
   tags: string;
 };
@@ -37,6 +38,7 @@ export type ContactEditorSource = {
   properties?: string[] | null;
   address?: string | null;
   notes?: string | null;
+  leadType?: string | null;
   type?: string | null;
   tags?: string[] | null;
 };
@@ -69,6 +71,7 @@ export function contactEditorDefaults(contact: ContactEditorSource): ContactForm
     properties: joinChipList(contact.properties),
     address: contact.address ?? '',
     notes: contact.notes ?? '',
+    leadType: ['buyer','seller','rental'].includes(contact.leadType ?? '') ? contact.leadType as 'buyer' | 'seller' | 'rental' : '',
     type: asType(contact.type),
     tags: joinChipList(contact.tags),
   };
@@ -90,6 +93,7 @@ export function contactFormResetValues(
       preferences: defaultValues?.preferences ?? '',
       address: defaultValues?.address ?? '',
       notes: defaultValues?.notes ?? '',
+      leadType: defaultValues?.leadType ?? '',
       type: asType(defaultValues?.type),
       tags: defaultValues?.tags ?? '',
     },

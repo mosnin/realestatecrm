@@ -63,7 +63,7 @@ export function DealsPageClient({
   // you click "At risk: 3", the board narrows to those three. The page tells
   // one story instead of two.
   const [boardStatus, setBoardStatus] = useState<BoardStatus>('active');
-  const [focus, setFocus] = useState<BoardFocus>(null);
+  const [focus, setFocus] = useState<BoardFocus>('at-risk');
   // Search is part of the page-level toolbar so the status toggle, search,
   // and focus chip share one row. Used to be in the kanban — but having three
   // separate rows of chrome was the whole problem.
@@ -254,7 +254,7 @@ export function DealsPageClient({
   const hasPipelines = pipelines.length > 0;
 
   return (
-    <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-9 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
+    <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-4 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
       {/* A pipeline is a working board, so its orientation reads horizontally:
           outcome statement first, current operating context and action at the
           right edge, then the full-width board below. */}
@@ -269,13 +269,7 @@ export function DealsPageClient({
           </p>
         </div>
         {hasPipelines && (
-          <div className="flex flex-col items-start gap-4 lg:items-end">
-            <div className="text-left lg:text-right">
-              <p className={SECTION_LABEL}>Board context</p>
-              <p className="mt-2 text-sm text-foreground">
-                {pipelines.length === 1 ? '1 active pipeline' : `${pipelines.length} active pipelines`}
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
             {/* The conversation is the front door. Saying it out loud is
                 faster than any form, so it gets the primary pill. */}
             <Link
@@ -332,6 +326,7 @@ export function DealsPageClient({
           and the chrome ride the same line. */}
       {hasPipelines && (
         <div className="flex items-center gap-3 flex-wrap border-b border-border/70">
+          {boardStatus === 'active' && <div className="flex gap-1" aria-label="Deal work view"><button type="button" aria-pressed={focus === 'at-risk'} onClick={() => setFocus('at-risk')} className="px-3 py-2 text-sm">Needs attention</button><button type="button" aria-pressed={focus === null} onClick={() => setFocus(null)} className="px-3 py-2 text-sm">Full pipeline</button></div>}
           <div role="tablist" aria-label="Deal status" className="flex items-center gap-0">
             {STATUS_TABS.map((t) => {
               const isActive = boardStatus === t.key;

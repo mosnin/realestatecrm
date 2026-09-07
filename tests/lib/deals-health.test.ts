@@ -141,3 +141,21 @@ describe('classifyForStrips', () => {
     expect(waitingOnMe).toHaveLength(0);
   });
 });
+
+describe('transaction deadline truth', () => {
+  const base = {status:'active' as const, updatedAt:new Date(), stageChangedAt:new Date(), closeDate:null, followUpAt:null,nextAction:null,nextActionDueAt:null};
+  it('flags a passed inspection date even after a recent stage edit', () => {
+    expect(dealHealth({...base,inspectionDeadline:daysAgo(1)}).reason).toContain('Inspection');
+  });
+  it('does not flag a completed inspection checklist item', () => {
+    expect(dealHealth({...base,inspectionDeadline:daysAgo(1),checklist:[{kind:'inspection',label:'Inspection',dueAt:daysAgo(1).toISOString(),completedAt:new Date().toISOString()}]}).state).toBe('on-track');
+  });
+  it('flags a close date that passed yesterday', () => {
+    expect(dealHealth({...base,closeDate:daysAgo(1)}).state).toBe('at-risk');
+  });
+  it('flags overdue milestones and ignores completed milestones', () => {
+    const milestone = {id:'one',label:'Appraisal',dueDate:daysAgo(1).toISOString(),completed:false,completedAt:null};
+    expect(dealHealth({...base,milestones:[milestone]}).reason).toContain('Appraisal');
+    expect(dealHealth({...base,milestones:[{...milestone,completed:true}]}).state).toBe('on-track');
+  });
+});

@@ -42,6 +42,9 @@ type DealRow = {
   followUpAt: string | null;
   nextAction: string | null;
   nextActionDueAt: string | null;
+  inspectionDeadline: string | null;
+  earnestDueAt: string | null;
+  milestones: import('@/lib/types').DealMilestone[];
 };
 
 type StageRow = {
@@ -148,6 +151,7 @@ function buildColumns(
   for (const col of result) {
     col.deals.sort((a, b) => {
       const ha = dealHealth({
+        ...a,
         status: a.status,
         stageChangedAt: a.stageChangedAt,
         updatedAt: a.updatedAt,
@@ -157,6 +161,7 @@ function buildColumns(
         nextActionDueAt: a.nextActionDueAt,
       });
       const hb = dealHealth({
+        ...b,
         status: b.status,
         stageChangedAt: b.stageChangedAt,
         updatedAt: b.updatedAt,
@@ -186,6 +191,7 @@ export default async function BrokerDealsPage() {
   // Resolve ALL brokerage members — same pattern as the previous page.
   const allMembers = await getBrokerageMembers(brokerage.id, {
     includeSpaceName: true,
+    strict: true,
   });
 
   const memberSpaceIds = allMembers
@@ -218,28 +224,31 @@ export default async function BrokerDealsPage() {
   // Fetch active deals only — the kanban shows the live pipeline.
   // Won/lost/on-hold deals are closed chapter; the broker oversight
   // story is about what's in-flight right now.
-  const { data: dealsRaw } = spaceIds.length > 0
+  const { data: dealsRaw, error: dealsError } = spaceIds.length > 0
     ? await supabase
         .from('Deal')
         .select(
-          'id, spaceId, title, value, commissionRate, address, closeDate, stageId, status, createdAt, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt',
+          'id, spaceId, title, value, commissionRate, address, closeDate, stageId, status, createdAt, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt, inspectionDeadline, earnestDueAt, milestones',
         )
         .in('spaceId', spaceIds)
         .eq('status', 'active')
         .order('createdAt', { ascending: false })
         .limit(5000)
-    : { data: [] as DealRow[] };
+    : { data: [] as DealRow[], error: null };
 
   // Fetch stages for all spaces
-  const { data: stagesRaw } = spaceIds.length > 0
+  const { data: stagesRaw, error: stagesError } = spaceIds.length > 0
     ? await supabase
         .from('DealStage')
         .select('id, name, color, position, spaceId')
         .in('spaceId', spaceIds)
         .order('position', { ascending: true })
         .limit(2000)
-    : { data: [] as StageRow[] };
+    : { data: [] as StageRow[], error: null };
 
+  if (dealsError || stagesError) throw new Error('Brokerage pipeline unavailable');
+  const { data: checklistRows, error: checklistError } = spaceIds.length ? await supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').in('spaceId', spaceIds) : { data: [], error: null };
+  if (checklistError) throw new Error('Closing checklist unavailable');
   const stages = (stagesRaw ?? []) as StageRow[];
 
   // ── Enrich deals with realtor names ──────────────────────────────────────
@@ -259,6 +268,10 @@ export default async function BrokerDealsPage() {
     const nextActionDueAt = d.nextActionDueAt ? new Date(d.nextActionDueAt) : null;
 
     const health = dealHealth({
+      checklist: (checklistRows ?? []).filter((item: {dealId:string}) => item.dealId === d.id),
+      inspectionDeadline: d.inspectionDeadline,
+      earnestDueAt: d.earnestDueAt,
+      milestones: d.milestones,
       status: d.status as 'active' | 'won' | 'lost' | 'on_hold',
       stageChangedAt,
       updatedAt,
@@ -284,6 +297,10 @@ export default async function BrokerDealsPage() {
       followUpAt,
       nextAction: d.nextAction,
       nextActionDueAt,
+      checklist: (checklistRows ?? []).filter((item: {dealId:string}) => item.dealId === d.id),
+      inspectionDeadline: d.inspectionDeadline,
+      earnestDueAt: d.earnestDueAt,
+      milestones: d.milestones,
       realtorName,
       // Pass stageId for column slotting; not in BrokerDealItem interface
       stageId: d.stageId,

@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
   let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
   if (dealIds.length > 0) {
     const { data, error: clError } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
-      .select('dealId, completedAt, dueAt, label')
+      .select('dealId, kind, completedAt, dueAt, label')
       .in('dealId', dealIds);
     if (clError) throw clError;
     checklistRows = (data as typeof checklistRows) || [];

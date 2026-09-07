@@ -42,6 +42,7 @@ import { DASHBOARD_SURFACE } from '@/components/ui/surface-card';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { comparePeopleAttention, personAttention } from '@/lib/people-attention';
 import { ApplicationCompare } from './application-compare';
 import {
   DropdownMenu,
@@ -79,6 +80,9 @@ type Client = {
   address: string | null;
   notes: string | null;
   tags: string[];
+  work?: import('@/lib/people-work').PersonWork | null;
+  workUnavailable?: boolean;
+  lastContactedAt?: string | null;
   followUpAt: string | null;
   leadType: 'rental' | 'buyer' | 'seller';
   leadScore: number | null;
@@ -144,9 +148,10 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   // which became unreadable noise once a workspace accumulated >10 tags.
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [tagPopoverSearch, setTagPopoverSearch] = useState('');
+  const [attentionView, setAttentionView] = useState<'all' | 'attention'>('attention');
   const [sortBy, setSortBy] = useState<
-    'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority'
-  >('agent-priority');
+    'newest' | 'oldest' | 'name-az' | 'name-za' | 'agent-priority' | 'attention'
+  >('attention');
   const [importOpen, setImportOpen] = useState(false);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(openCreateForm);
@@ -231,6 +236,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
     tagFilter?: string;
     sourceFilter?: string;
     statusFilter?: typeof statusFilter;
+    attentionView?: 'all' | 'attention';
     sortBy?: typeof sortBy;
   };
 
@@ -271,6 +277,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
       sourceFilter,
       statusFilter,
       sortBy,
+      attentionView,
     };
     setSavingView(true);
     try {
@@ -304,6 +311,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
     setTagFilter(f.tagFilter ?? '');
     setSourceFilter(f.sourceFilter ?? '');
     setStatusFilter(f.statusFilter ?? 'active');
+    setAttentionView(f.attentionView === 'attention' ? 'attention' : 'all');
     if (f.sortBy) setSortBy(f.sortBy);
   }
 
@@ -331,6 +339,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
       for (let offset = 0; ; offset += pageSize) {
         const params = new URLSearchParams({
           slug,
+          work: '1',
           search,
           type: typeFilter,
           status: statusFilter,
@@ -358,7 +367,8 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   }, [slug, search, typeFilter, statusFilter, sourceFilter]);
 
   useEffect(() => {
-    fetchContacts();
+    const timer = setTimeout(() => void fetchContacts(), 200);
+    return () => { clearTimeout(timer); contactsRequestRef.current++; };
   }, [fetchContacts]);
 
   // Leaving Select mode clears the active selection — no orphaned state.
@@ -674,7 +684,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
 
   // Apply tag + leadType filters and sorting client-side
   const visibleContacts = (() => {
-    let list = contacts
+    let list = contacts.filter(c => attentionView === 'all' || personAttention(c).rank < 3)
       .filter((c) => {
         if (leadTypeFilter === 'all') return true;
         if (leadTypeFilter === 'new') return c.tags.includes('new-lead');
@@ -682,7 +692,9 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
       })
       .filter((c) => !tagFilter || c.tags.includes(tagFilter))
       .filter((c) => !sourceFilter || c.source === sourceFilter);
-    if (sortBy === 'agent-priority') {
+    if (sortBy === 'attention') {
+      list = [...list].sort((a,b) => comparePeopleAttention(a,b));
+    } else if (sortBy === 'agent-priority') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
     } else if (sortBy === 'oldest') {
       list = [...list].sort(
@@ -736,6 +748,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   ];
 
   const sortLabels: Record<typeof sortBy, string> = {
+    attention: 'Needs attention first',
     'agent-priority': 'Hottest first',
     newest: 'Recently added',
     oldest: 'Oldest first',
@@ -768,47 +781,21 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
   })();
 
   return (
-    <div className="space-y-10 sm:space-y-12" data-page-family="relationship-directory">
+    <div className="space-y-4" data-page-family="relationship-directory">
       {/* The relationship book opens like a directory, not another generic
           dashboard page. The count anchors the left edge; purpose and action
           sit opposite it. Filters and records keep their existing behavior. */}
-      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,.8fr)] lg:items-end lg:gap-14">
-        <div className="min-w-0">
-          <p className={SECTION_LABEL}>Relationship book</p>
-          <div className="mt-5 flex items-end gap-3">
-            <span
-              className="text-[4.75rem] leading-[.78] tracking-[-0.065em] text-foreground tabular-nums sm:text-[6.5rem]"
-              style={TITLE_FONT}
-            >
-              {loading ? '—' : <AnimatedNumber value={contacts.length} duration={560} />}
-            </span>
-            <span className="pb-1 text-sm text-muted-foreground sm:pb-2">people</span>
-          </div>
-          {subtitle && <p className={cn(BODY_MUTED, 'mt-5')}>{subtitle}</p>}
-        </div>
-        <div className="flex flex-col items-start gap-5 lg:items-end lg:text-right">
-          <div className="max-w-md space-y-2">
-            <h1 className={cn(H1, 'text-[2.4rem] leading-[.96] sm:text-[3.15rem]')} style={TITLE_FONT}>
-              <SplitReveal as="span" text="People worth staying close to." />
-            </h1>
-            <p className={BODY_MUTED}>
-              Find the next relationship to move, then keep every detail and follow-up in one place.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className={cn(PRIMARY_PILL, 'w-fit shrink-0')}
-          >
-            Add person
-          </button>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div><h1 className="text-2xl font-medium">People</h1><p className="mt-1 text-sm text-muted-foreground">{loading ? 'Loading people…' : error ? 'People unavailable' : subtitle}</p></div>
+        <button type="button" onClick={() => setAddOpen(true)} className={PRIMARY_PILL}>Add person</button>
       </header>
-
-      {summary}
+      {summary && <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Pipeline performance</summary><div className="mt-3">{summary}</div></details>}
 
       <section aria-label="Contact directory" className={cn(DASHBOARD_SURFACE, 'overflow-hidden')}>
-        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+        <div className="space-y-3 p-3 sm:p-4">
+          <div className="flex gap-2" aria-label="People work view">{(['attention','all'] as const).map(view => <button key={view} type="button" aria-pressed={attentionView === view} onClick={() => setAttentionView(view)} className={cn('rounded-md px-3 py-2 text-sm', attentionView === view ? 'bg-muted font-medium' : 'text-muted-foreground')}>{view === 'attention' ? 'Needs attention' : 'All people'}</button>)}</div>
+          {!loading && attentionView === 'attention' && !visibleContacts.length && contacts.length > 0 && <p className="text-sm text-muted-foreground">No follow-ups due in this view. <button type="button" onClick={() => setAttentionView('all')} className="underline">View all people</button></p>}
+
           {/* One compact records spine: lead cut, filters, then one hairline
               list. It scrolls horizontally only at the controls on narrow
               screens; the records themselves always remain a list. */}
@@ -870,7 +857,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
                   placeholder="Search…"
                   className="h-9 w-full rounded-full border-border/70 bg-background pl-9"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setSearch(e.target.value); if(e.target.value) setAttentionView('all'); }}
                 />
               </div>
 
@@ -1621,7 +1608,8 @@ function ContactRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const stage = STAGES.find((s) => s.key === contact.type)!;
+  const stage = STAGES.find((s) => s.key === contact.type) ?? STAGES[0];
+  const attention = personAttention(contact);
   // First-load stagger, capped at 20 rows — past that, the row enters
   // instantly. 15ms-per-row keeps the whole cascade under a third of a
   // second: one composed gesture, not a parade.
@@ -1642,6 +1630,7 @@ function ContactRow({
     <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_7rem_5rem_7rem] lg:gap-4">
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium text-foreground">{contact.name}</span>
+        <span className="block text-xs text-muted-foreground">{contact.leadType} · {contact.work ? `${contact.work.label} · ${contact.work.title}` : attention.reason ?? (contact.lastContactedAt ? `Last contact ${new Date(contact.lastContactedAt).toLocaleDateString()}` : 'No contact logged')}</span>
         <span className="mt-0.5 block truncate text-xs text-muted-foreground lg:hidden">
           {contactLine || 'No contact details'}
         </span>

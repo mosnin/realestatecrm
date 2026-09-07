@@ -7,7 +7,7 @@
 
 ## At a glance
 
-- **Page routes:** 224
+- **Page routes:** 227
 - **API endpoints:** 449
 - **Cron jobs:** 3
 - **DB tables:** 156  ·  **RPCs:** 72  ·  **migrations:** 274
@@ -80,7 +80,7 @@
 - `/book/[slug]`
 - `/book/[slug]/embed`
 
-**broker** (36)
+**broker** (39)
 
 - `/broker`
 - `/broker/activity`
@@ -91,6 +91,7 @@
 - `/broker/chippi`
 - `/broker/commissions`
 - `/broker/deals`
+- `/broker/deals/[id]`
 - `/broker/floor`
 - `/broker/forecast`
 - `/broker/import-export`
@@ -102,9 +103,11 @@
 - `/broker/messages`
 - `/broker/my-leads`
 - `/broker/people`
+- `/broker/people/[id]`
 - `/broker/pipeline`
 - `/broker/profitability`
 - `/broker/properties`
+- `/broker/properties/[id]`
 - `/broker/realtors`
 - `/broker/realtors/[userId]`
 - `/broker/reviews`

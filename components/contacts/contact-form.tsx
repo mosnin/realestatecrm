@@ -35,6 +35,7 @@ const schema = z.object({
   preferences: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  leadType: z.enum(['buyer', 'seller', 'rental', '']).refine(value => value !== '', 'Choose a relationship type'),
   type: z.enum(['QUALIFICATION', 'TOUR', 'APPLICATION']),
   tags: z.string().optional(),
 });
@@ -220,7 +221,7 @@ export function ContactForm({
     watch,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormData>({
+  } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: contactFormResetValues(defaultValues).values,
   });
@@ -268,6 +269,7 @@ export function ContactForm({
   }
 
   async function persistParsed(parsed: ParsedContact) {
+    if (!parsed.type) { flipToFillWith(parsed); return; }
     try {
       await onSubmit({
         name: parsed.name,
@@ -277,6 +279,7 @@ export function ContactForm({
         preferences: parsed.preferences ?? '',
         address: '',
         notes: '',
+        leadType: parsed.type,
         type: stageToType(parsed.stage),
         properties: parsed.properties,
         tags: [],
@@ -301,6 +304,7 @@ export function ContactForm({
       { shouldDirty: true },
     );
     setValue('preferences', parsed.preferences ?? '', { shouldDirty: true });
+    setValue('leadType', parsed.type ?? '', { shouldDirty: true });
     setValue('type', stageToType(parsed.stage), { shouldDirty: true });
     setProperties(parsed.properties);
     setPendingPreview(null);
@@ -469,7 +473,12 @@ export function ContactForm({
                 <Input id="name" {...register('name')} autoFocus />
               </FieldRow>
 
-              <FieldRow id="type" label="Stage">
+              <FieldRow id="leadType" label="Relationship type" error={errors.leadType?.message}>
+                <select id="leadType" {...register('leadType')} className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+                  <option value="">Choose type</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="rental">Rental</option>
+                </select>
+              </FieldRow>
+              <FieldRow id="type" label="Intake stage">
                 {useSegmented ? (
                   <div
                     role="radiogroup"

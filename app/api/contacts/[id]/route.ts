@@ -156,6 +156,10 @@ export async function PATCH(
         updates.followUpAt = d.toISOString();
       }
     }
+    if (body.leadType !== undefined) {
+      if (!['buyer', 'seller', 'rental'].includes(body.leadType)) return NextResponse.json({ error: 'Invalid relationship type' }, { status: 400 });
+      updates.leadType = body.leadType;
+    }
     if (body.lastContactedAt !== undefined) {
       if (body.lastContactedAt === null || body.lastContactedAt === '') {
         updates.lastContactedAt = null;

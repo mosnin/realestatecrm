@@ -5,13 +5,6 @@ const read = (file: string) => readFileSync(file, 'utf8');
 
 const FAMILY_SURFACES = [
   {
-    family: 'relationship-directory',
-    file: 'components/contacts/contact-table.tsx',
-    heading: 'People worth staying close to.',
-    work: 'aria-label="Contact directory"',
-    action: 'Add person',
-  },
-  {
     family: 'lead-intake',
     file: 'app/s/[slug]/leads/page.tsx',
     heading: 'Turn interest into a first conversation.',

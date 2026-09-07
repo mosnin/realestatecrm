@@ -11,6 +11,7 @@ import {
 } from '@/lib/contact-form-state';
 
 const EXISTING = {
+  leadType: 'seller' as const,
   name: 'Jane Chen',
   email: 'jane@example.com',
   phone: '555-0100',
@@ -27,6 +28,7 @@ describe('contactFormResetValues', () => {
   it('loads every editor field from an existing contact so Save cannot blank them', () => {
     const { values, properties } = contactFormResetValues(contactEditorDefaults(EXISTING));
     expect(values).toEqual({
+      leadType: 'seller',
       name: 'Jane Chen',
       email: 'jane@example.com',
       phone: '555-0100',

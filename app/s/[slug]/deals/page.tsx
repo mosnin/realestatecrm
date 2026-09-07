@@ -28,12 +28,13 @@ async function loadInitialDealsData(spaceId: string): Promise<{
   initialPipelineId: string | null;
 }> {
   try {
-    const { data: pipelineRows } = await supabase
+    const { data: pipelineRows, error: pipelineError } = await supabase
       .from('Pipeline')
       .select('*')
       .eq('spaceId', spaceId)
       .order('position', { ascending: true });
 
+    if (pipelineError) throw pipelineError;
     const pipelines = (pipelineRows ?? []) as Pipeline[];
     if (pipelines.length === 0) {
       return { pipelines, initialStages: [], initialPipelineId: null };
@@ -43,25 +44,32 @@ async function loadInitialDealsData(spaceId: string): Promise<{
     // mount; the first paint uses the first pipeline so we always have
     // something to compute KPIs from.
     const firstPipelineId = pipelines[0].id;
-    const { data: stageRows } = await supabase
+    const { data: stageRows, error: stageError } = await supabase
       .from('DealStage')
       .select('*')
       .eq('spaceId', spaceId)
       .eq('pipelineId', firstPipelineId)
       .order('position', { ascending: true });
+    if (stageError) throw stageError;
     const stages = (stageRows ?? []) as DealStage[];
 
     const stageIds = stages.map((s) => s.id);
     let dealRows: Deal[] = [];
     if (stageIds.length > 0) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('Deal')
         .select('*')
         .eq('spaceId', spaceId)
         .in('stageId', stageIds);
+      if (error) throw error;
       dealRows = (data ?? []) as Deal[];
     }
 
+    if (dealRows.length) {
+      const { data: checklist, error } = await supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').eq('spaceId', spaceId);
+      if (error) throw error;
+      dealRows = dealRows.map(deal => ({ ...deal, checklist: (checklist ?? []).filter((item: {dealId:string}) => item.dealId === deal.id) }));
+    }
     const dealsByStage = new Map<string, Deal[]>();
     for (const deal of dealRows) {
       const arr = dealsByStage.get(deal.stageId) ?? [];
@@ -77,7 +85,7 @@ async function loadInitialDealsData(spaceId: string): Promise<{
     return { pipelines, initialStages, initialPipelineId: firstPipelineId };
   } catch (err) {
     console.error('[deals] initial SSR fetch failed', err);
-    return { pipelines: [], initialStages: [], initialPipelineId: null };
+    throw err;
   }
 }
 

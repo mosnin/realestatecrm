@@ -1,3 +1,5 @@
+import { readAllRows } from '@/lib/read-all-rows';
+import { dealHealth, inferNextAction } from '@/lib/deals/health';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
@@ -34,16 +36,11 @@ export default async function PropertiesPage({
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) redirect('/');
 
-  let properties: Property[] = [];
+  let properties: (Property & { workSummary?: string })[] = [];
   let fetchError = false;
   try {
-    const { data, error } = await supabase
-      .from('Property')
-      .select('*')
-      .or(`spaceId.eq.${space.id},assignedSpaceId.eq.${space.id}`)
-      .order('createdAt', { ascending: false });
-    if (error) throw error;
-    properties = (data ?? []) as Property[];
+    properties = await readAllRows<Property>((from,to) => supabase.from('Property').select('*').or(`spaceId.eq.${space.id},assignedSpaceId.eq.${space.id}`).order('createdAt', {ascending:false}).order('id').range(from,to));
+
   } catch (err) {
     console.error('[properties/page] DB query failed', { slug, error: err });
     fetchError = true;
@@ -65,12 +62,21 @@ export default async function PropertiesPage({
     );
   }
 
+  try {
+    const deals = await readAllRows<import('@/lib/types').Deal>((from,to) => supabase.from('Deal').select('*').eq('spaceId',space.id).eq('status','active').not('propertyId','is',null).order('id').range(from,to));
+    const checklist = await readAllRows<{dealId:string;kind:string;label:string;dueAt:string|null;completedAt:string|null}>((from,to) => supabase.from('DealChecklistItem').select('dealId,kind,label,dueAt,completedAt').eq('spaceId',space.id).order('id').range(from,to));
+    const dealsWithChecklist = deals.map(deal => ({...deal, checklist: checklist.filter(item => item.dealId === deal.id)}));
+    properties = properties.map(property => {
+      const linked = dealsWithChecklist.filter(deal=>deal.propertyId===property.id).sort((a,b)=>(dealHealth(a).state==='on-track'?1:0)-(dealHealth(b).state==='on-track'?1:0));
+      return {...property,workSummary: linked[0] ? `${linked[0].title} · ${dealHealth(linked[0]).reason || inferNextAction(linked[0])?.label || 'No next action recorded'}` : 'No active deal linked'};
+    });
+  } catch { properties = properties.map(property=>({...property,workSummary:'Linked deal status unavailable'})); }
+
   // One quiet sentence about the wall — sale-status counts narrated, not
   // tallied in a chart. Active is the loud fact; the rest is supporting.
   const activeCount = properties.filter((p) => p.listingStatus === 'active').length;
   const pendingCount = properties.filter((p) => p.listingStatus === 'pending').length;
-  const analyzedCount = properties.filter((p) => p.analyzedAt || p.analysis).length;
-  const pricedCount = properties.filter((p) => p.listPrice != null).length;
+  const analyzedCount = properties.filter((p) => p.analysis?.sources?.length).length;
   const subtitle =
     properties.length === 0
       ? 'No properties yet.'
@@ -81,38 +87,18 @@ export default async function PropertiesPage({
 
   return (
     <SupportingPage family="inventory" width="wide">
-      <SupportingOrientation
-        family="inventory"
-        eyebrow="Properties / Inventory"
-        title={<SplitReveal as="span" text="The homes behind every conversation" />}
-        summary={subtitle}
-        nextAction={
-          properties.length === 0
-            ? 'Add the first property you are actively selling, buying, or researching.'
-            : analyzedCount < properties.length
-              ? `Enrich ${properties.length - analyzedCount} ${properties.length - analyzedCount === 1 ? 'property' : 'properties'} so pricing and outreach use grounded context.`
-              : 'Open the active listing with the closest next deadline and move it forward.'
-        }
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-          <AreaIqLauncher />
-          <Link
-            href={`/s/${slug}/properties/new`}
-            className={cn(PRIMARY_PILL, 'inline-flex items-center gap-1.5')}
-          >
-            <Plus size={14} aria-hidden />
-            Add property
-          </Link>
-          </div>
-        }
-      />
-
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div><h1 className="text-2xl font-medium">Properties</h1><p className="mt-1 text-sm text-muted-foreground">{subtitle}</p></div>
+        <Link href={`/s/${slug}/properties/new`} className={PRIMARY_PILL}>Add property</Link>
+      </header>
+      <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Inventory summary and area research</summary><div className="mt-3"><AreaIqLauncher />
       <SupportingMetricBand>
         <SupportingMetric label="Inventory" value={properties.length} detail="all saved properties" />
         <SupportingMetric label="Active" value={activeCount} detail="currently marketed" accent />
         <SupportingMetric label="Pending" value={pendingCount} detail="moving to close" />
-        <SupportingMetric label="Market ready" value={`${analyzedCount}/${properties.length}`} detail={`${pricedCount} with a list price`} />
+        <SupportingMetric label="Research saved" value={`${analyzedCount}/${properties.length}`} detail="web evidence, not verified availability" />
       </SupportingMetricBand>
+      </div></details>
 
       <SupportingWorkArea>
       {/* Empty state — calm fact, not a directive. */}

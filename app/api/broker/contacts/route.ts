@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { attachPeopleWork } from '@/lib/people-work';
 import { requireBroker } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
   // ── Resolve all member spaces ──────────────────────────────────────────────
   const allMembers = await getBrokerageMembers(brokerage.id, {
     includeSpaceName: true,
+    strict: true,
   });
 
   const memberSpaceIds = allMembers
@@ -71,7 +73,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('Contact')
     .select(
-      'id, name, email, phone, type, leadType, leadScore, scoreLabel, tags, followUpAt, createdAt, updatedAt, spaceId'
+      'id, name, email, phone, type, leadType, leadScore, scoreLabel, tags, followUpAt, lastContactedAt, createdAt, updatedAt, spaceId'
     )
     .in('spaceId', spaceIds);
 
@@ -101,6 +103,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query
     .order('updatedAt', { ascending: false })
+    .order('id', { ascending: true })
     .range(offset, offset + limit - 1);
 
   if (error) {
@@ -114,5 +117,5 @@ export async function GET(req: NextRequest) {
     realtorName: spaceToRealtor.get(c.spaceId) ?? 'Unknown real estate agent',
   }));
 
-  return NextResponse.json(annotated);
+  return NextResponse.json(req.nextUrl.searchParams.get('work') === '1' ? await attachPeopleWork(annotated) : annotated);
 }

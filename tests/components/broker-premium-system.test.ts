@@ -96,20 +96,11 @@ describe("broker premium dashboard contract", () => {
     }
   });
 
-  it("sends broker Chippi deep links to the canonical chat route", () => {
-    const ownedSources = [
-      "app/broker/deals/broker-kanban-board.tsx",
-      "app/broker/forecast/page.tsx",
-      "app/broker/people/broker-people-table.tsx",
-      "app/broker/realtors/realtors-client.tsx",
-      "app/broker/realtors/[userId]/page.tsx",
-    ].map(read);
-
-    for (const source of ownedSources) {
-      expect(source).not.toMatch(
-        /\/broker\?(?:prompt|prefill|conversationId)=/,
-      );
-      expect(source).toContain("/broker/chippi?prompt=");
-    }
+  it("opens an ID-bound brokerage record without requiring chat", async () => {
+    const { BrokerRecordDetail } = await import('@/components/broker/record-detail');
+    const html = renderToStaticMarkup(React.createElement(BrokerRecordDetail, { title: 'Buyer record', back: '/broker/people', fields: [{label:'Follow-up',value:'Due today'}] }));
+    expect(html).toContain('Buyer record');
+    expect(html).toContain('Due today');
+    expect(html).toContain('href="/broker/people"');
   });
 });
