@@ -12,6 +12,12 @@ describe('Actual useful work', () => {
     expect(classifyToolOutcome('schedule_tour', { summary: 'Booked', display: 'tours', data: { tours: [{ tourId: 'saved-tour' }] } })).toBe('completed');
     expect(classifyToolOutcome('schedule_tour', { summary: 'No receipt', display: 'tours', data: { tours: [] } })).toBe('read');
   });
+  it.each(['not_connected', 'unconfirmed'])('does not count a local tour as a confirmed calendar booking: %s', (calendarStatus) => {
+    expect(classifyToolOutcome('schedule_tour', { summary: 'Tour saved', display: 'tours', data: { tours: [{ tourId: 'local-tour', calendarStatus }] } })).toBe('uncertain');
+  });
+  it('accepts a tour with a confirmed calendar receipt', () => {
+    expect(classifyToolOutcome('schedule_tour', { summary: 'Tour saved', display: 'tours', data: { tours: [{ tourId: 'local-tour', calendarStatus: 'confirmed', externalEventId: 'provider-event' }] } })).toBe('completed');
+  });
   it('does not count a draft as activation', () => {
     firstAction.mockClear();
     recordToolOutcome('draft_email', { summary: 'ready', display: 'message-draft' }, { userId: 'owner', space: { id: 'space', slug: 'oak', name: 'Oak', ownerId: 'owner' }, signal: new AbortController().signal });

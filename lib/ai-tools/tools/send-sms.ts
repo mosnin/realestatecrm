@@ -1,3 +1,4 @@
+import { checkCoverageAction } from '@/lib/follow-through/guard';
 /**
  * `send_sms` — send an SMS to a contact via Telnyx.
  *
@@ -85,6 +86,8 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
   },
 
   async handler(args, ctx) {
+    const coverageError = await checkCoverageAction(ctx, args.contactId, 'sms');
+    if (coverageError) return { summary: coverageError, display: 'error' };
     let resolvedPhone: string | null = null;
     let resolvedContactId: string | null = null;
 
@@ -170,7 +173,7 @@ export const sendSmsTool = defineTool<typeof parameters, SendSMSResult>({
     // number, premium prefix, provider error). Distinguish between "we
     // didn't send" vs "provider accepted but silently dropped" isn't
     // possible here — treat false as a delivery failure.
-    const idemKey = makeIdempotencyKey('send_sms', ctx.space.id, resolvedPhone, args.body);
+    const idemKey = ctx.followThroughScope ? `coverage:${ctx.space.id}:${ctx.followThroughScope.runId}:sms` : makeIdempotencyKey('send_sms', ctx.space.id, resolvedPhone, args.body);
     const ok = await withIdempotency(idemKey, () =>
       // Consumer outreach on the realtor's behalf. Approval-gated in chat, but
       // approval is not consent — the compliance gate still applies.

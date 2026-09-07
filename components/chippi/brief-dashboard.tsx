@@ -1,5 +1,6 @@
 'use client';
 
+import { FollowThroughDesk } from '@/components/follow-through/desk';
 import React, {
   useEffect,
   useMemo,
@@ -307,6 +308,7 @@ export function BriefDashboard({ slug, data }: Props) {
           How Chippi works <ArrowUpRight size={14} />
         </Link>
       </header>
+      <FollowThroughDesk slug={slug} />
       {missing.size > 0 && (
         <div
           role="alert"

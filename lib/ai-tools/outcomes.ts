@@ -31,7 +31,8 @@ export function classifyToolOutcome(
     return 'drafted';
   if (result.display === 'warning') return 'uncertain';
   if (name === 'schedule_tour' && result.display === 'tours') {
-    const tours = (result.data as { tours?: Array<{ tourId?: string }> } | undefined)?.tours;
+    const tours = (result.data as { tours?: Array<{ tourId?: string; calendarStatus?: string }> } | undefined)?.tours;
+    if (tours?.some(tour => tour.calendarStatus && tour.calendarStatus !== 'confirmed')) return 'uncertain';
     if (tours?.some(tour => typeof tour.tourId === 'string' && tour.tourId.length > 0)) return 'completed';
   }
   if (SIDE_EFFECTING_TOOLS.has(name) && result.display === 'success')

@@ -111,6 +111,7 @@ export interface RunAutonomousInstructionInput {
   /** Derived from the saved workflow policy, never an inbound event. */
   executionMode?: 'review' | 'autonomous';
   authorizedInstruction?: string;
+  followThroughScope?: { contactId: string; workflowId: string; runId: string; channel: 'email' | 'sms' };
 }
 
 export interface RunAutonomousInstructionResult {
@@ -167,6 +168,7 @@ export async function runAutonomousInstruction(
     ctx.workMode = input.executionMode === 'autonomous';
     ctx.workExecutionMode = input.executionMode ?? 'review';
     ctx.backgroundAuthorizedInstruction = input.authorizedInstruction;
+    ctx.followThroughScope = input.followThroughScope;
     ctx.onToolOutcome = ({ outcome }) => outcomes.push(outcome);
 
     // Headless: no resultSink (we don't surface rich cards to a UI), no history

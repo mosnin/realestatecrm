@@ -88,6 +88,7 @@ export interface ExecuteActionOptions {
   autonomy: WorkflowAutonomy;
   /** The WorkflowRun id, threaded for audit correlation on scheduled rows. */
   runId?: string;
+  workflowId?: string;
 }
 
 /**
@@ -250,8 +251,13 @@ async function runChippi(
   context: WorkflowContext,
   opts: ExecuteActionOptions,
 ): Promise<ActionStepResult> {
+  const contactId = resolveContactId(context);
+  if (action.config.restrictToTriggerContact && (!contactId || !opts.workflowId || !opts.runId)) {
+    return { status: 'failed', detail: { error: 'Coverage requires a bound contact and workflow run' } };
+  }
   const result = await runAutonomousInstruction({
     spaceId: opts.spaceId,
+    followThroughScope: action.config.restrictToTriggerContact ? { contactId: contactId!, workflowId: opts.workflowId!, runId: opts.runId!, channel: context.event?.channel === 'sms' ? 'sms' : 'email' } : undefined,
     executionMode: opts.autonomy === 'auto' ? 'autonomous' : 'review',
     authorizedInstruction: action.config.instruction,
     instruction: resolveTokens(action.config.instruction, context),

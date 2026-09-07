@@ -68,6 +68,8 @@ export interface ToolContext {
   /** Server-only execution observer; never populated from model arguments. */
   onToolOutcome?: (receipt: { name: string; outcome: import('./outcomes').ToolOutcome }) => void;
   backgroundRun?: boolean;
+  /** Server-bound routine recipient and channel; never granted by event text. */
+  followThroughScope?: { contactId: string; workflowId: string; runId: string; channel: 'email' | 'sms' };
   /** Unexpanded workflow instruction saved by the workspace owner. Recipient
    * names/event payloads may provide data, never execution authority. */
   backgroundAuthorizedInstruction?: string;

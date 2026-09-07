@@ -79,6 +79,9 @@ interface ScheduleTourResult {
     guestName: string;
     propertyAddress: string | null;
     status: 'scheduled';
+    calendarStatus: 'confirmed' | 'not_connected' | 'unconfirmed';
+    externalEventId: string | null;
+    propertyAccessConfirmed: false;
   }>;
 }
 
@@ -217,6 +220,8 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     // a CalendarEventMirror row. Best-effort: the Tour row is committed
     // either way. No connection → skip cleanly (the realtor sees the
     // tour in their CRM; the calendar prompt teaches them to connect).
+    let calendarStatus: 'confirmed' | 'not_connected' | 'unconfirmed' = 'not_connected';
+    let externalEventId: string | null = null;
     try {
       const connection = await findCalendarConnection(ctx.space.id);
       if (connection) {
@@ -228,7 +233,8 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
         ]
           .filter(Boolean)
           .join('\n');
-        await writeEventThrough({
+        calendarStatus = 'unconfirmed';
+        const receipt = await writeEventThrough({
           spaceId: ctx.space.id,
           connection,
           title: `Tour: ${guestName || 'Guest'}`,
@@ -241,8 +247,11 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
           sourceTourId: tourId,
           createdBy: 'agent',
         });
+        externalEventId = receipt.externalEventId;
+        calendarStatus = receipt.externalOk && receipt.externalEventId ? 'confirmed' : 'unconfirmed';
       }
     } catch (err) {
+      calendarStatus = 'unconfirmed';
       logger.warn(
         '[tools.schedule_tour] calendar through-write failed',
         { tourId, spaceId: ctx.space.id },
@@ -260,7 +269,7 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
     const where = args.propertyAddress ? ` at ${args.propertyAddress}` : '';
     await chargeWorkflow(ctx.space.id, 'tour_booking');
     return {
-      summary: `Tour scheduled for ${guestName || 'guest'}${where} — ${prettyTime}.`,
+      summary: `Tour saved for ${guestName || 'guest'}${where} — ${prettyTime}. ${calendarStatus === 'confirmed' ? 'External calendar event confirmed.' : calendarStatus === 'not_connected' ? 'No external calendar is connected; this is saved in Chippi only.' : 'External calendar delivery is unconfirmed; check the calendar before retrying.'} Property access and any required agreement still need confirmation.`,
       data: {
         tours: [
           {
@@ -271,6 +280,9 @@ export const scheduleTourTool = defineTool<typeof parameters, ScheduleTourResult
             guestName,
             propertyAddress: args.propertyAddress?.trim() || null,
             status: 'scheduled',
+            calendarStatus,
+            externalEventId,
+            propertyAccessConfirmed: false,
           },
         ],
       },

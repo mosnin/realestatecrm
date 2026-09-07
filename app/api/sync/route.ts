@@ -165,22 +165,15 @@ async function GETHandler(req: NextRequest) {
   const fub = await findActive({ spaceId: space.id, userId, toolkit: 'follow_up_boss' });
   if (fub?.secretCiphertext) {
     try {
-      const { ok, records } = await fubListPeople(decrypt(fub.secretCiphertext), 50);
-      return NextResponse.json<SyncResponse>({
-        connected: true,
-        source: 'follow_up_boss',
-        records: ok ? records : [],
-      });
+      const { ok, records } = await fubListPeople(decrypt(fub.secretCiphertext), 50, { offset: Math.max(0, Math.min(100000, Number(req.nextUrl.searchParams.get('offset')) || 0)), search: (req.nextUrl.searchParams.get('search') ?? '').slice(0,100) });
+      if (!ok) return NextResponse.json({ error: 'Follow Up Boss is connected but could not be read. Reconnect or try again.' }, { status: 502 });
+      return NextResponse.json<SyncResponse>({ connected: true, source: 'follow_up_boss', records });
     } catch (err) {
       logger.error('[sync] follow up boss read failed', {
         spaceId: space.id,
         err: err instanceof Error ? err.message : String(err),
       });
-      return NextResponse.json<SyncResponse>({
-        connected: true,
-        source: 'follow_up_boss',
-        records: [],
-      });
+      return NextResponse.json({ error: 'Follow Up Boss could not be read.' }, { status: 502 });
     }
   }
 

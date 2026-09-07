@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { dispatchDueScheduledMessages } from '@/lib/workflows/scheduled-dispatch';
+import { dispatchCrmWritebacks } from '@/lib/follow-through/crm-writeback';
 import { monitorCron } from '@/lib/cron-monitor';
 
 export const runtime = 'nodejs';
@@ -40,8 +41,11 @@ async function handler(req: NextRequest) {
   }
 
   const startedAt = Date.now();
-  const summary = await dispatchDueScheduledMessages();
-  const result = { ...summary, durationMs: Date.now() - startedAt };
+  const [summary, crmWriteback] = await Promise.all([
+    dispatchDueScheduledMessages(),
+    dispatchCrmWritebacks(),
+  ]);
+  const result = { ...summary, crmWriteback, durationMs: Date.now() - startedAt };
   console.log('[cron/scheduled-messages] Tick complete', result);
   return NextResponse.json(result);
 }

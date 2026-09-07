@@ -1,3 +1,4 @@
+import { checkCoverageAction } from '@/lib/follow-through/guard';
 /**
  * `send_email` — compose + send an email after realtor approval.
  *
@@ -119,6 +120,8 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
   },
 
   async handler(args, ctx) {
+    const coverageError = await checkCoverageAction(ctx, args.contactId, 'email');
+    if (coverageError) return { summary: coverageError, display: 'error' };
     // Resolve the recipient. Three cases, in order of preference:
     //   1. contactId provided → look it up, use that contact's email.
     //   2. toEmail provided, matches a contact in this space → use that.
@@ -243,7 +246,7 @@ export const sendEmailTool = defineTool<typeof parameters, SendEmailResult>({
     // while collapsing a byte-for-byte retry, so its local key includes a body
     // hash. A durable execution already has an immutable database action id;
     // that server-issued identity must win regardless of message content.
-    const durableIdempotencyKey = ctx.executionIdempotencyKey;
+    const durableIdempotencyKey = ctx.executionIdempotencyKey ?? (ctx.followThroughScope ? `coverage:${ctx.space.id}:${ctx.followThroughScope.runId}:email` : undefined);
     const bodyHash = crypto
       .createHash('sha256')
       .update(args.body.trim())

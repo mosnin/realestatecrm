@@ -30,15 +30,19 @@ function authHeader(apiKey: string): string {
 async function fubFetch(
   apiKey: string,
   path: string,
+  options: { method?: 'GET' | 'POST'; body?: unknown } = {},
 ): Promise<{ ok: boolean; status: number; body: unknown }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(`${FUB_BASE}${path}`, {
-      method: 'GET',
+      method: options.method ?? 'GET',
+      redirect: 'error',
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
       headers: {
         Authorization: authHeader(apiKey),
         Accept: 'application/json',
+        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       signal: controller.signal,
     });
@@ -152,12 +156,13 @@ function mapPerson(p: FubPerson, idx: number): SyncRecord {
 export async function listPeople(
   apiKey: string,
   limit = 50,
+  query?: { offset?: number; search?: string },
 ): Promise<{ ok: boolean; records: SyncRecord[] }> {
   let res: Awaited<ReturnType<typeof fubFetch>>;
   try {
     res = await fubFetch(
       apiKey.trim(),
-      `/people?limit=${Math.min(limit, 100)}&sort=-updated`,
+      `/people?limit=${Math.max(1, Math.min(Math.floor(limit), 100))}&sort=-updated${query?.offset ? `&offset=${query.offset}` : ''}${query?.search ? `&name=${encodeURIComponent(query.search)}` : ''}`,
     );
   } catch (err) {
     logger.warn('[fub] listPeople request failed', {
@@ -174,4 +179,23 @@ export async function listPeople(
   const body = (res.body ?? {}) as { people?: unknown };
   const people = Array.isArray(body.people) ? (body.people as FubPerson[]) : [];
   return { ok: true, records: people.slice(0, limit).map(mapPerson) };
+}
+
+/** Import one provider-verified record. Never trust contact fields supplied by the browser. */
+export async function getPerson(apiKey: string, externalId: string): Promise<SyncRecord> {
+  if (!/^[1-9]\d*$/.test(externalId)) throw new Error('Invalid Follow Up Boss person');
+  const result = await fubFetch(apiKey, `/people/${externalId}`);
+  const body = result.body as FubPerson | null;
+  if (!result.ok || !body || String(body.id) !== externalId) throw new Error('Could not read this Follow Up Boss person');
+  return mapPerson(body, 0);
+}
+export async function writePersonNote(apiKey: string, externalId: string, body: string): Promise<string> {
+  if (!/^[1-9]\d*$/.test(externalId) || !Number.isSafeInteger(Number(externalId))) throw new Error('Invalid person identity');
+  // No automatic POST retries: a timeout may follow a committed external note.
+  const result = await fubFetch(apiKey, '/notes', { method: 'POST', body: {
+    personId: Number(externalId), subject: 'Chippi follow-through', body, isHtml: false,
+  } });
+  const note = result.body as { id?: string | number } | null;
+  if (!result.ok || !note?.id) throw new Error('Follow Up Boss note delivery is unconfirmed');
+  return String(note.id);
 }
