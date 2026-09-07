@@ -397,3 +397,32 @@ describe('GET /api/cron/routines', () => {
     expect(maxInFlight).toBeLessThanOrEqual(8);
   });
 });
+
+describe('Convex selected routine scheduling', () => {
+  afterEach(() => {
+    delete process.env.CONVEX_FOLLOW_UP_ROUTINE_ID;
+    delete process.env.CONVEX_HTTP_URL;
+    delete process.env.CHIPPI_CONVEX_SECRET;
+  });
+  it.each(['queued', 'running', 'uncertain'])('retains the same due slot for %s without invoking the old executor', async state => {
+    process.env.CONVEX_FOLLOW_UP_ROUTINE_ID = 'pilot';
+    process.env.CONVEX_HTTP_URL = 'https://pilot.convex.site';
+    process.env.CHIPPI_CONVEX_SECRET = 'test';
+    const due = { id: 'pilot', spaceId: 's1', instruction: 'Follow up', nextRunAt: '2026-01-01T00:00:00.000Z' };
+    queueTick({ due: [due], activeSpaceIds: ['s1'] });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ jobId: 'job-1', state })));
+    const res = await invoke('Bearer test-secret');
+    expect(res.status).toBe(200);
+    expect(modalCalls).toHaveLength(0);
+    expect(supabaseCalls.filter(c => c.chain.some(([method]) => method === 'update'))).toHaveLength(0);
+    expect((await res.json()).coordinated).toBe(1);
+  });
+  it('fails closed when the selected coordinator is unavailable', async () => {
+    process.env.CONVEX_FOLLOW_UP_ROUTINE_ID = 'pilot';
+    queueTick({ due: [{ id: 'pilot', spaceId: 's1', instruction: 'Follow up' }], activeSpaceIds: ['s1'] });
+    const res = await invoke('Bearer test-secret');
+    expect(modalCalls).toHaveLength(0);
+    expect(supabaseCalls.filter(c => c.chain.some(([method]) => method === 'update'))).toHaveLength(0);
+    expect((await res.json()).errored).toBe(1);
+  });
+});

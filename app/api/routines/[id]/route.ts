@@ -1,3 +1,4 @@
+import { usesConvexFollowUp } from '@/lib/convex/follow-up-pilot';
 /**
  * PATCH  /api/routines/[id] — edit instruction / cadence / hour / enabled.
  * DELETE /api/routines/[id] — remove a routine.
@@ -170,6 +171,8 @@ export async function POST(
     .eq('id', id)
     .maybeSingle();
   if (!routine) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  if (usesConvexFollowUp(id)) return NextResponse.json({ error: 'This follow-up is managed by its scheduled execution. Check its execution status before starting another run.' }, { status: 409 });
 
   // Optimistically stamp the run so the UI updates instantly. after() corrects
   // the status to 'error' if the dispatch never landed. The Modal endpoint

@@ -13,6 +13,7 @@
  * stays timezone-agnostic and the realtor never thinks about UTC.
  */
 
+import { FollowUpExecutions } from './follow-up-executions';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Play, Pencil, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -294,15 +295,18 @@ export function RoutinesManager({
     setActionError('');
     try {
       const res = await fetch(`${apiBase}/${id}`, { method: 'POST' });
-      if (!res.ok && res.status !== 202) throw new Error('run failed');
+      if (!res.ok && res.status !== 202) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error ?? 'Couldn’t start the routine.');
+      }
       // Pull the refreshed run stamps so the card shows "Ran just now".
       const listRes = await fetch(apiBase);
       if (listRes.ok) {
         const data = await listRes.json();
         if (Array.isArray(data.routines)) setRoutines(data.routines);
       }
-    } catch {
-      setActionError('Couldn’t start the routine.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Couldn’t start the routine.');
     } finally {
       setRunningId(null);
     }
@@ -346,6 +350,7 @@ export function RoutinesManager({
     // Routines have no wide working surface (the composer is a simple form) —
     // the whole section reads at People's column width.
     <div className="mx-auto w-full max-w-5xl space-y-6">
+      {apiBase === '/api/routines' && <FollowUpExecutions />}
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
       {/* The composer is an input surface — it stays a discrete card.

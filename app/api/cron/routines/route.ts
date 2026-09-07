@@ -4,10 +4,9 @@
  * Hourly tick. Finds every enabled Routine whose nextRunAt has passed and
  * fires the Modal autonomous run with the routine's instruction attached.
  *
- * IMPORTANT: This endpoint never sends email or SMS. It triggers the same
- * Modal agent path the manual "Run now" and the 4-hour sweep use — the run
- * produces AgentDraft rows with status 'pending'. Only the realtor approving
- * a draft fires an outbound channel.
+ * Saved autonomous instructions run under the workspace sending policy.
+ * The selected Convex pilot delegates execution coordination; other routines
+ * retain the existing path. Supabase remains authoritative for the schedule.
  *
  * Auth: Bearer ${CRON_SECRET}. Disable: set CRON_ROUTINES_DISABLED=1.
  *
@@ -18,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { fireRoutineRun } from '@/lib/routines';
+import { enqueueFollowUp, usesConvexFollowUp } from '@/lib/convex/follow-up-pilot';
 import { monitorCron } from '@/lib/cron-monitor';
 import { isPremiumAccessBlocked } from '@/lib/api-auth';
 import { unscoped } from '@/lib/supabase-guard';
@@ -40,6 +40,7 @@ interface DueRoutine {
   id: string;
   spaceId: string;
   instruction: string;
+  nextRunAt: string;
 }
 
 async function handler(req: NextRequest) {
@@ -63,7 +64,7 @@ async function handler(req: NextRequest) {
   // ── 1. Due routines ─────────────────────────────────────────────────────
   const { data: dueRows, error: dueErr } = await unscoped(supabase
     .from('Routine'), 'cron: cross-tenant discovery then per-row work')
-    .select('id, spaceId, instruction')
+    .select('id, spaceId, instruction, nextRunAt')
     .eq('enabled', true)
     .lte('nextRunAt', nowIso)
     .order('nextRunAt', { ascending: true })
@@ -172,6 +173,7 @@ async function handler(req: NextRequest) {
   // ── 3. Fire with bounded concurrency ────────────────────────────────────
   let fired = 0;
   let errored = 0;
+  let coordinated = 0;
   let cursor = 0;
 
   async function worker() {
@@ -179,6 +181,23 @@ async function handler(req: NextRequest) {
       const routine = runnable[cursor++];
       const ownerId = ownerIdsBySpace.get(routine.spaceId);
       const ownerClerkId = ownerId ? clerkIdByOwner.get(ownerId) : undefined;
+      if (usesConvexFollowUp(routine.id)) {
+        try {
+          const receipt = await enqueueFollowUp({ spaceId: routine.spaceId, routineId: routine.id, scheduledFor: routine.nextRunAt });
+          coordinated++;
+          // Pending or ambiguous runs retain their slot. No fallback, no duplicate execution.
+          if (['completed', 'failed', 'skipped'].includes(receipt.state)) {
+            const { error } = await unscoped(supabase.from('Routine'), 'cron: selected Convex routine terminal receipt')
+              .update({ lastRunAt: new Date().toISOString(), lastRunStatus: receipt.state === 'completed' ? 'ok' : receipt.state === 'skipped' ? 'skipped' : 'error' })
+              .eq('id', routine.id).eq('spaceId', routine.spaceId).eq('nextRunAt', routine.nextRunAt);
+            if (error) throw error;
+          }
+        } catch (error) {
+          errored++;
+          console.error('[cron/routines] Convex coordination unavailable; retained due slot', { routineId: routine.id }, error);
+        }
+        continue;
+      }
       let status: 'ok' | 'error';
       try {
         status = await fireRoutineRun(routine.spaceId, routine.instruction, ownerClerkId);
@@ -205,6 +224,7 @@ async function handler(req: NextRequest) {
   const summary = {
     due: due.length,
     fired,
+    coordinated,
     errored,
     skipped: skippedInactive,
     durationMs: Date.now() - startedAt,
