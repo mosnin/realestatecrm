@@ -1,9 +1,10 @@
 # Chippi workforce: source import and integration design
 
-Status: complete Cadre source imported unchanged; integration design reviewed
-against source and live UI. The Workforce view, Chippi protection, identity
-bridge, and VM service are not yet integrated into Chippi. This document is the
-implementation contract, not a claim of working product parity.
+Status: the complete source is retained in a pinned fork. The authenticated
+client mount, signed identity bridge, protected Chippi, native CRM queries,
+workspace switching, and execution reauthorization are implemented locally.
+The runtime has not been provisioned for customers. Full provider parity is
+still an acceptance requirement; see [implementation and remaining gates](workforce-implementation.md).
 
 ## Source and live evidence
 

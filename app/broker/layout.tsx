@@ -11,6 +11,7 @@ import { Header } from '@/components/dashboard/header';
 import { AccountSwitchSwipe } from '@/components/dashboard/account-switch';
 import { BrokerMain } from '@/components/broker/broker-main';
 import { EmbedDetector } from '@/components/chippi/embed-detector';
+import { unscoped } from '@/lib/supabase-guard';
 import { supabase } from '@/lib/supabase';
 import { isAccountComped } from '@/lib/billing/comp';
 import { hasCurrentSubscription } from '@/lib/api-auth';
@@ -31,6 +32,18 @@ export default async function BrokerLayout({ children }: { children: React.React
   if (!ctx) {
     redirect('/setup');
   }
+
+  const { data: memberships } = await unscoped(supabase.from('BrokerageMembership'), 'list current user workspace memberships for the switcher')
+    .select('brokerageId, role, Brokerage(id, name)').eq('userId', ctx.dbUserId);
+  const availableMemberships = (memberships ?? []).flatMap(m => {
+    const brokerage = Array.isArray(m.Brokerage) ? m.Brokerage[0] : m.Brokerage;
+    return brokerage?.id && brokerage.name ? [{ id: brokerage.id, name: brokerage.name, role: m.role }] : [];
+  });
+  // Current first is the shell's active identity; all other authorized destinations remain visible.
+  const brokerageMemberships = [
+    { id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role },
+    ...availableMemberships.filter(m => m.id !== ctx.brokerage.id),
+  ];
 
   // Look up their realtor workspace (may not exist for broker-only accounts)
   const { data: spaceRow } = await supabase
@@ -242,7 +255,7 @@ export default async function BrokerLayout({ children }: { children: React.React
           mirrors the realtor layout (app/s/[slug]/layout.tsx). */}
       <EmbedDetector />
       <SidebarCollapseProvider>
-        <WorkspaceShell slug={slug} spaceId={spaceRow?.id} spaceName={spaceName} isBroker brokerageRole={ctx.membership.role} brokerageMemberships={[{id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role}]} isPlatformAdmin={isPlatformAdmin}>
+        <WorkspaceShell slug={slug} spaceId={spaceRow?.id} spaceName={spaceName} isBroker brokerageRole={ctx.membership.role} brokerageMemberships={brokerageMemberships} isPlatformAdmin={isPlatformAdmin}>
           <BrokerMain>{children}</BrokerMain>
         </WorkspaceShell>
       </SidebarCollapseProvider>

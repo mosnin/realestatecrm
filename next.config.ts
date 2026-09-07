@@ -58,6 +58,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/workforce/**/*": ["./public/workforce-assets/index.html"] },
   // Do not advertise framework internals on every response.
   poweredByHeader: false,
   // jsdom (via isomorphic-dompurify on the server) ships a runtime CSS

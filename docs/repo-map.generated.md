@@ -8,9 +8,9 @@
 ## At a glance
 
 - **Page routes:** 224
-- **API endpoints:** 443
+- **API endpoints:** 449
 - **Cron jobs:** 3
-- **DB tables:** 156  ·  **RPCs:** 71  ·  **migrations:** 273
+- **DB tables:** 156  ·  **RPCs:** 72  ·  **migrations:** 274
 - **Agent tools — TS (lib/ai-tools):** 83 declared, 84 wired into `ALL_TOOLS`
 - **Agent tools — Python (agent/):** 63 declared
 
@@ -429,7 +429,7 @@
 
 - `/api/affiliate`
 
-**/api/agent** (52)
+**/api/agent** (53)
 
 - `/api/agent/active-runs`
 - `/api/agent/activity`
@@ -454,6 +454,7 @@
 - `/api/agent/events`
 - `/api/agent/goals`
 - `/api/agent/goals/[id]`
+- `/api/agent/health`
 - `/api/agent/inbound`
 - `/api/agent/insights`
 - `/api/agent/memory`
@@ -812,10 +813,11 @@
 - `/api/integrations/health`
 - `/api/integrations/kvcore`
 
-**/api/internal** (14)
+**/api/internal** (17)
 
 - `/api/internal/area-research`
 - `/api/internal/automations/create`
+- `/api/internal/convex-follow-up`
 - `/api/internal/integrations/execute`
 - `/api/internal/integrations/search`
 - `/api/internal/messages/send`
@@ -824,6 +826,8 @@
 - `/api/internal/studio/edit`
 - `/api/internal/studio/generate`
 - `/api/internal/swarm-runs/launch`
+- `/api/internal/workforce/authorize`
+- `/api/internal/workforce/crm`
 - `/api/internal/workspace-runs/callback`
 - `/api/internal/workspace-runs/launch-claim`
 - `/api/internal/workspace-runs/tasks/callback`
@@ -936,10 +940,11 @@
 
 - `/api/reviews/[campaignId]`
 
-**/api/routines** (2)
+**/api/routines** (3)
 
 - `/api/routines`
 - `/api/routines/[id]`
+- `/api/routines/executions`
 
 **/api/saved-views** (1)
 
@@ -1068,6 +1073,10 @@
 - `/api/workflows/sample-trigger`
 - `/api/workflows/trigger-options`
 
+**/api/workforce** (1)
+
+- `/api/workforce/[kind]/[id]/[...path]`
+
 **/api/workspace-runs** (4)
 
 - `/api/workspace-runs/[id]`
@@ -1105,9 +1114,9 @@ the runtimes diverge — this table makes the drift visible.
 
 **Tables (156):** `AIUserProfile`, `AffiliateAccount`, `AgentActionProposal`, `AgentActivityLog`, `AgentDraft`, `AgentEventInbox`, `AgentGoal`, `AgentJobRun`, `AgentMemory`, `AgentOutbox`, `AgentPausedRun`, `AgentQuestion`, `AgentRunArtifact`, `AgentRunEvent`, `AgentRunLedger`, `AgentSettings`, `AgentTask`, `AgentTrajectory`, `Announcement`, `AnnouncementDismissal`, `AppKnowledgeDoc`, `AppNotification`, `ApplicationMessage`, `ApplicationStatusUpdate`, `AreaReport`, `Artifact`, `ArtifactVersion`, `Attachment`, `AuditLog`, `Brief`, `BriefTipHistory`, `BrokerConversation`, `BrokerMessage`, `BrokerNotification`, `BrokerRoutine`, `Brokerage`, `BrokerageChatConversation`, `BrokerageChatMessage`, `BrokerageIntegrationConnection`, `BrokerageMembership`, `BrokerageRemoval`, `BrokerageTemplate`, `BrowserAction`, `BrowserLink`, `BrowserPairingCode`, `BrowserSession`, `CalendarEvent`, `CalendarEventMirror`, `CalendarNote`, `CallLog`, `Channel`, `ChannelMember`, `ChannelMessage`, `ChatUsage`, `ClientAuthCode`, `ClientCommitment`, `ClientDocument`, `ClientInfoRequest`, `ClientMessage`, `ClientUser`, `CmaReport`, `CommissionLedger`, `CommissionSplit`, `Contact`, `ContactDocument`, `Conversation`, `CreditLot`, `CreditTxn`, `CrmContactLink`, `CrmWriteback`, `CustomAgent`, `CustomPlugin`, `DeadLetterEvent`, `Deal`, `DealActivity`, `DealChecklistItem`, `DealContact`, `DealDocument`, `DealReviewComment`, `DealReviewRequest`, `DealRoutingRule`, `DealStage`, `DisabledSpace`, `DocumentEmbedding`, `DripEnrollment`, `DripSequence`, `EmailBroadcast`, `ExecutionStep`, `File`, `FormAnalyticsEvent`, `FormDraft`, `GoalDecomposition`, `GoogleCalendarToken`, `InboxMessage`, `InboxThread`, `IntegrationConnection`, `IntegrationEvent`, `IntegrationTrigger`, `Invitation`, `InviteCode`, `InviteCodeRedemption`, `McpApiKey`, `McpAuthCode`, `Message`, `MessageTemplate`, `MessagingConsent`, `MessagingSuppression`, `Note`, `NotificationPreference`, `NotificationState`, `Offer`, `OfferEvent`, `Pipeline`, `ProfilePage`, `Property`, `PropertyPacket`, `PushSubscription`, `ReviewCampaign`, `Routine`, `SavedView`, `ScheduleOccurrence`, `ScheduleOccurrenceStep`, `ScheduledMessage`, `SignatureRequest`, `Space`, `SpaceSetting`, `StudioBrand`, `StudioGeneration`, `StudioPost`, `SupportTicket`, `SwarmEvent`, `SwarmMember`, `SwarmRun`, `TaskCheckpoint`, `TaskDependency`, `TelemetryEvent`, `Tour`, `TourAvailabilityOverride`, `TourFeedback`, `TourPropertyProfile`, `TourWaitlist`, `User`, `UserSkill`, `WorkSession`, `WorkSessionAction`, `Workflow`, `WorkflowRun`, `WorkflowRunStep`, `WorkspaceRun`, `WorkspaceRunEvent`, `WorkspaceRunFile`, `WorkspaceRunLaunchReceipt`, `WorkspaceRunTask`, `WorkspaceRunTaskEvent`, `WorkspaceRunTaskFile`, `WorkspaceRunTaskPlanClaim`
 
-**RPCs (71):** `accept_workspace_launch`, `accept_workspace_run_task_launch`, `append_agent_run_event`, `book_tour_atomic`, `broker_routine_set_next_run`, `cancel_workspace_run_and_session`, `cancel_workspace_run_task`, `change_client_commitment`, `charge_credits_for_chat_usage`, `claim_agent_job`, `claim_schedule_occurrence`, `claim_schedule_occurrence_step`, `claim_work_session_phase`, `claim_workspace_launch`, `claim_workspace_run_task_launch`, `cleanup_agent_data`, `count_runs_per_workflow`, `create_brokerage_with_owner`, `create_client_commitment`, `create_space_with_defaults`, `current_user_internal_id`, `drip_sequence_set_updated_at`, `enqueue_reserved_workspace_run_task_with_plan`, `enqueue_workspace_run_task`, `enqueue_workspace_run_task_with_plan`, `enqueue_workspace_run_task_with_program`, `ensure_agent_settings_for_space`, `fail_empty_work_session_artifact`, `fail_stale_accepted_workspace_launch`, `finish_agent_job`, `finish_schedule_occurrence`, `finish_schedule_occurrence_step`, `finish_workspace_run_and_session`, `finish_workspace_run_task`, `grant_credits`, `heartbeat_agent_job`, `heartbeat_schedule_occurrence`, `heartbeat_schedule_occurrence_step`, `import_fub_person`, `list_workspace_run_recovery_candidates`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `materialize_schedule_occurrence`, `merge_contacts`, `normalize_invite_code`, `offboard_brokerage_member`, `patch_work_session_phase`, `public`, `purge_credit_rows_for_account`, `queue_crm_activity`, `reconcile_commitment_delivery`, `record_workspace_launch_receipt`, `record_workspace_run_event`, `record_workspace_run_task_event`, `redeem_invite_code_atomic`, `refund_credit_txn`, `release_workspace_run_task_plan`, `reorder_deal`, `reserve_workspace_run_task_plan`, `resolve_billing_account_for_space`, `routine_next_run_at`, `routine_set_next_run`, `scheduled_message_set_updated_at`, `search_knowledge_docs`, `spend_credits`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`, `validate_agent_job_child`, `workflow_set_updated_at`
+**RPCs (72):** `accept_workspace_launch`, `accept_workspace_run_task_launch`, `append_agent_run_event`, `assign_broker_lead`, `book_tour_atomic`, `broker_routine_set_next_run`, `cancel_workspace_run_and_session`, `cancel_workspace_run_task`, `change_client_commitment`, `charge_credits_for_chat_usage`, `claim_agent_job`, `claim_schedule_occurrence`, `claim_schedule_occurrence_step`, `claim_work_session_phase`, `claim_workspace_launch`, `claim_workspace_run_task_launch`, `cleanup_agent_data`, `count_runs_per_workflow`, `create_brokerage_with_owner`, `create_client_commitment`, `create_space_with_defaults`, `current_user_internal_id`, `drip_sequence_set_updated_at`, `enqueue_reserved_workspace_run_task_with_plan`, `enqueue_workspace_run_task`, `enqueue_workspace_run_task_with_plan`, `enqueue_workspace_run_task_with_program`, `ensure_agent_settings_for_space`, `fail_empty_work_session_artifact`, `fail_stale_accepted_workspace_launch`, `finish_agent_job`, `finish_schedule_occurrence`, `finish_schedule_occurrence_step`, `finish_workspace_run_and_session`, `finish_workspace_run_task`, `grant_credits`, `heartbeat_agent_job`, `heartbeat_schedule_occurrence`, `heartbeat_schedule_occurrence_step`, `import_fub_person`, `list_workspace_run_recovery_candidates`, `match_agent_memory`, `match_documents`, `match_documents_hybrid`, `materialize_schedule_occurrence`, `merge_contacts`, `normalize_invite_code`, `offboard_brokerage_member`, `patch_work_session_phase`, `public`, `purge_credit_rows_for_account`, `queue_crm_activity`, `reconcile_commitment_delivery`, `record_workspace_launch_receipt`, `record_workspace_run_event`, `record_workspace_run_task_event`, `redeem_invite_code_atomic`, `refund_credit_txn`, `release_workspace_run_task_plan`, `reorder_deal`, `reserve_workspace_run_task_plan`, `resolve_billing_account_for_space`, `routine_next_run_at`, `routine_set_next_run`, `scheduled_message_set_updated_at`, `search_knowledge_docs`, `spend_credits`, `stamp_brief_enabled_at`, `sync_commission_ledger`, `update_updated_at_column`, `validate_agent_job_child`, `workflow_set_updated_at`
 
-**Migrations:** 273 (latest: `20260919010000_crm_follow_through.sql`)
+**Migrations:** 274 (latest: `20260920000000_atomic_broker_assignment.sql`)
 
 ## External services
 

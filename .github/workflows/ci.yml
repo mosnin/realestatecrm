@@ -28,6 +28,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Fail on stray package-lock.json
         run: |
@@ -112,3 +114,50 @@ jobs:
       - name: Agent unit tests
         working-directory: agent
         run: python -m pytest tests/ -q
+
+  workforce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: chippi_test
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: chippi_workforce
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U chippi_test -d chippi_workforce"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: integrations/cadre
+    env:
+      DATABASE_URL: postgresql://chippi_test:test-only-password@127.0.0.1:5432/chippi_workforce
+      CHIPPI_TEST_DATABASE_URL: postgresql://chippi_test:test-only-password@127.0.0.1:5432/chippi_workforce
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          package_json_file: integrations/cadre/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @rakazo/db generate
+      - run: pnpm --filter @rakazo/db migrate
+      - run: pnpm check
+      - run: pnpm exec vitest run --maxWorkers=2
+      - run: pnpm --filter @rakazo/web build
+        env:
+          CHIPPI_BUILD: 'true'
+      - run: pnpm --filter @rakazo/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @rakazo/web exec playwright test --config playwright.chippi.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chippi-workforce-browser-report
+          path: integrations/cadre/playwright-report-chippi

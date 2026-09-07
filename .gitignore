@@ -67,3 +67,6 @@ _diagnostic*
 # Native Mac build products
 /apps/macos/.build/
 /apps/macos/dist/
+
+# Independently compiled Cadre client
+/public/workforce-assets/

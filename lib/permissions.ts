@@ -11,6 +11,7 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
+import { cookies } from 'next/headers';
 import { supabase } from '@/lib/supabase';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { unscoped } from '@/lib/supabase-guard';
@@ -168,6 +169,11 @@ export async function requireAdminCapability(
   return { clerkUserId: session.userId, adminRole: role };
 }
 
+export async function activeBrokerageId(): Promise<string | undefined> {
+  // Older clients without a selection keep the deterministic landing default.
+  try { return (await cookies()).get('chippi-brokerage')?.value; } catch { return undefined; }
+}
+
 // ── Broker ────────────────────────────────────────────────────────────────────
 
 type BrokerContext = {
@@ -186,7 +192,7 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
 
   const { data: user } = await supabase
     .from('User')
-    .select('id, status')
+    .select('id, status, platformRole')
     .eq('clerkId', session.userId)
     .maybeSingle();
   if (!user) return null;
@@ -197,7 +203,7 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
   // eventually fell out of the DB. Resilient to a missing `status` column
   // pre-BP1a migration: maybeSingle() returns { status: undefined } which
   // is not === 'offboarded'.
-  if ((user as { status?: string }).status === 'offboarded') return null;
+  if (user.status === 'offboarded' || user.platformRole === 'banned') return null;
 
   // Fetch all broker-level memberships. A user may own one brokerage and
   // manage another — prefer broker_owner so they always land on their own brokerage.
@@ -216,11 +222,13 @@ export async function getBrokerContext(): Promise<BrokerContext | null> {
   // by createdAt). The old `?? memberships[0]` fell back to PostgREST insertion
   // order, so the same user could resolve to a different brokerage run-to-run
   // and act on the wrong one.
-  const membership =
+  const selectedId = await activeBrokerageId();
+  const membership = selectedId ? memberships.find(m => m.brokerageId === selectedId) :
     memberships.find((m) => m.role === 'broker_owner') ??
     memberships.find((m) => m.role === 'broker_admin') ??
     memberships[0];
 
+  if (!membership) return null;
   const { data: brokerage } = await supabase
     .from('Brokerage')
     .select('*')
@@ -255,12 +263,12 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
 
   const { data: user } = await supabase
     .from('User')
-    .select('id, status')
+    .select('id, status, platformRole')
     .eq('clerkId', session.userId)
     .maybeSingle();
   if (!user) return null;
   // Offboarding gate — see getBrokerContext above for rationale.
-  if ((user as { status?: string }).status === 'offboarded') return null;
+  if (user.status === 'offboarded' || user.platformRole === 'banned') return null;
 
   const { data: memberships } = await unscoped(
     supabase.from('BrokerageMembership'),
@@ -275,12 +283,14 @@ export async function getBrokerMemberContext(): Promise<BrokerContext | null> {
   // Prefer broker_owner > broker_admin > realtor_member, oldest within a tier
   // (query ordered by createdAt) so a multi-brokerage user resolves
   // deterministically instead of by PostgREST insertion order.
-  const membership =
+  const selectedId = await activeBrokerageId();
+  const membership = selectedId ? memberships.find(m => m.brokerageId === selectedId) :
     memberships.find((m) => m.role === 'broker_owner') ??
     memberships.find((m) => m.role === 'broker_admin') ??
     memberships.find((m) => m.role === 'realtor_member') ??
     memberships[0];
 
+  if (!membership) return null;
   const { data: brokerage } = await supabase
     .from('Brokerage')
     .select('*')

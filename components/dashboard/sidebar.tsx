@@ -1,5 +1,6 @@
 'use client';
 
+import { DashboardViewToggle } from "./dashboard-view-toggle";
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -512,9 +513,9 @@ export function WorkspaceSwitcher({
     workspaces.push({
       key: b.id,
       name: b.name,
-      href: '/broker',
+      href: `/broker/switch/${encodeURIComponent(b.id)}`,
       icon: Building2,
-      isCurrent: isOnBrokerPage,
+      isCurrent: isOnBrokerPage && b.id === brokerageMemberships[0]?.id,
     });
   }
 
@@ -636,14 +637,14 @@ function WorkspaceSwitcherRows({
         </div>
       )}
       {userEmail && <div className="my-1 mx-1 h-px bg-border/60" />}
-      {workspaces.map((w, idx) => {
+      {workspaces.map((w) => {
         const WIcon = w.icon;
-        const shortcut = `⌘${idx + 1}`;
         return (
           <Link
             key={w.key}
             href={w.href}
-            onClick={() => { if (!w.isCurrent && w.href === '/broker') triggerAccountSwitch(); }}
+            prefetch={false}
+            onClick={() => { if (!w.isCurrent && w.href.startsWith('/broker/switch/')) triggerAccountSwitch(); }}
             className={cn(
               'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
               w.isCurrent
@@ -657,11 +658,7 @@ function WorkspaceSwitcherRows({
             <span className="flex-1 truncate font-medium">{w.name}</span>
             {w.isCurrent ? (
               <Check size={13} strokeWidth={2} className="text-foreground flex-shrink-0" />
-            ) : (
-              <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-                {shortcut}
-              </kbd>
-            )}
+            ) : null}
           </Link>
         );
       })}
@@ -674,9 +671,6 @@ function WorkspaceSwitcherRows({
         <span className="flex-1 text-left">
           {hasTeam ? 'New team' : 'Create or join a team'}
         </span>
-        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-          ⌘A
-        </kbd>
       </Link>
     </>
   );
@@ -1714,6 +1708,8 @@ export function Sidebar({
             <SearchPill collapsed={brokerCollapsed} />
           </div>
 
+          {["broker_owner", "broker_admin"].includes(brokerageRole ?? "") && <DashboardViewToggle kind="brokerage" id={brokerageMemberships[0]?.id ?? ""} />}
+
           {/* Broker primary nav — same structural vocabulary as RealtorNav:
               py-2 vertical breathing, space-y-3 between section groups,
               overflow-y-auto so deep section lists don't push the footer off. */}
@@ -2008,6 +2004,7 @@ function RealtorSidebarShell({
           userEmail={email}
         />
 
+        <DashboardViewToggle kind="personal" id={slug} />
         {/* Search */}
         <div className="mt-3">
           <SearchPill collapsed={collapsed} />

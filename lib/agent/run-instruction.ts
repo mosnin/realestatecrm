@@ -80,10 +80,10 @@ export async function buildHeadlessToolContext(
 
   const { data: owner } = await supabase
     .from('User')
-    .select('clerkId')
+    .select('clerkId, status, platformRole')
     .eq('id', space.ownerId)
     .maybeSingle();
-  if (!owner?.clerkId) {
+  if (!owner?.clerkId || owner.status === 'offboarded' || owner.platformRole === 'banned') {
     logger.warn('[agent/run-instruction] space owner has no clerkId', { spaceId, ownerId: space.ownerId });
     return null;
   }

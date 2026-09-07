@@ -19,9 +19,9 @@ export async function executeConvexFollowUp(job: FollowUpReference & { jobId: st
     .select('ownerId, stripeSubscriptionStatus, stripePeriodEnd').eq('id', job.spaceId).maybeSingle();
   if (spaceError) throw spaceError;
   if (!space || isPremiumAccessBlocked(space.stripeSubscriptionStatus, space.stripePeriodEnd)) return 'skipped' as const;
-  const { data: owner, error: ownerError } = await supabase.from('User').select('clerkId, platformRole').eq('id', space.ownerId).maybeSingle();
+  const { data: owner, error: ownerError } = await supabase.from('User').select('clerkId, platformRole, status').eq('id', space.ownerId).maybeSingle();
   if (ownerError) throw ownerError;
-  if (!owner?.clerkId || owner.platformRole === 'banned') return 'skipped' as const;
+  if (!owner?.clerkId || owner.platformRole === 'banned' || owner.status === 'offboarded') return 'skipped' as const;
   // Canonical runner enforces the saved autonomy policy, tool grants, shared lock and budget.
   return await fireRoutineRun(job.spaceId, routine.instruction, owner.clerkId) === 'ok' ? 'completed' as const : 'failed' as const;
 }

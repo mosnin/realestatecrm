@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "node scripts/build-workforce.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -14,7 +14,8 @@
     "agent:eval": "python3 tests/agent-eval/run.py",
     "db:status": "supabase migration list --linked",
     "db:diff": "supabase db push --linked --dry-run",
-    "db:migrate": "supabase db push --linked"
+    "db:migrate": "supabase db push --linked",
+    "build:workforce": "node scripts/build-workforce.mjs"
   },
   "dependencies": {
     "@amplitude/unified": "^1.0.5",
