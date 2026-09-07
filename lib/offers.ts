@@ -15,6 +15,7 @@
  * actual status changes.
  */
 import 'server-only';
+import { readAllRows } from '@/lib/read-all-rows';
 import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { advanceDealFromEvent } from '@/lib/deals/advance-from-event';
@@ -122,11 +123,7 @@ export class IllegalOfferTransitionError extends Error {
 // ── CRUD ─────────────────────────────────────────────────────────────────
 
 export async function listOffers(spaceId: string): Promise<Offer[]> {
-  const { data, error } = await tenantTable(supabase, 'Offer', { spaceId })
-    .select('*')
-    .order('createdAt', { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as unknown as Offer[];
+  return readAllRows<Offer>((from,to) => tenantTable(supabase, 'Offer', { spaceId }).select('*').order('createdAt', { ascending: false }).order('id').range(from,to));
 }
 
 /**

@@ -154,6 +154,7 @@ export function EmailInboxView({
    *  below this entered with the initial filter paint and should not re-
    *  animate; rows at/after it are the newly appended page and stagger in. */
   const [appendCursor, setAppendCursor] = useState(0);
+  const fetchVersion = useRef(0);
   const filterRef = useRef<EmailFilter>('inbox');
 
   // Search state: raw input, debounced query that actually fires.
@@ -201,8 +202,9 @@ export function EmailInboxView({
         setLoading(false);
         return;
       }
+      const version = ++fetchVersion.current;
       if (args.append) setLoadingMore(true);
-      else setLoading(true);
+      else { setLoading(true); setLoadingMore(false); }
       setErrorMessage(null);
 
       const params = new URLSearchParams();
@@ -216,7 +218,7 @@ export function EmailInboxView({
         if (!res.ok) throw new Error(`Could not load (${res.status}).`);
         const data = (await res.json()) as FetchPayload;
         // If a newer fetch already wrote (filter changed), discard this one.
-        if (filterRef.current !== args.filter) return;
+        if (version !== fetchVersion.current || filterRef.current !== args.filter) return;
         if (!data.connected) {
           setConnected(false);
           setItems([]);
@@ -235,12 +237,12 @@ export function EmailInboxView({
         });
         setNextPageToken(data.nextPageToken);
       } catch (err) {
-        if (filterRef.current !== args.filter) return;
+        if (version !== fetchVersion.current || filterRef.current !== args.filter) return;
         setErrorMessage(
           err instanceof Error ? err.message : 'Could not reach your inbox.',
         );
       } finally {
-        if (filterRef.current === args.filter) {
+        if (version === fetchVersion.current && filterRef.current === args.filter) {
           if (args.append) setLoadingMore(false);
           else setLoading(false);
         }

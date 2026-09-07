@@ -55,7 +55,7 @@ interface ConnectionRow {
 
 // ── Health badge types ────────────────────────────────────────────────────────
 
-export type HealthStatus = 'healthy' | 'expired' | 'error' | 'disconnected';
+export type HealthStatus = 'unknown' | 'healthy' | 'expired' | 'error' | 'disconnected';
 
 interface ConnectionHealth {
   toolkit: string;
@@ -108,7 +108,7 @@ function IntegrationHealthBadge({
         ? 'Auth expired'
         : status === 'error'
           ? 'Connection error'
-          : 'Not connected';
+          : status === 'unknown' ? 'Not verified' : 'Not connected';
 
   const textClass =
     status === 'healthy'

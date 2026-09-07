@@ -1,3 +1,4 @@
+import { readAllRows } from '@/lib/read-all-rows';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
@@ -26,16 +27,19 @@ export async function createCommitment(spaceId: string, input: CommitmentInput):
 }
 export async function listCommitments(spaceId: string): Promise<Commitment[]> {
   const [open, closed] = await Promise.all([
-    tenantTable(supabase, 'ClientCommitment', { spaceId }).select('*').in('status', ['open', 'accepted']).order('dueAt', { ascending: true }).limit(100),
+    readAllRows<Commitment>((from,to) => tenantTable(supabase, 'ClientCommitment', { spaceId }).select('*').in('status', ['open', 'accepted']).order('dueAt', { ascending: true }).order('id').range(from,to)).then(data => ({data,error:null})),
     tenantTable(supabase, 'ClientCommitment', { spaceId }).select('*').in('status', ['completed', 'canceled']).order('updatedAt', { ascending: false }).limit(20),
   ]);
   if (open.error || closed.error) throw new Error('Client commitments could not be loaded.');
   const rows = [...(open.data ?? []), ...(closed.data ?? [])] as Commitment[];
   const ids = rows.flatMap(r => r.scheduledMessageId ? [r.scheduledMessageId] : []);
   if (!ids.length) return rows;
-  const result = await tenantTable(supabase, 'ScheduledMessage', { spaceId })
-    .select('id, status, detail').in('id', ids);
-  if (result.error) throw new Error('Delivery receipts could not be loaded.');
-  const receipts = new Map((result.data ?? []).map((r: { id: string; status: string; detail: Record<string, unknown> | null }) => [r.id, r]));
+  const receipts = new Map<string, NonNullable<Commitment['delivery']>>();
+  for (let start = 0; start < ids.length; start += 100) {
+    const result = await tenantTable(supabase, 'ScheduledMessage', { spaceId })
+      .select('id, status, detail').in('id', ids.slice(start, start + 100));
+    if (result.error) throw new Error('Delivery receipts could not be loaded.');
+    for (const row of result.data ?? []) receipts.set(row.id, row);
+  }
   return rows.map(r => ({ ...r, delivery: r.scheduledMessageId ? (receipts.get(r.scheduledMessageId) ?? null) as Commitment['delivery'] : null }));
 }

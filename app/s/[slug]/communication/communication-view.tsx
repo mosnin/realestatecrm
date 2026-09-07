@@ -38,7 +38,7 @@ export function CommunicationView({
     : emailProvider === 'gmail'
       ? 'Reading from Gmail.'
       : emailProvider === 'outlook'
-        ? 'Reading from Outlook.'
+        ? 'Outlook is connected; reading mail here is not available yet.'
         : 'Reading from your inbox.';
   const providerName = emailProvider === 'gmail'
     ? 'Gmail'
@@ -54,8 +54,8 @@ export function CommunicationView({
         <header className="grid min-w-0 gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-16">
           <div className="max-w-3xl space-y-3">
             <p className={SECTION_LABEL}>Client mail</p>
-            <h1 className="text-[3rem] leading-[.96] tracking-[-0.045em] text-foreground sm:text-[4.5rem]" style={TITLE_FONT}>
-              Reply while the conversation is warm.
+            <h1 className="text-2xl font-medium tracking-tight text-foreground" style={TITLE_FONT}>
+              Mailbox
             </h1>
             <p className={BODY_MUTED}>{subtitle}</p>
           </div>

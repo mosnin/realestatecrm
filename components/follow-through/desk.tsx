@@ -12,6 +12,9 @@ const control = 'min-h-10 rounded-lg border border-border bg-background px-3 py-
 export function FollowThroughDesk({ slug }: { slug: string }) {
   const [items, setItems] = useState<Commitment[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [coverageError, setCoverageError] = useState('');
+  const loadVersion = useRef(0);
   const [coverage, setCoverage] = useState<Coverage[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -25,17 +28,22 @@ export function FollowThroughDesk({ slug }: { slug: string }) {
   const [note, setNote] = useState('');
   const requestId = useRef<string | null>(null);
   const load = useCallback(async (query = '') => {
+    const version = ++loadVersion.current;
     setLoading(true);
     try {
-      const [work, routines] = await Promise.all([
+      const [work, routines] = await Promise.allSettled([
         fetch(`/api/follow-through?slug=${encodeURIComponent(slug)}&search=${encodeURIComponent(query)}`).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error); return b; }),
         fetch(`/api/follow-through/coverage?slug=${encodeURIComponent(slug)}`).then(async r => { const b = await r.json(); if (!r.ok) throw new Error(b.error); return b; }),
       ]);
-      setItems(work.items); setPeople(work.contacts); setCoverage(routines.coverage); setError('');
+      if (version !== loadVersion.current) return;
+      if (work.status === 'fulfilled') { setItems(work.value.items); setPeople(work.value.contacts); setError(''); }
+      else setError('Client work could not be refreshed. Previously loaded work may be outdated.');
+      if (routines.status === 'fulfilled') { setCoverage(routines.value.coverage); setCoverageError(''); }
+      else setCoverageError('Automatic coverage status unavailable. Client commitments remain available.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Follow-through is unavailable.'); }
-    finally { setLoading(false); }
+    finally { if (version === loadVersion.current) setLoading(false); }
   }, [slug]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadVersion.current += 1; }; }, [load]);
   async function mutate(url: string, method: string, body: unknown) {
     setBusy(true); setError('');
     try {
@@ -69,9 +77,10 @@ export function FollowThroughDesk({ slug }: { slug: string }) {
       </div>
     </div>
     {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg bg-destructive/10 p-3 text-sm"><span>{error}</span><button className="underline" disabled={loading} onClick={() => void load(search)}>Try again</button></div>}
+    {coverageError && <p role="alert" className="text-sm text-destructive">{coverageError}</p>}
     {configure && <div className="space-y-3 border-y border-border py-4">
       <p className="text-sm text-muted-foreground">Turning on a routine authorizes its messages to run automatically. Existing opt-outs and sending limits still apply.</p>
-      {coverage.map(c => <div key={c.key} className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-medium">{c.title}</h3><p className="mt-1 text-sm text-muted-foreground">{c.description}</p><p className="mt-1 text-xs text-muted-foreground">{c.lastRunStatus === 'error' ? 'Last run needs attention. Open activity to inspect it.' : c.lastRunAt ? `Last run: ${new Date(c.lastRunAt).toLocaleString()}` : 'No run recorded yet.'}</p></div><button role="switch" aria-checked={c.enabled} aria-label={c.title} disabled={busy || loading} className={`${control} shrink-0 ${c.enabled ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => void mutate('/api/follow-through/coverage', 'POST', { slug, key: c.key, enabled: !c.enabled })}>{c.enabled ? 'On' : 'Off'}</button></div>)}
+      {coverage.map(c => <div key={c.key} className="flex items-start justify-between gap-4"><div><h3 className="text-sm font-medium">{c.title}</h3><p className="mt-1 text-sm text-muted-foreground">{c.description}</p><p className="mt-1 text-xs text-muted-foreground">{c.lastRunStatus === 'error' ? 'Last run needs attention. Open activity to inspect it.' : c.lastRunAt ? `Last run: ${new Date(c.lastRunAt).toLocaleString()}` : 'No run recorded yet.'}</p></div><button role="switch" aria-checked={c.enabled} aria-label={c.title} disabled={busy || loading || Boolean(coverageError)} className={`${control} shrink-0 ${c.enabled ? 'bg-primary text-primary-foreground' : ''}`} onClick={() => void mutate('/api/follow-through/coverage', 'POST', { slug, key: c.key, enabled: !c.enabled })}>{c.enabled ? 'On' : 'Off'}</button></div>)}
       <Link className="inline-block text-sm underline" href={`/s/${slug}/automations/settings`}>Sending policies and limits</Link>
     </div>}
     {adding && <form onSubmit={create} className="grid gap-3 rounded-lg bg-muted/30 p-4 sm:grid-cols-2">
@@ -88,13 +97,14 @@ export function FollowThroughDesk({ slug }: { slug: string }) {
     </form>}
     <div className="flex items-center justify-between gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={showClosed} onChange={e => setShowClosed(e.target.checked)} />Include completed work</label><button aria-label="Refresh follow-through" disabled={loading} onClick={() => void load(search)}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button></div>
     {loading && !items.length ? <p className="text-sm text-muted-foreground" role="status">Loading client work…</p> : !error && !visible.length ? <p className="py-3 text-sm text-muted-foreground">No open commitments. Add a promise or turn on coverage for future replies.</p> : null}
-    <ul className="divide-y divide-border">{visible.slice(0, 20).map(item => <li key={item.id} className="space-y-2 py-4">
+    <ul className="divide-y divide-border">{visible.slice(0, visibleCount).map(item => <li key={item.id} className="space-y-2 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><Link className="text-sm font-medium hover:underline break-words" href={`/s/${slug}/contacts/${item.contactId}`}>{item.title}</Link><p className="mt-1 text-xs text-muted-foreground">{new Date(item.dueAt).toLocaleString()} · {commitmentState(item)}</p></div>
       {!closed(item) && <div className="flex flex-wrap gap-2">{!item.scheduledMessageId && item.status === 'open' && <button disabled={busy} className={control} onClick={() => void mutate('/api/follow-through', 'PATCH', { slug, id: item.id, action: 'accept' })}>Accept</button>}{!item.scheduledMessageId && <button className={control} onClick={() => { setClosing(item.id); setNote(''); }}>Record outcome</button>}<button disabled={busy} className={control} onClick={() => void mutate('/api/follow-through', 'PATCH', { slug, id: item.id, action: 'cancel' })}>Cancel</button></div>}</div>
       <p className="break-words text-sm text-muted-foreground">{item.instruction}</p>
       {item.completionNote && <p className="text-sm">Outcome: {item.completionNote}</p>}
       {closing === item.id && <form className="flex flex-wrap gap-2" onSubmit={async e => { e.preventDefault(); if (await mutate('/api/follow-through', 'PATCH', { slug, id: item.id, action: 'complete', note })) setClosing(null); }}><input className={`${control} min-w-0 flex-1`} aria-label="Completed outcome" required maxLength={2000} value={note} onChange={e => setNote(e.target.value)} placeholder="What was completed?" /><button disabled={busy} className={control}>Save outcome</button></form>}
     </li>)}</ul>
-    {visible.length > 20 && <p className="text-xs text-muted-foreground">Showing the first 20 of {visible.length} loaded commitments.</p>}
+    {visible.length > visibleCount && <button className={control} onClick={() => setVisibleCount(count => count + 20)}>Show more commitments ({visible.length - visibleCount} remaining)</button>}
+    {showClosed && <p className="text-xs text-muted-foreground">Includes the 20 most recently closed commitments.</p>}
   </section>;
 }

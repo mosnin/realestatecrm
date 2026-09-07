@@ -14,6 +14,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { getSpaceForUser } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { readAllRows } from '@/lib/read-all-rows';
 import { tenantTable } from '@/lib/tenant-db';
 import { uploadObject, deleteObject, buildKey } from '@/lib/storage';
 
@@ -37,11 +38,11 @@ export async function GET() {
   const space = await getSpaceForUser(authResult.userId);
   if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const { data, error } = await tenantTable(supabase, 'File', { spaceId: space.id })
+  const { data, error } = await readAllRows<{id:string;name:string;sizeBytes:number;createdAt:string}>((from,to) => tenantTable(supabase, 'File', { spaceId: space.id })
     .select('id, name, sizeBytes, createdAt')
     .eq('mimeType', DOC_MIME)
     .order('createdAt', { ascending: false })
-    .limit(500);
+    .order('id').range(from,to)).then(data => ({data,error:null as unknown})).catch(error => ({data:null,error}));
 
   if (error) {
     logger.error('[files/documents] list failed', { spaceId: space.id }, error);

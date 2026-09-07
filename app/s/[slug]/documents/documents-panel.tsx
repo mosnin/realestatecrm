@@ -95,6 +95,7 @@ export function DocumentsPanel() {
       if (!res.ok) throw new Error('Failed to load documents');
       const data = await res.json();
       setDocs(data.documents ?? []);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {

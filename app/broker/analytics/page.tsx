@@ -14,6 +14,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import type { Metadata } from 'next';
 import {
@@ -65,24 +66,24 @@ export default async function BrokerAnalyticsPage() {
   const { brokerage } = ctx;
 
   // Fetch all members with their spaces.
-  const members = await getBrokerageMembers(brokerage.id, { includeSpaceName: true });
+  const members = await getBrokerageMembers(brokerage.id, { includeSpaceName: true, strict: true });
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
   // Fetch contacts and deals across all member spaces.
   const [contactsRes, dealsRes, speedToLeadRes] = await Promise.all([
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('id, spaceId, type, source')
           .in('spaceId', spaceIds)
-          .limit(50000)
+          .order('id').range(from,to)).then(data => ({data}))
       : Promise.resolve({ data: [] }),
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Deal')
           .select('id, spaceId, status, value, closeReason')
           .in('spaceId', spaceIds)
-          .limit(50000)
+          .order('id').range(from,to)).then(data => ({data}))
       : Promise.resolve({ data: [] }),
     // Brokerage-wide speed-to-lead. Additive: a failure hides the card
     // (never a fabricated number) instead of taking down the page.

@@ -58,6 +58,7 @@ export function LibraryPanel() {
   const slug = params?.slug;
   const router = useRouter();
 
+  const [retry, setRetry] = useState(0);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -73,6 +74,8 @@ export function LibraryPanel() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     (async () => {
       try {
         const data = await loadPage(0);
@@ -89,7 +92,7 @@ export function LibraryPanel() {
     return () => {
       cancelled = true;
     };
-  }, [loadPage]);
+  }, [loadPage, retry]);
 
   async function handleLoadMore() {
     if (nextOffset === null || loadingMore) return;
@@ -175,7 +178,7 @@ export function LibraryPanel() {
   if (error && items.length === 0) {
     return (
       <p className="py-12 text-center text-[12.5px] text-rose-700 dark:text-rose-400">
-        {error}
+        {error} <button type="button" className="underline" onClick={() => setRetry(value => value + 1)}>Try again</button>
       </p>
     );
   }

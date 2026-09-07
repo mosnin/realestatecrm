@@ -30,8 +30,8 @@ export default async function DocumentsPage({
       <SupportingOrientation
         family="records"
         eyebrow="Records / Documents"
-        title="Write the context that should survive the conversation"
-        summary="Create durable notes, briefs, and source material that stay in your words and remain available to Chippi."
+        title="Documents"
+        summary="Find, write, and update the notes and documents Chippi uses."
         nextAction="Capture the one decision, process, or client detail you do not want buried in a message thread."
         action={<SupportingActionLink href="#documents-workspace">Open document room</SupportingActionLink>}
         layout="rail"

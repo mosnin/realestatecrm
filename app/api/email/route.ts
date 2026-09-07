@@ -183,7 +183,7 @@ async function fetchGmailPage(args: {
     logger.warn('[api/email] gmail list !successful', {
       err: (resp as { error?: string }).error ?? null,
     });
-    return { items: [], nextPageToken: null };
+    throw new Error('The email provider could not load messages.');
   }
 
   const data = resp.data as

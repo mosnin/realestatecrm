@@ -19,13 +19,6 @@ const FAMILY_SURFACES = [
     action: 'Plan outreach',
   },
   {
-    family: 'offer-negotiation',
-    file: 'app/s/[slug]/offers/page.tsx',
-    heading: 'Turn the right offer into a signed deal.',
-    work: '<OffersClient',
-    action: 'Offer volume',
-  },
-  {
     family: 'broker-review-room',
     file: 'app/s/[slug]/reviews/page.tsx',
     heading: 'Clear the question. Keep the deal moving.',
@@ -38,13 +31,6 @@ const FAMILY_SURFACES = [
     heading: 'Protect the time that closes deals.',
     work: '<MonthView',
     action: 'onAdd=',
-  },
-  {
-    family: 'email-command',
-    file: 'app/s/[slug]/communication/communication-view.tsx',
-    heading: 'Reply while the conversation is warm.',
-    work: '<EmailInboxView',
-    action: 'Source of truth',
   },
   {
     family: 'team-room',
