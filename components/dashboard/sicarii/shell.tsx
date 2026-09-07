@@ -16,13 +16,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
-const LogoMark = ({ className }: { className?: string }) => (
-  <img
-    src="/chip-avatar.png"
-    alt=""
-    className={cn("rounded-full object-cover", className)}
-  />
-);
+import { BrandLogo } from "@/components/brand-logo";
 import { usePathname } from "next/navigation";
 import {
   motion,
@@ -523,10 +517,7 @@ function Sidebar({
         {/* ── Logo / wordmark ── */}
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border/40 px-4 dark:border-white/[0.06]">
           <Link href={home} className="flex items-center gap-2.5">
-            <LogoMark className="h-6 w-6" />
-            <span className="font-brand text-base font-bold text-foreground">
-              Chippi
-            </span>
+            <BrandLogo className="h-7" alt="Chippi" />
           </Link>
           <button
             type="button"
@@ -933,10 +924,7 @@ function DashboardShell({
             <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 sm:pt-5 lg:px-8">
               <div className="flex h-12 items-center justify-between gap-2">
                 <Link href={home} className="flex items-center gap-2">
-                  <LogoMark className="h-6 w-6" />
-                  <span className="font-brand text-base font-bold text-foreground hidden sm:inline">
-                    Chippi
-                  </span>
+                  <BrandLogo className="h-6" alt="Chippi" />
                 </Link>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   {/* Personal vs team context: switching orgs re-scopes every
