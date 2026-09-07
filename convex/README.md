@@ -8,6 +8,4 @@ No browser-readable functions or duplicate authentication system are introduced.
 HTTP actions use service authentication; the existing Clerk-authenticated Next.js
 endpoint scopes status reads to the current Supabase workspace.
 
-`_generated` currently contains typed bootstrap bindings because this account requires
-project creation through Vercel. After linking a deployment, run `pnpm exec convex dev --once`
-to replace them with Convex-generated bindings and deploy the functions.
+The production backend is deployed to `charming-armadillo-315`. `_generated` now contains official Convex CLI bindings. Run `pnpm exec convex codegen` after backend changes and deploy to the explicitly selected environment. See `docs/product-rebuild/deployment-and-role-audit-2026-09-07.md` for the verified configuration and web-release gap.

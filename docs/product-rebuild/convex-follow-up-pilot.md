@@ -1,5 +1,7 @@
 # Convex + Supabase: one autonomous follow-up routine
 
+Deployment update: the dedicated `chippi-follow-up` Convex production backend has now been created, deployed, and manually configured. Authenticated HTTP verification passed. The production web callback is still absent and the pilot remains inactive. See [deployment and role audit](deployment-and-role-audit-2026-09-07.md). The setup and local receipt below describe the initial implementation.
+
 ## What is implemented
 
 - Supabase remains authoritative for contacts, deals, memberships, credentials, saved instructions and the routine's nextRunAt. There is no customer-data migration.
