@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { TrendingUp, RotateCcw } from 'lucide-react';
 import { getSpaceFromSlug, getSpaceForUser } from '@/lib/space';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { DealsPageClient } from '@/components/deals/deals-page-client';
 import { H3, BODY_MUTED } from '@/lib/typography';
@@ -19,8 +20,7 @@ type StageWithDeals = DealStage & { deals: Deal[] };
  * deals" for a beat on every reload, which read as "I lost your data."
  * Pre-computing on the server makes the first paint truthful.
  *
- * Failures are non-fatal: any throw drops us back to the legacy
- * empty-then-fetch behaviour so the page never hard-blocks on a stat strip.
+ * Query failures reach the error boundary rather than appearing as an empty pipeline.
  */
 async function loadInitialDealsData(spaceId: string): Promise<{
   pipelines: Pipeline[];
@@ -28,13 +28,11 @@ async function loadInitialDealsData(spaceId: string): Promise<{
   initialPipelineId: string | null;
 }> {
   try {
-    const { data: pipelineRows, error: pipelineError } = await supabase
+    const pipelineRows = await readAllRows<Pipeline>((from, to) => supabase
       .from('Pipeline')
       .select('*')
       .eq('spaceId', spaceId)
-      .order('position', { ascending: true });
-
-    if (pipelineError) throw pipelineError;
+      .order('position', { ascending: true }).order('id').range(from, to));
     const pipelines = (pipelineRows ?? []) as Pipeline[];
     if (pipelines.length === 0) {
       return { pipelines, initialStages: [], initialPipelineId: null };
@@ -44,30 +42,27 @@ async function loadInitialDealsData(spaceId: string): Promise<{
     // mount; the first paint uses the first pipeline so we always have
     // something to compute KPIs from.
     const firstPipelineId = pipelines[0].id;
-    const { data: stageRows, error: stageError } = await supabase
+    const stageRows = await readAllRows<DealStage>((from, to) => supabase
       .from('DealStage')
       .select('*')
       .eq('spaceId', spaceId)
       .eq('pipelineId', firstPipelineId)
-      .order('position', { ascending: true });
-    if (stageError) throw stageError;
+      .order('position', { ascending: true }).order('id').range(from, to));
     const stages = (stageRows ?? []) as DealStage[];
 
     const stageIds = stages.map((s) => s.id);
     let dealRows: Deal[] = [];
     if (stageIds.length > 0) {
-      const { data, error } = await supabase
+      const data = await readAllRows<Deal>((from, to) => supabase
         .from('Deal')
         .select('*')
         .eq('spaceId', spaceId)
-        .in('stageId', stageIds);
-      if (error) throw error;
+        .in('stageId', stageIds).order('id').range(from, to));
       dealRows = (data ?? []) as Deal[];
     }
 
     if (dealRows.length) {
-      const { data: checklist, error } = await supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').eq('spaceId', spaceId);
-      if (error) throw error;
+      const checklist = await readAllRows<{dealId:string;kind:string;label:string;dueAt:string|null;completedAt:string|null}>((from,to) => supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').eq('spaceId', spaceId).order('id').range(from,to));
       dealRows = dealRows.map(deal => ({ ...deal, checklist: (checklist ?? []).filter((item: {dealId:string}) => item.dealId === deal.id) }));
     }
     const dealsByStage = new Map<string, Deal[]>();

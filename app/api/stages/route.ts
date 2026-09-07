@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { requireSpaceOwner } from '@/lib/api-auth';
 import { logger } from '@/lib/logger';
 import type { DealStage } from '@/lib/types';
+import { readAllRows } from '@/lib/read-all-rows';
 import { tenantTable } from '@/lib/tenant-db';
 
 
@@ -27,22 +28,14 @@ export async function GET(req: NextRequest) {
     stageQuery = stageQuery.eq('pipelineType', pipelineType);
   }
 
-  const { data: stageData, error: stageError } = await stageQuery.order('position', {
-    ascending: true,
-  });
-  if (stageError) throw stageError;
-  const stageRows = stageData || [];
+  const stageRows = await readAllRows<any>((from,to) => stageQuery.order('position', { ascending: true }).order('id').range(from,to));
 
   // Get deals – only for the stages in the current result set
   const stageIds = stageRows.map((r: any) => r.id);
   let dealRows: any[] = [];
   if (stageIds.length > 0) {
-    const { data, error: dealError } = await tenantTable(supabase, 'Deal', { spaceId: space.id })
-      .select('*')
-      .in('stageId', stageIds)
-      .order('position', { ascending: true });
-    if (dealError) throw dealError;
-    dealRows = data || [];
+    dealRows = await readAllRows<any>((from,to) => tenantTable(supabase, 'Deal', { spaceId: space.id })
+      .select('*').in('stageId', stageIds).order('position', { ascending: true }).order('id').range(from,to));
   }
 
   const dealIds = dealRows.map((r: any) => r.id);
@@ -50,24 +43,23 @@ export async function GET(req: NextRequest) {
   // Get dealContacts with contact info
   let dealContactRows: any[] = [];
   if (dealIds.length > 0) {
-    const { data, error: dcError } = await supabase
-      .from('DealContact')
-      .select('dealId, contactId, Contact(id, name)')
-      .in('dealId', dealIds);
-    if (dcError) throw dcError;
-    dealContactRows = data || [];
+    for (let start = 0; start < dealIds.length; start += 100) {
+      dealContactRows.push(...await readAllRows<any>((from,to) => supabase.from('DealContact')
+        .select('dealId, contactId, Contact(id, name)').in('dealId', dealIds.slice(start, start + 100))
+        .order('dealId').order('contactId').range(from,to)));
+    }
   }
 
   // Fetch checklist items for these deals — used for the per-card progress chip.
   // We only select the minimal fields needed for the summary (completedAt, dueAt,
   // label) so the payload doesn't balloon with long custom labels.
-  let checklistRows: Array<{ dealId: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
+  let checklistRows: Array<{ dealId: string; kind: string; completedAt: string | null; dueAt: string | null; label: string }> = [];
   if (dealIds.length > 0) {
-    const { data, error: clError } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
-      .select('dealId, kind, completedAt, dueAt, label')
-      .in('dealId', dealIds);
-    if (clError) throw clError;
-    checklistRows = (data as typeof checklistRows) || [];
+    for (let start = 0; start < dealIds.length; start += 100) {
+      checklistRows.push(...await readAllRows<(typeof checklistRows)[number]>((from,to) => tenantTable(supabase, 'DealChecklistItem', { spaceId: space.id })
+        .select('dealId, kind, completedAt, dueAt, label').in('dealId', dealIds.slice(start, start + 100))
+        .order('id').range(from,to)));
+    }
   }
 
   // Group dealContacts by dealId

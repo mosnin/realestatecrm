@@ -1,3 +1,4 @@
+import { readAllRows } from '@/lib/read-all-rows';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getBrokerRecord } from '@/lib/broker-records';
@@ -9,8 +10,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params;
   const deal = await getBrokerRecord('deals', id);
   if (!deal) notFound();
-  const { data: checklist, error } = await tenantTable(supabase, 'DealChecklistItem', { spaceId: deal.spaceId }).select('*').eq('dealId', id).order('position');
-  if (error) throw error;
+  const checklist = await readAllRows<any>((from,to) => tenantTable(supabase, 'DealChecklistItem', { spaceId: deal.spaceId }).select('*').eq('dealId', id).order('position').order('id').range(from,to));
   const record = { ...deal, checklist: checklist ?? [] };
   const health = dealHealth(record);
   return <BrokerRecordDetail title={deal.title} back="/broker/deals" fields={[

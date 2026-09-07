@@ -64,7 +64,11 @@ interface PipelineStats {
  * "1 deal hasn't moved in 14 days. Take a look." → board filters to that
  * deal. The page tells one story instead of two.
  */
-export function PipelineSummary({
+export function PipelineSummary(props: PipelineSummaryProps) {
+  return <PipelineSummaryForSelection key={`${props.slug}:${props.pipelineId}`} {...props} />;
+}
+
+function PipelineSummaryForSelection({
   slug,
   pipelineId,
   focus,

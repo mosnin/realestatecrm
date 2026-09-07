@@ -80,8 +80,6 @@ export function dealHealth(deal: DealHealthInput): DealHealthMeta {
   const today = startOfToday();
   const now = Date.now();
   const deadline = nextDealDeadline(deal);
-  if (deadline && commitmentTime(deadline.dueAt) < now) return { state: 'at-risk', reason: `${deadline.label} deadline passed${deadline.confirm ? ' · confirm completion' : ''}` };
-  if (deadline && commitmentTime(deadline.dueAt) <= now + 3 * MS_PER_DAY) return { state: 'at-risk', reason: `${deadline.label} due within 3 days` };
 
   // Days the deal has sat in its current stage. `stageChangedAt` is bumped by
   // PATCH /api/deals/[id] whenever stageId changes (and by POST /api/deals
@@ -114,13 +112,21 @@ export function dealHealth(deal: DealHealthInput): DealHealthMeta {
   const nextDue = deal.nextActionDueAt ? new Date(deal.nextActionDueAt) : null;
   const nextActionOverdue = !!(deal.nextAction && nextDue && !isNaN(nextDue.getTime()) && nextDue.getTime() < now);
 
-  // Stuck first — most urgent
+  const deadlineReason = deadline && commitmentTime(deadline.dueAt) < now
+    ? `${deadline.label} deadline passed${deadline.confirm ? ' · confirm completion' : ''}`
+    : deadline && commitmentTime(deadline.dueAt) <= now + 3 * MS_PER_DAY
+      ? `${deadline.label} due within 3 days`
+      : null;
+
+  // Preserve severe signals while retaining the actionable deadline.
   if (stageDays != null && stageDays >= 30) {
-    return { state: 'stuck', reason: `${stageDays} days in this stage` };
+    return { state: 'stuck', reason: `${stageDays} days in this stage${deadlineReason ? ` · ${deadlineReason}` : ''}` };
   }
   if (closeDays != null && closeDays <= -3) {
-    return { state: 'stuck', reason: `expected close was ${Math.abs(closeDays)} days ago` };
+    return { state: 'stuck', reason: `expected close was ${Math.abs(closeDays)} days ago${deadlineReason ? ` · ${deadlineReason}` : ''}` };
   }
+
+  if (deadlineReason) return { state: 'at-risk', reason: deadlineReason };
 
   if (closeDays != null && closeDays < 0) return { state: 'at-risk', reason: 'expected closing date passed' };
 

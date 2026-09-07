@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
 import { formatCompact } from '@/lib/formatting';
@@ -224,8 +225,8 @@ export default async function BrokerDealsPage() {
   // Fetch active deals only — the kanban shows the live pipeline.
   // Won/lost/on-hold deals are closed chapter; the broker oversight
   // story is about what's in-flight right now.
-  const { data: dealsRaw, error: dealsError } = spaceIds.length > 0
-    ? await supabase
+  const dealsRaw = spaceIds.length > 0
+    ? await readAllRows<DealRow>((from,to) => supabase
         .from('Deal')
         .select(
           'id, spaceId, title, value, commissionRate, address, closeDate, stageId, status, createdAt, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt, inspectionDeadline, earnestDueAt, milestones',
@@ -233,22 +234,20 @@ export default async function BrokerDealsPage() {
         .in('spaceId', spaceIds)
         .eq('status', 'active')
         .order('createdAt', { ascending: false })
-        .limit(5000)
-    : { data: [] as DealRow[], error: null };
+        .order('id').range(from,to))
+    : [];
 
   // Fetch stages for all spaces
-  const { data: stagesRaw, error: stagesError } = spaceIds.length > 0
-    ? await supabase
+  const stagesRaw = spaceIds.length > 0
+    ? await readAllRows<StageRow>((from,to) => supabase
         .from('DealStage')
         .select('id, name, color, position, spaceId')
         .in('spaceId', spaceIds)
         .order('position', { ascending: true })
-        .limit(2000)
-    : { data: [] as StageRow[], error: null };
+        .order('id').range(from,to))
+    : [];
 
-  if (dealsError || stagesError) throw new Error('Brokerage pipeline unavailable');
-  const { data: checklistRows, error: checklistError } = spaceIds.length ? await supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').in('spaceId', spaceIds) : { data: [], error: null };
-  if (checklistError) throw new Error('Closing checklist unavailable');
+  const checklistRows = spaceIds.length ? await readAllRows<{dealId:string;kind:string;label:string;dueAt:string|null;completedAt:string|null}>((from,to) => supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').in('spaceId', spaceIds).order('id').range(from,to)) : [];
   const stages = (stagesRaw ?? []) as StageRow[];
 
   // ── Enrich deals with realtor names ──────────────────────────────────────

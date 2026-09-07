@@ -159,3 +159,16 @@ describe('transaction deadline truth', () => {
     expect(dealHealth({...base,milestones:[{...milestone,completed:true}]}).state).toBe('on-track');
   });
 });
+
+it('retains stuck severity and explains an upcoming inspection', () => {
+  const result = dealHealth({status:'active',stageChangedAt:daysAgo(40),closeDate:null,followUpAt:null,inspectionDeadline:daysFromNow(1),...baseHealth});
+  expect(result.state).toBe('stuck');
+  expect(result.reason).toContain('40 days in this stage');
+  expect(result.reason).toContain('Inspection due within 3 days');
+});
+it('retains overdue closing severity alongside an overdue contract deadline', () => {
+  const result = dealHealth({status:'active',stageChangedAt:daysAgo(1),closeDate:daysAgo(5),followUpAt:null,earnestDueAt:daysAgo(1),...baseHealth});
+  expect(result.state).toBe('stuck');
+  expect(result.reason).toContain('expected close was 5 days ago');
+  expect(result.reason).toContain('Earnest money deadline passed');
+});

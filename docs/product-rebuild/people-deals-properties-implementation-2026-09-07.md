@@ -24,6 +24,16 @@ Baseline: `mosnin/realestatecrm`, `codex/autonomous-product-rebuild`, `3174aff9d
 
 - Production build and authenticated agent/team/brokerage workflows need provider verification before release. Earlier staging provisioning failure is not resolved by these code changes.
 - Brokerage pool inventory is still a pool, not a union of every member's inventory. Member-space sharing semantics are unchanged and need explicit multi-brokerage policy review.
-- Large People directories are fetched in pages but still rendered as a complete result; server-driven search/windowing remains a performance follow-up. Some deal queries retain existing provider caps.
+- Large People directories are fetched in pages but still rendered as a complete result; server-driven search/windowing remains a performance follow-up. The follow-up review removed the deal/checklist caps from agent SSR, the stages API, and brokerage board/detail queries.
 - No native MLS freshness guarantee or new listing-versus-buyer-shortlist data model is claimed. Web research remains supplementary evidence.
 - Inbound unanswered-reply prioritization and broader automation reliability need separate end-to-end acceptance. Live Workforce/VM and Convex release gates from PR #612 remain in force.
+
+## Second-review corrections
+
+- Pipeline summary state is keyed by workspace and pipeline. Component tests exercise A → B → A and a delayed B response after returning to A.
+- Stuck severity is evaluated before deadline warnings; the reason retains the contract deadline. Both stage-stalled and overdue-closing regressions are covered.
+- Brokerage person detail loads the same commitment/delivery enrichment as the directory, including unavailable data. Rendered tests cover failed delivery and unavailable execution state.
+- Agent initial pipeline, stages API, brokerage board, and brokerage deal detail read all deal/checklist pages with deterministic ordering. The stages API batches relation IDs in groups of 100. A route test exercises 1,101 deals and 1,101 checklist rows including last-page completion evidence; another verifies a later-page failure returns 500.
+- These fixes require no schema changes or production mutations. Provider deployment and authenticated acceptance remain separate gates.
+
+Second-review validation: 779 Vitest files passed; 6,688 tests passed and 7 skipped. TypeScript, lint (existing warnings), tenant scope scanner and 52 script contracts passed. The delayed pipeline-response regression also passed separately.
