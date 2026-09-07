@@ -63,3 +63,7 @@ __pycache__/
 
 # Throwaway probe scripts (agent runs)
 _diagnostic*
+
+# Native Mac build products
+/apps/macos/.build/
+/apps/macos/dist/

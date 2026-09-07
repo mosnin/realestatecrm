@@ -258,14 +258,14 @@ export function DealsPageClient({
       {/* A pipeline is a working board, so its orientation reads horizontally:
           outcome statement first, current operating context and action at the
           right edge, then the full-width board below. */}
-      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
+      <header className="grid gap-4 border-b border-border/60 pb-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
         <div className="max-w-3xl space-y-3">
           <p className={SECTION_LABEL}>Deal pipeline</p>
-          <h1 className={cn(H1, 'text-[3rem] leading-[.95] sm:text-[4.75rem]')} style={TITLE_FONT}>
-            Move the deal that can close next.
+          <h1 className={cn(H1, 'text-2xl leading-tight sm:text-3xl')} style={TITLE_FONT}>
+            Deals
           </h1>
           <p className={BODY_MUTED}>
-            Read the board left to right. Fix stalled work first, then protect the closings already in motion.
+            Track progress, unblock stalled deals, and protect upcoming closings.
           </p>
         </div>
         {hasPipelines && (

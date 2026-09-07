@@ -250,7 +250,7 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
       {/* ── Header — canonical three-line status-sentence pattern.
           Muted greeting → serif H1 → one-sentence status. Same shape
           every other broker page uses. ── */}
-      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[24rem] sm:min-h-[28rem]')}>
+      <BriefReveal delay={0.01} className={BROKER_HERO}>
         <div
           aria-hidden="true"
           data-chippi-atmosphere="ascii-field"
@@ -263,12 +263,12 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
             CHIPPI // TODAY
           </p>
           <h1
-            className="mt-10 max-w-4xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
+            className="mt-4 max-w-4xl text-2xl leading-tight tracking-tight text-foreground sm:text-3xl"
             style={TITLE_FONT}
           >
             <SplitReveal as="span" text={`Welcome back, ${firstName}`} />
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-foreground/80 sm:text-lg">
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {statusSentence}
           </p>
         </header>

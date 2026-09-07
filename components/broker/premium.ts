@@ -26,7 +26,7 @@ export const BROKER_PAGE_HEADER =
   'flex flex-col gap-7 border-b chippi-dashboard-divider pb-8 pt-2 sm:flex-row sm:items-end sm:justify-between sm:pb-10';
 
 export const BROKER_PAGE_TITLE =
-  'text-4xl tracking-tight text-foreground sm:text-5xl [font-family:var(--font-title)]';
+  'text-2xl tracking-tight text-foreground sm:text-3xl [font-family:var(--font-title)]';
 
 export const BROKER_PAGE_DESCRIPTION =
   'max-w-2xl text-[15px] leading-relaxed text-muted-foreground';
@@ -35,7 +35,7 @@ export const BROKER_OUTCOME_STRIP =
   `${DASHBOARD_SURFACE} grid overflow-hidden sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0 [&>*]:px-6 [&>*]:py-6 [&>*]:border-t [&>*]:border-border/60 [&>*:first-child]:border-t-0 sm:[&>*:nth-child(-n+2)]:border-t-0 sm:[&>*:nth-child(even)]:border-l lg:[&>*]:border-l lg:[&>*]:border-t-0 lg:[&>*:first-child]:border-l-0`;
 
 export const BROKER_HERO =
-  `${DASHBOARD_SURFACE} relative overflow-hidden p-6 sm:p-9 lg:p-11`;
+  `${DASHBOARD_SURFACE} relative overflow-hidden p-5 sm:p-6`;
 
 export const BROKER_PANEL =
   `${DASHBOARD_SURFACE} p-5 sm:p-7`;

@@ -469,7 +469,7 @@ export default async function BrokerBriefPage() {
           carrying Chippi's chief-of-staff sentence, and the small hairline
           stats row inside the story handles the context numbers. No second
           muted line — two stat surfaces stacked read as noise. */}
-      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[30rem] sm:min-h-[34rem]')}>
+      <BriefReveal delay={0.01} className={BROKER_HERO}>
         <div
           aria-hidden="true"
           data-chippi-atmosphere="ascii-field"
@@ -477,7 +477,7 @@ export default async function BrokerBriefPage() {
         >
           <AsciiField className="h-full w-full" cell={13} speed={0.035} />
         </div>
-        <header className="relative z-10 min-h-[24rem] sm:min-h-[27rem]">
+        <header className="relative z-10">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
@@ -487,7 +487,7 @@ export default async function BrokerBriefPage() {
                 {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <p className="mt-10 text-sm text-muted-foreground">
+            <p className="mt-4 text-sm text-muted-foreground">
               {getGreeting()}. {brokerage.name}.
             </p>
             <div className="mt-3">
@@ -552,12 +552,12 @@ export default async function BrokerBriefPage() {
       >
         <BriefKpiTile
           label="Pipeline"
-          display={`$${formatCompact(totalPipeline)}`}
+          display={formatCompact(totalPipeline)}
           sub={`${totalDeals} active deal${totalDeals === 1 ? '' : 's'}`}
         />
         <BriefKpiTile
           label="Won"
-          display={`$${formatCompact(totalWonValue)}`}
+          display={formatCompact(totalWonValue)}
           sub="closed this period"
         />
         <BriefKpiTile
@@ -829,7 +829,7 @@ export default async function BrokerBriefPage() {
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
                         {deals.count > 0 && (
                           <span className="tabular-nums whitespace-nowrap">
-                            {deals.count} deal{deals.count === 1 ? '' : 's'} · ${formatCompact(deals.value)}
+                            {deals.count} deal{deals.count === 1 ? '' : 's'} · {formatCompact(deals.value)}
                           </span>
                         )}
                         {apps > 0 && (
