@@ -1,3 +1,4 @@
+import { workspaceTeams } from '@/lib/workspaces/teams';
 import '@/components/dashboard/sicarii/theme.css';
 import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
 import { Suspense } from 'react';
@@ -225,6 +226,7 @@ export default async function DashboardLayout({
   let isBroker = false;
   let brokerageName: string | null = null;
   let brokerageRole: string | null = null;
+  const teamWorkspaces = await workspaceTeams(dbUser.id);
   let brokerageMemberships: { id: string; name: string; role: string }[] = [];
   try {
     const { data: memberships } = await supabase
@@ -272,7 +274,7 @@ export default async function DashboardLayout({
       {/* Collapse state is shared between the sidebar and the header's panel
           toggle, so the provider wraps both. */}
       <SidebarCollapseProvider>
-        <WorkspaceShell slug={slug} spaceId={space.id} spaceName={space.name} isBroker={isBroker} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin}>
+        <WorkspaceShell {...teamWorkspaces} slug={slug} spaceId={space.id} spaceName={space.name} isBroker={isBroker} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin}>
           <PlatformBanner />
           <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>{children}</LayoutShell>
         </WorkspaceShell>

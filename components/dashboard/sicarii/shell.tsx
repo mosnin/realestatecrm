@@ -91,6 +91,7 @@ interface ShellNavigation {
   allItems: SicariiNavItem[];
   home: string;
   utilities: React.ReactNode;
+  workspaceControl?: React.ReactNode;
 }
 const ShellNavigationContext = createContext<ShellNavigation>({
   items: [],
@@ -496,7 +497,7 @@ function Sidebar({
 }) {
   void isStaff;
   const pathname = usePathname() ?? "";
-  const { allItems, sidebarGroups, home, utilities } = useShellNavigation();
+  const { allItems, sidebarGroups, home, utilities, workspaceControl } = useShellNavigation();
 
   return (
     <motion.nav
@@ -529,6 +530,7 @@ function Sidebar({
           </button>
         </div>
 
+        {workspaceControl && <div className="shrink-0 border-b border-border/40 px-3 py-3">{workspaceControl}</div>}
         {!home.startsWith("/broker") && (
           <button
             type="button"
@@ -843,11 +845,12 @@ export function SicariiShell({
   allItems,
   home,
   utilities,
+  workspaceControl,
   children,
 }: ShellNavigation & { children: React.ReactNode }) {
   return (
     <ShellNavigationContext.Provider
-      value={{ items, allItems, home, utilities, sidebarGroups }}
+      value={{ items, allItems, home, utilities, sidebarGroups, workspaceControl }}
     >
       <DashboardShell isStaff={false}>{children}</DashboardShell>
     </ShellNavigationContext.Provider>
@@ -860,7 +863,7 @@ function DashboardShell({
   isStaff: boolean;
   children: React.ReactNode;
 }) {
-  const { home, utilities } = useShellNavigation();
+  const { home, utilities, workspaceControl } = useShellNavigation();
   const pathname = usePathname() ?? "";
   const isChat = pathname.endsWith("/chippi");
   const prefersReduced = useReducedMotion();
@@ -943,6 +946,7 @@ function DashboardShell({
                   {!isSidebar && utilities}
                 </div>
               </div>
+              {!isSidebar && workspaceControl && <div className="mt-2 max-w-sm">{workspaceControl}</div>}
             </div>
           </motion.div>
 

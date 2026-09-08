@@ -1,3 +1,4 @@
+import { workspaceTeams } from '@/lib/workspaces/teams';
 import '@/components/dashboard/sicarii/theme.css';
 import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
 import { redirect } from 'next/navigation';
@@ -20,7 +21,7 @@ import { ChippiSplash } from '@/components/dashboard/chippi-splash';
 import { pickGreeting } from '@/lib/greetings';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Teams — Chippi' };
+export const metadata: Metadata = { title: 'Brokerage — Chippi' };
 
 export default async function BrokerLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
@@ -40,6 +41,7 @@ export default async function BrokerLayout({ children }: { children: React.React
     return brokerage?.id && brokerage.name ? [{ id: brokerage.id, name: brokerage.name, role: m.role }] : [];
   });
   // Current first is the shell's active identity; all other authorized destinations remain visible.
+  const teamWorkspaces = await workspaceTeams(ctx.dbUserId);
   const brokerageMemberships = [
     { id: ctx.brokerage.id, name: ctx.brokerage.name, role: ctx.membership.role },
     ...availableMemberships.filter(m => m.id !== ctx.brokerage.id),
@@ -255,7 +257,7 @@ export default async function BrokerLayout({ children }: { children: React.React
           mirrors the realtor layout (app/s/[slug]/layout.tsx). */}
       <EmbedDetector />
       <SidebarCollapseProvider>
-        <WorkspaceShell slug={slug} spaceId={spaceRow?.id} spaceName={spaceName} isBroker brokerageRole={ctx.membership.role} brokerageMemberships={brokerageMemberships} isPlatformAdmin={isPlatformAdmin}>
+        <WorkspaceShell {...teamWorkspaces} activeBrokerageId={ctx.brokerage.id} slug={slug} spaceId={spaceRow?.id} spaceName={spaceName} isBroker brokerageRole={ctx.membership.role} brokerageMemberships={brokerageMemberships} isPlatformAdmin={isPlatformAdmin}>
           <BrokerMain>{children}</BrokerMain>
         </WorkspaceShell>
       </SidebarCollapseProvider>

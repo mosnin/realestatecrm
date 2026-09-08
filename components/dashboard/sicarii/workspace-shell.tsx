@@ -26,6 +26,8 @@ import {
   WorkspaceSwitcher,
   BrokerSidebarConversations,
 } from "@/components/dashboard/sidebar";
+import { DashboardViewToggle } from '@/components/dashboard/dashboard-view-toggle';
+import { workspaceRoleLabel, type TeamWorkspace } from '@/lib/workspaces/navigation';
 import { NotificationCenter } from "@/components/dashboard/notification-center";
 import { NotificationBell } from "@/components/broker/notification-bell";
 import { ShareLinksMenu } from "@/components/dashboard/share-links-menu";
@@ -103,6 +105,9 @@ interface Props {
   brokerageRole?: string | null;
   brokerageMemberships?: { id: string; name: string; role: string }[];
   isPlatformAdmin?: boolean;
+  activeBrokerageId?: string;
+  teams?: TeamWorkspace[];
+  teamsUnavailable?: boolean;
   children: React.ReactNode;
 }
 export function WorkspaceShell({
@@ -113,6 +118,9 @@ export function WorkspaceShell({
   brokerageRole,
   brokerageMemberships = [],
   isPlatformAdmin,
+  activeBrokerageId,
+  teams = [],
+  teamsUnavailable = false,
   children,
 }: Props) {
   const pathname = usePathname() ?? "";
@@ -258,7 +266,7 @@ export function WorkspaceShell({
             "/broker/deals",
             "/broker/messages",
           ]),
-          group("Team", [
+          group("Brokerage", [
             "/broker/realtors",
             "/broker/people",
             "/broker/properties",
@@ -360,19 +368,25 @@ export function WorkspaceShell({
   if (extraItems.length)
     sidebarGroups.push({ label: "Switch workspace", items: extraItems });
   const home = broker ? "/broker/brief" : `${base}/chippi/brief`;
-  const utilities = (
-    <>
-      <div className="sicarii-workspace max-w-44 min-w-0">
+  const workspaceControl = <div>
+      <div className="sicarii-workspace min-w-0">
         <WorkspaceSwitcher
-          currentName={broker ? brokerageMemberships[0]?.name ?? spaceName : spaceName}
-          currentSubtitle={broker ? "Brokerage" : "Workspace"}
+          currentName={broker ? brokerageMemberships.find(b => b.id === activeBrokerageId)?.name ?? spaceName : spaceName}
+          currentSubtitle={broker ? `Brokerage · ${workspaceRoleLabel(brokerageRole ?? "")}` : "Agent workspace"}
           currentIcon={broker ? Building2 : Home}
           slug={slug}
           spaceName={spaceName}
           brokerageMemberships={brokerageMemberships}
+          activeBrokerageId={activeBrokerageId}
+          teams={teams}
+          teamsUnavailable={teamsUnavailable}
           isOnBrokerPage={broker}
         />
       </div>
+    {(!broker || brokerAdmin) && <DashboardViewToggle kind={broker ? 'brokerage' : 'personal'} id={broker ? activeBrokerageId ?? '' : slug} />}
+  </div>;
+  const utilities = (
+    <>
       <ConversationHistory slug={slug} broker={broker} />
       {!broker && (
         <button
@@ -413,11 +427,13 @@ export function WorkspaceShell({
   );
   return (
     <SicariiShell
+      key={broker ? `brokerage:${activeBrokerageId}` : `personal:${spaceId ?? slug}`}
       sidebarGroups={sidebarGroups}
       items={items}
       allItems={allItems}
       home={home}
       utilities={utilities}
+      workspaceControl={workspaceControl}
     >
       {children}
     </SicariiShell>

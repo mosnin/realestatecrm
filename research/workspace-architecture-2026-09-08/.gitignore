@@ -1,0 +1,5 @@
+# Keep retained third-party source bodies and provider receipts local.
+*
+!.gitignore
+!decision.md
+!implementation.md

@@ -43,11 +43,11 @@ export async function listWorkforceScopes(clerkId: string) {
   ]);
   const teamScopes = process.env.CHIPPI_WORKFORCE_ENABLED === 'true' ? await listTeams(user.id) : [];
   return [
-    ...teamScopes.map(team => ({ href: `/workforce/team/${encodeURIComponent(team.id)}/app`, name: team.name, role: `Team ${team.role}` })),
-    ...(personal.error ? [] : personal.data ?? []).map(row => ({ href: `/workforce/personal/${encodeURIComponent(row.slug)}/app`, name: row.name, role: 'Personal workspace' })),
+    ...teamScopes.map(team => ({ kind: 'team' as const, href: `/workforce/team/${encodeURIComponent(team.id)}/app`, name: team.name, role: `Team ${team.role}` })),
+    ...(personal.error ? [] : personal.data ?? []).map(row => ({ kind: 'personal' as const, href: `/workforce/personal/${encodeURIComponent(row.slug)}/app`, name: row.name, role: 'Agent workspace' })),
     ...(brokerage.error ? [] : brokerage.data ?? []).map(row => {
       const org = Array.isArray(row.Brokerage) ? row.Brokerage[0] : row.Brokerage;
-      return { href: `/workforce/brokerage/${encodeURIComponent(row.brokerageId)}/app`, name: org?.name ?? 'Brokerage', role: row.role === 'broker_owner' ? 'Brokerage owner' : 'Brokerage admin' };
+      return { kind: 'brokerage' as const, href: `/workforce/brokerage/${encodeURIComponent(row.brokerageId)}/app`, name: org?.name ?? 'Brokerage', role: row.role === 'broker_owner' ? 'Brokerage owner' : 'Brokerage admin' };
     }),
   ];
 }

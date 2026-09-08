@@ -1,3 +1,4 @@
+import { brokerageSwitchDestination } from '@/lib/workspaces/navigation';
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +14,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (error || !user || user.status === 'offboarded' || user.platformRole === 'banned') return new Response(null, { status: 403 });
   const { data: member, error: memberError } = await unscoped(supabase.from('BrokerageMembership'), 'validate explicit workspace switch against current membership').select('role').eq('userId', user.id).eq('brokerageId', id).maybeSingle();
   if (memberError || !member || !['broker_owner', 'broker_admin', 'realtor_member'].includes(member.role)) return new Response(null, { status: 403 });
-  const response = NextResponse.redirect(new URL('/broker', request.url));
+  const response = NextResponse.redirect(new URL(brokerageSwitchDestination(new URL(request.url).searchParams.get('next'), member.role), request.url));
   response.headers.set('cache-control', 'no-store');
   response.cookies.set('chippi-brokerage', id, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
   return response;

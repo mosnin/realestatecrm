@@ -16,7 +16,7 @@ export async function GET(request: Request, context: { params: Promise<{ kind: s
     const html = await readFile(path.join(process.cwd(), 'public/workforce-assets/index.html'), 'utf8');
     const basePath = `/workforce/${kind}/${encodeURIComponent(id)}`;
     const workspaces = await listWorkforceScopes(userId);
-    const config = JSON.stringify({ workspaces, basePath, apiBase: `/api/workforce/${kind}/${encodeURIComponent(id)}`, crmHref: scope.crmHref, name: scope.principal.name, role: kind === 'team' ? `Team ${scope.principal.role}` : scope.principal.role === 'admin' ? 'Brokerage admin' : (kind === 'brokerage' ? 'Brokerage owner' : 'Personal workspace') }).replace(/</g, '\\u003c');
+    const config = JSON.stringify({ kind, workspaces, basePath, apiBase: `/api/workforce/${kind}/${encodeURIComponent(id)}`, crmHref: scope.crmHref, name: scope.principal.name, role: kind === 'team' ? `Team ${scope.principal.role}` : scope.principal.role === 'admin' ? 'Brokerage admin' : (kind === 'brokerage' ? 'Brokerage owner' : 'Agent workspace') }).replace(/</g, '\\u003c');
     return new Response(html.replace('<html lang="en">', '<html lang="en" data-chippi-host>').replace('</head>', `<script type="application/json" id="chippi-host">${config}</script></head>`), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-frame-options': 'DENY', 'x-content-type-options': 'nosniff' } });
   } catch { return new Response('Workforce client is not installed', { status: 503 }); }
 }
