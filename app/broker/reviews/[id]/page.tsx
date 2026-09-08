@@ -13,7 +13,7 @@ export default async function BrokerReviewDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // 1. Load the review request. 404 if it doesn't exist OR belongs to a
   //    different brokerage — we must not leak existence across brokerages.

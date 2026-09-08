@@ -7,7 +7,7 @@
 
 ## At a glance
 
-- **Page routes:** 228
+- **Page routes:** 229
 - **API endpoints:** 450
 - **Cron jobs:** 3
 - **DB tables:** 156  ·  **RPCs:** 72  ·  **migrations:** 275
@@ -390,6 +390,10 @@
 **trial** (1)
 
 - `/trial`
+
+**workspace-unavailable** (1)
+
+- `/workspace-unavailable`
 
 ## API endpoints
 

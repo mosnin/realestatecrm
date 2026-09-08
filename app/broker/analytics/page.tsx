@@ -61,7 +61,7 @@ function formatCompact(n: number): string {
 export default async function BrokerAnalyticsPage() {
   // Gate: broker_owner + broker_admin only.
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

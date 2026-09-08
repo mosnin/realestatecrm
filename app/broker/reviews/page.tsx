@@ -18,7 +18,7 @@ import { BROKER_PAGE_READING } from '@/components/broker/premium';
 // redirect instead of an uncaught throw — matches app/broker/members/page.tsx.
 export default async function BrokerReviewsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // 1. Pull open review requests for this brokerage, newest-first. Other tabs
   //    fetch on demand via /api/broker/reviews?status=X.

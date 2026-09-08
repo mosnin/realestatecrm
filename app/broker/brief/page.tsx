@@ -95,7 +95,7 @@ function getGreeting() {
 
 export default async function BrokerBriefPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // realtor_member sees their own work surface, not the swarm.
   if (ctx.membership.role === 'realtor_member') {

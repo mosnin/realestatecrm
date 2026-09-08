@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: 'Real estate agents — Teams' };
 
 export default async function BrokerRealtorsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

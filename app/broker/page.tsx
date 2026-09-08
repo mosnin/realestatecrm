@@ -1,3 +1,5 @@
+import { activeBrokerageId, getBrokerMemberContext } from '@/lib/permissions';
+import { brokerageUrl } from '@/lib/workspaces/brokerage-request';
 import { redirect } from 'next/navigation';
 
 /**
@@ -17,5 +19,8 @@ export default async function BrokerHomePage({
   if (prefill) query.set('prefill', prefill);
 
   const serialized = query.toString();
-  redirect(serialized ? `/broker/chippi?${serialized}` : '/broker/brief');
+  const destination = serialized ? `/broker/chippi?${serialized}` : '/broker/brief';
+  let brokerageId = await activeBrokerageId();
+  if (brokerageId === '') brokerageId = (await getBrokerMemberContext())?.brokerage.id;
+  redirect(brokerageId ? brokerageUrl(destination, brokerageId) : destination);
 }

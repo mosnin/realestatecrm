@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
  */
 export default async function BrokerMessagesPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/setup');
+  if (!ctx) redirect('/workspace-unavailable');
 
   return (
     <div className={cn(BROKER_PAGE_WIDE, 'flex h-full max-w-7xl flex-col')} data-broker-premium-page="messages" data-broker-family="communications-inbox">

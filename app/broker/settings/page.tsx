@@ -28,7 +28,7 @@ export const metadata: Metadata = { title: 'General settings — Teams' };
  */
 export default async function BrokerSettingsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage, membership } = ctx;
   const canEdit = membership.role === 'broker_owner' || membership.role === 'broker_admin';

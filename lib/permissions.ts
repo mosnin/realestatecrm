@@ -1,3 +1,4 @@
+import { BROKERAGE_HEADER } from '@/lib/workspaces/brokerage-request';
 /**
  * Central permission helpers for the org/role system.
  *
@@ -11,7 +12,7 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { supabase } from '@/lib/supabase';
 import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { unscoped } from '@/lib/supabase-guard';
@@ -170,7 +171,13 @@ export async function requireAdminCapability(
 }
 
 export async function activeBrokerageId(): Promise<string | undefined> {
-  // Older clients without a selection keep the deterministic landing default.
+  // Middleware derives this from the URL or the same-origin dashboard referrer.
+  // An explicit unavailable selection must never fall back to another membership.
+  try {
+    const requestHeaders = await headers();
+    if (requestHeaders.has(BROKERAGE_HEADER)) return requestHeaders.get(BROKERAGE_HEADER) ?? undefined;
+  } catch { /* Non-request callers retain the landing preference below. */ }
+  // The cookie is a legacy landing preference, not the active tab's identity.
   try { return (await cookies()).get('chippi-brokerage')?.value; } catch { return undefined; }
 }
 

@@ -1,3 +1,4 @@
+import { BROKERAGE_HEADER, BROKERAGE_PARAM, REQUEST_URL_HEADER, brokerageUrl } from '@/lib/workspaces/brokerage-request';
 import { workspaceTeams } from '@/lib/workspaces/teams';
 import '@/components/dashboard/sicarii/theme.css';
 import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
@@ -28,10 +29,18 @@ export default async function BrokerLayout({ children }: { children: React.React
   if (!userId) redirect('/login/realtor');
 
   const ctx = await getBrokerMemberContext();
+  const requestHeaders = await headers();
 
   // Not a broker — redirect to the setup page
   if (!ctx) {
+    if (requestHeaders.has(BROKERAGE_HEADER)) redirect('/workspace-unavailable');
     redirect('/setup');
+  }
+
+  // First visit with no saved preference: bind the resolved membership into the URL.
+  const requestPath = requestHeaders.get(REQUEST_URL_HEADER);
+  if (requestPath && !new URL(requestPath, 'https://workspace.invalid').searchParams.has(BROKERAGE_PARAM)) {
+    redirect(brokerageUrl(requestPath, ctx.brokerage.id));
   }
 
   const { data: memberships } = await unscoped(supabase.from('BrokerageMembership'), 'list current user workspace memberships for the switcher')
@@ -134,7 +143,7 @@ export default async function BrokerLayout({ children }: { children: React.React
       // Not subscribed on EITHER entity → send to the brokerage billing surface
       // (self-serve Team / Team Plus checkout + payment management live there).
       if (!brokerageSubscribed && !legacySpaceSubscribed) {
-        redirect('/broker/billing');
+        redirect(brokerageUrl('/broker/billing', ctx.brokerage.id));
       }
     } catch (err: any) {
       // Next.js redirect() throws a special error — re-throw it.
@@ -143,7 +152,7 @@ export default async function BrokerLayout({ children }: { children: React.React
       // than leave an unsubscribed owner inside the dashboard. /broker/billing
       // re-checks ownership and is always reachable (exempt above).
       console.error('[broker-layout] Subscription gate error:', err);
-      redirect('/broker/billing');
+      redirect(brokerageUrl('/broker/billing', ctx.brokerage.id));
     }
   }
 

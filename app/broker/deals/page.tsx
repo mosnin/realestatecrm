@@ -185,7 +185,7 @@ function buildColumns(
 
 export default async function BrokerDealsPage() {
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

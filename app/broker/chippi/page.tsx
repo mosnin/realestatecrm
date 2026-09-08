@@ -1,3 +1,4 @@
+import { brokerageUrl } from '@/lib/workspaces/brokerage-request';
 import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getBrokerMemberContext } from '@/lib/permissions';
@@ -14,8 +15,8 @@ export default async function BrokerChippiPage({
   searchParams: Promise<{ conversationId?: string; prompt?: string; prefill?: string }>;
 }) {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
-  if (ctx.membership.role === 'realtor_member') redirect('/broker/brief');
+  if (!ctx) redirect('/workspace-unavailable');
+  if (ctx.membership.role === 'realtor_member') redirect(brokerageUrl('/broker/brief', ctx.brokerage.id));
 
   const {
     conversationId: urlConversationId,

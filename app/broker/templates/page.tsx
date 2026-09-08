@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Templates — Teams' };
 
 export default async function TemplatesPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // Only the owner/admins can author the library; the write API routes
   // (POST/PATCH/DELETE/publish) hard-gate to those roles and 403 otherwise.

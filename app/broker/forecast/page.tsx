@@ -114,7 +114,7 @@ function closingProbability(
 
 export default async function BrokerForecastPage() {
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

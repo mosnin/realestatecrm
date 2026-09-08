@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Properties — Brokerage' };
 
 export default async function BrokerPropertiesPage() {
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   return (
     <div className={BROKER_PAGE_READING} data-broker-premium-page="properties">

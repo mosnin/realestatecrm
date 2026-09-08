@@ -12,7 +12,7 @@ beforeEach(() => { state.clerkId = 'clerk-a'; state.role = 'broker_admin'; state
 describe('explicit brokerage switch route', () => {
   it('rechecks exact membership and sets the selected account before redirecting to People', async () => {
     const response = await GET(new Request('https://example.test/broker/switch/broker-b?next=%2Fbroker%2Fpeople'), context);
-    expect(response.headers.get('location')).toBe('https://example.test/broker/people');
+    expect(response.headers.get('location')).toBe('https://example.test/broker/people?brokerage=broker-b');
     expect(response.headers.get('set-cookie')).toContain('chippi-brokerage=broker-b');
     expect(state.filters).toContainEqual(['BrokerageMembership', 'userId', 'user-a']);
     expect(state.filters).toContainEqual(['BrokerageMembership', 'brokerageId', 'broker-b']);
@@ -20,7 +20,7 @@ describe('explicit brokerage switch route', () => {
   it.each(['https://evil.test', '/broker/deals'])('does not redirect a regular member to %s', async next => {
     state.role = 'realtor_member';
     const response = await GET(new Request(`https://example.test/broker/switch/broker-b?next=${encodeURIComponent(next)}`), context);
-    expect(response.headers.get('location')).toBe('https://example.test/broker');
+    expect(response.headers.get('location')).toBe('https://example.test/broker?brokerage=broker-b');
   });
   it('cannot switch a removed membership', async () => {
     state.role = null;

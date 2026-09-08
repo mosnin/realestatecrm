@@ -1,3 +1,4 @@
+import { brokerageUrl } from '@/lib/workspaces/brokerage-request';
 import { getBrokerContext } from '@/lib/permissions';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
@@ -32,7 +33,7 @@ type Params = { params: Promise<{ userId: string }> };
 export default async function RealtorDrilldownPage({ params }: Params) {
   const { userId } = await params;
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // Verify membership
   const { data: membership } = await supabase
@@ -42,7 +43,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     .eq('userId', userId)
     .maybeSingle();
 
-  if (!membership) redirect('/broker/realtors');
+  if (!membership) redirect(brokerageUrl('/broker/realtors', ctx.brokerage.id));
 
   // Get user + space
   const { data: user } = await supabase
@@ -51,7 +52,7 @@ export default async function RealtorDrilldownPage({ params }: Params) {
     .eq('id', userId)
     .maybeSingle();
 
-  if (!user) redirect('/broker/realtors');
+  if (!user) redirect(brokerageUrl('/broker/realtors', ctx.brokerage.id));
 
   const { data: space } = await supabase
     .from('Space')

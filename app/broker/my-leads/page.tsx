@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: 'My Leads — Chippi' };
 
 export default async function MyLeadsPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage, dbUserId } = ctx;
 

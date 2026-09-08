@@ -8,7 +8,7 @@ export const metadata = { title: 'Import / Export — Teams' };
 
 export default async function ImportExportPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

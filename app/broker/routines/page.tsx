@@ -10,7 +10,7 @@ import { BROKER_PAGE_READING } from '@/components/broker/premium';
 // app/broker/activity/page.tsx.
 export default async function BrokerRoutinesPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   return (
     <div className={`${BROKER_PAGE_READING} max-w-4xl`} data-broker-premium-page="routines">

@@ -1,3 +1,4 @@
+import { brokerageRequestScope } from '@/lib/workspaces/brokerage-request';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -271,7 +272,14 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   // Pass the current pathname to layouts via request header (used by subscription gate)
-  const requestHeaders = new Headers(request.headers);
+  const brokerageScope = brokerageRequestScope({ url: request.url, method: request.method,
+    headers: request.headers, cookie: request.cookies.get('chippi-brokerage')?.value });
+  if (brokerageScope.redirectTo) {
+    const response = NextResponse.redirect(new URL(brokerageScope.redirectTo, request.url));
+    response.headers.set('cache-control', 'no-store');
+    return response;
+  }
+  const requestHeaders = brokerageScope.headers;
   requestHeaders.set('x-pathname', pathname);
   if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname.startsWith('/login')) {
     const explicit = request.nextUrl.searchParams.get('hl');

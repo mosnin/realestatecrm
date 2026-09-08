@@ -54,7 +54,7 @@ const rolePillClass =
 
 export default async function BrokerInvitationsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // Pull seat usage alongside invitations so the forms can render capacity
   // inline (and disable submit when at cap) instead of only reacting to the

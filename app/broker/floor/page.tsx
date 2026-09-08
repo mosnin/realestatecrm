@@ -43,7 +43,7 @@ const STALLED_AFTER_DAYS = 10;
 
 export default async function BrokerFloorPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/broker');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const roster = await rosterForBrokerage(ctx.brokerage.id);
   const userIds = roster.map((r) => r.userId);
