@@ -16,14 +16,16 @@ Teams are explicit shared workspaces for people and their Chippi agent teams. A 
 
 The dedicated Render PostgreSQL database and runtime service have been created in the confirmed workspace. A separate Fly app and R2 artifact bucket have been created. Cadre's Cloudflare gateway is deployed with separate secrets and an exact configured Fly app restriction. Chippi runtime configuration selects Fly, Pi, Graphile, Postgres realtime, and the model configured on the inspected Cadre runtime. Cadre source pin: `3ead9d8406360edc0fcc87f4dae11fb733d0231c`.
 
-The initial Render service deployment preceded database/provider configuration and failed. A deployment with the saved settings was then triggered. Runtime health, successful real computer use, model delivery, and restart/recovery remain distinct acceptance checks.
+The dedicated runtime is live at Cadre revision `3ead9d8406360edc0fcc87f4dae11fb733d0231c`. Its health response confirms Pi, Fly, Composio, Graphile jobs, and PostgreSQL realtime. The branch preview has the dedicated bridge origin and signing secret configured, with customer-facing flags still disabled. The later Cadre mobile dependency patch changes no deployed runtime code.
+
+A real synthetic Fly canary using the original adapter and deployed computer image passed desktop preparation, one agent writing a shared file and another reading it, separate agent screen sessions, cross-team access denial, and file persistence after stopping and restarting the machine. The canary machine and its disk were destroyed after verification. The R2 gateway passed authenticated write/read/delete and unauthenticated denial; its synthetic object was deleted. These checks do not establish real-model delegation or authenticated customer workflow acceptance.
 
 ## Verification
 
 - Root full test run: 6,707 passed, seven skipped before the final revocation regression and route tests; all fourteen focused team-account tests subsequently passed.
 - Existing Workforce scope/proxy/CRM tests plus new team scope and CRM refusal coverage passed.
 - Cadre suite: 2,816 passed, 133 skipped. The configured-Fly-host and signed-team-principal tests pass.
-- Root TypeScript and lint passed (existing unrelated lint warnings). Cadre core/API/worker TypeScript checks passed. Tenant-scope scanner passed.
+- Root TypeScript and lint passed (existing unrelated lint warnings). All 22 Cadre package checks passed after aligning three Expo patch dependencies required by its mobile compatibility check. Tenant-scope scanner passed.
 - Migration applied to an isolated local PostgreSQL database. SQL checks verified client-role denial, foreign-key enforcement, and rejection of an invalid owner membership role. No production CRM migration was applied.
 - The actual TeamsClient was exercised in the internal browser using synthetic API fixtures: team creation, invitation display, membership controls, desktop and 390-pixel mobile layouts. Mobile document width remained 390 pixels. This is component/browser verification, not authenticated hosted acceptance.
 
