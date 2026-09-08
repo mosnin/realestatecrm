@@ -316,6 +316,10 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // completed turn (the ChatGPT-Work "queued messages" mechanic).
   const [queuedMessages, setQueuedMessages] = useState<PendingTurnMessage[]>([]);
   const queuedRef = useRef<PendingTurnMessage[]>([]);
+  // A pre-claim failure can leave the durable row pending. Polling that row
+  // must not retry a rejected request forever; only an explicit retry may
+  // submit it again in this tab.
+  const blockedAutoRetryTurnsRef = useRef(new Set<string>());
   const durableTurnQueueEnabled = taskEndpoint === '/api/ai/task';
   // Exact identity of the currently running/approval-paused turn. Stop and
   // Steer must target this id rather than a conversation-wide flag that can
@@ -922,6 +926,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
       } finally {
         detach();
+        const mayContinueQueue = turnOutcomeRef.current === 'complete'
+          || turnOutcomeRef.current === 'cancelled';
+        if (!mayContinueQueue && turnOutcomeRef.current !== 'paused') {
+          blockedAutoRetryTurnsRef.current.add(rec.turnId);
+        }
         // The finished record is deliberately LEFT in the runner: it's the
         // tombstone the workspace's history loader consumes to know "a turn
         // ended since your server props rendered — fetch fresh." Consuming
@@ -954,7 +963,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // the history loader, so the loader sees the flag already set and
         // doesn't blank the thread it just watched stream in.
         onTurnSettledRef.current?.(rec.conversationId);
-        if (durableTurnQueueEnabled && turnOutcomeRef.current !== 'paused') {
+        if (durableTurnQueueEnabled && mayContinueQueue) {
           // PostgreSQL — not this component — decides whether a paused
           // turn holds the queue and which pending instruction is next.
           await drainDurableQueueRef.current?.(rec.conversationId);
@@ -1179,7 +1188,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [activeWorkbookArtifactId, consumeStream, spaceSlug, taskEndpoint, workExecutionMode]);
 
   const dispatchQueuedTurn = useCallback(async (turn: ConversationTurnRecord) => {
-    if (isStreamingRef.current) return;
+    if (isStreamingRef.current || blockedAutoRetryTurnsRef.current.has(turn.id)) return;
     const meta: AttachmentMeta[] = (turn.attachments ?? []).map((attachment) => ({
       ...attachment,
       isImage: attachment.isImage ?? attachment.mimeType.startsWith('image/'),
@@ -1621,6 +1630,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           const turns = await loadDurableTurns(conversationId);
           const sameTurn = turns.find((turn) => turn.id === accepted.turn.id);
           if (sameTurn?.status === 'pending' && !isStreamingRef.current) {
+            blockedAutoRetryTurnsRef.current.delete(sameTurn.id);
             beginAcceptedTurn({
               turnId: sameTurn.id,
               clientRequestId: sameTurn.clientRequestId,

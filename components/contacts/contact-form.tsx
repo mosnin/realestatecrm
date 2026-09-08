@@ -225,6 +225,14 @@ export function ContactForm({
     resolver: zodResolver(schema),
     defaultValues: contactFormResetValues(defaultValues).values,
   });
+  const relationshipType = watch('leadType');
+  const budgetLabel = relationshipType === 'rental'
+    ? 'Monthly rental budget'
+    : relationshipType === 'seller'
+      ? 'Target sale price'
+      : relationshipType === 'buyer'
+        ? 'Purchase budget'
+        : 'Budget';
 
   // Properties live outside react-hook-form so the chip input owns them.
   const [properties, setProperties] = useState<string[]>(
@@ -536,12 +544,12 @@ export function ContactForm({
               {/* Hairline divider — identity above, qualification below */}
               <div className="border-t border-border/60 !my-7" />
 
-              <FieldRow id="budget" label="Monthly budget" optional>
+              <FieldRow id="budget" label={budgetLabel} optional>
                 <Input
                   id="budget"
                   type="number"
                   step="0.01"
-                  placeholder="e.g. 2500"
+                  placeholder={relationshipType === 'rental' ? 'e.g. 2500' : 'e.g. 650000'}
                   {...register('budget')}
                 />
               </FieldRow>
