@@ -8,7 +8,7 @@ import { Users, ArrowRight, Plus } from 'lucide-react';
 type Team = { id: string; name: string; role: 'owner' | 'admin' | 'member' };
 type Parent = { name: string; href: string; role: string };
 type Member = { userId: string; role: 'admin' | 'member'; User: { name: string } | { name: string }[] | null };
-export function TeamsClient({ initialMode = null }: { initialMode?: 'create' | 'join' | null }) {
+export function TeamsClient({ initialMode = null, sharedRecordsEnabled = false }: { initialMode?: 'create' | 'join' | null; sharedRecordsEnabled?: boolean }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +78,7 @@ export function TeamsClient({ initialMode = null }: { initialMode?: 'create' | '
       {loading ? <p role="status" className="text-sm text-muted-foreground">Loading teams…</p> : teams.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><Users className="mx-auto mb-3 text-muted-foreground" size={24} /><h2 className="font-medium">Bring your team together</h2><p className="mt-2 text-sm text-muted-foreground">Create a workspace or join with an invitation code.</p></div> : <div className="divide-y rounded-xl border bg-card">{teams.map(team => <section key={team.id} className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 max-w-full"><h2 className="break-words font-medium">{team.name}</h2><p className="mt-1 text-xs capitalize text-muted-foreground">{team.role}</p></div><div className="flex flex-wrap gap-2">
           {team.role !== 'member' && <><Button variant="ghost" disabled={busy} onClick={() => void manage(team)}>Members</Button><Button variant="outline" disabled={busy} onClick={async () => { const data = await action({ action: 'invite', teamId: team.id }); if (data) setInvite({ teamId: team.id, code: data.code }); }}>Invite</Button></>}
+          {sharedRecordsEnabled && <Button variant="outline" asChild><Link href={`/teams/${encodeURIComponent(team.id)}/records`}>Shared records</Link></Button>}
           <Button asChild><Link href={`/workforce/team/${team.id}/app`}>Open workspace<ArrowRight size={14} className="ml-2" /></Link></Button>
         </div></div>
         {invite?.teamId === team.id && <div className="mt-4 rounded-lg bg-muted p-4"><label className="grid gap-2 text-sm">Invitation code<Input readOnly value={invite.code} onFocus={e => e.target.select()} /></label><p className="mt-2 text-xs text-muted-foreground">Share with people who should access this team’s conversations, files, and computer. Expires in 7 days. Creating another code replaces this one.</p></div>}

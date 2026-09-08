@@ -5,5 +5,5 @@ export default async function TeamsPage({ searchParams }: { searchParams: Promis
   if (process.env.CHIPPI_WORKFORCE_ENABLED !== 'true') notFound();
   if (!(await auth()).userId) redirect('/login/realtor');
   const { mode } = await searchParams;
-  return <TeamsClient initialMode={mode === 'create' || mode === 'join' ? mode : null} />;
+  return <TeamsClient sharedRecordsEnabled={process.env.CHIPPI_TEAM_CRM_ENABLED === 'true'} initialMode={mode === 'create' || mode === 'join' ? mode : null} />;
 }

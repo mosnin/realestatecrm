@@ -1,3 +1,4 @@
+import { listSharedRecords, RECORD_KINDS } from '@/lib/teams/shared-records';
 import 'server-only';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +9,16 @@ import type { WorkforcePrincipal } from '@/integrations/cadre/packages/core/src/
 // Explicit tenant-safe queries; adding a registry tool does not automatically expose it to workers.
 export const WORKFORCE_CRM_QUERIES = ['list_contacts', 'find_person', 'find_deal', 'find_tours', 'find_property', 'pipeline_summary', 'workspace_stats', 'find_stuck_deals', 'find_quiet_hot_persons', 'find_overdue_followups'] as const;
 export async function queryWorkforceCrm(principal: WorkforcePrincipal, clerkId: string, input: { operation?: string; tool?: string; args?: unknown; spaceId?: string }, signal: AbortSignal) {
+  if (principal.kind === 'team' && process.env.CHIPPI_TEAM_CRM_ENABLED === 'true') {
+    const parameters = z.object({ kind: z.enum(RECORD_KINDS).optional(), offset: z.number().int().min(0).max(100000).optional() }).strict();
+    if (input.operation === 'catalog') return { tools: [{ name: 'list_shared_records', description: 'Read the fields of People, Deals, and Properties explicitly shared with this team. Follow nextOffset for more records. This does not expose private notes, messages, files, or linked records.', parameters: z.toJSONSchema(parameters, { io: 'input' }) }] };
+    if (input.operation === 'workspaces') return { workspaces: [] };
+    if (input.operation !== 'query' || input.tool !== 'list_shared_records' || input.spaceId) throw new Error('CRM records are not shared with this team');
+    signal.throwIfAborted();
+    const result = await listSharedRecords(principal.scopeId, principal.actorId, parameters.parse(input.args ?? {}));
+    signal.throwIfAborted();
+    return result;
+  }
   if (principal.kind === 'team') {
     if (input.operation === 'catalog') return { tools: [] };
     if (input.operation === 'workspaces') return { workspaces: [] };

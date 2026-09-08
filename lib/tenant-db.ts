@@ -31,6 +31,7 @@ export type ScopeColumn = 'spaceId' | 'brokerageId';
 export const TENANT_TABLES: Record<string, ScopeColumn> = {
   // ── space-scoped (the realtor workspace) ────────────────────────────────
   Contact: 'spaceId',
+  TeamRecordGrant: 'spaceId',
   ClientCommitment: 'spaceId',
   CrmContactLink: 'spaceId',
   CrmWriteback: 'spaceId',
