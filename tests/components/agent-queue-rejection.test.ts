@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAgentTask } from '@/components/ai/hooks/use-agent-task';
-import { __resetTurnRunnerForTests } from '@/components/ai/hooks/turn-runner';
+import { __resetTurnRunnerForTests, consumeFinishedTurn, turnKey } from '@/components/ai/hooks/turn-runner';
 
 let driver: ReturnType<typeof useAgentTask>;
 let host: HTMLDivElement;
@@ -54,6 +54,22 @@ afterEach(async () => {
 });
 
 describe('durable queue after pre-claim failure', () => {
+  it('keeps a failed turn blocked across navigation and allows retry after returning', async () => {
+    failure = 402;
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => { await driver.send('Read my priorities', [], 'work'); });
+    expect(attempts).toHaveLength(1);
+    await act(async () => root.render(null));
+    // The history loader consumes the finished transcript record on return.
+    consumeFinishedTurn(turnKey('/api/ai/task', 'qa-conversation'));
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(attempts).toHaveLength(1);
+    expect(driver.error).toBeTruthy();
+    await act(async () => { await driver.retryLastMessage(); });
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1].turnId).toBe(attempts[0].turnId);
+  });
   it.each([402, 429, 503, 'network', 'truncated'] as const)(
     'does not redispatch a pending turn after %s and permits an explicit retry', async (kind) => {
       failure = kind;

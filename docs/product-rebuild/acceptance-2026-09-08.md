@@ -67,3 +67,24 @@ is still needed for completed provider work; no credits were purchased.
 Final corrected-code validation: 800 test files, 6,814 passing tests, seven
 skipped; TypeScript, lint, and diff whitespace checks pass. The corrected-code
 provider/browser and hosted build checks are not implied by baseline CI above.
+
+## Follow-up acceptance
+
+Revision `096da3e7d393672afbfd1260402e31e1a128163b` completed all GitHub CI
+jobs, including the production build. Its main preview is Ready at
+https://chippi-ifxt8arn4-mosnins-projects.vercel.app . Authenticated browser
+checks on that revision confirmed all three relationship-specific budget
+labels. A new read-only Today goal received one rate-limit error and remained
+at one user message and one error when rechecked, with explicit Try again
+available. No provider completion is claimed.
+
+A follow-up regression exposed an additional navigation case: unmounting and
+returning to the conversation retried the pending rejected turn once. Retry
+blocks now live beside the tab's stream runner, separately from transcript
+records consumed by history refresh. Returning restores explicit retry's saved
+turn identity without dispatching it. A real-hook regression covers unmount,
+history consumption, remount, polling, and manual retry; it failed before the
+fix. This is in-tab navigation protection, not durable cross-device rejection
+state. Reloaded/new browser runtimes still reconcile against the server queue.
+The follow-up code passes TypeScript, lint, and all 800 test files: 6,815 tests
+passed and seven skipped. Its hosted deployment acceptance is still separate.

@@ -61,6 +61,25 @@ interface InternalRecord extends TurnRecord {
 }
 
 const records = new Map<string, InternalRecord>();
+// Like the streams themselves, rejection state survives component navigation.
+// Keep it separate from transcript tombstones, which history loading consumes.
+const automaticRetryBlocks = new Set<string>();
+
+function retryBlockKey(endpoint: string, conversationId: string, turnId: string): string {
+  return JSON.stringify([endpoint, conversationId, turnId]);
+}
+
+export function blockAutomaticRetry(endpoint: string, conversationId: string, turnId: string): void {
+  automaticRetryBlocks.add(retryBlockKey(endpoint, conversationId, turnId));
+}
+
+export function isAutomaticRetryBlocked(endpoint: string, conversationId: string, turnId: string): boolean {
+  return automaticRetryBlocks.has(retryBlockKey(endpoint, conversationId, turnId));
+}
+
+export function clearAutomaticRetryBlock(endpoint: string, conversationId: string, turnId: string): void {
+  automaticRetryBlocks.delete(retryBlockKey(endpoint, conversationId, turnId));
+}
 
 /** Finished records linger so a late-mounting surface can detect "a turn
  *  completed while nothing was watching" and force a fresh history fetch.
@@ -240,6 +259,7 @@ function emit(rec: InternalRecord, event: AgentEvent): void {
 
 /** Test-only: reset all module state between test cases. */
 export function __resetTurnRunnerForTests(): void {
+  automaticRetryBlocks.clear();
   for (const rec of records.values()) rec.controller.abort();
   records.clear();
 }

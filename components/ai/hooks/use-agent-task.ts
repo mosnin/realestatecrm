@@ -34,6 +34,9 @@ import {
   abortTurn,
   getTurn,
   turnKey,
+  blockAutomaticRetry,
+  isAutomaticRetryBlocked,
+  clearAutomaticRetryBlock,
   type TurnRecord,
 } from './turn-runner';
 import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
@@ -316,10 +319,6 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   // completed turn (the ChatGPT-Work "queued messages" mechanic).
   const [queuedMessages, setQueuedMessages] = useState<PendingTurnMessage[]>([]);
   const queuedRef = useRef<PendingTurnMessage[]>([]);
-  // A pre-claim failure can leave the durable row pending. Polling that row
-  // must not retry a rejected request forever; only an explicit retry may
-  // submit it again in this tab.
-  const blockedAutoRetryTurnsRef = useRef(new Set<string>());
   const durableTurnQueueEnabled = taskEndpoint === '/api/ai/task';
   // Exact identity of the currently running/approval-paused turn. Stop and
   // Steer must target this id rather than a conversation-wide flag that can
@@ -929,7 +928,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         const mayContinueQueue = turnOutcomeRef.current === 'complete'
           || turnOutcomeRef.current === 'cancelled';
         if (!mayContinueQueue && turnOutcomeRef.current !== 'paused') {
-          blockedAutoRetryTurnsRef.current.add(rec.turnId);
+          blockAutomaticRetry(rec.endpoint, rec.conversationId, rec.turnId);
         }
         // The finished record is deliberately LEFT in the runner: it's the
         // tombstone the workspace's history loader consumes to know "a turn
@@ -1188,7 +1187,15 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
   }, [activeWorkbookArtifactId, consumeStream, spaceSlug, taskEndpoint, workExecutionMode]);
 
   const dispatchQueuedTurn = useCallback(async (turn: ConversationTurnRecord) => {
-    if (isStreamingRef.current || blockedAutoRetryTurnsRef.current.has(turn.id)) return;
+    if (isStreamingRef.current) return;
+    if (isAutomaticRetryBlocked(taskEndpoint, turn.conversationId, turn.id)) {
+      // A fresh surface needs the saved identity too, so its Retry button
+      // retries this exact turn rather than silently doing nothing.
+      lastAcceptedTurnRef.current = { turn };
+      lastUserInputRef.current = { text: turn.message, attachmentIds: turn.attachmentIds };
+      setError(previous => previous ?? 'This saved request did not finish. Retry when you are ready.');
+      return;
+    }
     const meta: AttachmentMeta[] = (turn.attachments ?? []).map((attachment) => ({
       ...attachment,
       isImage: attachment.isImage ?? attachment.mimeType.startsWith('image/'),
@@ -1202,7 +1209,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       attachmentIds: turn.attachmentIds,
       attachmentsMeta: meta,
     });
-  }, [beginAcceptedTurn]);
+  }, [beginAcceptedTurn, taskEndpoint]);
   dispatchQueuedTurnRef.current = dispatchQueuedTurn;
 
   const drainDurableQueue = useCallback(async (conversationId: string) => {
@@ -1630,7 +1637,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           const turns = await loadDurableTurns(conversationId);
           const sameTurn = turns.find((turn) => turn.id === accepted.turn.id);
           if (sameTurn?.status === 'pending' && !isStreamingRef.current) {
-            blockedAutoRetryTurnsRef.current.delete(sameTurn.id);
+            clearAutomaticRetryBlock(taskEndpoint, sameTurn.conversationId, sameTurn.id);
             beginAcceptedTurn({
               turnId: sameTurn.id,
               clientRequestId: sameTurn.clientRequestId,
@@ -1654,7 +1661,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     const last = lastUserInputRef.current;
     if (!last) return;
     await send(last.text, last.attachmentIds);
-  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, removeQueuedMessage, send]);
+  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, removeQueuedMessage, send, taskEndpoint]);
 
   // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
   useEffect(() => {
