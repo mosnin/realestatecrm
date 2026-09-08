@@ -174,7 +174,7 @@ final class CRMWebSession: NSObject, ObservableObject, WKNavigationDelegate, WKU
         alert.runModal()
         completionHandler()
     }
-    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable (Bool) -> Void) {
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @Sendable (Bool) -> Void) {
         let alert = dialog(message, origin: frame.securityOrigin)
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Cancel")
