@@ -8,13 +8,13 @@ import { Users, ArrowRight, Plus } from 'lucide-react';
 type Team = { id: string; name: string; role: 'owner' | 'admin' | 'member' };
 type Parent = { name: string; href: string; role: string };
 type Member = { userId: string; role: 'admin' | 'member'; User: { name: string } | { name: string }[] | null };
-export function TeamsClient() {
+export function TeamsClient({ initialMode = null }: { initialMode?: 'create' | 'join' | null }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'create' | 'join' | null>(null);
+  const [mode, setMode] = useState<'create' | 'join' | null>(initialMode);
   const [name, setName] = useState('');
   const [parent, setParent] = useState('');
   const [code, setCode] = useState('');

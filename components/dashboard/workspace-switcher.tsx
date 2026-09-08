@@ -6,6 +6,7 @@ import { Building2, Briefcase, Check, ChevronsUpDown, Search, Users } from 'luci
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { triggerAccountSwitch } from './account-switch';
+import { workspaceExperience } from '@/lib/workspaces/experience';
 import { cn } from '@/lib/utils';
 import { workspaceDestination, workspaceRoleLabel, type TeamWorkspace, type WorkspaceKind } from '@/lib/workspaces/navigation';
 
@@ -37,6 +38,11 @@ export function NamedWorkspaceSwitcher({ currentName, currentSubtitle, currentIc
     ...teams.map(team => ({ ...team, kind: 'team' as WorkspaceKind, current: false })),
     ...brokerageMemberships.map(b => ({ ...b, kind: 'brokerage' as WorkspaceKind, current: isOnBrokerPage && b.id === currentBroker })),
   ];
+  const { canSwitch } = workspaceExperience(rows.length, teamsUnavailable);
+  if (!canSwitch) return <div className="flex min-h-11 min-w-0 items-center gap-2 p-2" aria-label={`Current workspace: ${currentName}`}>
+    <Icon size={17} className="shrink-0 text-muted-foreground" />
+    {!collapsed && <span className="min-w-0 truncate text-sm font-medium">{currentName}</span>}
+  </div>;
   const groups = [{ kind: 'personal', label: 'Agent workspace', icon: Briefcase }, { kind: 'team', label: 'Teams', icon: Users }, { kind: 'brokerage', label: 'Brokerages', icon: Building2 }] as const;
   const matches = rows.filter(row => `${row.name} ${workspaceRoleLabel(row.role)} ${row.kind === 'personal' ? 'agent' : row.kind}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const content = <div>

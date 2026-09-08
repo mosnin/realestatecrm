@@ -79,24 +79,14 @@ export default async function SetupPage({
   }
 
   // Broker-only users who are already set up — go straight to /broker
-  if (dbUser?.accountType === 'broker_only' && dbUser?.onboard) {
+  if (dbUser?.accountType === 'broker_only' && dbUser?.onboard && !dbUser?.space?.slug) {
     redirect('/broker');
   }
 
-  // Already has a workspace — check if broker first (brokers land on /broker)
+  // A brokerage role does not replace an existing personal business.
+  // Explicit brokerage setup remains available without recreating that business.
   if (dbUser?.space?.slug) {
-    // Check if this user is a broker — redirect to broker dashboard instead
-    if (dbUser?.id) {
-      const { data: brokerMembership } = await supabase
-        .from('BrokerageMembership')
-        .select('id')
-        .eq('userId', dbUser.id)
-        .in('role', ['broker_owner', 'broker_admin'])
-        .maybeSingle();
-      if (brokerMembership) {
-        redirect('/broker');
-      }
-    }
+    if (type === 'broker') redirect('/brokerage');
     redirect(`/s/${dbUser.space.slug}/chippi/brief`);
   }
 

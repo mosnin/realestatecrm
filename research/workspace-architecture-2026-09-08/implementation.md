@@ -18,3 +18,13 @@ Validation: full local CRM suite passed 6,727 tests with seven skipped before th
 Remaining architecture work: URL/request-bound brokerage identity for independent tabs; workspace-scoped unsaved draft behavior; explicit team record sharing; team handoff/ownership queues on CRM data; real-account role/revocation acceptance and existing Workforce billing/provider gates. The dashboard-responsibility table in decision.md describes the target, not three newly implemented complete dashboard experiences.
 
 Evidence review: `review-v2.md` and `independent-review-v2.json` retain the independent assessment. The packet remains needs_evidence because freshness and discovery/coverage are limited. The citation gap in the original claim c5 was corrected in v2. No churn, usability, or security certification is claimed.
+
+## Solo workspace follow-through
+
+A single known workspace now shows a static identity in the CRM shell. A second membership restores the existing grouped picker; directory failures keep the picker available instead of asserting that the account is solo. Workspace settings expose optional team creation/join and brokerage setup. Team links select the matching existing form directly. Personal onboarding finishes at Today.
+
+Post-login routing resolves personal and brokerage capabilities together and honors explicit brokerage intent. A brokerage role no longer steals the personal landing destination. Invited admins without personal workspaces retain brokerage access. Failed directory queries render a retry state rather than sending customers into setup. Existing personal workspaces also bypass repeated setup regardless of brokerage membership. No personal records are migrated or shared by these navigation changes. Personal Workforce remains independent of human-team membership, behind its existing deployment gates.
+
+Validation: 791 test files passed; 6,746 tests passed, seven skipped. TypeScript passed. Lint passed with existing warnings. Tenant scanner found no unscoped call sites across 961 files and 127 registered tables. Actual-component Chrome fixtures verified static solo identity, membership-driven picker appearance, grouped team access, Escape/focus restoration, settings links, and a 390px mobile layout with no horizontal overflow. Fixture memberships were synthetic; authenticated provisioning and production activation were not exercised. No migrations or provider changes were made.
+
+The architecture gaps listed above remain outstanding; this addition completes the solo navigation and landing behavior, not team CRM sharing or production Workforce rollout.
