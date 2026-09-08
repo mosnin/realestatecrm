@@ -34,3 +34,12 @@ describe('native CRM workforce boundary', () => {
     await expect(queryWorkforceCrm(principal, 'clerk-user', { operation: 'catalog' }, signal)).rejects.toThrow('policy mismatch');
   });
 });
+
+it('does not expose private CRM data through a shared team account', async () => {
+  const team = { ...principal, kind: 'team' as const, role: 'member' as const };
+  expect(await queryWorkforceCrm(team, 'clerk-user', { operation: 'catalog' }, signal)).toEqual({ tools: [] });
+  expect(await queryWorkforceCrm(team, 'clerk-user', { operation: 'workspaces' }, signal)).toEqual({ workspaces: [] });
+  await expect(queryWorkforceCrm(team, 'clerk-user', { operation: 'query', tool: 'list_contacts', spaceId: 'private' }, signal)).rejects.toThrow('not shared');
+  expect(from).not.toHaveBeenCalled();
+  expect(execute).not.toHaveBeenCalled();
+});

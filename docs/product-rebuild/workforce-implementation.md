@@ -1,7 +1,7 @@
 # Chippi Workforce implementation
 
 This change integrates the original Cadre client and execution code. The parent
-repository pins `mosnin/cadre` at `60d2307fa846635ce94d8c96f75557eca0b876d3`
+repository pins `mosnin/cadre` at `3ead9d8406360edc0fcc87f4dae11fb733d0231c`
 on `codex/chippi-workforce`. It does
 not replace CRM routes or the logged-out Chippi website. The deployment flags
 remain off until the remaining release gates below are met.
@@ -133,3 +133,7 @@ hosted acceptance. The flags stay off while these concrete gates remain.
 - Desktop and mobile checks used the internal browser, with no browser errors.
   CI now has an isolated two-viewport browser test and screenshot artifact job;
   its remote result is separate from the completed local browser checks.
+
+## Collaborative accounts and live infrastructure follow-up
+
+See [collaborative-teams-2026-09-08.md](collaborative-teams-2026-09-08.md) for team membership, sponsorship, shared-machine authority, and verification. The dedicated blueprint now selects Fly, matching the inspected live Cadre configuration; the original Modal adapter remains available. The Render workspace is confirmed and dedicated resources have been created. Hosted acceptance and CRM migration gates still apply.

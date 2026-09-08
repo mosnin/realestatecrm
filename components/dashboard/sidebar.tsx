@@ -663,6 +663,7 @@ function WorkspaceSwitcherRows({
         );
       })}
       <div className="my-1 mx-1 h-px bg-border/60" />
+      {process.env.NEXT_PUBLIC_CHIPPI_WORKFORCE_ENABLED === 'true' && <Link href="/teams" className="flex h-9 items-center gap-2 rounded-md px-2 text-[12px] text-foreground/70 hover:bg-foreground/[0.05]">Teams</Link>}
       <Link
         href="/brokerage"
         className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"

@@ -8,6 +8,11 @@ import type { WorkforcePrincipal } from '@/integrations/cadre/packages/core/src/
 // Explicit tenant-safe queries; adding a registry tool does not automatically expose it to workers.
 export const WORKFORCE_CRM_QUERIES = ['list_contacts', 'find_person', 'find_deal', 'find_tours', 'find_property', 'pipeline_summary', 'workspace_stats', 'find_stuck_deals', 'find_quiet_hot_persons', 'find_overdue_followups'] as const;
 export async function queryWorkforceCrm(principal: WorkforcePrincipal, clerkId: string, input: { operation?: string; tool?: string; args?: unknown; spaceId?: string }, signal: AbortSignal) {
+  if (principal.kind === 'team') {
+    if (input.operation === 'catalog') return { tools: [] };
+    if (input.operation === 'workspaces') return { workspaces: [] };
+    throw new Error('CRM records are not shared with this team');
+  }
   if (input.operation === 'catalog') {
     return { tools: WORKFORCE_CRM_QUERIES.map(name => {
       const tool = getTool(name);
