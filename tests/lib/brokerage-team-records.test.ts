@@ -43,6 +43,16 @@ beforeEach(()=>{
  };
 });
 describe('brokerage records explicitly shared with a team',()=>{
+ it('exposes write permission only with both the feature and an explicit manager grant',async()=>{
+  vi.stubEnv('CHIPPI_TEAM_RECORD_EDITS_ENABLED','true');state.tables.Contact[0].updatedAt='2026-09-08T12:00:00Z';
+  expect((await listBrokerageRecords('team-a','viewer')).records[0]).not.toHaveProperty('canEdit');
+  state.tables.BrokerageTeamRecordGrant[0].canEdit=true;
+  expect((await listBrokerageRecords('team-a','viewer')).records[0]).toMatchObject({canEdit:true,revision:'2026-09-08T12:00:00Z'});
+  state.tables.BrokerageMembership[1].role='broker_admin';
+  await shareBrokerageRecord('team-a','viewer',{kind:'contact',recordId:'person-a',allowEdits:false});
+  expect(state.tables.BrokerageTeamRecordGrant[0].canEdit).toBe(false);
+ });
+
  it('preserves existing team sharing before the new migration is activated',async()=>{
   vi.stubEnv('CHIPPI_BROKERAGE_TEAM_SHARING_ENABLED','false');
   expect(await listBrokerageRecords('team-a','viewer')).toEqual({records:[],nextOffset:null});

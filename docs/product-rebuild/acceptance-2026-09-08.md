@@ -195,3 +195,43 @@ from its actual rendered header.
 This closes the implementation gap for read-only brokerage-owned sharing,
 not delegated record editing or live team/provider acceptance. Those remain
 outstanding alongside automatic escalation and agent-initiated team mutations.
+
+## Explicit delegated edits
+
+Team sharing now offers an owner-controlled edit opt-in, disabled by default.
+Delegated fields are limited to contact identity details, deal title/value/close
+date, and property address/city/price/bedrooms/bathrooms. Notes, messages,
+commission details, deal stage and listing status cannot be edited through this
+surface. Selecting a different record, source or record type resets the opt-in.
+The editor preserves a failed save and reuses its request identity on retry;
+unsaved edits recover within the authenticated actor/team's current browser tab.
+
+The service-only `edit_team_shared_record` transaction rechecks and locks current
+team membership, sponsor authority, source ownership and the explicit write
+grant. It checks the source revision and atomically saves the update and its
+receipt. Repeating the same request returns that receipt without applying the
+update again. An in-progress revocation wins before a subsequent edit. Source
+workspace search-index refresh is best effort after the transaction; it does
+not copy private source fields into a team index.
+
+Local validation: TypeScript and lint pass; 809 web test files pass with 6,878
+passed tests and seven skipped. All 55 script checks pass; tenant scope covers
+971 files and 131 registered tables. The new disposable PostgreSQL fixture
+passes migration reapplication, personal/brokerage edits, stale revisions,
+request replay, private-field rejection, revoked grants, removed/offboarded
+members, demoted brokerage management, source transfers, concurrent revocation,
+and rollback when receipt persistence fails. React tests exercise failed-save
+retries and draft recovery. These are local tests, not live multi-role acceptance.
+
+Apply `20260924000000_team_record_edits.sql` after both sharing migrations using
+the release workflow, then enable `CHIPPI_TEAM_RECORD_EDITS_ENABLED` in the
+acceptance environment. Brokerage editing also requires its sharing flag.
+No production migration or feature activation has been performed here. A stale
+source revision requires a refresh; draft recovery does not reconcile edits
+against a changed source baseline. Revoked users cannot retrieve old receipts.
+
+The preceding brokerage-sharing commit passed all GitHub jobs and the main
+preview deployment. The separate staging deployment again failed before build
+with `Resource provisioning failed`. Team agent mutations, automatic escalation,
+populated hosted/provider acceptance and signed-in/notarized Mac acceptance
+remain outstanding; this change must not be represented as completing them.

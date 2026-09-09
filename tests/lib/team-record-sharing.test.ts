@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 type Row = Record<string, any>;
 const state = vi.hoisted(() => ({ tables: {} as Record<string, Row[]>, actorRole: 'member', denyActor: false, failTable: '', calls: [] as {table:string; filters:[string,unknown][]; mode:string}[] }));
@@ -29,7 +29,9 @@ vi.mock('@/lib/supabase', () => ({supabase:{from(table:string){
   return query;
 }}}));
 import { listSharedRecords, revokeRecord, shareRecord, sharingCandidates } from '@/lib/teams/shared-records';
+afterEach(()=>vi.unstubAllEnvs());
 beforeEach(()=>{
+  vi.stubEnv('CHIPPI_TEAM_RECORD_EDITS_ENABLED','false');
   state.actorRole='member';state.denyActor=false;state.failTable='';state.calls=[];
   state.tables={
     TeamRecordGrant:[{id:'grant-a',teamId:'team-a',spaceId:'space-a',recordKind:'contact',recordId:'person-a',grantedBy:'owner',revokedAt:null}],
@@ -41,6 +43,22 @@ beforeEach(()=>{
   };
 });
 describe('explicit team record sharing',()=>{
+  it('requires explicit owner permission before exposing editing or a revision',async()=>{
+    state.tables.Contact[0].updatedAt='2026-09-08T12:00:00Z';state.tables.TeamRecordGrant[0].canEdit=true;
+    expect((await listSharedRecords('team-a','viewer')).records[0]).not.toHaveProperty('canEdit');
+    vi.stubEnv('CHIPPI_TEAM_RECORD_EDITS_ENABLED','true');
+    expect((await listSharedRecords('team-a','viewer')).records[0]).toMatchObject({canEdit:true,revision:'2026-09-08T12:00:00Z'});
+    state.tables.TeamRecordGrant[0].canEdit=false;
+    expect((await listSharedRecords('team-a','viewer')).records[0]).not.toHaveProperty('revision');
+  });
+  it('lets the source owner explicitly opt in and later remove write permission',async()=>{
+    const input={spaceId:'space-viewer',kind:'contact' as const,recordId:'person-viewer',allowEdits:true};
+    await expect(shareRecord('team-a','viewer',input)).rejects.toThrow('not enabled');
+    vi.stubEnv('CHIPPI_TEAM_RECORD_EDITS_ENABLED','true');await shareRecord('team-a','viewer',input);
+    expect(state.tables.TeamRecordGrant[1].canEdit).toBe(true);
+    await shareRecord('team-a','viewer',{...input,allowEdits:false});expect(state.tables.TeamRecordGrant[1].canEdit).toBe(false);
+  });
+
   it('returns only granted rows and allowed fields, with exact source-space filters',async()=>{
     const result=await listSharedRecords('team-a','viewer');
     expect(result.records).toEqual([{grantId:'grant-a',kind:'contact',title:'Alex',fields:{name:'Alex',email:'alex@example.test',phone:null,leadType:'buyer'},canRevoke:false}]);

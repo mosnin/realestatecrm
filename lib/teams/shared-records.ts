@@ -9,8 +9,9 @@ import { RECORD_KINDS, SHARED_RECORD_FIELDS, type RecordKind } from './record-fi
 export { RECORD_KINDS, SHARED_RECORD_FIELDS, type RecordKind } from './record-fields';
 const grants = () => unscoped(supabase.from('TeamRecordGrant'), 'team membership validated before reading explicit record grants across spaces');
 const PAGE_SIZE = 25;
-type Grant = { id: string; teamId: string; spaceId: string; recordKind: RecordKind; recordId: string; grantedBy: string };
-export type SharedRecord = { grantId: string; kind: RecordKind; title: string; fields: Record<string, unknown>; canRevoke: boolean; source?: 'brokerage' };
+const editingEnabled=()=>process.env.CHIPPI_TEAM_RECORD_EDITS_ENABLED==='true';
+type Grant = { id: string; teamId: string; spaceId: string; recordKind: RecordKind; recordId: string; grantedBy: string; canEdit?: boolean };
+export type SharedRecord = { grantId: string; kind: RecordKind; title: string; fields: Record<string, unknown>; canRevoke: boolean; source?: 'brokerage'; canEdit?: boolean; revision?: string };
 
 async function ownedSpace(spaceId: string, actorId: string) {
   const result = await supabase.from('Space').select('id, name').eq('id', spaceId).eq('ownerId', actorId).maybeSingle();
@@ -20,19 +21,20 @@ async function ownedSpace(spaceId: string, actorId: string) {
 async function readRecord(spaceId: string, kind: RecordKind, recordId: string) {
   const policy = SHARED_RECORD_FIELDS[kind];
   if (!policy) throw new Error('Unsupported record type');
-  let query = tenantTable(supabase, policy.table, { spaceId }).select(policy.columns).eq('id', recordId);
+  let query = tenantTable(supabase, policy.table, { spaceId }).select(policy.columns+(editingEnabled()?', updatedAt':'')).eq('id', recordId);
   if (kind !== 'deal') query = query.is('brokerageId', null); // Assignment is not ownership of brokerage-pool records.
   const result = await query.maybeSingle();
   if (result.error) throw new Error('Record unavailable');
   return result.data as Record<string, unknown> | null;
 }
-export async function shareRecord(teamId: string, actorId: string, input: { spaceId: string; kind: RecordKind; recordId: string }) {
+export async function shareRecord(teamId: string, actorId: string, input: { spaceId: string; kind: RecordKind; recordId: string; allowEdits?: boolean }) {
+  if(input.allowEdits&&!editingEnabled())throw new Error('Team editing is not enabled');
   await teamAccess(teamId, actorId);
   await ownedSpace(input.spaceId, actorId);
   if (!(await readRecord(input.spaceId, input.kind, input.recordId))) throw new Error('Record unavailable');
   const result = await tenantTable(supabase, 'TeamRecordGrant', { spaceId: input.spaceId }).upsert({
     teamId, spaceId: input.spaceId, recordKind: input.kind, recordId: input.recordId,
-    grantedBy: actorId, revokedAt: null, createdAt: new Date().toISOString(),
+    grantedBy: actorId, ...(editingEnabled()?{canEdit:input.allowEdits??false}:{}), revokedAt: null, createdAt: new Date().toISOString(),
   }, { onConflict: 'teamId,spaceId,recordKind,recordId' }).select('id').single();
   if (result.error) throw new Error('Record could not be shared');
   return result.data;
@@ -51,13 +53,13 @@ export async function listSharedRecords(teamId: string, actorId: string, input: 
   const access = await teamAccess(teamId, actorId);
   const offset = input.offset ?? 0;
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) throw new Error('Invalid page');
-  let query = grants().select('id, teamId, spaceId, recordKind, recordId, grantedBy').eq('teamId', teamId).is('revokedAt', null);
+  let query = grants().select('id, teamId, spaceId, recordKind, recordId, grantedBy'+(editingEnabled()?', canEdit':'')).eq('teamId', teamId).is('revokedAt', null);
   if (input.kind) query = query.eq('recordKind', input.kind);
   const result = await query.order('createdAt', { ascending: false }).order('id').range(offset, offset + PAGE_SIZE - 1);
   if (result.error) throw new Error('Shared records unavailable');
   const liveOwners = new Map<string, Promise<boolean>>();
   const records: SharedRecord[] = [];
-  for (const grant of (result.data ?? []) as Grant[]) {
+  for (const grant of (result.data ?? []) as unknown as Grant[]) {
     const key = `${grant.grantedBy}:${grant.spaceId}`;
     if (!liveOwners.has(key)) liveOwners.set(key, (async () => {
       // Removal, offboarding, or transfer of the source workspace ends the grant.
@@ -78,10 +80,10 @@ export async function listSharedRecords(teamId: string, actorId: string, input: 
     if (!record) continue;
     const fields = Object.fromEntries(SHARED_RECORD_FIELDS[grant.recordKind].columns.split(', ').filter(key => key !== 'id').map(key => [key, record[key] ?? null]));
     records.push({ grantId: grant.id, kind: grant.recordKind, title: String(record[SHARED_RECORD_FIELDS[grant.recordKind].title] ?? 'Untitled'), fields,
-      canRevoke: grant.grantedBy === actorId || access.role === 'owner' });
+      canRevoke: grant.grantedBy === actorId || access.role === 'owner', ...(editingEnabled()&&grant.canEdit&&typeof record.updatedAt==='string'?{canEdit:true,revision:record.updatedAt}:{}) });
   }
   const brokerage=await listBrokerageRecords(teamId,actorId,input);
-  return { records:[...records,...brokerage.records], brokerageSharingAvailable:await brokerageSharingAvailable(teamId,actorId), nextOffset: (result.data?.length ?? 0) === PAGE_SIZE || brokerage.nextOffset!==null ? offset + PAGE_SIZE : null };
+  return { records:[...records,...brokerage.records], brokerageSharingAvailable:await brokerageSharingAvailable(teamId,actorId), editingAvailable:editingEnabled(), nextOffset: (result.data?.length ?? 0) === PAGE_SIZE || brokerage.nextOffset!==null ? offset + PAGE_SIZE : null };
 }
 
 export async function sharingCandidates(teamId: string, actorId: string, input: { spaceId?: string; kind: RecordKind; search?: string; offset?: number }) {

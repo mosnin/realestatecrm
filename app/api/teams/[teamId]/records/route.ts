@@ -1,17 +1,20 @@
 import { auth } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { resolveWorkforceScope } from '@/lib/workforce/scope';
 import { listSharedRecords, RECORD_KINDS, revokeRecord, shareRecord, sharingCandidates } from '@/lib/teams/shared-records';
 import { readJsonWithLimit, BODY_LIMITS } from '@/lib/validation';
 import { checkRateLimit } from '@/lib/rate-limit';
 import {brokerageCandidates,shareBrokerageRecord,revokeBrokerageRecord} from '@/lib/teams/brokerage-records';
+import {recordEditRequest} from '@/lib/teams/record-edit-policy';
+import {editSharedRecord,TeamRecordEditError,refreshEditedRecordIndex} from '@/lib/teams/record-edits';
 import { audit } from '@/lib/audit';
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,150}$/);
 const kind = z.enum(RECORD_KINDS);
 const bodySchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('share'), spaceId: id, kind, recordId: id }).strict(),
-  z.object({ action: z.literal('share_brokerage'), kind, recordId: id }).strict(),
+  recordEditRequest.extend({action:z.literal('edit')}).strict(),
+  z.object({ action: z.literal('share'), spaceId: id, kind, recordId: id, allowEdits:z.boolean().optional() }).strict(),
+  z.object({ action: z.literal('share_brokerage'), kind, recordId: id, allowEdits:z.boolean().optional() }).strict(),
   z.object({ action: z.literal('revoke_brokerage'), grantId: z.string().uuid() }).strict(),
   z.object({ action: z.literal('revoke'), grantId: z.string().uuid() }).strict(),
 ]);
@@ -27,6 +30,7 @@ async function authority(context: Context) {
   return { userId, teamId, scope };
 }
 function failure(error: unknown) {
+  if(error instanceof TeamRecordEditError)return NextResponse.json({error:error.message},{status:error.status,headers:{'Cache-Control':'no-store'}});
   const message = error instanceof Error ? error.message : '';
   return NextResponse.json({ error: message === 'disabled' ? 'Team sharing is not enabled' : 'Shared records are unavailable. Check your access and try again.' },
     { status: message === 'disabled' ? 404 : message === 'unauthenticated' ? 401 : 403, headers: { 'Cache-Control': 'no-store' } });
@@ -54,7 +58,13 @@ export async function POST(request: Request, context: Context) {
     const parsed = bodySchema.safeParse(read.data);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     const input = parsed.data;
-    if (input.action === 'share') {
+    if(input.action==='edit') {
+      const {action,...edit}=input;
+      const result=await editSharedRecord(teamId,scope.principal.actorId,edit);
+      const refresh=refreshEditedRecordIndex(result).catch(error=>console.error('[team-records] source index refresh failed',{recordId:result.recordId,error}));
+      after(()=>refresh);
+      await audit({actorClerkId:userId,action:'UPDATE',resource:'TeamRecordEdit',resourceId:result.id,spaceId:result.spaceId??undefined,metadata:{teamId,recordKind:result.recordKind,recordId:result.recordId}});
+    } else if (input.action === 'share') {
       const grant = await shareRecord(teamId, scope.principal.actorId, input);
       await audit({ actorClerkId: userId, action: 'CREATE', resource: 'TeamRecordGrant', resourceId: grant.id, spaceId: input.spaceId, metadata: { teamId, recordKind: input.kind, recordId: input.recordId } });
     } else if(input.action==='share_brokerage') {

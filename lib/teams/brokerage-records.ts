@@ -6,6 +6,7 @@ import {teamAccess} from './server';
 import {SHARED_RECORD_FIELDS,type RecordKind} from './record-fields';
 import type {SharedRecord} from './shared-records';
 
+const editingEnabled=()=>process.env.CHIPPI_TEAM_RECORD_EDITS_ENABLED==='true';
 function enabled(){return process.env.CHIPPI_BROKERAGE_TEAM_SHARING_ENABLED==='true';}
 function requireEnabled(){if(!enabled())throw new Error('Brokerage team sharing is not enabled');}
 
@@ -19,7 +20,7 @@ function recordQuery(brokerageId:string,kind:RecordKind) {
   if(!policy)throw new Error('Unsupported record type');
   // Contacts/properties can have nullable spaceId. Deals inherit brokerage
   // scope through their Space FK. Neither path treats assignment as ownership.
-  const query=unscoped(supabase.from(policy.table),'explicit brokerage grant and current team membership checked; record query binds brokerage ownership').select(policy.columns+(kind==='deal'?', Space!inner(brokerageId)':''));
+  const query=unscoped(supabase.from(policy.table),'explicit brokerage grant and current team membership checked; record query binds brokerage ownership').select(policy.columns+(editingEnabled()?', updatedAt':'')+(kind==='deal'?', Space!inner(brokerageId)':''));
   return kind==='deal'?query.eq('Space.brokerageId',brokerageId):query.eq('brokerageId',brokerageId);
 }
 function allowedFields(kind:RecordKind,record:Record<string,unknown>) {
@@ -42,13 +43,14 @@ export async function brokerageCandidates(teamId:string,actorId:string,input:{ki
   if(error)throw new Error('Brokerage records unavailable');
   return {spaces:[],spaceId:null,records:(data??[]).map(row=>allowedFields(input.kind,row as unknown as Record<string,unknown>)),nextOffset:data?.length===25?offset+25:null};
 }
-export async function shareBrokerageRecord(teamId:string,actorId:string,input:{kind:RecordKind;recordId:string}) {
+export async function shareBrokerageRecord(teamId:string,actorId:string,input:{kind:RecordKind;recordId:string;allowEdits?:boolean}) {
   requireEnabled();
   const {team}=await teamAccess(teamId,actorId);
   if(team.parentKind!=='brokerage'||!await manager(team.parentRouteId,actorId))throw new Error('Only brokerage managers can share brokerage records');
+  if(input.allowEdits&&!editingEnabled())throw new Error('Team editing is not enabled');
   const record=await recordQuery(team.parentRouteId,input.kind).eq('id',input.recordId).maybeSingle();
   if(record.error||!record.data)throw new Error('Brokerage record unavailable');
-  const {data,error}=await tenantTable(supabase,'BrokerageTeamRecordGrant',{brokerageId:team.parentRouteId}).upsert({teamId,brokerageId:team.parentRouteId,recordKind:input.kind,recordId:input.recordId,grantedBy:actorId,revokedAt:null,createdAt:new Date().toISOString()},{onConflict:'teamId,brokerageId,recordKind,recordId'}).select('id').single();
+  const {data,error}=await tenantTable(supabase,'BrokerageTeamRecordGrant',{brokerageId:team.parentRouteId}).upsert({teamId,brokerageId:team.parentRouteId,recordKind:input.kind,recordId:input.recordId,grantedBy:actorId,...(editingEnabled()?{canEdit:input.allowEdits??false}:{}),revokedAt:null,createdAt:new Date().toISOString()},{onConflict:'teamId,brokerageId,recordKind,recordId'}).select('id').single();
   if(error)throw new Error('Brokerage record could not be shared');
   return {id:data.id,brokerageId:team.parentRouteId};
 }
@@ -70,7 +72,7 @@ export async function listBrokerageRecords(teamId:string,actorId:string,input:{o
   if(team.parentKind!=='brokerage')return {records:[] as SharedRecord[],nextOffset:null};
   const offset=input.offset??0;
   if(!Number.isSafeInteger(offset)||offset<0||offset>100000)throw new Error('Invalid page');
-  let query=tenantTable(supabase,'BrokerageTeamRecordGrant',{brokerageId:team.parentRouteId}).select('id, recordKind, recordId, grantedBy').eq('teamId',teamId).is('revokedAt',null);
+  let query=tenantTable(supabase,'BrokerageTeamRecordGrant',{brokerageId:team.parentRouteId}).select('id, recordKind, recordId, grantedBy'+(editingEnabled()?', canEdit':'')).eq('teamId',teamId).is('revokedAt',null);
   if(input.kind)query=query.eq('recordKind',input.kind);
   const {data,error}=await query.order('createdAt',{ascending:false}).order('id').range(offset,offset+24);
   if(error)throw new Error('Brokerage shares unavailable');
@@ -95,7 +97,7 @@ export async function listBrokerageRecords(teamId:string,actorId:string,input:{o
     if(record.error)throw new Error('Brokerage record unavailable');
     if(!record.data)continue;
     const fields=allowedFields(kind,record.data as unknown as Record<string,unknown>);delete fields.id;
-    records.push({grantId:grant.id,kind,title:String(fields[SHARED_RECORD_FIELDS[kind].title]??'Untitled'),fields,source:'brokerage',canRevoke:viewerManager||role==='owner'||grant.grantedBy===actorId});
+    records.push({grantId:grant.id,kind,title:String(fields[SHARED_RECORD_FIELDS[kind].title]??'Untitled'),fields,source:'brokerage',canRevoke:viewerManager||role==='owner'||grant.grantedBy===actorId,...(editingEnabled()&&grant.canEdit&&typeof (record.data as any).updatedAt==='string'?{canEdit:true,revision:(record.data as any).updatedAt}:{})});
   }
   return {records,nextOffset:data?.length===25?offset+25:null};
 }

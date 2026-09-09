@@ -1,3 +1,4 @@
+import {FormDraftProvider} from '@/hooks/use-form-draft';
 import { auth } from '@clerk/nextjs/server';
 import { notFound, redirect } from 'next/navigation';
 import { resolveWorkforceScope } from '@/lib/workforce/scope';
@@ -10,5 +11,5 @@ export default async function SharedRecordsPage({ params }: { params: Promise<{ 
   const { teamId } = await params;
   let scope;
   try { scope = await resolveWorkforceScope('team', teamId, userId); } catch { notFound(); }
-  return <SharedRecordsClient teamId={teamId} teamName={scope.principal.name} />;
+  return <FormDraftProvider actorId={scope.principal.actorId} spaceId={`team:${teamId}`}><SharedRecordsClient teamId={teamId} teamName={scope.principal.name} /></FormDraftProvider>;
 }
