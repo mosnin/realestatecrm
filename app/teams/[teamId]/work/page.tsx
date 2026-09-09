@@ -1,3 +1,4 @@
+import {FormDraftProvider} from '@/hooks/use-form-draft';
 import {auth} from '@clerk/nextjs/server';
 import {notFound,redirect} from 'next/navigation';
 import {resolveWorkforceScope} from '@/lib/workforce/scope';
@@ -8,5 +9,5 @@ export default async function Page({params}:{params:Promise<{teamId:string}>}) {
   const {userId}=await auth();if(!userId)redirect('/login/realtor');
   const {teamId}=await params;
   let scope;try{scope=await resolveWorkforceScope('team',teamId,userId);}catch{notFound();}
-  return <TeamWorkClient key={teamId} teamId={teamId} name={scope.principal.name}/>;
+  return <FormDraftProvider actorId={scope.principal.actorId} spaceId={`team:${teamId}`}><TeamWorkClient key={teamId} teamId={teamId} name={scope.principal.name}/></FormDraftProvider>;
 }

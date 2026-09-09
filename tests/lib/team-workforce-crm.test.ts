@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only',()=>({}));
+vi.mock('@/lib/workforce/team-actions',()=>({executeTeamAction:vi.fn()}));
 const { shared, execute, work }=vi.hoisted(()=>({shared:vi.fn(),execute:vi.fn(),work:vi.fn()}));
 vi.mock('@/lib/teams/shared-records',()=>({listSharedRecords:shared,RECORD_KINDS:['contact','deal','property']}));
 vi.mock('@/lib/teams/work-items',()=>({listTeamWork:work}));

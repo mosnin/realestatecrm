@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { teamAccess, teamPeople, type TeamRole } from './server';
 
-export const workItemInput = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(4000).default(''), assignedTo: z.string().min(1).max(150), dueAt: z.string().datetime({offset:true}) }).strict();
+export const workItemInput = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(4000).default(''), assignedTo: z.string().min(1).max(150), dueAt: z.string().datetime({offset:true}), requestId:z.string().uuid().optional() }).strict();
 export const workItemUpdate = z.object({ id: z.string().uuid(), version: z.number().int().positive(), action: z.enum(['accept','complete','cancel','reassign']), assignedTo: z.string().min(1).max(150).optional() }).strict();
 export type TeamWorkItem = { id:string; teamId:string; createdBy:string; assignedTo:string; title:string; description:string; dueAt:string; status:'assigned'|'accepted'|'done'|'cancelled'; version:number; acknowledgedAt:string|null; completedAt:string|null };
 const table = (teamId:string) => tenantTable(supabase,'TeamWorkItem',{teamId});
@@ -49,8 +49,15 @@ export async function createTeamWork(teamId:string,actorId:string,input:z.infer<
   const {role}=await teamAccess(teamId,actorId);
   if(role==='member' && input.assignedTo!==actorId) throw new Error('Only team managers can assign work to someone else');
   await activeMember(teamId,input.assignedTo);
-  const {data,error}=await table(teamId).insert({id:randomUUID(),teamId,createdBy:actorId,...input}).select(fields).single();
-  if(error) throw new Error('Work could not be saved');
+  const {requestId,...details}=input;
+  const {data,error}=await table(teamId).insert({id:requestId??randomUUID(),teamId,createdBy:actorId,...details}).select(fields).single();
+  if(error?.code==='23505'&&requestId){
+    const previous=await table(teamId).select(fields).eq('id',requestId).eq('createdBy',actorId).maybeSingle();
+    const item=previous.data;
+    if(!previous.error&&item&&item.title===details.title&&item.description===details.description&&item.assignedTo===details.assignedTo&&Date.parse(item.dueAt)===Date.parse(details.dueAt))return item;
+    throw new Error('Request changed. Refresh before assigning work again.');
+  }
+  if(error||!data) throw new Error('Work could not be saved');
   return data;
 }
 export async function updateTeamWork(teamId:string,actorId:string,input:z.infer<typeof workItemUpdate>) {
@@ -62,4 +69,14 @@ export async function updateTeamWork(teamId:string,actorId:string,input:z.infer<
   const result=await table(teamId).update({...patch,version:input.version+1,updatedAt:new Date().toISOString()}).eq('id',input.id).eq('version',input.version).select(fields).maybeSingle();
   if(result.error || !result.data) throw new Error('Work changed. Refresh and try again.');
   return result.data;
+}
+
+/** Deadline-driven attention; resolved work disappears without a background-job race. */
+export async function teamWorkAttention(teamId:string,actorId:string) {
+  const {role}=await teamAccess(teamId,actorId);
+  let query=table(teamId).select('id',{count:'exact',head:true}).in('status',['assigned','accepted']).lt('dueAt',new Date().toISOString());
+  if(role==='member')query=query.eq('assignedTo',actorId);
+  const {count,error}=await query;
+  if(error||count===null)throw new Error('Team attention unavailable');
+  return {overdue:count,manager:role!=='member'};
 }

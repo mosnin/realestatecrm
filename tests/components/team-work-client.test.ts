@@ -5,13 +5,14 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 vi.mock('next/link',()=>({default:({children,...props}:any)=>React.createElement('a',props,children)}));
 vi.mock('@/components/ui/button',()=>({Button:({children,variant,...props}:any)=>React.createElement('button',props,children)}));
 vi.mock('@/components/ui/input',()=>({Input:(props:any)=>React.createElement('input',props)}));
+import {FormDraftProvider} from '@/hooks/use-form-draft';
 import {TeamWorkClient} from '@/app/teams/[teamId]/work/work-client';
 let root:ReturnType<typeof createRoot>,host:HTMLDivElement;
 const fetchMock=vi.fn();
 const item={id:'task-a',teamId:'team-a',createdBy:'manager',assignedTo:'agent',title:'Confirm inspection',description:'',dueAt:'2026-09-01T10:00:00Z',status:'assigned',version:1,acknowledgedAt:null,completedAt:null};
 const data={items:[item],role:'member',actorId:'agent',people:[{id:'agent',name:'Me'}],nextOffset:null};
 const response=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
-beforeEach(()=>{vi.stubGlobal('React',React);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.stubGlobal('fetch',fetchMock);fetchMock.mockReset();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
+beforeEach(()=>{vi.stubGlobal('React',React);vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.stubGlobal('fetch',fetchMock);fetchMock.mockReset();sessionStorage.clear();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
 async function mount(){await act(async()=>root.render(React.createElement(TeamWorkClient,{teamId:'team-a',name:'Team A'})));}
 async function click(label:string){const button=[...host.querySelectorAll('button')].find(button=>button.textContent===label);expect(button).toBeTruthy();await act(async()=>button!.click());}
@@ -31,4 +32,16 @@ it('queries completed work from the first page instead of filtering a partial pa
 });
 it('shows an explicit load failure with recovery',async()=>{
  fetchMock.mockResolvedValueOnce(response({},503)).mockResolvedValueOnce(response(data));await mount();expect(host.querySelector('[role="alert"]')).toBeTruthy();await click('Refresh');expect(host.querySelector('[role="alert"]')).toBeNull();expect(host.textContent).toContain('Confirm inspection');
+});
+
+it('recovers an unsaved assignment and reuses its identity after an uncertain save',async()=>{
+ fetchMock.mockImplementation(async(_url,init)=>init?.method==='POST'?response({},503):response(data));
+ const render=async()=>{await act(async()=>root.render(React.createElement(FormDraftProvider,{actorId:'agent',spaceId:'team:team-a',children:React.createElement(TeamWorkClient,{teamId:'team-a',name:'Team A'})})));};
+ const fill=async(selector:string,value:string)=>{const node=host.querySelector(selector)!;await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));});};
+ await render();await fill('input[maxlength="200"]','Follow up with inspector');await fill('input[type="datetime-local"]','2026-09-10T10:00');
+ await act(async()=>root.render(null));await render();expect(host.textContent).toContain('Your unsaved assignment was restored');
+ await click('Assign work');await click('Assign work');
+ const posts=fetchMock.mock.calls.filter(([,init])=>init?.method==='POST');expect(posts).toHaveLength(2);
+ const first=JSON.parse(posts[0][1].body);expect(JSON.parse(posts[1][1].body)).toEqual(first);expect(first).toMatchObject({title:'Follow up with inspector',requestId:expect.any(String)});
+ expect(host.querySelector<HTMLInputElement>('input[maxlength="200"]')!.value).toBe('Follow up with inspector');
 });

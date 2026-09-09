@@ -1,3 +1,4 @@
+import { teamWorkAttention } from '@/lib/teams/work-items';
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -19,8 +20,20 @@ export async function GET(req: Request) {
   try {
     const user = await teamUser(userId);
     const teamId = new URL(req.url).searchParams.get('teamId');
-    if (teamId) return NextResponse.json(await teamMembers(id.parse(teamId), user.id));
-    return NextResponse.json({ teams: await listTeams(user.id), parents: (await listWorkforceScopes(userId)).filter(scope => !scope.href.startsWith('/workforce/team/')) });
+    if (teamId) {
+      await resolveWorkforceScope('team',id.parse(teamId),userId);
+      return NextResponse.json(await teamMembers(teamId, user.id),{headers:{'Cache-Control':'no-store'}});
+    }
+    const teams=await listTeams(user.id);
+    const visible=[];
+    for(const team of teams){
+      try{await resolveWorkforceScope('team',team.id,userId);}catch{continue;}
+      // An unavailable counter stays unknown; never present an outage as zero overdue work.
+      let attention=null;
+      if(process.env.CHIPPI_TEAM_CRM_ENABLED==='true')try{attention=await teamWorkAttention(team.id,user.id);}catch{}
+      visible.push({...team,attention});
+    }
+    return NextResponse.json({ teams:visible, parents: (await listWorkforceScopes(userId)).filter(scope => !scope.href.startsWith('/workforce/team/')) },{headers:{'Cache-Control':'no-store'}});
   } catch { return NextResponse.json({ error: 'Teams unavailable' }, { status: 403 }); }
 }
 export async function POST(req: Request) {
@@ -44,6 +57,7 @@ export async function POST(req: Request) {
       await resolveWorkforceScope('team', body.teamId, userId);
       return NextResponse.json(await inviteTeam(body.teamId, user.id));
     }
+    await resolveWorkforceScope('team',body.teamId,userId);
     await changeTeamMember(body.teamId, user.id, body.userId, body.role);
     return NextResponse.json({ success: true });
   } catch { return NextResponse.json({ error: 'Team action unavailable. Check your access and try again.' }, { status: 403 }); }

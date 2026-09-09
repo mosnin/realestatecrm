@@ -1,3 +1,4 @@
+import {executeTeamAction} from './team-actions';
 import { listTeamWork } from '@/lib/teams/work-items';
 import { listSharedRecords, RECORD_KINDS } from '@/lib/teams/shared-records';
 import 'server-only';
@@ -10,6 +11,7 @@ import type { WorkforcePrincipal } from '@/integrations/cadre/packages/core/src/
 // Explicit tenant-safe queries; adding a registry tool does not automatically expose it to workers.
 export const WORKFORCE_CRM_QUERIES = ['list_contacts', 'find_person', 'find_deal', 'find_tours', 'find_property', 'pipeline_summary', 'workspace_stats', 'find_stuck_deals', 'find_quiet_hot_persons', 'find_overdue_followups'] as const;
 export async function queryWorkforceCrm(principal: WorkforcePrincipal, clerkId: string, input: { operation?: string; tool?: string; args?: unknown; spaceId?: string }, signal: AbortSignal) {
+  if(input.operation==='action'||input.operation==='action_catalog')return executeTeamAction(principal,clerkId,input,signal);
   if (principal.kind === 'team' && process.env.CHIPPI_TEAM_CRM_ENABLED === 'true') {
     const parameters = z.object({ kind: z.enum(RECORD_KINDS).optional(), offset: z.number().int().min(0).max(100000).optional() }).strict();
     const workParameters = z.object({ offset: z.number().int().min(0).max(100000).default(0), closed: z.boolean().default(false) }).strict();

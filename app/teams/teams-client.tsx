@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Users, ArrowRight, Plus } from 'lucide-react';
-type Team = { id: string; name: string; role: 'owner' | 'admin' | 'member' };
+type Team = { id: string; name: string; role: 'owner' | 'admin' | 'member'; attention?:{overdue:number;manager:boolean}|null };
 type Parent = { name: string; href: string; role: string };
 type Member = { userId: string; role: 'admin' | 'member'; User: { name: string } | { name: string }[] | null };
 export function TeamsClient({ initialMode = null, sharedRecordsEnabled = false }: { initialMode?: 'create' | 'join' | null; sharedRecordsEnabled?: boolean }) {
@@ -21,19 +21,24 @@ export function TeamsClient({ initialMode = null, sharedRecordsEnabled = false }
   const [invite, setInvite] = useState<{ teamId: string; code: string } | null>(null);
   const [selected, setSelected] = useState<Team | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (background = false) => {
+    if(!background)setLoading(true);
     setError('');
     try {
       const response = await fetch('/api/teams', { cache: 'no-store' });
       if (!response.ok) throw new Error('Your teams could not be loaded.');
       const data = await response.json();
       setTeams(data.teams); setParents(data.parents);
-      setParent(current => current || data.parents[0]?.href || '');
+      setParent(current => data.parents.some((item:Parent)=>item.href===current)?current:data.parents[0]?.href||'');
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(()=>{
+    const check=()=>{if(!busy&&document.visibilityState==='visible')void refresh(true);};
+    const timer=setInterval(check,60000);document.addEventListener('visibilitychange',check);
+    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',check);};
+  },[busy,refresh]);
   async function action(body: Record<string, unknown>) {
     setBusy(true); setError('');
     try {
@@ -76,7 +81,7 @@ export function TeamsClient({ initialMode = null, sharedRecordsEnabled = false }
         <div className="flex gap-2"><Button disabled={busy || (mode === 'create' && !parent)}>{busy ? 'Saving…' : mode === 'create' ? 'Create team' : 'Join team'}</Button><Button type="button" variant="ghost" onClick={() => setMode(null)}>Cancel</Button></div>
       </form>}
       {loading ? <p role="status" className="text-sm text-muted-foreground">Loading teams…</p> : teams.length === 0 ? <div className="rounded-xl border border-dashed p-10 text-center"><Users className="mx-auto mb-3 text-muted-foreground" size={24} /><h2 className="font-medium">Bring your team together</h2><p className="mt-2 text-sm text-muted-foreground">Create a workspace or join with an invitation code.</p></div> : <div className="divide-y rounded-xl border bg-card">{teams.map(team => <section key={team.id} className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 max-w-full"><h2 className="break-words font-medium">{team.name}</h2><p className="mt-1 text-xs capitalize text-muted-foreground">{team.role}</p></div><div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div className="min-w-0 max-w-full"><h2 className="break-words font-medium">{team.name}</h2><p className="mt-1 text-xs capitalize text-muted-foreground">{team.role}</p>{sharedRecordsEnabled&&team.attention&&team.attention.overdue>0&&<Link href={`/teams/${encodeURIComponent(team.id)}/work`} className="mt-2 block text-sm text-destructive">{team.attention.overdue} overdue {team.attention.overdue===1?'action':'actions'}{team.attention.manager?' · Review team work':' · Needs your attention'}</Link>}{sharedRecordsEnabled&&team.attention===null&&<p className="mt-2 text-xs text-muted-foreground">Work status unavailable</p>}</div><div className="flex flex-wrap gap-2">
           {team.role !== 'member' && <><Button variant="ghost" disabled={busy} onClick={() => void manage(team)}>Members</Button><Button variant="outline" disabled={busy} onClick={async () => { const data = await action({ action: 'invite', teamId: team.id }); if (data) setInvite({ teamId: team.id, code: data.code }); }}>Invite</Button></>}
           {sharedRecordsEnabled && <Button variant="outline" asChild><Link href={`/teams/${encodeURIComponent(team.id)}/work`}>Team work</Link></Button>}
           {sharedRecordsEnabled && <Button variant="outline" asChild><Link href={`/teams/${encodeURIComponent(team.id)}/records`}>Shared records</Link></Button>}

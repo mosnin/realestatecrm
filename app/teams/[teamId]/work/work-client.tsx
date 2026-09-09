@@ -4,6 +4,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {useFormDraft} from '@/hooks/use-form-draft';
 import {useUnsavedChanges} from '@/hooks/use-unsaved-changes';
 import type {TeamWorkItem} from '@/lib/teams/work-items';
 const statusLabels={assigned:'Awaiting acknowledgment',accepted:'In progress',done:'Completed',cancelled:'Cancelled'};
@@ -11,6 +12,8 @@ type Data={items:TeamWorkItem[];role:string;actorId:string;people:{id:string;nam
 export function TeamWorkClient({teamId,name}:{teamId:string;name:string}) {
   const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[offset,setOffset]=useState(0),[closed,setClosed]=useState(false);
   const [title,setTitle]=useState(''),[due,setDue]=useState(''),[assignee,setAssignee]=useState('');
+  const [requestId,setRequestId]=useState('');
+  const draft=useFormDraft('team-work-new',{title,due,assignee,requestId},value=>{setTitle(value.title);setDue(value.due);setAssignee(value.assignee);setRequestId(value.requestId);},{title:'',due:'',assignee:'',requestId:''});
   useUnsavedChanges(Boolean(title||due));
   const endpoint=`/api/teams/${encodeURIComponent(teamId)}/work`;
   const requestVersion=useRef(0);
@@ -22,7 +25,7 @@ export function TeamWorkClient({teamId,name}:{teamId:string;name:string}) {
   useEffect(()=>{setData(null);void load();return()=>{requestVersion.current++;};},[load]);
   async function save(body:object,update=false) {
     setBusy(true);setError('');
-    try{const res=await fetch(endpoint,{method:update?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!res.ok)throw new Error('Could not save. Work or permissions may have changed. Refresh and try again.');if(!update){setTitle('');setDue('');}await load();}
+    try{const res=await fetch(endpoint,{method:update?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!res.ok)throw new Error('Could not save. Work or permissions may have changed. Refresh and try again.');if(!update){draft.clear();setTitle('');setDue('');setAssignee('');setRequestId('');}await load();}
     catch(e){setError(e instanceof Error?e.message:'Could not save');}finally{setBusy(false);}
   }
   return <main className="app-theme min-h-screen bg-background text-foreground"><div className="mx-auto max-w-5xl space-y-6 px-5 py-8">
@@ -30,10 +33,11 @@ export function TeamWorkClient({teamId,name}:{teamId:string;name:string}) {
     <header><p className="text-sm text-muted-foreground">{name}</p><h1 className="text-2xl font-semibold">Team work</h1><p className="mt-2 text-sm text-muted-foreground">One owner and one due date for every next step.</p></header>
     {error&&<div role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm">{error}<Button variant="ghost" disabled={busy} onClick={()=>void load()}>Refresh</Button></div>}
     {!data?<p role="status">Loading team work…</p>:<>
-      <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void save({title,assignedTo:assignee||data.actorId,dueAt:new Date(due).toISOString()});}}>
-        <label className="text-sm">Next action<Input disabled={busy} required maxLength={200} value={title} onChange={e=>setTitle(e.target.value)}/></label>
-        <label className="text-sm">Due date<Input disabled={busy} required type="datetime-local" value={due} onChange={e=>setDue(e.target.value)}/></label>
-        <label className="text-sm">Owner<select disabled={busy} className="mt-1 w-full rounded-md border bg-background p-2" value={assignee||data.actorId} onChange={e=>setAssignee(e.target.value)}>{data.people.filter(person=>data.role!=='member'||person.id===data.actorId).map(person=><option key={person.id} value={person.id}>{person.id===data.actorId?'Me':person.name}</option>)}</select></label>
+      {draft.restored&&<p role="status" className="text-sm text-muted-foreground">Your unsaved assignment was restored.</p>}{draft.storageError&&<p role="status" className="text-sm text-destructive">Draft recovery is unavailable. Keep this form open until you save.</p>}
+      <form className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();const id=requestId||crypto.randomUUID();setRequestId(id);void save({title,assignedTo:assignee||data.actorId,dueAt:new Date(due).toISOString(),requestId:id});}}>
+        <label className="text-sm">Next action<Input disabled={busy} required maxLength={200} value={title} onChange={e=>{setTitle(e.target.value);setRequestId('');}}/></label>
+        <label className="text-sm">Due date<Input disabled={busy} required type="datetime-local" value={due} onChange={e=>{setDue(e.target.value);setRequestId('');}}/></label>
+        <label className="text-sm">Owner<select disabled={busy} className="mt-1 w-full rounded-md border bg-background p-2" value={assignee||data.actorId} onChange={e=>{setAssignee(e.target.value);setRequestId('');}}>{data.people.filter(person=>data.role!=='member'||person.id===data.actorId).map(person=><option key={person.id} value={person.id}>{person.id===data.actorId?'Me':person.name}</option>)}</select></label>
         <Button disabled={busy} className="self-end">Assign work</Button>
       </form>
       <div className="flex items-center justify-between"><h2 className="font-medium">{closed?'Completed and cancelled':'Needs attention'}</h2><Button variant="ghost" disabled={busy} onClick={()=>{setOffset(0);setClosed(!closed);}}>{closed?'Show open work':'Show completed'}</Button></div>
