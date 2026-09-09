@@ -49,3 +49,33 @@ A final review corrected the brokerage error-screen Reload link to retain the
 selected brokerage query parameter. Its rendered-page regression verifies the
 exact scoped destination, so changing the default selection in another tab
 cannot retarget recovery. The full local app gate was repeated after this fix.
+
+## Shared-record draft conflicts
+
+The preceding revision `a11ccb9c2e63a11d68d87961edec111b252e911d` passed all
+GitHub jobs and the main preview deployment. The separate staging project
+continued to fail provisioning; no production activation is implied.
+
+Shared-record editing now retains an unsaved draft when its source baseline
+changes. A comparison lists only fields the user edited. Fields also changed
+on the server keep the current value by default; the user can explicitly choose
+the draft value. Applying the selection preserves unrelated teammate changes,
+uses the current record revision, and still requires Save. Keeping the current
+record discards the stale draft without a write. Unresolved recovery survives
+repeated reloads in the same actor/team tab. This opt-in recovery behavior is
+currently used by the shared-record editor; other CRM forms retain their
+previous behavior.
+
+A refreshed read-only grant now removes its open editor. The server's atomic
+permission checks remain authoritative; the UI no longer invites an edit that
+has already lost permission.
+
+Validation: TypeScript and lint pass; 811 files and 6,897 tests pass with seven
+skipped. All 55 script checks and the tenant scanner pass. Behavioral tests
+cover overlapping/non-overlapping changes, repeated reloads, explicit discard,
+latest-revision payloads and revoked editor visibility. A temporary Chrome guest
+window exercised the actual component and application styles with synthetic
+data: choose the conflicting name, preserve the newer email, then save a payload
+containing only the selected name change. The window and fixture server were
+closed. This is browser component acceptance, not a live multi-user database
+write. No migration or flag change was introduced in this follow-up.
