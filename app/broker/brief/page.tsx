@@ -425,7 +425,7 @@ export default async function BrokerBriefPage() {
         <div role="alert" className="rounded-xl border border-border bg-card p-6">
           <h1 className="text-lg font-semibold">Lead ownership could not be checked</h1>
           <p className="mt-2 text-sm text-muted-foreground">Reload to try loading the team dashboard again.</p>
-          <a href="/broker/brief" className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Reload</a>
+          <a href={`/broker/brief?brokerage=${encodeURIComponent(brokerage.id)}`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Reload</a>
         </div>
       </section>
     );

@@ -1,7 +1,7 @@
 # Chippi Workforce implementation
 
 This change integrates the original Cadre client and execution code. The parent
-repository pins `mosnin/cadre` at `3ead9d8406360edc0fcc87f4dae11fb733d0231c`
+repository pins `mosnin/cadre` at `252dbbc6264f60719df6ff881244162c2b1d573e`
 on `codex/chippi-workforce`. It does
 not replace CRM routes or the logged-out Chippi website. The deployment flags
 remain off until the remaining release gates below are met.
@@ -32,7 +32,10 @@ remain off until the remaining release gates below are met.
   people, deals, tours, properties, pipeline, workspace statistics, stuck deals,
   quiet hot contacts, and overdue follow-ups. Brokerage queries must select a
   CRM workspace belonging to the verified brokerage. Worker arguments cannot
-  choose a different personal scope or grant a mutation.
+  choose a different personal scope or grant a mutation. Team mutations use a
+  separate non-read-only tool, gated by `CHIPPI_TEAM_ACTIONS_ENABLED`, with
+  current actor/team permissions, explicit record write grants, versions and
+  retry receipts. See `acceptance-2026-09-09.md` for exact coverage and limits.
 - Chippi orange tokens, sans-serif source typography, and a hosted-client ban
   on italic styles. Standalone Cadre appearance remains available unchanged.
 - CI initializes the exact submodule revision and independently tests the runtime
@@ -57,7 +60,12 @@ Root Chippi configuration:
 | `NEXT_PUBLIC_CHIPPI_WORKFORCE_ENABLED=true` | Show the CRM sidebar toggle |
 | `CHIPPI_WORKFORCE_API_ORIGIN` | Dedicated HTTPS runtime origin, without a path |
 | `CHIPPI_WORKFORCE_SECRET` | At least 32 random characters, server-only |
+| `CHIPPI_TEAM_ACTIONS_ENABLED` | Enable bounded team mutations after team acceptance |
 | `CADRE_PNPM` | Optional executable path to pnpm 9.15.0 |
+
+The source pin is not proof of the deployed runtime revision. The last recorded
+live runtime remains the earlier revision in `collaborative-teams-2026-09-08.md`;
+deploy and verify the new pin before enabling team actions.
 
 Dedicated Cadre runtime configuration:
 
@@ -67,6 +75,7 @@ Dedicated Cadre runtime configuration:
 | `CHIPPI_APP_ORIGIN` | HTTPS Chippi origin for current-authority and CRM checks |
 | `WEB_ORIGIN` | Same Chippi origin for integration return URLs |
 | `DATABASE_URL` | Separate operational PostgreSQL database; never point at CRM |
+| `CHIPPI_TEAM_ACTIONS_ENABLED` | Match the Chippi team-action gate; default false |
 | `SIGNUPS_ENABLED=false` | Accounts remain managed by Chippi |
 | `AGENT_RUNTIME`, model/provider variables | Real model execution, not scripted QA |
 | `SANDBOX_PROVIDER`, provider variables | Persistent computers |

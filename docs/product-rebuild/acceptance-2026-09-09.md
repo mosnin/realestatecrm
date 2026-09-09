@@ -44,3 +44,8 @@ and recovery; the separate staging project's provisioning failure; and an
 authenticated, Developer-ID-signed/notarized Mac release. Off-session team
 escalation delivery and conflict-aware recovery against changed form baselines
 remain implementation work. Retention improvement needs actual customer data.
+
+A final review corrected the brokerage error-screen Reload link to retain the
+selected brokerage query parameter. Its rendered-page regression verifies the
+exact scoped destination, so changing the default selection in another tab
+cannot retarget recovery. The full local app gate was repeated after this fix.

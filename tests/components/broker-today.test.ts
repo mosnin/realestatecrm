@@ -121,6 +121,7 @@ describe('Brokerage Today', () => {
     const html = renderToStaticMarkup(await BrokerBriefPage());
     expect(html).toContain('Lead ownership could not be checked');
     expect(html).toContain('role="alert"');
+    expect(html).toContain('href="/broker/brief?brokerage=broker-1"');
     expect(html).not.toContain('No unassigned leads');
     expect(html).not.toContain('Every lead has been answered');
   });
