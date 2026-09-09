@@ -154,3 +154,44 @@ and team work mutations by Chippi; broader draft coverage; populated, hosted
 multi-role/provider acceptance; and Mac authenticated/distribution acceptance.
 Existing action-retention reporting is present in `/admin/cohorts`; actual
 customer receipts and retention improvement have not been verified.
+
+## Brokerage-owned sharing and authenticated draft acceptance
+
+Revision `bee2bf2aa80c233b237719d3b250dd1617b477ad` passed all GitHub checks,
+including the new disposable PostgreSQL job and production build. Its main
+preview is Ready at https://chippi-cy1q8h1ke-mosnins-projects.vercel.app .
+Authenticated Google sign-in reached the solo workspace. Unsaved People text
+and a Property address survived browser Back/Forward. The synthetic drafts
+were discarded; no CRM record was saved. The listing discard confirmation
+blocked the browser extension twice; native Chrome inspection resolved it
+and verified the return to the empty Properties list. This was a browser-control
+interruption, not evidence of a failed application discard.
+
+Brokerage-owned record sharing is now implemented locally in a separate grant
+table. A current manager can explicitly share selected records with a team
+sponsored by that brokerage. Assignment and team-admin status alone do not
+authorize this. Reads recheck grantor account status, team membership,
+brokerage management authority, active grant and current record ownership.
+Deals bind through their workspace's brokerage. Joined metadata and private
+fields do not appear in the response. Team members see the selected records
+alongside existing personal shares. Revocation removes future visibility.
+
+This extension defaults off with `CHIPPI_BROKERAGE_TEAM_SHARING_ENABLED=false`,
+so existing shared-record reads do not require its table before migration.
+Apply `20260923000000_brokerage_team_record_sharing.sql` through the documented
+release workflow, then enable that flag after the membership/ownership checks.
+It also requires the existing Workforce/team CRM flags. The new migration
+passes twice-applied disposable PostgreSQL checks; no production application
+is implied. There are now 24 local SQL fixtures (the prior 23 plus this one).
+
+Brokerage-sharing coverage includes 14 behavioral storage/authority cases,
+API actor/account binding, and the real shared-record React component's
+brokerage selection/share/revoke flow with mocked HTTP. Local TypeScript and
+lint pass; the full web suite passes 808 files, 6,870 tests, with seven skipped.
+The tenant scanner checks 969 files and 130 registered tables. The People
+form also now displays recovery/storage-failure status, which was missing
+from its actual rendered header.
+
+This closes the implementation gap for read-only brokerage-owned sharing,
+not delegated record editing or live team/provider acceptance. Those remain
+outstanding alongside automatic escalation and agent-initiated team mutations.

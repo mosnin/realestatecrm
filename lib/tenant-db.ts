@@ -33,6 +33,7 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   Contact: 'spaceId',
   TeamRecordGrant: 'spaceId',
   TeamWorkItem: 'teamId',
+  BrokerageTeamRecordGrant: 'brokerageId',
   ClientCommitment: 'spaceId',
   CrmContactLink: 'spaceId',
   CrmWriteback: 'spaceId',

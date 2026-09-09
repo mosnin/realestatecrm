@@ -1,8 +1,9 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-const mocks=vi.hoisted(()=>({auth:vi.fn(),resolve:vi.fn(),share:vi.fn(),revoke:vi.fn(),list:vi.fn(),candidates:vi.fn(),audit:vi.fn()}));
+const mocks=vi.hoisted(()=>({auth:vi.fn(),resolve:vi.fn(),share:vi.fn(),revoke:vi.fn(),list:vi.fn(),candidates:vi.fn(),audit:vi.fn(),brokerShare:vi.fn(),brokerRevoke:vi.fn(),brokerCandidates:vi.fn()}));
 vi.mock('@clerk/nextjs/server',()=>({auth:mocks.auth}));
 vi.mock('@/lib/workforce/scope',()=>({resolveWorkforceScope:mocks.resolve}));
 vi.mock('@/lib/teams/shared-records',()=>({RECORD_KINDS:['contact','deal','property'],shareRecord:mocks.share,revokeRecord:mocks.revoke,listSharedRecords:mocks.list,sharingCandidates:mocks.candidates}));
+vi.mock('@/lib/teams/brokerage-records',()=>({shareBrokerageRecord:mocks.brokerShare,revokeBrokerageRecord:mocks.brokerRevoke,brokerageCandidates:mocks.brokerCandidates}));
 vi.mock('@/lib/rate-limit',()=>({checkRateLimit:async()=>({allowed:true})}));
 vi.mock('@/lib/audit',()=>({audit:mocks.audit}));
 import {GET,POST} from '@/app/api/teams/[teamId]/records/route';
@@ -11,6 +12,19 @@ const request=(body:unknown)=>new Request('https://app.test/api/teams/team-a/rec
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('CHIPPI_WORKFORCE_ENABLED','true');vi.stubEnv('CHIPPI_TEAM_CRM_ENABLED','true');mocks.auth.mockResolvedValue({userId:'clerk-a'});mocks.resolve.mockResolvedValue({principal:{actorId:'actor-a',name:'Team A'}});mocks.share.mockResolvedValue({id:'grant-a'});mocks.revoke.mockResolvedValue({spaceId:'space-a'});mocks.list.mockResolvedValue({records:[],nextOffset:null});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('team sharing API',()=>{
+ it('derives brokerage sharing authority from the team instead of caller supplied account IDs',async()=>{
+  mocks.brokerShare.mockResolvedValue({id:'broker-grant',brokerageId:'broker-a'});
+  expect((await POST(request({action:'share_brokerage',kind:'contact',recordId:'person-a'}),context)).status).toBe(200);
+  expect(mocks.brokerShare).toHaveBeenCalledWith('team-a','actor-a',expect.objectContaining({recordId:'person-a'}));
+  expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({resource:'BrokerageTeamRecordGrant',metadata:expect.objectContaining({brokerageId:'broker-a'})}));
+  expect((await POST(request({action:'share_brokerage',kind:'contact',recordId:'person-a',brokerageId:'foreign'}),context)).status).toBe(400);
+ });
+ it('routes brokerage candidates through the brokerage manager reader',async()=>{
+  mocks.brokerCandidates.mockResolvedValue({records:[],spaces:[],nextOffset:null});
+  expect((await GET(new Request('https://app.test/api/teams/team-a/records?mode=brokerage_candidates&kind=property'),context)).status).toBe(200);
+  expect(mocks.brokerCandidates).toHaveBeenCalledWith('team-a','actor-a',expect.objectContaining({kind:'property'}));
+ });
+
  it('derives the actor and team from authenticated authority',async()=>{
   const response=await POST(request({action:'share',spaceId:'space-a',kind:'contact',recordId:'person-a'}),context);
   expect(response.status).toBe(200);expect(mocks.resolve).toHaveBeenCalledWith('team','team-a','clerk-a');expect(mocks.share).toHaveBeenCalledWith('team-a','actor-a',expect.objectContaining({recordId:'person-a'}));expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({spaceId:'space-a',resource:'TeamRecordGrant'}));

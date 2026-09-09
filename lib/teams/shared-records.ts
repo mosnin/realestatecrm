@@ -3,18 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { tenantTable } from '@/lib/tenant-db';
 import { unscoped } from '@/lib/supabase-guard';
 import { teamAccess } from './server';
+import {listBrokerageRecords,brokerageSharingAvailable} from './brokerage-records';
 
-export const RECORD_KINDS = ['contact', 'deal', 'property'] as const;
-export type RecordKind = typeof RECORD_KINDS[number];
-export const SHARED_RECORD_FIELDS = {
-  contact: { table: 'Contact', title: 'name', columns: 'id, name, email, phone, leadType' },
-  deal: { table: 'Deal', title: 'title', columns: 'id, title, status, value, closeDate' },
-  property: { table: 'Property', title: 'address', columns: 'id, address, city, listingStatus, listPrice, beds, baths' },
-} as const;
+import { RECORD_KINDS, SHARED_RECORD_FIELDS, type RecordKind } from './record-fields';
+export { RECORD_KINDS, SHARED_RECORD_FIELDS, type RecordKind } from './record-fields';
 const grants = () => unscoped(supabase.from('TeamRecordGrant'), 'team membership validated before reading explicit record grants across spaces');
 const PAGE_SIZE = 25;
 type Grant = { id: string; teamId: string; spaceId: string; recordKind: RecordKind; recordId: string; grantedBy: string };
-export type SharedRecord = { grantId: string; kind: RecordKind; title: string; fields: Record<string, unknown>; canRevoke: boolean };
+export type SharedRecord = { grantId: string; kind: RecordKind; title: string; fields: Record<string, unknown>; canRevoke: boolean; source?: 'brokerage' };
 
 async function ownedSpace(spaceId: string, actorId: string) {
   const result = await supabase.from('Space').select('id, name').eq('id', spaceId).eq('ownerId', actorId).maybeSingle();
@@ -84,7 +80,8 @@ export async function listSharedRecords(teamId: string, actorId: string, input: 
     records.push({ grantId: grant.id, kind: grant.recordKind, title: String(record[SHARED_RECORD_FIELDS[grant.recordKind].title] ?? 'Untitled'), fields,
       canRevoke: grant.grantedBy === actorId || access.role === 'owner' });
   }
-  return { records, nextOffset: (result.data?.length ?? 0) === PAGE_SIZE ? offset + PAGE_SIZE : null };
+  const brokerage=await listBrokerageRecords(teamId,actorId,input);
+  return { records:[...records,...brokerage.records], brokerageSharingAvailable:await brokerageSharingAvailable(teamId,actorId), nextOffset: (result.data?.length ?? 0) === PAGE_SIZE || brokerage.nextOffset!==null ? offset + PAGE_SIZE : null };
 }
 
 export async function sharingCandidates(teamId: string, actorId: string, input: { spaceId?: string; kind: RecordKind; search?: string; offset?: number }) {

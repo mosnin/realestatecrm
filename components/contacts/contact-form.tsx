@@ -423,6 +423,8 @@ export function ContactForm({
             screen readers and doesn't emit its missing-title console error. */}
         <div className="px-6 py-4 border-b border-border/60">
           <DialogTitle className={H2}>{displayTitle}</DialogTitle>
+          {draft.restored && <p role="status" className="mt-2 text-sm text-muted-foreground">Your unsaved person was restored in this tab.</p>}
+          {draft.storageError && <p role="status" className="mt-2 text-sm text-destructive">Draft recovery is unavailable. Keep this page open until you save.</p>}
           <DialogDescription className="sr-only">
             {mode === 'edit'
               ? 'Update this person’s contact details and stage.'
