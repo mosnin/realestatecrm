@@ -22,7 +22,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export type ScopeColumn = 'spaceId' | 'brokerageId';
+export type ScopeColumn = 'spaceId' | 'brokerageId' | 'teamId';
 
 /**
  * Table name → the column that scopes it to a tenant. A row in one of these
@@ -32,6 +32,7 @@ export const TENANT_TABLES: Record<string, ScopeColumn> = {
   // ── space-scoped (the realtor workspace) ────────────────────────────────
   Contact: 'spaceId',
   TeamRecordGrant: 'spaceId',
+  TeamWorkItem: 'teamId',
   ClientCommitment: 'spaceId',
   CrmContactLink: 'spaceId',
   CrmWriteback: 'spaceId',
@@ -188,7 +189,7 @@ export function scopeColumnFor(table: string): ScopeColumn | null {
   return TENANT_TABLES[table] ?? null;
 }
 
-type Scope = { spaceId: string } | { brokerageId: string };
+type Scope = { spaceId: string } | { brokerageId: string } | { teamId: string };
 
 /**
  * Positive affordance: open a query on a tenant table with the scope filter
@@ -233,10 +234,7 @@ export function tenantTable(client: SupabaseClient, table: string, scope: Scope)
   if (!column) {
     throw new Error(`tenantTable: "${table}" is not a registered tenant table`);
   }
-  const value =
-    column === 'spaceId'
-      ? (scope as { spaceId?: string }).spaceId
-      : (scope as { brokerageId?: string }).brokerageId;
+  const value = (scope as Partial<Record<ScopeColumn, string>>)[column];
   if (typeof value !== 'string' || !value) {
     throw new Error(
       `tenantTable: "${table}" is scoped by ${column}, but no ${column} was provided`,

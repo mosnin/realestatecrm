@@ -93,8 +93,29 @@ jobs:
             exit 1
           fi
 
+  # Exercise migrations and atomic state transitions against disposable local
+  # databases. These fixtures do not require production credentials.
+  postgres-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL fixture runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-16
+          echo '/usr/lib/postgresql/16/bin' >> "$GITHUB_PATH"
+      - name: Run isolated SQL lifecycle and migration tests
+        shell: bash
+        run: |
+          for script in tests/postgres/*.sh; do
+            echo "::group::$script"
+            bash "$script"
+            echo '::endgroup::'
+          done
+
   # Modal agent unit tests (pytest). Complements the TS suite; does not need
-  # a live database. SQL shell tests in tests/postgres/ stay local / secret-gated.
+  # a live database.
   agent-pytest:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -59,6 +59,10 @@ export function PropertyDetailClient({ slug, initial, initialAreaReport, linkedD
       setProperty(updated);
       setEditing(false);
       toast.success('Saved.');
+      return true;
+    } catch {
+      toast.error("Couldn't save that. Try again.");
+      return false;
     } finally {
       setSubmitting(false);
     }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useFormDraft } from '@/hooks/use-form-draft';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -68,6 +70,14 @@ export default function NewDealPage() {
   const [titleError, setTitleError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const draftValues={selectedContacts,pipelineType,stageId,title,priority,value,commissionRate,probability,closeDate,address,propertyId,description,step};
+  const baseline=useRef(draftValues);
+  const draft=useFormDraft('deal:new',draftValues,saved=>{
+    setSelectedContacts(saved.selectedContacts);setPipelineType(saved.pipelineType);setStageId(saved.stageId);setTitle(saved.title);setPriority(saved.priority);setValue(saved.value);setCommissionRate(saved.commissionRate);setProbability(saved.probability);setCloseDate(saved.closeDate);setAddress(saved.address);setPropertyId(saved.propertyId);setDescription(saved.description);setStep(saved.step);
+  },baseline.current);
+  const snapshot = JSON.stringify(draftValues);
+  const original = useRef(snapshot);
+  const { confirmLeave, markSaved } = useUnsavedChanges(snapshot !== original.current);
 
   function handleNext() {
     if (step === 1) {
@@ -121,6 +131,7 @@ export default function NewDealPage() {
         }
         const newProperty = (await propRes.json()) as { id: string };
         resolvedPropertyId = newProperty.id;
+        setPropertyId(newProperty.id);
       }
 
       const res = await fetch('/api/deals', {
@@ -144,6 +155,8 @@ export default function NewDealPage() {
       });
       if (res.ok) {
         const newDeal = await res.json();
+        draft.clear();
+        markSaved();
         router.push(`/s/${slug}/deals/${newDeal.id}`);
       } else {
         const body = await res.json().catch(() => ({}));
@@ -176,7 +189,7 @@ export default function NewDealPage() {
       <div className="flex items-center gap-3 mb-6">
         <button
           type="button"
-          onClick={() => router.push(`/s/${slug}/deals`)}
+          onClick={() => { if (confirmLeave()) router.push(`/s/${slug}/deals`); }}
           aria-label="Back to deals"
           className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
         >
@@ -187,6 +200,8 @@ export default function NewDealPage() {
         </h1>
       </div>
 
+      {draft.restored&&<p role="status" className="mb-4 text-sm text-muted-foreground">Your unsaved deal was restored in this tab.</p>}
+      {draft.storageError&&<p role="status" className="mb-4 text-sm text-destructive">Draft recovery is unavailable. Keep this page open until you save.</p>}
       {/* Step progress */}
       <div className="mb-8">
         <WizardProgress
@@ -277,7 +292,7 @@ export default function NewDealPage() {
             Back
           </Button>
         ) : (
-          <Button variant="ghost" onClick={() => router.push(`/s/${slug}/deals`)}>
+          <Button variant="ghost" onClick={() => { if (confirmLeave()) { draft.clear(); router.push(`/s/${slug}/deals`); } }}>
             Cancel
           </Button>
         )}

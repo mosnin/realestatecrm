@@ -115,6 +115,7 @@ import { isResearchWorkspaceIntent } from '@/lib/chippi/research-workspace-inten
 import { isWorkspaceRunContinuationIntent } from '@/lib/chippi/workspace-run-intent';
 import { chatContinuationIdempotencySeed, isConversationWorkspaceContinuationEligible } from '@/lib/workspace-runs/conversation-continuation';
 import { tenantTable } from '@/lib/tenant-db';
+import { rejectPendingTurn } from '@/lib/chat/reject-pending-turn';
 
 // A Modal chat turn can run for minutes (multi-tool agentic reasoning). The
 // proxy must outlive the Modal function (its timeout is 600s) or Vercel kills
@@ -912,6 +913,19 @@ export async function POST(req: NextRequest) {
   const ctxOrResponse = await resolveToolContext(spaceSlug, abortController.signal);
   if (ctxOrResponse instanceof NextResponse) return ctxOrResponse;
   const ctx: ToolContext = ctxOrResponse;
+  async function rejectBeforeExecution(payload: { error: string }, init: { status: number; headers?: Record<string, string> }) {
+    try {
+      await rejectPendingTurn(supabase, {
+        spaceId: ctx.space.id, conversationId: body.conversationId,
+        turnId: body.turnId, clientRequestId: body.clientRequestId,
+        message: rawMessage, error: payload.error,
+      });
+    } catch (error) {
+      logger.error('[ai/task] could not settle preflight rejection', { spaceId: ctx.space.id }, error);
+    }
+    return NextResponse.json(payload, init);
+  }
+
   let activeWorkbook: ToolContext['activeWorkbook'] | undefined;
   let workModeSelected = body.mode === 'work' || body.mode === 'agent';
   let workExecutionMode = parseWorkExecutionMode(body.executionMode);
@@ -931,10 +945,10 @@ export async function POST(req: NextRequest) {
     checkRateLimit(`chat:space:${ctx.space.id}`, 60, 600),
   ]);
   if (!userLimit.allowed) {
-    return NextResponse.json({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
+    return rejectBeforeExecution({ error: chippiErrorMessage('rate_limited') }, { status: 429 });
   }
   if (!ipLimit.allowed || !spaceLimit.allowed) {
-    return NextResponse.json(
+    return rejectBeforeExecution(
       { error: chippiErrorMessage('rate_limited') },
       { status: 429, headers: { 'Retry-After': '600' } },
     );
@@ -961,7 +975,7 @@ export async function POST(req: NextRequest) {
         .eq('clerkId', ctx.userId)
         .maybeSingle();
       if (userRow?.platformRole !== 'admin') {
-        return NextResponse.json(
+        return rejectBeforeExecution(
           {
             error:
               'Your subscription needs attention — update your payment method in billing to keep using Chippi. Your workspace and data stay available.',
@@ -1015,7 +1029,7 @@ export async function POST(req: NextRequest) {
         todayTokens,
         dailyTokenBudget,
       });
-      return NextResponse.json({ error: 'Daily token budget exceeded' }, { status: 429 });
+      return rejectBeforeExecution({ error: 'Daily token budget exceeded' }, { status: 429 });
     }
   } catch (err) {
     logger.warn('[ai/task] token budget check failed — continuing', { spaceSlug }, err);
@@ -1031,13 +1045,13 @@ export async function POST(req: NextRequest) {
       await assertCanSpend(ctx.space.id, 'chat_turn');
     } catch (err) {
       if (err instanceof SubscriptionDelinquentError) {
-        return NextResponse.json(
+        return rejectBeforeExecution(
           { error: 'Your subscription is inactive. Update your payment method or resubscribe to keep chatting with Chippi.' },
           { status: 402 },
         );
       }
       if (err instanceof CreditsExhaustedError) {
-        return NextResponse.json(
+        return rejectBeforeExecution(
           { error: 'Out of credits. Buy a top-up or upgrade your plan to keep chatting with Chippi.' },
           { status: 402 },
         );

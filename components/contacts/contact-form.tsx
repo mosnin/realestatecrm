@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useFormDraft } from '@/hooks/use-form-draft';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -49,6 +51,7 @@ type SubmitData = Omit<FormData, 'tags' | 'budget'> & {
 };
 
 interface ContactFormProps {
+  recordId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: SubmitData) => Promise<void>;
@@ -213,6 +216,7 @@ export function ContactForm({
   title,
   mode = 'add',
   slug,
+  recordId,
 }: ContactFormProps) {
   const {
     register,
@@ -220,7 +224,7 @@ export function ContactForm({
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: contactFormResetValues(defaultValues).values,
@@ -249,6 +253,7 @@ export function ContactForm({
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [pendingPreview, setPendingPreview] = useState<ParsedContact | null>(null);
+  const { confirmLeave } = useUnsavedChanges(open && (isDirty || typedText.length > 0 || JSON.stringify(properties) !== JSON.stringify(contactFormResetValues(defaultValues).properties)));
 
   // Reset every time the modal opens. defaultValues are only applied on
   // mount by RHF — the edit dialog stays mounted with empty defaults until
@@ -265,10 +270,17 @@ export function ContactForm({
     setPendingPreview(null);
   }, [open, canType, reset]);
 
+  const draftValues={values:watch(),properties,typedText,tab};
+  const draftBaseline=useRef({values:contactFormResetValues(defaultValues).values,properties:contactFormResetValues(defaultValues).properties,typedText:'',tab:canType?'type' as const:'fill' as const});
+  const draft=useFormDraft(`contact:${mode==='add'?'new':recordId??'unavailable'}`,draftValues,saved=>{
+    reset(saved.values,{keepDefaultValues:true});setProperties(saved.properties);setTypedText(saved.typedText);setTab(saved.tab);
+  },draftBaseline.current,open&&(mode==='add'||Boolean(recordId)));
+
   const type = watch('type');
   const displayTitle = title ?? (mode === 'edit' ? 'Edit person' : 'Add a person');
 
   function resetAll() {
+    draft.clear();
     reset();
     setProperties([]);
     setTypedText('');
@@ -405,7 +417,7 @@ export function ContactForm({
   const useSegmented = CONTACT_STAGES.length <= 4;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => { if (next || confirmLeave()) { if (!next) draft.clear(); onOpenChange(next); } }}>
       <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
         {/* Header — DialogTitle (not a bare h2) so Radix labels the dialog for
             screen readers and doesn't emit its missing-title console error. */}
@@ -468,6 +480,7 @@ export function ContactForm({
             preview={pendingPreview}
             onSubmit={handleParseSubmit}
             onCancel={() => {
+              if (!confirmLeave()) return;
               resetAll();
               onOpenChange(false);
             }}
@@ -578,6 +591,7 @@ export function ContactForm({
               <button
                 type="button"
                 onClick={() => {
+                  if (!confirmLeave()) return;
                   resetAll();
                   onOpenChange(false);
                 }}

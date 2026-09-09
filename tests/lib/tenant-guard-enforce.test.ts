@@ -109,7 +109,7 @@ describe('TENANT_TABLES registry completeness', () => {
 
   it('every registered table scopes by a real tenant column', () => {
     for (const [table, col] of Object.entries(TENANT_TABLES)) {
-      expect(['spaceId', 'brokerageId'], `${table} has an invalid scope column`).toContain(col);
+      expect(['spaceId', 'brokerageId', 'teamId'], `${table} has an invalid scope column`).toContain(col);
     }
   });
 

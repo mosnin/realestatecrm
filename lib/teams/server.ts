@@ -74,6 +74,20 @@ export async function teamMembers(teamId: string, userId: string) {
   const data = await allRows((from, to) => members().select('userId, role, User(name)').eq('teamId', teamId).is('revokedAt', null).order('userId').range(from, to));
   return { ownerId: team.ownerId, members: data };
 }
+/** Team members can identify collaborators without receiving account or billing data. */
+export async function teamPeople(teamId: string, userId: string) {
+  const { team } = await teamAccess(teamId, userId);
+  const owner = await supabase.from('User').select('id, name').eq('id', team.ownerId).maybeSingle();
+  if (owner.error) throw new Error('Team directory unavailable');
+  const rows = await allRows((from, to) => members().select('userId, User(name)').eq('teamId', teamId).is('revokedAt', null).in('role', ['admin', 'member']).order('userId').range(from, to));
+  const people = new Map<string, { id: string; name: string }>();
+  if (owner.data) people.set(owner.data.id, { id: owner.data.id, name: owner.data.name || 'Team owner' });
+  for (const row of rows) {
+    const user = Array.isArray(row.User) ? row.User[0] : row.User;
+    people.set(row.userId, { id: row.userId, name: user?.name || 'Team member' });
+  }
+  return [...people.values()];
+}
 export async function changeTeamMember(teamId: string, actorId: string, userId: string, role: 'admin' | 'member' | 'remove') {
   const access = await teamAccess(teamId, actorId);
   // Only the owner assigns authority or removes members. The owner cannot be removed.

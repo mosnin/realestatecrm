@@ -10,6 +10,7 @@ let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 let saved: Record<string, unknown> | null;
 let attempts: Record<string, unknown>[];
+let durableRejection: boolean;
 let failure: number | 'network' | 'truncated';
 
 function Harness() {
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   saved = null;
+  durableRejection = false;
   attempts = [];
   host = document.createElement('div');
   document.body.append(host);
@@ -33,10 +35,11 @@ beforeEach(() => {
     }
     if (url.startsWith('/api/ai/turns?')) {
       // Bound a regressed loop so the assertion fails instead of hanging CI.
-      return Response.json({ turns: saved ? [{ ...saved, status: attempts.length > 3 ? 'failed' : 'pending' }] : [] });
+      return Response.json({ turns: saved ? [{ ...saved, status: attempts.length > 3 ? 'failed' : saved.status }] : [] });
     }
     if (url === '/api/ai/task') {
       attempts.push(JSON.parse(String(init?.body)));
+      if (durableRejection && saved) saved.status = 'failed';
       if (failure === 'network') throw new Error('Network error');
       if (failure === 'truncated') return new Response('', { headers: { 'content-type': 'text/event-stream' } });
       return Response.json({ error: failure === 402 ? 'Out of credits.' : 'Request unavailable.' }, { status: failure });
@@ -54,6 +57,19 @@ afterEach(async () => {
 });
 
 describe('durable queue after pre-claim failure', () => {
+  it('keeps a server-settled rejection visible without redispatch from a fresh runtime', async () => {
+    failure = 402;
+    durableRejection = true;
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => { await driver.send('Read my priorities', [], 'work'); });
+    await act(async () => root.render(null));
+    __resetTurnRunnerForTests();
+    await act(async () => root.render(React.createElement(Harness)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(attempts).toHaveLength(1);
+    expect(driver.isStreaming).toBe(false);
+    expect(driver.queuedMessages).toEqual([expect.objectContaining({id:attempts[0].turnId,text:'Read my priorities',status:'failed'})]);
+  });
   it('keeps a failed turn blocked across navigation and allows retry after returning', async () => {
     failure = 402;
     await act(async () => root.render(React.createElement(Harness)));

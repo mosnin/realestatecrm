@@ -45,6 +45,7 @@ export default function NewPropertyPage() {
       }
       const created = (await res.json()) as Property;
       router.push(`/s/${slug}/properties/${created.id}`);
+      return true;
     } catch {
       toast.error("Couldn't create that property. Try again.");
     } finally {

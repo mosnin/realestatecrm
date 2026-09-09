@@ -1,3 +1,4 @@
+import { listTeamWork } from '@/lib/teams/work-items';
 import { listSharedRecords, RECORD_KINDS } from '@/lib/teams/shared-records';
 import 'server-only';
 import { z } from 'zod';
@@ -11,8 +12,16 @@ export const WORKFORCE_CRM_QUERIES = ['list_contacts', 'find_person', 'find_deal
 export async function queryWorkforceCrm(principal: WorkforcePrincipal, clerkId: string, input: { operation?: string; tool?: string; args?: unknown; spaceId?: string }, signal: AbortSignal) {
   if (principal.kind === 'team' && process.env.CHIPPI_TEAM_CRM_ENABLED === 'true') {
     const parameters = z.object({ kind: z.enum(RECORD_KINDS).optional(), offset: z.number().int().min(0).max(100000).optional() }).strict();
-    if (input.operation === 'catalog') return { tools: [{ name: 'list_shared_records', description: 'Read the fields of People, Deals, and Properties explicitly shared with this team. Follow nextOffset for more records. This does not expose private notes, messages, files, or linked records.', parameters: z.toJSONSchema(parameters, { io: 'input' }) }] };
+    const workParameters = z.object({ offset: z.number().int().min(0).max(100000).default(0), closed: z.boolean().default(false) }).strict();
+    if (input.operation === 'catalog') return { tools: [{ name: 'list_shared_records', description: 'Read the fields of People, Deals, and Properties explicitly shared with this team. Follow nextOffset for more records. This does not expose private notes, messages, files, or linked records.', parameters: z.toJSONSchema(parameters, { io: 'input' }) }, {name: 'list_team_work', description: 'Read this team’s assigned work, owners, due dates, acknowledgment and completion status. Follow nextOffset for more work. Overdue work is not completed work.', parameters: z.toJSONSchema(workParameters, {io:'input'})}] };
     if (input.operation === 'workspaces') return { workspaces: [] };
+    if (input.operation === 'query' && input.tool === 'list_team_work' && !input.spaceId) {
+      const args = workParameters.parse(input.args ?? {});
+      signal.throwIfAborted();
+      const result = await listTeamWork(principal.scopeId, principal.actorId, args.offset, args.closed);
+      signal.throwIfAborted();
+      return result;
+    }
     if (input.operation !== 'query' || input.tool !== 'list_shared_records' || input.spaceId) throw new Error('CRM records are not shared with this team');
     signal.throwIfAborted();
     const result = await listSharedRecords(principal.scopeId, principal.actorId, parameters.parse(input.args ?? {}));

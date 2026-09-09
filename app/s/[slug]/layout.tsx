@@ -1,3 +1,4 @@
+import { FormDraftProvider } from '@/hooks/use-form-draft';
 import { workspaceTeams } from '@/lib/workspaces/teams';
 import '@/components/dashboard/sicarii/theme.css';
 import { WorkspaceShell } from '@/components/dashboard/sicarii/workspace-shell';
@@ -276,7 +277,7 @@ export default async function DashboardLayout({
       <SidebarCollapseProvider>
         <WorkspaceShell {...teamWorkspaces} slug={slug} spaceId={space.id} spaceName={space.name} isBroker={isBroker} brokerageRole={brokerageRole} brokerageMemberships={brokerageMemberships} isPlatformAdmin={dbUser.isPlatformAdmin}>
           <PlatformBanner />
-          <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}>{children}</LayoutShell>
+          <LayoutShell slug={slug} liveNotifications={<LiveNotifications spaceId={space.id} slug={slug} />}><FormDraftProvider key={space.id + dbUser.id} actorId={dbUser.id} spaceId={space.id}>{children}</FormDraftProvider></LayoutShell>
         </WorkspaceShell>
       </SidebarCollapseProvider>
       {/* The Island — ambient pill for background work sessions, floating

@@ -1553,6 +1553,7 @@ export function ContactTable({ slug, openCreateForm = false, summary }: ContactT
         onOpenChange={(o) => !o && setEditContact(null)}
         onSubmit={handleEdit}
         mode="edit"
+        recordId={editContact?.id}
         defaultValues={editContact ? contactEditorDefaults(editContact) : undefined}
       />
 
