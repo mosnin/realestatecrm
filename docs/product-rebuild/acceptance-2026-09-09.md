@@ -79,3 +79,18 @@ data: choose the conflicting name, preserve the newer email, then save a payload
 containing only the selected name change. The window and fixture server were
 closed. This is browser component acceptance, not a live multi-user database
 write. No migration or flag change was introduced in this follow-up.
+
+## Team-work service validation
+
+Team-work services now validate creation/update input and pagination themselves,
+and recheck the actor's active account before reads, attention counts, creation
+or transitions. This protects direct/internal callers as well as the already
+validated HTTP routes. Focused tests cover malformed input, invalid pages and
+offboarded actors, alongside existing role, scope, version and retry cases.
+No schema, UI, provider configuration or customer data change is required.
+
+The full local TypeScript/lint/web gate passes: 811 files, 6,900 passing tests
+and seven skipped. All 55 script checks and the tenant scanner pass. The prior
+revision's GitHub checks and main preview passed; the separate staging project
+still fails provisioning. This follow-up does not resolve the remaining live
+provider, activation, escalation-delivery or Mac release gates.

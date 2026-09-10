@@ -39,6 +39,8 @@ export function transitionWorkItem(item:TeamWorkItem, actorId:string, role:TeamR
 }
 
 export async function listTeamWork(teamId:string,actorId:string,offset=0,closed=false) {
+  if(!Number.isSafeInteger(offset)||offset<0||offset>100000||typeof closed!=='boolean')throw new Error('Invalid work view');
+  await activeMember(teamId,actorId);
   const access=await teamAccess(teamId,actorId);
   const {data,error}=await table(teamId).select(fields).in('status',closed?['done','cancelled']:['assigned','accepted']).order('dueAt').order('id').range(offset,offset+49);
   if(error) throw new Error('Team work could not be loaded');
@@ -46,6 +48,8 @@ export async function listTeamWork(teamId:string,actorId:string,offset=0,closed=
   return {items:(data??[]) as TeamWorkItem[], role:access.role,actorId,people,nextOffset:data?.length===50?offset+50:null};
 }
 export async function createTeamWork(teamId:string,actorId:string,input:z.infer<typeof workItemInput>) {
+  input=workItemInput.parse(input);
+  await activeMember(teamId,actorId);
   const {role}=await teamAccess(teamId,actorId);
   if(role==='member' && input.assignedTo!==actorId) throw new Error('Only team managers can assign work to someone else');
   await activeMember(teamId,input.assignedTo);
@@ -61,6 +65,8 @@ export async function createTeamWork(teamId:string,actorId:string,input:z.infer<
   return data;
 }
 export async function updateTeamWork(teamId:string,actorId:string,input:z.infer<typeof workItemUpdate>) {
+  input=workItemUpdate.parse(input);
+  await activeMember(teamId,actorId);
   const {role}=await teamAccess(teamId,actorId);
   const {data,error}=await table(teamId).select(fields).eq('id',input.id).maybeSingle();
   if(error || !data) throw new Error('Work unavailable');
@@ -73,6 +79,7 @@ export async function updateTeamWork(teamId:string,actorId:string,input:z.infer<
 
 /** Deadline-driven attention; resolved work disappears without a background-job race. */
 export async function teamWorkAttention(teamId:string,actorId:string) {
+  await activeMember(teamId,actorId);
   const {role}=await teamAccess(teamId,actorId);
   let query=table(teamId).select('id',{count:'exact',head:true}).in('status',['assigned','accepted']).lt('dueAt',new Date().toISOString());
   if(role==='member')query=query.eq('assignedTo',actorId);

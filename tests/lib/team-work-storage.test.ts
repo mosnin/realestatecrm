@@ -20,22 +20,22 @@ vi.mock('@/lib/supabase',()=>({supabase:{from(table:string){
  return q;
 }}}));
 import {listTeamWork,createTeamWork,updateTeamWork,teamWorkAttention} from '@/lib/teams/work-items';
-const base={id:'work-a',teamId:'team-a',assignedTo:'actor',createdBy:'actor',status:'assigned',version:1,title:'Inspection',dueAt:'2026-09-10T10:00:00Z'};
-beforeEach(()=>{state.rows=[{...base},{...base,id:'foreign',teamId:'team-b'}];state.role='member';state.denied=false;state.offboarded=false;state.conflict=false;});
+const base={id:'10000000-0000-4000-8000-000000000010',teamId:'team-a',assignedTo:'actor',createdBy:'actor',status:'assigned',version:1,title:'Inspection',dueAt:'2026-09-10T10:00:00Z'};
+beforeEach(()=>{state.rows=[{...base},{...base,id:'10000000-0000-4000-8000-000000000011',teamId:'team-b'}];state.role='member';state.denied=false;state.offboarded=false;state.conflict=false;});
 describe('team work storage authority',()=>{
  it('reads only the team and requested status page',async()=>{
   state.rows.push({...base,id:'closed',status:'done'});
-  expect((await listTeamWork('team-a','actor')).items.map(item=>item.id)).toEqual(['work-a']);
+  expect((await listTeamWork('team-a','actor')).items.map(item=>item.id)).toEqual(['10000000-0000-4000-8000-000000000010']);
   expect((await listTeamWork('team-a','actor',0,true)).items.map(item=>item.id)).toEqual(['closed']);
  });
  it('cannot acknowledge another team’s record',async()=>{
-  await expect(updateTeamWork('team-a','actor',{id:'foreign',version:1,action:'accept'})).rejects.toThrow('unavailable');expect(state.rows[1].status).toBe('assigned');
+  await expect(updateTeamWork('team-a','actor',{id:'10000000-0000-4000-8000-000000000011',version:1,action:'accept'})).rejects.toThrow('unavailable');expect(state.rows[1].status).toBe('assigned');
  });
  it('keeps a conflicting update from overwriting the winner',async()=>{
-  state.conflict=true;await expect(updateTeamWork('team-a','actor',{id:'work-a',version:1,action:'accept'})).rejects.toThrow('changed');expect(state.rows[0]).toMatchObject({status:'assigned',version:2});
+  state.conflict=true;await expect(updateTeamWork('team-a','actor',{id:'10000000-0000-4000-8000-000000000010',version:1,action:'accept'})).rejects.toThrow('changed');expect(state.rows[0]).toMatchObject({status:'assigned',version:2});
  });
  it('rejects revoked membership before mutation',async()=>{
-  state.denied=true;await expect(updateTeamWork('team-a','actor',{id:'work-a',version:1,action:'accept'})).rejects.toThrow('unavailable');expect(state.rows[0].version).toBe(1);
+  state.denied=true;await expect(updateTeamWork('team-a','actor',{id:'10000000-0000-4000-8000-000000000010',version:1,action:'accept'})).rejects.toThrow('unavailable');expect(state.rows[0].version).toBe(1);
  });
  it('members can create their own work but only managers can delegate',async()=>{
   const input={title:'Follow up',description:'',assignedTo:'other',dueAt:base.dueAt};
@@ -54,13 +54,30 @@ it('reconciles a repeated assignment request without creating a second task',asy
  await expect(createTeamWork('team-a','actor',{...input,title:'Different work'})).rejects.toThrow('Request changed');expect(state.rows).toHaveLength(3);
 });
 it('does not reconcile another team or actor’s request identity',async()=>{
- const input={title:base.title,description:'',assignedTo:'actor',dueAt:base.dueAt,requestId:'foreign'};
+ const input={title:base.title,description:'',assignedTo:'actor',dueAt:base.dueAt,requestId:'10000000-0000-4000-8000-000000000011'};
  await expect(createTeamWork('team-a','actor',input)).rejects.toThrow('Request changed');
- state.rows[0].createdBy='other';await expect(createTeamWork('team-a','actor',{...input,requestId:'work-a'})).rejects.toThrow('Request changed');
+ state.rows[0].createdBy='other';await expect(createTeamWork('team-a','actor',{...input,requestId:'10000000-0000-4000-8000-000000000010'})).rejects.toThrow('Request changed');
 });
 it('routes overdue team work to managers while members see only their own attention count',async()=>{
- state.rows=[{...base,dueAt:'2020-01-01'},{...base,id:'other',assignedTo:'other',dueAt:'2020-01-01'},{...base,id:'closed',status:'done',dueAt:'2020-01-01'},{...base,id:'foreign',teamId:'team-b',dueAt:'2020-01-01'}];
+ state.rows=[{...base,dueAt:'2020-01-01'},{...base,id:'other',assignedTo:'other',dueAt:'2020-01-01'},{...base,id:'closed',status:'done',dueAt:'2020-01-01'},{...base,id:'10000000-0000-4000-8000-000000000011',teamId:'team-b',dueAt:'2020-01-01'}];
  expect(await teamWorkAttention('team-a','actor')).toEqual({overdue:1,manager:false});state.role='admin';
  expect(await teamWorkAttention('team-a','actor')).toEqual({overdue:2,manager:true});
  state.denied=true;await expect(teamWorkAttention('team-a','actor')).rejects.toThrow('unavailable');
+});
+
+it('validates direct callers before writing malformed work',async()=>{
+ const input={title:' ',description:'',assignedTo:'actor',dueAt:'invalid'};
+ await expect(createTeamWork('team-a','actor',input)).rejects.toThrow();
+ await expect(updateTeamWork('team-a','actor',{id:base.id,version:0,action:'accept'})).rejects.toThrow();
+ expect(state.rows).toHaveLength(2);expect(state.rows[0].version).toBe(1);
+});
+it('rejects invalid pagination rather than passing it to storage',async()=>{
+ for(const offset of [-1,0.5,100001,Number.NaN])await expect(listTeamWork('team-a','actor',offset)).rejects.toThrow('Invalid work view');
+});
+it('blocks offboarded actors from reads, attention and transitions',async()=>{
+ state.offboarded=true;
+ await expect(listTeamWork('team-a','actor')).rejects.toThrow('unavailable');
+ await expect(teamWorkAttention('team-a','actor')).rejects.toThrow('unavailable');
+ await expect(updateTeamWork('team-a','actor',{id:base.id,version:1,action:'accept'})).rejects.toThrow('unavailable');
+ expect(state.rows[0].status).toBe('assigned');
 });
