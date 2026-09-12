@@ -1,21 +1,6 @@
 'use client';
 
-/**
- * PropertyListGrid — the realtor's listing wall.
- *
- * A property list is a register AND a gallery: the realtor scans facts, but
- * they also recognise houses by their photo first, address second. So this
- * is a responsive card grid — a strong 4:3 cover, a confident compact price,
- * a quiet status chip, and a fact line. Cards lift a hair on hover and arrive
- * in a stagger. Each card *expands in place* (no navigation) to reveal a spec
- * strip + a thumbnail rail of the rest of the photos, so the realtor can
- * glance the details of three listings without leaving the wall. The card
- * title still links to the full detail page.
- *
- * Pure presentation: same data, same routes, same links as the server list it
- * replaces (address → `/s/[slug]/properties/[id]`, "Add property" → `/new`).
- * No data is fetched here; the server page passes the rows in.
- */
+/** Searchable property register with the existing expandable gallery available on demand. */
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -32,39 +17,32 @@ import { PropertyStatusBadge } from './property-status-badge';
 
 interface Props {
   slug: string;
-  properties: Property[];
+  properties: (Property & {workSummary?:string})[];
 }
 
 export function PropertyListGrid({ slug, properties }: Props) {
   const reduce = useReducedMotion();
 
-  return (
-    <motion.ul
-      initial="initial"
-      animate="enter"
-      variants={{
-        initial: {},
-        enter: { transition: { staggerChildren: reduce ? 0 : 0.045 } },
-      }}
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-    >
-      {properties.map((property) => (
-        <motion.li
-          key={property.id}
-          variants={{
-            initial: reduce ? { opacity: 0 } : { opacity: 0, y: 10 },
-            enter: {
-              opacity: 1,
-              y: 0,
-              transition: { duration: DURATION_BASE, ease: EASE_OUT },
-            },
-          }}
-        >
-          <PropertyCard slug={slug} property={property} reduce={!!reduce} />
-        </motion.li>
-      ))}
-    </motion.ul>
-  );
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const [view, setView] = useState<'list' | 'gallery'>('list');
+  const visible = properties.filter(p => (status === 'all' || p.listingStatus === status) && `${formatPropertyAddress(p)} ${p.mlsNumber ?? ''}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="space-y-4">
+    <div className="flex flex-wrap gap-2">
+      <input aria-label="Search properties" placeholder="Search address or MLS number" value={query} onChange={e => setQuery(e.target.value)} className="min-w-0 basis-full sm:basis-auto flex-1 rounded-md border bg-background px-3 py-2 text-sm" />
+      <select aria-label="Property status" value={status} onChange={e => setStatus(e.target.value)} className="rounded-md border bg-background px-3 py-2 text-sm"><option value="all">All statuses</option>{['active','pending','sold','off_market','owned'].map(v => <option key={v} value={v}>{v.replace('_',' ')}</option>)}</select>
+      <button type="button" onClick={() => setView(view === 'list' ? 'gallery' : 'list')} className="rounded-md border px-3 py-2 text-sm">{view === 'list' ? 'Gallery view' : 'List view'}</button>
+    </div>
+    <p className="text-xs text-muted-foreground">{visible.length} properties · Saved facts may need verification. Research does not confirm listing availability.</p>
+    {!visible.length && <p role="status" className="py-6 text-sm">No properties match. Try another search or status.</p>}
+    <ul className={view === 'gallery' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'divide-y'}>
+      {visible.map(property => <li key={property.id}>{view === 'gallery' ? <PropertyCard slug={slug} property={property} reduce={!!reduce}/> : <Link href={`/s/${slug}/properties/${property.id}`} className="flex flex-wrap items-center gap-3 py-4 focus-visible:outline focus-visible:outline-2">
+        {property.photos?.[0] && <img src={property.photos[0]} alt="" className="h-14 w-20 rounded object-cover"/>}
+        <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{formatPropertyAddress(property)}</span><span className="block text-xs text-muted-foreground">{formatPropertyFacts(property)}</span>{property.workSummary && <span className="block text-xs">{property.workSummary}</span>}<span className="block text-xs text-muted-foreground">{property.analysis?.sources?.length ? `Web research · ${new Date(property.analysis.analyzedAt).toLocaleDateString()}` : property.analyzedAt ? 'Research attempted · no saved evidence' : 'Research not run'}</span></span>
+        <span className="flex items-center gap-3"><PropertyStatusBadge status={property.listingStatus}/><span className="text-sm tabular-nums">{property.listPrice == null ? 'Price unknown' : property.listPrice.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0})}</span></span>
+      </Link>}</li>)}
+    </ul>
+  </div>;
 }
 
 function PropertyCard({
@@ -174,14 +152,10 @@ function PropertyCard({
             // Serif display face — matches the focal-stat treatment used on
             // the detail page and the commissions stat strip.
             <span style={TITLE_FONT}>
-              <AnimatedNumber
-                value={property.listPrice}
-                format={formatCompact}
-                className="text-[21px] leading-none tracking-tight tabular-nums text-foreground"
-              />
+              <span className="text-[21px] leading-none tabular-nums">{property.listPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
             </span>
           ) : (
-            <span className="text-sm italic text-muted-foreground">Price TBD</span>
+            <span className="text-sm not-italic text-muted-foreground">Price TBD</span>
           )}
 
           {expandable ? (
@@ -310,11 +284,7 @@ function SpecChip({
           {rawValue != null ? (
             rawValue
           ) : (
-            <AnimatedNumber
-              value={value ?? 0}
-              format={(n) => `${Math.round(n).toLocaleString()}${suffix}`}
-              duration={600}
-            />
+            <span>{value?.toLocaleString() ?? '—'}{suffix}</span>
           )}
         </span>
         <span className="ml-1 text-[11px] text-muted-foreground">{label}</span>

@@ -318,7 +318,7 @@ export function McpSection({ slug }: McpSectionProps) {
         {mcpKeysLoading ? (
           <div className="h-16 rounded-md bg-foreground/[0.04] animate-pulse" />
         ) : mcpKeys.length === 0 ? (
-          <p className={`${BODY_MUTED} italic`}>
+          <p className={`${BODY_MUTED} not-italic`}>
             No keys yet. Generate one to connect a client.
           </p>
         ) : (

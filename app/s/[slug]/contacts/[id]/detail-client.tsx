@@ -248,7 +248,7 @@ export function EditableField({
       }}
       className={cn(
         'text-left rounded-sm hover:bg-foreground/[0.04] transition-colors -mx-1 px-1',
-        !value && 'text-muted-foreground italic',
+        !value && 'text-muted-foreground not-italic',
         className,
       )}
     >

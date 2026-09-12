@@ -25,7 +25,7 @@ export const metadata: Metadata = { title: 'Profile — Broker Settings' };
  */
 export default async function BrokerSettingsProfilePage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

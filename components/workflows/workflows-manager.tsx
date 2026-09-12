@@ -1414,7 +1414,7 @@ function WorkflowRow({
           {workflow.description ? (
             <>
               <span className="text-muted-foreground/40 flex-shrink-0">·</span>
-              <span className="truncate italic">{workflow.description}</span>
+              <span className="truncate not-italic">{workflow.description}</span>
             </>
           ) : workflow.trigger.type !== 'webhook' ? (
             <>

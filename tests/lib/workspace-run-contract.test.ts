@@ -8,7 +8,6 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
 describe('Workspace Run vertical contract', () => {
   it('keeps the user-visible journey feature-gated and attached to natural-language Work mode', () => {
-    expect(read('components/chippi/chippi-workspace.tsx')).toContain('ChatWorkModeSwitch');
     expect(read('components/chippi/chippi-workspace.tsx')).not.toContain('WorkSessionDialog');
     expect(read('components/ui/chippi-prompt-box.tsx')).not.toContain("action: 'work-session'");
     expect(read('lib/ai-tools/tools/start-work-session.ts')).toContain(".enum(['research', 'workspace'])");

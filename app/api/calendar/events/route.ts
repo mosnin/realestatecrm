@@ -46,6 +46,7 @@ const LOOKAHEAD_DAYS = 30;
  *  tenant calls don't cross-pollinate. The serverless cold-start
  *  ratio means this is mostly a hot-loop guard, not a long-term cache. */
 interface CacheEntry {
+  connectionId: string;
   expiresAt: number;
   payload: ConnectedPayload;
 }
@@ -139,12 +140,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(payload);
   }
 
+  if (connection.toolkit !== 'googlecalendar') {
+    return NextResponse.json({ error: 'Reading this calendar provider is not available here yet. Open your provider calendar to verify your schedule.' }, { status: 501 });
+  }
+
   // Hot-path cache. Independent of connection identity — a reconnect
   // (which mints a new connection id) bypasses the memo on the next
   // request because the cached payload no longer satisfies "events for
   // THIS active connection"; we just keep it simple and key by space.
   const cached = memo.get(space.id);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.connectionId === connection.id && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.payload);
   }
 
@@ -193,6 +198,7 @@ export async function GET(req: NextRequest) {
         '[api/calendar/events] composio returned !successful',
         { spaceId: space.id, provider: connection.toolkit, err: resp.error ?? null },
       );
+      return NextResponse.json({ error: 'Your calendar provider could not load events. Try again.' }, { status: 502 });
     }
   } catch (err) {
     logger.error(
@@ -200,9 +206,7 @@ export async function GET(req: NextRequest) {
       { spaceId: space.id, provider: connection.toolkit },
       err,
     );
-    // Don't 500 — the realtor sees an empty list with the calm empty
-    // state. Composio's flakiness shouldn't break the calendar page.
-    events = [];
+    return NextResponse.json({ error: 'Calendar unavailable. Your schedule could not be verified.' }, { status: 502 });
   }
 
   const payload: ConnectedPayload = {
@@ -210,7 +214,7 @@ export async function GET(req: NextRequest) {
     provider: connection.toolkit,
     events,
   };
-  memo.set(space.id, { expiresAt: Date.now() + MEMO_TTL_MS, payload });
+  memo.set(space.id, { connectionId: connection.id, expiresAt: Date.now() + MEMO_TTL_MS, payload });
   return NextResponse.json(payload);
 }
 

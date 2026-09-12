@@ -187,7 +187,7 @@ export function DealInlineField({
       )}
       title={`Edit ${label.toLowerCase()}`}
     >
-      <span className={cn('text-sm flex-1 min-w-0', !displayText && 'text-muted-foreground italic')}>
+      <span className={cn('text-sm flex-1 min-w-0', !displayText && 'text-muted-foreground not-italic')}>
         {displayText ?? placeholder}
       </span>
       <Pencil

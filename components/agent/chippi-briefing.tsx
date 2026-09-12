@@ -30,6 +30,8 @@ interface BriefingData {
 }
 
 export function ChippiBriefing({ slug }: { slug: string }) {
+  const [unavailable, setUnavailable] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [data, setData] = useState<BriefingData>({
     priorityItems: [],
     generatedAt: null,
@@ -50,6 +52,9 @@ export function ChippiBriefing({ slug }: { slug: string }) {
           fetch('/api/agent/goals?status=active&limit=1', { signal: controller.signal }),
         ]);
 
+        if (![priorityRes, draftsRes, questionsRes, goalsRes].every(response => response.ok)) throw new Error('Briefing unavailable');
+        if (controller.signal.aborted) return;
+        setUnavailable(false);
         const priority = priorityRes.ok ? await priorityRes.json() : { items: [], generatedAt: null };
         const drafts = draftsRes.ok ? await draftsRes.json() : [];
         const questions = questionsRes.ok ? await questionsRes.json() : [];
@@ -64,12 +69,14 @@ export function ChippiBriefing({ slug }: { slug: string }) {
           isLoaded: true,
         });
       } catch {
+        if (controller.signal.aborted) return;
+        setUnavailable(true);
         setData(prev => ({ ...prev, isLoaded: true }));
       }
     }
     void load();
     return () => controller.abort();
-  }, []);
+  }, [slug, retry]);
 
   const agentHref = `/s/${slug}/chippi`;
   const hasAnything = data.pendingDrafts > 0 || data.pendingQuestions > 0 || data.priorityItems.length > 0;
@@ -85,6 +92,8 @@ export function ChippiBriefing({ slug }: { slug: string }) {
     );
   }
 
+  if (unavailable) return <div role="alert" className="rounded-xl border p-4 text-sm">Chippi’s briefing could not be verified. <button className="underline" onClick={() => setRetry(value => value + 1)}>Try again</button></div>;
+
   if (!hasAnything && data.isLoaded) {
     return (
       <div className="rounded-2xl border border-border bg-muted/20 p-4 sm:p-5 flex items-center gap-3">
@@ -93,7 +102,7 @@ export function ChippiBriefing({ slug }: { slug: string }) {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium">You&apos;re ahead of it</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Nothing urgent on Chippi&apos;s desk &mdash; pipeline looks healthy. I&apos;ll surface anything that needs you.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">No items were flagged in the current briefing. Open Today to review your work.</p>
         </div>
       </div>
     );

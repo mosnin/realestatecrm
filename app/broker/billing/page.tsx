@@ -21,7 +21,7 @@ export default async function BrokerBillingPage() {
   if (!userId) redirect('/login/realtor');
 
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/setup');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // The brokerage's OWN Stripe identity — written by the brokerage-scoped
   // checkout and kept current by the webhook. When a brokerage subscription

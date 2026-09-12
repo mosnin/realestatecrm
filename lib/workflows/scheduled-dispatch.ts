@@ -57,6 +57,9 @@ import crypto from 'crypto';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { runAutonomousInstruction } from '@/lib/agent/run-instruction';
+import { composeScheduledMessage } from './compose-message';
+import { recordActivityOutcome } from '@/lib/ai-tools/outcomes';
+import { emit, maybeEmitFirstAction } from '@/lib/telemetry';
 import { sendSMS } from '@/lib/sms';
 import { describeDelivery, sendDraft } from '@/lib/delivery';
 import { checkSendAllowed } from '@/lib/messaging/compliance';
@@ -90,6 +93,8 @@ export interface DueScheduledMessage {
   recipientContactId: string | null;
   instruction: string;
   autonomy: WorkflowAutonomy;
+  workflowId?: string | null;
+  detail?: { contentMode?: 'literal' | 'instruction'; source?: string; sequenceId?: string } | null;
 }
 
 async function spaceOwnerClerkId(spaceId: string): Promise<string | undefined> {
@@ -125,7 +130,7 @@ export interface DispatchSummary {
  *  abort the batch. */
 async function setStatus(
   id: string,
-  status: 'drafted' | 'sent' | 'failed',
+  status: 'drafted' | 'sent' | 'failed' | 'canceled',
   detail: Record<string, unknown>,
 ): Promise<void> {
   const { error } = await unscoped(supabase
@@ -209,13 +214,14 @@ async function recentAutoSendCount(spaceId: string, now: Date): Promise<number> 
  * headless agent, which drafts (AgentDraft rows) and NEVER sends. For 'notify'
  * we also fire the realtor nudge. Returns the resulting status.
  */
-async function processDraft(row: DueScheduledMessage): Promise<'drafted' | 'failed'> {
+async function processDraft(row: DueScheduledMessage): Promise<'drafted' | 'failed' | 'skipped'> {
+  if (!(await claimForSend(row.id))) return 'skipped';
   const recipient = row.recipientContactId ? `contact ${row.recipientContactId}` : 'the relevant contact';
   const composed = `Draft a ${row.channel} to ${recipient}: ${row.instruction}`;
   const result = await runAutonomousInstruction({ spaceId: row.spaceId, instruction: composed });
 
-  if (!result.ok) {
-    await setStatus(row.id, 'failed', { stage: 'draft', error: result.error ?? 'draft run failed' });
+  if (!result.ok || result.outcome !== 'drafted') {
+    await setStatus(row.id, 'failed', { stage: 'draft', error: result.error ?? 'No saved draft was confirmed' });
     return 'failed';
   }
 
@@ -276,11 +282,10 @@ async function processAuto(
     return 'failed';
   }
 
-  // The 'auto' send body. There is no human to compose it here, so the
-  // instruction itself IS the message body — a workflow set to autonomy='auto'
-  // opts into sending the instruction's text. (Drafting via the agent is the
-  // 'draft'/'notify' posture; 'auto' is the deliberate no-tap path.)
-  const body = row.instruction;
+  // Historical rows contain literal text. Newly authored AI instructions are
+  // explicitly marked in detail and composed only after this send is claimed.
+  let body = row.instruction;
+  let subject: string | undefined;
   let deliveredTo: string | null = null;
   let deliveryVia: string | null = null;
 
@@ -341,6 +346,20 @@ async function processAuto(
     return 'deferred';
   }
 
+  if (row.detail?.contentMode === 'instruction') {
+    try {
+      const message = await composeScheduledMessage({
+        spaceId: row.spaceId, scheduledMessageId: row.id, channel: row.channel,
+        instruction: row.instruction, recipientName: contact.name ?? '',
+      });
+      body = message.body;
+      subject = message.subject;
+    } catch {
+      await setStatus(row.id, 'failed', { stage: 'compose', error: 'Could not prepare a valid message. Nothing was sent.' });
+      return 'failed';
+    }
+  }
+
   if (row.channel === 'email') {
     const { data: spaceSetting } = await supabase
       .from('SpaceSetting')
@@ -350,7 +369,7 @@ async function processAuto(
     const fromName = (spaceSetting?.businessName as string | undefined) ?? row.spaceId;
     const clerkId = await spaceOwnerClerkId(row.spaceId);
     const delivery = await sendDraft(
-      { channel: 'email', subject: `Message from ${fromName}`, content: body },
+      { channel: 'email', subject: subject ?? `Message from ${fromName}`, content: body },
       { name: (contact.name ?? '').trim() || 'there', email: contact.email, phone: contact.phone },
       fromName,
       { spaceId: row.spaceId, userId: clerkId },
@@ -388,6 +407,10 @@ async function processAuto(
     deliveredTo = contact.phone;
   }
 
+  void recordActivityOutcome({ spaceId: row.spaceId, name: `send_${row.channel}`, outcome: 'completed', callId: `scheduled:${row.id}` });
+  void emit({ event: 'agent_action_result', spaceId: row.spaceId, payload: { toolName: `send_${row.channel}`, outcome: 'completed', background: true, scheduledMessageId: row.id } });
+  void maybeEmitFirstAction({ spaceId: row.spaceId, toolName: `send_${row.channel}` });
+
   // RAIL 2 — AUDIT. The send went out; record it on the contact's timeline and
   // inbox transcript. Mirrors /api/agent/send. Best-effort: an audit-write
   // failure must not flip a real send into a 'failed' (which could re-send).
@@ -418,7 +441,7 @@ async function processAuto(
       contactId: contact.id,
       channel: row.channel as InboxChannel,
       body,
-      subject: null,
+      subject: subject ?? null,
       metadata: { source: 'workflow_scheduled_auto', scheduledMessageId: row.id },
     },
     { route: 'scheduled-dispatch', spaceId: row.spaceId, scheduledMessageId: row.id },
@@ -445,6 +468,24 @@ async function processRow(
   now: Date,
 ): Promise<'drafted' | 'sent' | 'deferred' | 'skipped' | 'failed'> {
   try {
+    // Re-read the saved policy before acting. A queued row does not override
+    // an owner who has since paused or reduced an automation's permissions.
+    if (row.workflowId) {
+      const { data: workflow, error } = await tenantTable(supabase, 'Workflow', { spaceId: row.spaceId })
+        .select('enabled, autonomy').eq('id', row.workflowId).maybeSingle();
+      if (error) return 'deferred';
+      if (!workflow?.enabled) {
+        await setStatus(row.id, 'canceled', { reason: 'Automation was paused or removed before this step ran.' });
+        return 'skipped';
+      }
+      if (row.autonomy === 'auto' && workflow.autonomy !== 'auto') row = { ...row, autonomy: workflow.autonomy === 'notify' ? 'notify' : 'draft' };
+    }
+    if (row.detail?.source === 'drip') {
+      const { data: settings, error } = await tenantTable(supabase, 'AgentSettings', { spaceId: row.spaceId })
+        .select('autonomyLevel').maybeSingle();
+      if (error) return 'deferred';
+      if (row.autonomy === 'auto' && settings?.autonomyLevel !== 'autonomous') row = { ...row, autonomy: 'draft' };
+    }
     if (row.autonomy === 'auto') {
       return await processAuto(row, now);
     }
@@ -491,7 +532,7 @@ export async function dispatchDueScheduledMessages(now: Date = new Date()): Prom
 
   const { data: rows, error } = await unscoped(supabase
     .from('ScheduledMessage'), 'post-fetch: caller verified parent scope before this id query')
-    .select('id, spaceId, channel, recipientContactId, instruction, autonomy')
+    .select('id, spaceId, channel, recipientContactId, instruction, autonomy, detail, workflowId')
     .eq('status', 'pending')
     .lte('sendAt', now.toISOString())
     .order('sendAt', { ascending: true })

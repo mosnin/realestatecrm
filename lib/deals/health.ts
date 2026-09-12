@@ -45,7 +45,11 @@ function daysBetween(a: Date, b: Date): number {
 // stageChangedAt is optional in the input so callers that pre-date the column
 // (broker pipeline, morning routes, old tests) keep compiling. Internally we
 // prefer it when present and fall back to updatedAt when not.
-type DealHealthInput = {
+export type DealHealthInput = {
+  inspectionDeadline?: Date | string | null;
+  earnestDueAt?: Date | string | null;
+  milestones?: Deal['milestones'];
+  checklist?: { kind?: string; label: string; dueAt: string | null; completedAt: string | null }[];
   status: Deal['status'];
   stageChangedAt?: Deal['stageChangedAt'];
   updatedAt?: Deal['updatedAt'];
@@ -55,10 +59,27 @@ type DealHealthInput = {
   nextActionDueAt: Deal['nextActionDueAt'];
 };
 
+/** Date-only commitments stay due through the end of that local day. */
+export function commitmentTime(value: string | Date): number {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T23:59:59.999`).getTime();
+  return new Date(value).getTime();
+}
+export function nextDealDeadline(deal: Pick<DealHealthInput, 'inspectionDeadline' | 'earnestDueAt' | 'milestones' | 'checklist'>) {
+  const items = (deal.checklist ?? []).filter(i => !i.completedAt && i.dueAt).map(i => ({ label: i.label, dueAt: i.dueAt!, confirm: false }));
+  for (const item of deal.milestones ?? []) if (!item.completed && !item.completedAt && item.dueDate) items.push({ label: item.label, dueAt: item.dueDate, confirm: false });
+  for (const [kind, label, value] of [['inspection', 'Inspection', deal.inspectionDeadline], ['earnest_money', 'Earnest money', deal.earnestDueAt]] as const) {
+    // An explicit completed checklist item is completion evidence for the contract date.
+    if (value && !(deal.checklist ?? []).some(i => i.kind === kind && i.completedAt)) items.push({ label, dueAt: value instanceof Date ? value.toISOString() : value, confirm: true });
+  }
+  return items.filter(i => Number.isFinite(commitmentTime(i.dueAt))).sort((a,b) => commitmentTime(a.dueAt)-commitmentTime(b.dueAt))[0] ?? null;
+}
+
 export function dealHealth(deal: DealHealthInput): DealHealthMeta {
   if (deal.status !== 'active') return { state: 'on-track', reason: '' };
 
   const today = startOfToday();
+  const now = Date.now();
+  const deadline = nextDealDeadline(deal);
 
   // Days the deal has sat in its current stage. `stageChangedAt` is bumped by
   // PATCH /api/deals/[id] whenever stageId changes (and by POST /api/deals
@@ -84,20 +105,30 @@ export function dealHealth(deal: DealHealthInput): DealHealthMeta {
 
   // Follow-up overdue means the realtor committed to doing something and hasn't.
   const followUp = deal.followUpAt ? new Date(deal.followUpAt) : null;
-  const followUpOverdue = !!(followUp && !isNaN(followUp.getTime()) && followUp.getTime() < today.getTime());
+  const followUpOverdue = !!(followUp && !isNaN(followUp.getTime()) && followUp.getTime() < now);
 
   // Realtor-authored next action that's past its due date — a strong
   // "this specific deal is being ignored" signal.
   const nextDue = deal.nextActionDueAt ? new Date(deal.nextActionDueAt) : null;
-  const nextActionOverdue = !!(deal.nextAction && nextDue && !isNaN(nextDue.getTime()) && nextDue.getTime() < today.getTime());
+  const nextActionOverdue = !!(deal.nextAction && nextDue && !isNaN(nextDue.getTime()) && nextDue.getTime() < now);
 
-  // Stuck first — most urgent
+  const deadlineReason = deadline && commitmentTime(deadline.dueAt) < now
+    ? `${deadline.label} deadline passed${deadline.confirm ? ' · confirm completion' : ''}`
+    : deadline && commitmentTime(deadline.dueAt) <= now + 3 * MS_PER_DAY
+      ? `${deadline.label} due within 3 days`
+      : null;
+
+  // Preserve severe signals while retaining the actionable deadline.
   if (stageDays != null && stageDays >= 30) {
-    return { state: 'stuck', reason: `${stageDays} days in this stage` };
+    return { state: 'stuck', reason: `${stageDays} days in this stage${deadlineReason ? ` · ${deadlineReason}` : ''}` };
   }
   if (closeDays != null && closeDays <= -3) {
-    return { state: 'stuck', reason: `expected close was ${Math.abs(closeDays)} days ago` };
+    return { state: 'stuck', reason: `expected close was ${Math.abs(closeDays)} days ago${deadlineReason ? ` · ${deadlineReason}` : ''}` };
   }
+
+  if (deadlineReason) return { state: 'at-risk', reason: deadlineReason };
+
+  if (closeDays != null && closeDays < 0) return { state: 'at-risk', reason: 'expected closing date passed' };
 
   // At risk — needs a nudge
   if (stageDays != null && stageDays >= 15) {
@@ -128,11 +159,14 @@ export function dealHealth(deal: DealHealthInput): DealHealthMeta {
  * The returned `dueAt` is used by the Today inbox to flag overdue items.
  */
 export function inferNextAction(
-  deal: Pick<Deal, 'status' | 'followUpAt' | 'closeDate' | 'nextAction' | 'nextActionDueAt'>,
+  deal: Pick<Deal, 'status' | 'followUpAt' | 'closeDate' | 'nextAction' | 'nextActionDueAt'> & Pick<DealHealthInput, 'inspectionDeadline' | 'earnestDueAt' | 'milestones' | 'checklist'>,
 ): { label: string; dueAt: Date | null } | null {
   if (deal.status !== 'active') return null;
 
   const today = startOfToday();
+
+  const deadline = nextDealDeadline(deal);
+  if (deadline && commitmentTime(deadline.dueAt) <= Date.now() + 3 * MS_PER_DAY) return { label: `${deadline.label}${deadline.confirm ? ' · confirm completion' : ''}`, dueAt: new Date(commitmentTime(deadline.dueAt)) };
 
   // 1. Realtor-authored next action wins.
   if (deal.nextAction && deal.nextAction.trim()) {
@@ -215,7 +249,7 @@ export function classifyForStrips<T extends Pick<Deal, 'status' | 'updatedAt' | 
 
 export const HEALTH_META: Record<DealHealth, { label: string; dotClass: string; textClass: string }> = {
   'on-track': {
-    label: 'On track',
+    label: 'No flagged issues',
     dotClass: 'bg-emerald-500',
     textClass: 'text-emerald-700 dark:text-emerald-400',
   },

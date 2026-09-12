@@ -184,7 +184,7 @@ export function buildChatAgent(
     ...ctx,
     directExecutionToolNames:
       ctx.workMode === true && ctx.workExecutionMode !== 'review' && opts.userMessage != null
-        ? selectDirectExecutionToolNames(opts.userMessage, selectedDomain, ctx.conversationGoal)
+        ? selectDirectExecutionToolNames(ctx.backgroundRun ? (ctx.backgroundAuthorizedInstruction ?? '') : opts.userMessage, selectedDomain, ctx.backgroundRun ? undefined : ctx.conversationGoal)
         : [],
   };
   const domainTools = selectedDomain.filter((t) => !['open_spreadsheet_in_workbench', 'inspect_workbook', 'apply_workbook_transformation'].includes(t.name) || isWorkbenchEnabled()).map((t: ToolDefinition) =>

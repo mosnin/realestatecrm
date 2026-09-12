@@ -155,11 +155,11 @@ export function WhatIDid({ slug }: { slug: string }) {
                     {targetName ? (
                       <span className="font-medium text-foreground">{targetName}</span>
                     ) : (
-                      <span className="text-muted-foreground italic">a contact</span>
+                      <span className="text-muted-foreground not-italic">a contact</span>
                     )}
                   </p>
                   {entry.reasoning && (
-                    <p className="text-xs text-muted-foreground italic line-clamp-1 mt-0.5">
+                    <p className="text-xs text-muted-foreground not-italic line-clamp-1 mt-0.5">
                       {entry.reasoning}
                     </p>
                   )}

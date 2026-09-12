@@ -53,21 +53,23 @@ test('homepage proof band stays contained on a phone viewport', async ({ page })
   );
   await values[0].scrollIntoViewIfNeeded();
 
-  const boxes: Array<{ x: number; y: number; width: number; height: number }> = [];
-  for (const value of values) {
-    await expect(value).toBeVisible();
-    await expect
-      .poll(async () => value.boundingBox(), { timeout: 5_000 })
-      .not.toBeNull();
-    const box = await value.boundingBox();
-    expect(box, 'proof value should have a rendered box').toBeTruthy();
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
-    boxes.push(box!);
-  }
+  // Hydration can replace a node between reads. Retry the complete geometry
+  // assertion so every successful check describes the currently rendered band.
+  await expect(async () => {
+    const boxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+    for (const value of values) {
+      const box = await value.boundingBox();
+      expect(box, 'proof value should have a rendered box').toBeTruthy();
+      expect(box!.width).toBeGreaterThan(0);
+      expect(box!.height).toBeGreaterThan(0);
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+      boxes.push(box!);
+    }
 
-  expect(boxes[0].y).toBeLessThan(boxes[1].y);
-  expect(boxes[1].y).toBeLessThan(boxes[2].y);
+    expect(boxes[0].y).toBeLessThan(boxes[1].y);
+    expect(boxes[1].y).toBeLessThan(boxes[2].y);
+  }).toPass({ timeout: 5_000 });
 
   const viewport = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,

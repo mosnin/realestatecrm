@@ -18,6 +18,7 @@
  *   { connected: boolean, source: string | null, records: SyncRecord[] }
  */
 
+import { CrmLinkButton, CrmFollowThroughStatus } from '@/components/follow-through/crm-link';
 import { useCallback, useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Plug, RefreshCw, Unplug, User } from 'lucide-react';
@@ -93,7 +94,7 @@ export const CRM_ENTRIES: CrmEntry[] = [
   { toolkit: 'hubspot', name: 'HubSpot', blurb: 'Sync deals and contacts from HubSpot.' },
   { toolkit: 'salesforce', name: 'Salesforce', blurb: 'Mirror your Salesforce contacts.' },
   { toolkit: 'pipedrive', name: 'Pipedrive', blurb: 'Bring your Pipedrive contacts here.' },
-  { toolkit: 'zoho', name: 'Zoho CRM', blurb: 'Two-way sync with Zoho.' },
+  { toolkit: 'zoho', name: 'Zoho CRM', blurb: 'Read your Zoho contacts.' },
 ];
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -123,13 +124,16 @@ export function SyncView({ slug }: SyncViewProps) {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
   const reduced = useReducedMotion();
 
   const fetchRecords = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const res = await fetch(`/api/sync?slug=${encodeURIComponent(slug)}`);
+      const res = await fetch(`/api/sync?slug=${encodeURIComponent(slug)}&offset=${offset}&search=${encodeURIComponent(query)}`);
       if (!res.ok) throw new Error(`Fetch failed (${res.status}).`);
       const json = (await res.json()) as SyncResponse;
       setData(json);
@@ -140,7 +144,7 @@ export function SyncView({ slug }: SyncViewProps) {
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, offset, query]);
 
   useEffect(() => {
     void fetchRecords();
@@ -167,6 +171,12 @@ export function SyncView({ slug }: SyncViewProps) {
         <p className={BODY_MUTED}>{statusSentence()}</p>
       </header>
 
+      {data?.source === 'follow_up_boss' && <form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); setOffset(0); setQuery(search); }}>
+        <input className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm" aria-label="Search Follow Up Boss people" placeholder="Search all Follow Up Boss people" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className="min-h-10 rounded-lg border border-border px-3 text-sm">Search</button>
+        <button type="button" className="min-h-10 px-3 text-sm disabled:opacity-40" disabled={loading || offset===0} onClick={() => setOffset(Math.max(0,offset-50))}>Previous</button>
+        <button type="button" className="min-h-10 px-3 text-sm disabled:opacity-40" disabled={loading || data.records.length<50} onClick={() => setOffset(offset+50)}>Next 50</button>
+      </form>}
       {/* ── Loading state ── */}
       {loading && (
         <p className={BODY_MUTED}>One moment — pulling your contacts.</p>
@@ -578,6 +588,7 @@ function RecordsList({
   return (
     <div className="space-y-5">
       <SyncToolbar source={source} slug={slug} onRefresh={onRefresh} />
+      {source === 'follow_up_boss' && <CrmFollowThroughStatus slug={slug} />}
 
       {/* Staggered record list */}
       <motion.ul
@@ -587,14 +598,14 @@ function RecordsList({
         animate="enter"
       >
         {records.map((record) => (
-          <RecordRow key={record.id} record={record} reduced={reduced} />
+          <RecordRow key={record.id} record={record} reduced={reduced} slug={slug} source={source} />
         ))}
       </motion.ul>
     </div>
   );
 }
 
-function RecordRow({ record, reduced }: { record: SyncRecord; reduced: boolean }) {
+function RecordRow({ record, reduced, slug, source }: { record: SyncRecord; reduced: boolean; slug: string; source: string | null }) {
   const initials = record.name
     .split(' ')
     .slice(0, 2)
@@ -619,7 +630,7 @@ function RecordRow({ record, reduced }: { record: SyncRecord; reduced: boolean }
 
   return (
     <motion.li
-      className="flex items-center gap-3 py-3 hover:bg-foreground/[0.04] -mx-3 px-3 rounded-sm transition-colors duration-150"
+      className="flex flex-wrap items-center gap-3 py-3 hover:bg-foreground/[0.04] -mx-3 px-3 rounded-sm transition-colors duration-150"
       variants={reduced ? undefined : STAGGER_ITEM}
     >
       {/* Avatar */}
@@ -647,6 +658,7 @@ function RecordRow({ record, reduced }: { record: SyncRecord; reduced: boolean }
         </p>
       </div>
 
+      {source === 'follow_up_boss' && <CrmLinkButton slug={slug} externalId={record.id} />}
       {/* Meta */}
       {dateLabel && (
         <span className={cn(META, 'shrink-0 tabular-nums')}>{dateLabel}</span>
@@ -669,6 +681,7 @@ function ConnectedEmptyState({
   return (
     <div className="space-y-5">
       <SyncToolbar source={source} slug={slug} onRefresh={onRefresh} />
+      {source === 'follow_up_boss' && <CrmFollowThroughStatus slug={slug} />}
 
       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-5 py-10 text-center">
         <p className={BODY}>Nothing in your {sourceLabel(source)} yet.</p>

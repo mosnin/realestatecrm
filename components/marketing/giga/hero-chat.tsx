@@ -39,7 +39,6 @@ export function HeroChat({ lang = 'en' }: { lang?: Lang }) {
         <div className="mt-2 flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-white/70">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/favicon.png" alt="Chippi" width={16} height={16} className="h-4 w-4 rounded" />
             Chippi
           </span>
           <button

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
 import { resolveBrokerContext } from '@/lib/agent/broker-context';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
 import { formatCompact } from '@/lib/formatting';
@@ -42,6 +43,9 @@ type DealRow = {
   followUpAt: string | null;
   nextAction: string | null;
   nextActionDueAt: string | null;
+  inspectionDeadline: string | null;
+  earnestDueAt: string | null;
+  milestones: import('@/lib/types').DealMilestone[];
 };
 
 type StageRow = {
@@ -148,6 +152,7 @@ function buildColumns(
   for (const col of result) {
     col.deals.sort((a, b) => {
       const ha = dealHealth({
+        ...a,
         status: a.status,
         stageChangedAt: a.stageChangedAt,
         updatedAt: a.updatedAt,
@@ -157,6 +162,7 @@ function buildColumns(
         nextActionDueAt: a.nextActionDueAt,
       });
       const hb = dealHealth({
+        ...b,
         status: b.status,
         stageChangedAt: b.stageChangedAt,
         updatedAt: b.updatedAt,
@@ -179,13 +185,14 @@ function buildColumns(
 
 export default async function BrokerDealsPage() {
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 
   // Resolve ALL brokerage members — same pattern as the previous page.
   const allMembers = await getBrokerageMembers(brokerage.id, {
     includeSpaceName: true,
+    strict: true,
   });
 
   const memberSpaceIds = allMembers
@@ -218,28 +225,29 @@ export default async function BrokerDealsPage() {
   // Fetch active deals only — the kanban shows the live pipeline.
   // Won/lost/on-hold deals are closed chapter; the broker oversight
   // story is about what's in-flight right now.
-  const { data: dealsRaw } = spaceIds.length > 0
-    ? await supabase
+  const dealsRaw = spaceIds.length > 0
+    ? await readAllRows<DealRow>((from,to) => supabase
         .from('Deal')
         .select(
-          'id, spaceId, title, value, commissionRate, address, closeDate, stageId, status, createdAt, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt',
+          'id, spaceId, title, value, commissionRate, address, closeDate, stageId, status, createdAt, updatedAt, stageChangedAt, followUpAt, nextAction, nextActionDueAt, inspectionDeadline, earnestDueAt, milestones',
         )
         .in('spaceId', spaceIds)
         .eq('status', 'active')
         .order('createdAt', { ascending: false })
-        .limit(5000)
-    : { data: [] as DealRow[] };
+        .order('id').range(from,to))
+    : [];
 
   // Fetch stages for all spaces
-  const { data: stagesRaw } = spaceIds.length > 0
-    ? await supabase
+  const stagesRaw = spaceIds.length > 0
+    ? await readAllRows<StageRow>((from,to) => supabase
         .from('DealStage')
         .select('id, name, color, position, spaceId')
         .in('spaceId', spaceIds)
         .order('position', { ascending: true })
-        .limit(2000)
-    : { data: [] as StageRow[] };
+        .order('id').range(from,to))
+    : [];
 
+  const checklistRows = spaceIds.length ? await readAllRows<{dealId:string;kind:string;label:string;dueAt:string|null;completedAt:string|null}>((from,to) => supabase.from('DealChecklistItem').select('dealId, kind, label, dueAt, completedAt').in('spaceId', spaceIds).order('id').range(from,to)) : [];
   const stages = (stagesRaw ?? []) as StageRow[];
 
   // ── Enrich deals with realtor names ──────────────────────────────────────
@@ -259,6 +267,10 @@ export default async function BrokerDealsPage() {
     const nextActionDueAt = d.nextActionDueAt ? new Date(d.nextActionDueAt) : null;
 
     const health = dealHealth({
+      checklist: (checklistRows ?? []).filter((item: {dealId:string}) => item.dealId === d.id),
+      inspectionDeadline: d.inspectionDeadline,
+      earnestDueAt: d.earnestDueAt,
+      milestones: d.milestones,
       status: d.status as 'active' | 'won' | 'lost' | 'on_hold',
       stageChangedAt,
       updatedAt,
@@ -284,6 +296,10 @@ export default async function BrokerDealsPage() {
       followUpAt,
       nextAction: d.nextAction,
       nextActionDueAt,
+      checklist: (checklistRows ?? []).filter((item: {dealId:string}) => item.dealId === d.id),
+      inspectionDeadline: d.inspectionDeadline,
+      earnestDueAt: d.earnestDueAt,
+      milestones: d.milestones,
       realtorName,
       // Pass stageId for column slotting; not in BrokerDealItem interface
       stageId: d.stageId,

@@ -40,6 +40,7 @@ export default async function AutomationsPage({
     .maybeSingle();
   if (!spaceOwner) notFound();
 
+  let countsAvailable = true;
   let workflowCount = 0;
   let activeWorkflowCount = 0;
   let routineCount = 0;
@@ -51,11 +52,13 @@ export default async function AutomationsPage({
       supabase.from('Routine').select('*', { count: 'exact', head: true }).eq('spaceId', space.id),
       supabase.from('Routine').select('*', { count: 'exact', head: true }).eq('spaceId', space.id).eq('enabled', true),
     ]);
+    if ([workflows, activeWorkflows, routines, activeRoutines].some(result => result.error)) throw new Error('Automation counts unavailable');
     workflowCount = workflows.count ?? 0;
     activeWorkflowCount = activeWorkflows.count ?? 0;
     routineCount = routines.count ?? 0;
     activeRoutineCount = activeRoutines.count ?? 0;
   } catch (err) {
+    countsAvailable = false;
     console.error('[automations] count query failed', err);
   }
 
@@ -69,7 +72,7 @@ export default async function AutomationsPage({
         layout="stacked"
         eyebrow="Automations"
         title="Automations"
-        summary="When something happens, or on a schedule. Each one drafts or sends — you choose."
+        summary="Respond and follow up on the triggers you choose. Each automation shows whether it sends or prepares work for review."
         nextAction={
           workflowCount + routineCount === 0
             ? 'Start with one real moment you already handle by hand every week.'
@@ -86,8 +89,8 @@ export default async function AutomationsPage({
       />
 
       <SupportingMetricBand>
-        <SupportingMetric label="On" value={on} detail="running now" accent />
-        <SupportingMetric label="Paused" value={paused} detail="saved, not listening" />
+        <SupportingMetric label="On" value={countsAvailable ? on : 'Unavailable'} detail="enabled" accent />
+        <SupportingMetric label="Paused" value={countsAvailable ? paused : 'Unavailable'} detail="paused" />
       </SupportingMetricBand>
 
       <SupportingWorkArea>

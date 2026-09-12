@@ -106,3 +106,10 @@ export function computeCommission(
   const net = Math.max(0, gci - outgoing + mine);
   return { gci, outgoing, mine, net, outgoingPaid, outgoingUnpaid };
 }
+
+/** YTD uses the actual closing instant, never a later record edit. */
+export function closedThisYear(deal: { status: string; closedAt?: string | null }, now = new Date()): boolean {
+  if (deal.status !== 'won' || !deal.closedAt) return false;
+  const closed = new Date(deal.closedAt).getTime();
+  return Number.isFinite(closed) && closed >= new Date(now.getFullYear(), 0, 1).getTime() && closed <= now.getTime();
+}

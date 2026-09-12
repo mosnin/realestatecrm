@@ -13,7 +13,7 @@ import {
 
 export default async function BrokerMembersPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { data: memberships } = await supabase
     .from('BrokerageMembership')

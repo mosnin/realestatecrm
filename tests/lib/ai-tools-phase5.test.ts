@@ -176,7 +176,8 @@ describe('scheduleTourTool', () => {
       makeCtx(),
     );
     expect(result.display).toBe('tours');
-    expect(result.summary).toMatch(/Tour scheduled/);
+    expect(result.summary).toMatch(/Tour saved/);
+    expect(result.data).toMatchObject({ tours: [expect.objectContaining({ calendarStatus: 'not_connected', propertyAccessConfirmed: false })] });
     const tours = (result.data as { tours: { contactId: string | null }[] }).tours;
     expect(tours).toHaveLength(1);
     expect(tours[0].contactId).toBeNull();

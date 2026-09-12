@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { getSpaceFromSlug } from '@/lib/space';
 import { supabase } from '@/lib/supabase';
+import { AgentSettingsPanel } from '@/components/agent/agent-settings-panel';
 import { ChippiPageShell } from '@/components/chippi/chippi-page-shell';
 import { SECTION_LABEL, CAPTION } from '@/lib/typography';
 import { Button } from '@/components/ui/button';
@@ -33,13 +34,14 @@ export default async function AutomationSettingsPage({
   if (!spaceOwner) notFound();
 
   // Fetch active integrations so we can show what's powering automations.
-  const { data: connections } = await supabase
+  const { data: connections, error: connectionsError } = await supabase
     .from('IntegrationConnection')
     .select('id, toolkit, label, status, lastUsedAt')
     .eq('spaceId', space.id)
     .eq('status', 'active')
     .order('createdAt', { ascending: false });
 
+  if (connectionsError) throw new Error('Connected apps could not be loaded');
   const activeConnections = connections ?? [];
 
   return (
@@ -49,6 +51,7 @@ export default async function AutomationSettingsPage({
       subtitle="Control what apps your automations can act on."
       layout="dashboard"
     >
+      <AgentSettingsPanel slug={slug} />
       <RealtorPanel className="max-w-2xl space-y-8" as="div">
         <section className="space-y-4">
           <div className="space-y-1">

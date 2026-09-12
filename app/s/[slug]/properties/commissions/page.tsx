@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSpaceFromSlug } from '@/lib/space';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { ArrowRight } from 'lucide-react';
-import { computeCommission, type CommissionSplit } from '@/lib/commissions';
+import { computeCommission, closedThisYear, type CommissionSplit } from '@/lib/commissions';
 import { formatCurrency, formatCompact, pluralize } from '@/lib/formatting';
 import {
   H1,
@@ -27,6 +28,7 @@ interface DealRow {
   commissionRate: number | null;
   closeDate: string | null;
   updatedAt: string;
+  closedAt: string | null;
 }
 
 /**
@@ -45,22 +47,21 @@ export default async function PropertiesCommissionsPage({
   const space = await getSpaceFromSlug(slug);
   if (!space) notFound();
 
-  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
 
   const [dealsResult, splitsResult] = await Promise.all([
-    supabase
+    readAllRows<any>((from,to) => supabase
       .from('Deal')
-      .select('id, title, status, value, commissionRate, closeDate, updatedAt')
+      .select('id, title, status, value, commissionRate, closeDate, closedAt, updatedAt')
       .eq('spaceId', space.id)
-      .order('updatedAt', { ascending: false }),
-    supabase
+      .order('updatedAt', { ascending: false }).order('id').range(from,to)),
+    readAllRows<any>((from,to) => supabase
       .from('CommissionSplit')
       .select('*')
-      .eq('spaceId', space.id),
+      .eq('spaceId', space.id).order('id').range(from,to)),
   ]);
 
-  const deals = (dealsResult.data ?? []) as DealRow[];
-  const splits = (splitsResult.data ?? []) as CommissionSplit[];
+  const deals = dealsResult as DealRow[];
+  const splits = splitsResult as CommissionSplit[];
   const splitsByDeal = new Map<string, CommissionSplit[]>();
   for (const s of splits) {
     const arr = splitsByDeal.get(s.dealId) ?? [];
@@ -69,7 +70,7 @@ export default async function PropertiesCommissionsPage({
   }
 
   const closedYtd = deals.filter(
-    (d) => d.status === 'won' && d.updatedAt >= yearStart,
+    (d) => closedThisYear(d),
   );
   const inFlight = deals.filter((d) => d.status === 'active');
 
@@ -123,6 +124,7 @@ export default async function PropertiesCommissionsPage({
         </h1>
         <p className="text-sm text-muted-foreground">
           {subtitle}
+          {deals.some(deal => deal.status === 'won' && !deal.closedAt) && <span className="block mt-2 text-sm">Won deals without an actual close date are excluded from year-to-date totals.</span>}
         </p>
       </header>
 

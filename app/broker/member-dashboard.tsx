@@ -11,7 +11,6 @@ import type { Brokerage, BrokerageMembership } from '@/lib/types';
 import { BriefKpiTile } from '@/components/broker/brief-kpi-tile';
 import { BriefReveal } from '@/components/broker/brief-section';
 import { SplitReveal } from '@/components/motion';
-import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 import {
   BROKER_DIVIDED_LIST,
   BROKER_EMPTY,
@@ -35,11 +34,13 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
   const { brokerage, dbUserId } = ctx;
 
   // Find the member's personal Space
-  const { data: space } = await supabase
+  const { data: space, error: spaceError } = await supabase
     .from('Space')
     .select('id, slug, name')
     .eq('ownerId', dbUserId)
     .maybeSingle();
+
+  if (spaceError) throw new Error('Your workspace could not be loaded');
 
   // Find the member's User record for the name
   const { data: userRow } = await supabase
@@ -174,6 +175,10 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
       : Promise.resolve({ data: [] }),
   ]);
 
+  if ([assignedLeadsRes, contactedLeadsRes, activeDealsRes, wonDealsRes, recentLeadsRes, overdueFollowUpsRes, announcementsRes].some(result => 'error' in result && result.error)) {
+    throw new Error('Your daily work could not be loaded');
+  }
+
   const assignedCount = assignedLeadsRes.count ?? 0;
   const contactedCount = contactedLeadsRes.count ?? 0;
   const activeDealsCount = activeDealsRes.count ?? 0;
@@ -244,25 +249,19 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
       {/* ── Header — canonical three-line status-sentence pattern.
           Muted greeting → serif H1 → one-sentence status. Same shape
           every other broker page uses. ── */}
-      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[24rem] sm:min-h-[28rem]')}>
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
+      <BriefReveal delay={0.01} className={BROKER_HERO}>
+
         <header className="relative z-10">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
             CHIPPI // TODAY
           </p>
           <h1
-            className="mt-10 max-w-4xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
+            className="mt-4 max-w-4xl text-2xl leading-tight tracking-tight text-foreground sm:text-3xl"
             style={TITLE_FONT}
           >
             <SplitReveal as="span" text={`Welcome back, ${firstName}`} />
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-foreground/80 sm:text-lg">
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {statusSentence}
           </p>
         </header>
@@ -286,6 +285,10 @@ export async function MemberDashboard({ ctx }: MemberDashboardProps) {
         ))}
       </BriefReveal>
 
+      <Link href={`/s/${spaceSlug}/follow-through`} className="flex items-center justify-between rounded-lg border border-border px-5 py-4 text-sm">
+        <span><strong className="font-medium">Your handoffs</strong><span className="ml-2 text-muted-foreground">Accept assigned leads and record the first response.</span></span>
+        <ArrowRight className="h-4 w-4 shrink-0" />
+      </Link>
       {/* ── Two-column layout: Recent leads + Overdue follow-ups ── */}
       <BriefReveal delay={0.08} as="div" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent assigned leads */}

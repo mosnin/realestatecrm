@@ -87,7 +87,7 @@ async function fetchLedgerRows(
 export default async function BrokerProfitabilityPage() {
   // Gate: broker_owner + broker_admin only (same as /broker/analytics).
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

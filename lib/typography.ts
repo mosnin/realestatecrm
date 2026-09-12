@@ -142,7 +142,7 @@ export const PRIMARY_PILL =
 export const CHIPPI_PILL =
   'inline-flex items-center gap-1.5 rounded-full px-4 h-9 text-sm font-medium ' +
   'bg-foreground text-background ' +
-  'hover:bg-gradient-to-r hover:from-foreground hover:via-foreground hover:to-orange-500/90 ' +
+  'hover:bg-gradient-to-r hover:from-foreground hover:via-foreground hover:to-brand/90 ' +
   'active:scale-[0.98] transition-all duration-150 focus-visible:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-foreground/30 focus-visible:ring-offset-2 ' +
   'focus-visible:ring-offset-background';

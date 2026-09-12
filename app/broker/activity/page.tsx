@@ -11,7 +11,7 @@ import { BROKER_PAGE_READING } from '@/components/broker/premium';
 // requireBroker) so non-brokers get a clean redirect instead of a 500.
 export default async function BrokerActivityPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // Serialize one clock value into the client component so relative timestamps
   // cannot cross a second/minute boundary between SSR and hydration.

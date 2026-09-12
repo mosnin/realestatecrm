@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { readAllRows } from '@/lib/read-all-rows';
+import { comparePeopleAttention } from '@/lib/people-attention';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -36,6 +38,8 @@ import Link from 'next/link';
 
 type BrokerContact = {
   id: string;
+  work?: import('@/lib/people-work').PersonWork | null;
+  workUnavailable?: boolean;
   name: string;
   email: string | null;
   phone: string | null;
@@ -95,6 +99,7 @@ const stageLabels: Record<string, string> = {
 };
 
 const sortLabels = {
+  attention: 'Needs attention first',
   'agent-priority': 'Hottest first',
   newest: 'Recently added',
   oldest: 'Oldest first',
@@ -112,34 +117,41 @@ export function BrokerPeopleTable() {
   const [contacts, setContacts] = useState<BrokerContact[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer'>('all');
+  const [leadTypeFilter, setLeadTypeFilter] = useState<'all' | 'new' | 'rental' | 'buyer' | 'seller'>('all');
   const [tagFilter, setTagFilter] = useState('');
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [tagPopoverSearch, setTagPopoverSearch] = useState('');
-  const [sortBy, setSortBy] = useState<SortKey>('agent-priority');
+  const [sortBy, setSortBy] = useState<SortKey>('attention');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  const requestRef = useRef(0);
   const fetchContacts = useCallback(async () => {
+    const requestId = ++requestRef.current;
     try {
-      const params = new URLSearchParams({ search, type: typeFilter });
-      const res = await fetch(`/api/broker/contacts?${params}`);
-      if (!res.ok) {
-        setError(true);
-        return;
-      }
-      setContacts(await res.json());
+      const all = await readAllRows<BrokerContact>(async (offset, end) => {
+        const params = new URLSearchParams({search, work:'1', type:typeFilter,limit:String(end-offset+1),offset:String(offset)});
+        const res = await fetch(`/api/broker/contacts?${params}`);
+        if (!res.ok) throw new Error('People unavailable');
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error('Invalid People response');
+        if (requestId !== requestRef.current) throw new Error('Superseded search');
+        return {data,error:null};
+      });
+      setContacts(all);
       setError(false);
     } catch (err) {
+      if (requestId !== requestRef.current) return;
       console.error('[broker-people-table] fetch failed:', err);
       setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   }, [search, typeFilter]);
 
   useEffect(() => {
-    fetchContacts();
+    const timer = setTimeout(() => void fetchContacts(), 200);
+    return () => { clearTimeout(timer); requestRef.current++; };
   }, [fetchContacts]);
 
   // ── Client-side filtering + sorting ───────────────────────────────────────
@@ -154,11 +166,14 @@ export function BrokerPeopleTable() {
         if (leadTypeFilter === 'new') return c.tags.includes('new-lead');
         if (leadTypeFilter === 'rental') return c.leadType === 'rental';
         if (leadTypeFilter === 'buyer') return c.leadType === 'buyer';
+        if (leadTypeFilter === 'seller') return c.leadType === 'seller';
         return true;
       })
       .filter((c) => !tagFilter || c.tags.includes(tagFilter));
 
-    if (sortBy === 'agent-priority') {
+    if (sortBy === 'attention') {
+      list = [...list].sort((a,b) => comparePeopleAttention(a,b));
+    } else if (sortBy === 'agent-priority') {
       list = [...list].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1));
     } else if (sortBy === 'newest') {
       list = [...list].sort(
@@ -177,8 +192,9 @@ export function BrokerPeopleTable() {
   })();
 
   // ── Lead-type chips ────────────────────────────────────────────────────────
-  const leadTypeChips: { key: 'all' | 'new' | 'rental' | 'buyer'; label: string; count: number }[] = [
+  const leadTypeChips: { key: 'all' | 'new' | 'rental' | 'buyer' | 'seller'; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: contacts.length },
+    { key: 'seller', label: 'Seller', count: contacts.filter(c => c.leadType === 'seller').length },
     { key: 'new', label: 'New', count: contacts.filter((c) => c.tags.includes('new-lead')).length },
     { key: 'rental', label: 'Rental', count: contacts.filter((c) => c.leadType === 'rental').length },
     { key: 'buyer', label: 'Buyer', count: contacts.filter((c) => c.leadType === 'buyer').length },
@@ -563,10 +579,6 @@ function BrokerContactRow({
   const followUpDate = contact.followUpAt ? new Date(contact.followUpAt) : null;
   const followUpOverdue = followUpDate ? followUpDate < new Date() : false;
 
-  const drillPrompt = encodeURIComponent(
-    `Tell me about ${contact.name} (${contact.realtorName}'s lead). Where are they in the funnel and what's the next move?`
-  );
-
   const rowClassName = cn(
     'group/row flex items-center gap-3 py-3 px-2 -mx-2 rounded-md transition-colors',
     'hover:bg-muted/30',
@@ -578,7 +590,7 @@ function BrokerContactRow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: EASE_APPLE, delay }}
     >
-      <Link href={`/broker/chippi?prompt=${drillPrompt}`} className={rowClassName}>
+      <Link href={`/broker/people/${contact.id}`} className={rowClassName}>
         {/* Avatar */}
         <div className="w-8 h-8 rounded-full bg-muted/40 text-muted-foreground flex items-center justify-center text-xs font-semibold flex-shrink-0">
           {getInitials(contact.name)}
@@ -616,6 +628,7 @@ function BrokerContactRow({
             </div>
           )}
 
+          {(contact.work || contact.workUnavailable) && <p className="mt-1 text-xs">{contact.workUnavailable ? 'Follow-through status unavailable' : `${contact.work?.label} · ${contact.work?.title}`}</p>}
           {/* Realtor byline — the broker-only addition */}
           <div className="mt-0.5 text-[11px] text-muted-foreground/70 truncate">
             {contact.realtorName}

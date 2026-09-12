@@ -34,6 +34,9 @@ import {
   abortTurn,
   getTurn,
   turnKey,
+  blockAutomaticRetry,
+  isAutomaticRetryBlocked,
+  clearAutomaticRetryBlock,
   type TurnRecord,
 } from './turn-runner';
 import type { WorkExecutionMode } from '@/lib/chat/work-execution-mode';
@@ -922,6 +925,11 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         }
       } finally {
         detach();
+        const mayContinueQueue = turnOutcomeRef.current === 'complete'
+          || turnOutcomeRef.current === 'cancelled';
+        if (!mayContinueQueue && turnOutcomeRef.current !== 'paused') {
+          blockAutomaticRetry(rec.endpoint, rec.conversationId, rec.turnId);
+        }
         // The finished record is deliberately LEFT in the runner: it's the
         // tombstone the workspace's history loader consumes to know "a turn
         // ended since your server props rendered — fetch fresh." Consuming
@@ -954,7 +962,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
         // the history loader, so the loader sees the flag already set and
         // doesn't blank the thread it just watched stream in.
         onTurnSettledRef.current?.(rec.conversationId);
-        if (durableTurnQueueEnabled && turnOutcomeRef.current !== 'paused') {
+        if (durableTurnQueueEnabled && mayContinueQueue) {
           // PostgreSQL — not this component — decides whether a paused
           // turn holds the queue and which pending instruction is next.
           await drainDurableQueueRef.current?.(rec.conversationId);
@@ -1180,6 +1188,14 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
 
   const dispatchQueuedTurn = useCallback(async (turn: ConversationTurnRecord) => {
     if (isStreamingRef.current) return;
+    if (isAutomaticRetryBlocked(taskEndpoint, turn.conversationId, turn.id)) {
+      // A fresh surface needs the saved identity too, so its Retry button
+      // retries this exact turn rather than silently doing nothing.
+      lastAcceptedTurnRef.current = { turn };
+      lastUserInputRef.current = { text: turn.message, attachmentIds: turn.attachmentIds };
+      setError(previous => previous ?? 'This saved request did not finish. Retry when you are ready.');
+      return;
+    }
     const meta: AttachmentMeta[] = (turn.attachments ?? []).map((attachment) => ({
       ...attachment,
       isImage: attachment.isImage ?? attachment.mimeType.startsWith('image/'),
@@ -1193,7 +1209,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
       attachmentIds: turn.attachmentIds,
       attachmentsMeta: meta,
     });
-  }, [beginAcceptedTurn]);
+  }, [beginAcceptedTurn, taskEndpoint]);
   dispatchQueuedTurnRef.current = dispatchQueuedTurn;
 
   const drainDurableQueue = useCallback(async (conversationId: string) => {
@@ -1621,6 +1637,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
           const turns = await loadDurableTurns(conversationId);
           const sameTurn = turns.find((turn) => turn.id === accepted.turn.id);
           if (sameTurn?.status === 'pending' && !isStreamingRef.current) {
+            clearAutomaticRetryBlock(taskEndpoint, sameTurn.conversationId, sameTurn.id);
             beginAcceptedTurn({
               turnId: sameTurn.id,
               clientRequestId: sameTurn.clientRequestId,
@@ -1644,7 +1661,7 @@ export function useAgentTask(options: UseAgentTaskOptions): UseAgentTaskResult {
     const last = lastUserInputRef.current;
     if (!last) return;
     await send(last.text, last.attachmentIds);
-  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, removeQueuedMessage, send]);
+  }, [beginAcceptedTurn, durableTurnQueueEnabled, loadDurableTurns, removeQueuedMessage, send, taskEndpoint]);
 
   // Fix 3: count down rateLimitSeconds to zero, then auto-unlock the composer.
   useEffect(() => {

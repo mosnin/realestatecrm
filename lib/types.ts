@@ -446,6 +446,7 @@ export type Deal = {
   nextAction: string | null;
   nextActionDueAt: Date | null;
   /** Captured when a deal is marked won or lost so we can learn from it later. */
+  closedAt?: Date | string | null;
   wonLostReason: string | null;
   wonLostNote: string | null;
   /**

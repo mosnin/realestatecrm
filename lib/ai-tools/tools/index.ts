@@ -1,3 +1,4 @@
+import { recordClientCommitmentTool, listClientCommitmentsTool } from './client-commitments';
 /**
  * All tools known to the registry. New tools get appended here when they
  * ship. The list is grouped by category and within each category by
@@ -152,6 +153,8 @@ export const ALL_TOOLS: ToolDefinition[] = [
   logCallTool as ToolDefinition,
   logMeetingTool as ToolDefinition,
   setFollowupTool as ToolDefinition,
+  recordClientCommitmentTool as ToolDefinition,
+  listClientCommitmentsTool as ToolDefinition,
   clearFollowupTool as ToolDefinition,
   markPersonHotTool as ToolDefinition,
   markPersonColdTool as ToolDefinition,

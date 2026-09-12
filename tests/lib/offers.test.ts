@@ -50,7 +50,7 @@ vi.mock('@/lib/supabase', () => {
     };
 
     const chain: Record<string, unknown> = {};
-    for (const m of ['select', 'eq', 'order', 'limit']) {
+    for (const m of ['select', 'eq', 'order', 'limit', 'range']) {
       chain[m] = vi.fn((...args: unknown[]) => {
         chainCalls.push([m, args]);
         return chain;

@@ -1,4 +1,5 @@
 import { getBrokerContext } from '@/lib/permissions';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { getBrokerageMembers } from '@/lib/brokerage-members';
@@ -19,11 +20,11 @@ export const metadata: Metadata = { title: 'Real estate agents — Teams' };
 
 export default async function BrokerRealtorsPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 
-  const members = await getBrokerageMembers(brokerage.id, { includeOnboard: true, includeSpaceName: true });
+  const members = await getBrokerageMembers(brokerage.id, { includeOnboard: true, includeSpaceName: true, strict: true });
 
   const spaceIds = members.map((m) => m.Space?.id).filter(Boolean) as string[];
 
@@ -56,83 +57,75 @@ export default async function BrokerRealtorsPage() {
     recentContactRows,
   ] = await Promise.all([
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .not('tags', 'cs', '["application-link"]')
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Deal')
           .select('spaceId, value')
           .in('spaceId', spaceIds)
           .eq('status', 'active')
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Won deals — top-performer signal: closed something recently
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Deal')
           .select('spaceId, value')
           .in('spaceId', spaceIds)
           .eq('status', 'won')
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Open lead load — new leads not yet converted
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .contains('tags', ['new-lead'])
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Un-worked broker-assigned leads: assigned but lastContactedAt IS NULL
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .contains('tags', ['assigned-by-broker'])
           .is('lastContactedAt', null)
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Speed-to-lead misses: nudged (breached first-response SLA)
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .contains('tags', ['sla-nudged'])
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Speed-to-lead escalations: breached escalation SLA — the loudest signal
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('spaceId')
           .in('spaceId', spaceIds)
           .contains('tags', ['sla-escalated'])
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
     // Recent contacts for 7-day response-time band
     spaceIds.length > 0
-      ? supabase
+      ? readAllRows<any>((from,to) => supabase
           .from('Contact')
           .select('id, spaceId, createdAt')
           .in('spaceId', spaceIds)
           .gte('createdAt', responseSince)
-          .limit(10000)
-          .then((r) => r.data ?? [])
+          .order('id').range(from,to))
       : Promise.resolve([]),
   ]);
 
@@ -141,13 +134,13 @@ export default async function BrokerRealtorsPage() {
   // has the contact ids in hand.
   const recentContactIds = (recentContactRows as { id: string }[]).map((c) => c.id);
   const activityRows = recentContactIds.length > 0
-    ? (await supabase
+    ? (await readAllRows<any>((from,to) => supabase
         .from('ContactActivity')
         .select('contactId, createdAt, type')
+        .in('spaceId', spaceIds)
         .in('contactId', recentContactIds)
         .in('type', [...RESPONSE_OUTBOUND_TYPES])
-        .limit(20000)
-        .then((r) => r.data ?? [])) as { contactId: string; createdAt: string; type: string }[]
+        .order('id').range(from,to))) as { contactId: string; createdAt: string; type: string }[]
     : [];
 
   // First outbound timestamp per contact (only the earliest counts — that's

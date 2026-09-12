@@ -5,13 +5,6 @@ const read = (file: string) => readFileSync(file, 'utf8');
 
 const FAMILY_SURFACES = [
   {
-    family: 'relationship-directory',
-    file: 'components/contacts/contact-table.tsx',
-    heading: 'People worth staying close to.',
-    work: 'aria-label="Contact directory"',
-    action: 'Add person',
-  },
-  {
     family: 'lead-intake',
     file: 'app/s/[slug]/leads/page.tsx',
     heading: 'Turn interest into a first conversation.',
@@ -26,20 +19,6 @@ const FAMILY_SURFACES = [
     action: 'Plan outreach',
   },
   {
-    family: 'deal-pipeline',
-    file: 'components/deals/deals-page-client.tsx',
-    heading: 'Move the deal that can close next.',
-    work: '<KanbanBoard',
-    action: 'Tell Chippi',
-  },
-  {
-    family: 'offer-negotiation',
-    file: 'app/s/[slug]/offers/page.tsx',
-    heading: 'Turn the right offer into a signed deal.',
-    work: '<OffersClient',
-    action: 'Offer volume',
-  },
-  {
     family: 'broker-review-room',
     file: 'app/s/[slug]/reviews/page.tsx',
     heading: 'Clear the question. Keep the deal moving.',
@@ -52,13 +31,6 @@ const FAMILY_SURFACES = [
     heading: 'Protect the time that closes deals.',
     work: '<MonthView',
     action: 'onAdd=',
-  },
-  {
-    family: 'email-command',
-    file: 'app/s/[slug]/communication/communication-view.tsx',
-    heading: 'Reply while the conversation is warm.',
-    work: '<EmailInboxView',
-    action: 'Source of truth',
   },
   {
     family: 'team-room',

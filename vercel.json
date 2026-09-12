@@ -1,26 +1,47 @@
 {
-  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then exit 0; else exit 1; fi",
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" != \"codex/autonomous-product-rebuild\" ]; then exit 0; else exit 1; fi",
   "headers": [
     {
       "source": "/api/mcp/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, DELETE, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://claude.ai"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
       ]
     },
     {
       "source": "/api/mcp",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://claude.ai"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
       ]
     },
     {
       "source": "/.well-known/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://claude.ai" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://claude.ai"
+        }
       ]
     }
   ],

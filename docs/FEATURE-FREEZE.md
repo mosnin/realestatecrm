@@ -16,7 +16,7 @@ rollout flags stay off. See `docs/PROD-STATE.md`.
 | Account hard-delete | `ACCOUNT_DELETION_HARD_DELETE` | Needs `docs/DATA-DELETION.md` sign-off |
 | Chrome Web Store extension | store listing | `debugger` + `<all_urls>` — extended review |
 | Inngest cron mirrors | `INNGEST_CRONS_ENABLED` | Double-fires with the Worker |
-| Team / Team Plus self-serve | `lib/plans.ts` already routes to `/demo` | Seat + annual add-on prices must both exist |
+| Team / Team Plus billing expansion | Team signup is advertised in the current UI; live checkout is unverified | Require seat and annual add-on receipts before expanding rollout |
 
 ## Coming soon (honest)
 
@@ -27,7 +27,7 @@ API-key connects, not coming soon.
 Workflow **Wait / Delay** is hidden from the add-step picker. Existing
 delay steps halt the run instead of skipping the wait. Starter templates
 that used to insert a delay now use `schedule_message` (the working
-deferred-draft path). Async resumption of a mid-workflow wait is Phase 5.
+deferred-message path: sends when authorized, drafts when configured). Async resumption of a mid-workflow wait is Phase 5.
 
 ## After Gates 1–3 (order)
 

@@ -253,7 +253,7 @@ function ExpandedDetail({
           </p>
           {detail.notes.slice(0, 3).map((note) => (
             <div key={note.id} className="flex items-start justify-between gap-3">
-              <p className="text-sm text-muted-foreground italic line-clamp-2 flex-1">
+              <p className="text-sm text-muted-foreground not-italic line-clamp-2 flex-1">
                 &ldquo;{note.content}&rdquo;
               </p>
               <span className="text-[11px] tabular-nums text-muted-foreground flex-shrink-0">

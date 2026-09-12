@@ -64,7 +64,11 @@ interface PipelineStats {
  * "1 deal hasn't moved in 14 days. Take a look." → board filters to that
  * deal. The page tells one story instead of two.
  */
-export function PipelineSummary({
+export function PipelineSummary(props: PipelineSummaryProps) {
+  return <PipelineSummaryForSelection key={`${props.slug}:${props.pipelineId}`} {...props} />;
+}
+
+function PipelineSummaryForSelection({
   slug,
   pipelineId,
   focus,
@@ -77,6 +81,7 @@ export function PipelineSummary({
   // When the server pre-fetched stages, the first paint is already truthful
   // and we don't need a skeleton. Without initialStages, the strip starts in
   // a quiet loading state.
+  const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(!initialStages);
 
   const load = useCallback(async () => {
@@ -85,13 +90,15 @@ export function PipelineSummary({
         `/api/stages?slug=${encodeURIComponent(slug)}&pipelineId=${encodeURIComponent(pipelineId)}`,
       );
       if (!res.ok) {
-        setStages([]);
+        setUnavailable(true);
         return;
       }
       const data: StageWithDeals[] = await res.json();
-      setStages(Array.isArray(data) ? data : []);
+      if (!Array.isArray(data)) throw new Error('Invalid pipeline response');
+      setStages(data);
+      setUnavailable(false);
     } catch {
-      setStages([]);
+      setUnavailable(true);
     }
   }, [slug, pipelineId]);
 
@@ -117,7 +124,7 @@ export function PipelineSummary({
       await load();
       if (!cancelled) setLoading(false);
     })();
-    return () => {
+  return () => {
       cancelled = true;
     };
   }, [load, refreshKey, hasInitialServerData]);
@@ -173,12 +180,7 @@ export function PipelineSummary({
           }
         }
       } else if (status === 'won') {
-        // closeDate or updatedAt — closeDate first; fall back to updatedAt.
-        const ref = d.closeDate
-          ? new Date(d.closeDate as unknown as string)
-          : d.updatedAt
-            ? new Date(d.updatedAt as unknown as string)
-            : null;
+        const ref = d.closedAt ? new Date(d.closedAt) : null;
         if (ref && !isNaN(ref.getTime()) && ref >= monthStart && ref < monthEnd) {
           wonThisMonth += 1;
           wonThisMonthValue += value;
@@ -197,6 +199,9 @@ export function PipelineSummary({
       } else {
         narration = `${stuckCount} deals are stuck — they need a nudge.`;
       }
+      narrationAction = 'filter-at-risk';
+    } else if (atRisk > 0) {
+      narration = `${atRisk} ${atRisk === 1 ? 'deal needs' : 'deals need'} attention.`;
       narrationAction = 'filter-at-risk';
     } else if (closingThisWeek > 0) {
       narration =
@@ -236,6 +241,8 @@ export function PipelineSummary({
     else if (stats.narrationAction === 'add-deal') onAddDeal();
   }
 
+    if (unavailable) return <div role="alert" className="py-3 text-sm">Pipeline summary unavailable. <button type="button" onClick={() => void load()} className="underline">Retry</button></div>;
+
   const NarrationEl = stats.narrationAction ? motion.button : motion.p;
   const narrationClasses = cn(
     'text-lg text-muted-foreground text-left transition-colors',
@@ -269,7 +276,7 @@ export function PipelineSummary({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: loading ? 0.6 : 1, y: 0 }}
         transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70"
+        className="grid grid-cols-4 gap-px bg-border/70 rounded-xl overflow-hidden border border-border/70"
       >
         <StatCell
           number={<AnimatedNumber value={stats.active} />}
@@ -294,7 +301,7 @@ export function PipelineSummary({
         <StatCell
           number={<AnimatedNumber value={stats.atRisk} />}
           label="At risk"
-          sub={stats.atRisk > 0 ? 'need attention' : 'all moving'}
+          sub={stats.atRisk > 0 ? 'need attention' : 'no flagged issues'}
           dim={stats.atRisk === 0}
           // A single amber dot — the health vocabulary's "needs a nudge" —
           // only when there's actually something at risk. Restraint: no dot
@@ -346,7 +353,7 @@ function StatCell({ number, label, sub, dim, accentClass, selected, onClick }: S
       onClick={onClick}
       aria-pressed={isInteractive ? selected : undefined}
       className={cn(
-        'relative bg-background p-5 text-left transition-colors',
+        'relative bg-background p-2 sm:p-5 text-left transition-colors',
         isInteractive && 'cursor-pointer hover:bg-foreground/[0.03]',
         // Selected wash sits behind the content so the AnimatedNumber stays
         // clean. The motion.span underneath provides the slide.
@@ -371,7 +378,7 @@ function StatCell({ number, label, sub, dim, accentClass, selected, onClick }: S
       >
         {number}
       </p>
-      <p className={cn(BODY, 'mt-2 relative flex items-center gap-1.5')}>
+      <p className={cn(BODY, 'mt-2 relative flex items-center gap-1.5 text-[11px] sm:text-sm')}>
         {accentClass && (
           <span
             className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', accentClass)}
@@ -380,7 +387,7 @@ function StatCell({ number, label, sub, dim, accentClass, selected, onClick }: S
         )}
         {label}
       </p>
-      <p className={cn(SECTION_LABEL, 'mt-1 normal-case tracking-normal text-[11px] relative')}>
+      <p className={cn(SECTION_LABEL, 'hidden sm:block mt-1 normal-case tracking-normal text-[11px] relative')}>
         {sub}
       </p>
     </Component>

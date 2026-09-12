@@ -89,7 +89,7 @@ type RealtorRollup = {
 export default async function BrokerUsagePage() {
   // Gate — brokers and admins only.
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

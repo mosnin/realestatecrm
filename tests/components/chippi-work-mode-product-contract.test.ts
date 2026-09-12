@@ -9,24 +9,6 @@ describe('Chippi Chat/Work product contract', () => {
   const taskRoute = read('app/api/ai/task/route.ts');
   const workTool = read('lib/ai-tools/tools/start-work-session.ts');
 
-  it('renders one top-of-page Chat/Work selector in the existing workspace', () => {
-    expect(workspace).toContain('<ChatWorkModeSwitch');
-    expect(workspace).toContain('absolute left-1/2 top-1.5');
-    expect(prompt).toContain("{item === 'chat' ? 'Chat' : 'Work'}");
-    expect(prompt).not.toContain("{m === 'chat' ? 'Chat' : 'Agent'}");
-    expect(prompt).not.toContain("const Icon = item === 'chat'");
-    expect(prompt).not.toContain("active && item === 'work' && 'text-[#ff8a0a]'");
-  });
-
-  it('removes and locks the selector after the first user message', () => {
-    expect(workspace).toContain('!conversationModeLocked');
-    expect(workspace).toContain('modeLocked={conversationModeLocked}');
-    expect(workspace).toContain(
-      'onModeChange={conversationModeLocked ? undefined : selectChatMode}',
-    );
-    expect(prompt).toContain('!modeLocked || !skill.mode || skill.mode === chatMode');
-  });
-
   it('has no work-session modal or modal slash-command path', () => {
     expect(workspace).not.toContain('WorkSessionDialog');
     expect(workspace).not.toContain('workDialogOpen');

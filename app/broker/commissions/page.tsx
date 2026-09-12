@@ -1,4 +1,5 @@
 import { requireBroker } from '@/lib/permissions';
+import { readAllRows } from '@/lib/read-all-rows';
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -46,26 +47,26 @@ type LedgerWithJoins = LedgerDbRow & {
  * joins in memory.
  */
 async function fetchLedgerRows(brokerageId: string): Promise<LedgerRow[]> {
-  const { data: joined, error } = await supabase
+  const { data: joined, error } = await readAllRows<LedgerWithJoins>((from,to) => supabase
     .from('CommissionLedger')
     .select(
       '*, agent:User!CommissionLedger_agentUserId_fkey(id,name,email), deal:Deal!CommissionLedger_dealId_fkey(id,title)'
     )
     .eq('brokerageId', brokerageId)
     .order('closedAt', { ascending: false })
-    .limit(5000);
+    .order('id').range(from,to)).then(data => ({data,error:null as unknown})).catch(error => ({data:null,error}));
 
   if (!error && joined) {
     return (joined as LedgerWithJoins[]).map(flatten);
   }
 
   // Fallback: two separate queries joined in memory.
-  const { data: rows } = await supabase
+  const rows = await readAllRows<LedgerDbRow>((from,to) => supabase
     .from('CommissionLedger')
     .select('*')
     .eq('brokerageId', brokerageId)
     .order('closedAt', { ascending: false })
-    .limit(5000);
+    .order('id').range(from,to));
 
   const ledgerRows = (rows ?? []) as LedgerDbRow[];
   if (ledgerRows.length === 0) return [];

@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: 'MCP — Broker Settings' };
 
 export default async function BrokerSettingsMcpPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage, membership } = ctx;
   const canEdit = membership.role === 'broker_owner' || membership.role === 'broker_admin';

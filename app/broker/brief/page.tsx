@@ -29,8 +29,8 @@ import {
   draftStatsWindowStart,
   type DraftStatsRow,
 } from '@/lib/draft-stats';
+import { AssignmentHandoffs } from '@/components/broker/assignment-handoffs';
 import { MemberDashboard } from '../member-dashboard';
-import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 import {
   BROKER_DIVIDED_LIST,
   BROKER_EMPTY,
@@ -95,7 +95,7 @@ function getGreeting() {
 
 export default async function BrokerBriefPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // realtor_member sees their own work surface, not the swarm.
   if (ctx.membership.role === 'realtor_member') {
@@ -112,11 +112,12 @@ export default async function BrokerBriefPage() {
 
   // Make sure the broker owner's space is included — brokerage leads land
   // there before being routed.
-  const { data: ownerSpaceRow } = await supabase
+  const { data: ownerSpaceRow, error: ownerSpaceError } = await supabase
     .from('Space')
     .select('id')
     .eq('ownerId', ctx.brokerage.ownerId)
     .maybeSingle();
+  if (ownerSpaceError) throw new Error('Team workspace could not be loaded');
   if (ownerSpaceRow?.id && !spaceIds.includes(ownerSpaceRow.id)) {
     spaceIds.push(ownerSpaceRow.id);
   }
@@ -364,6 +365,7 @@ export default async function BrokerBriefPage() {
         .filter('metadata->>kind', 'eq', 'lead_sla_breach'),
     ]);
 
+    if (needsRes.error || escalatedRes.error) throw new Error('First responses could not be checked');
     needsResponse = needsRes.count ?? 0;
     escalatedToday = escalatedRes.count ?? 0;
   }
@@ -417,6 +419,18 @@ export default async function BrokerBriefPage() {
     {},
   );
 
+  if (('error' in applicationCountRes && applicationCountRes.error) || ('error' in leadCountRes && leadCountRes.error)) {
+    return (
+      <section data-broker-premium-page="brief" className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+        <div role="alert" className="rounded-xl border border-border bg-card p-6">
+          <h1 className="text-lg font-semibold">Lead ownership could not be checked</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Reload to try loading the team dashboard again.</p>
+          <a href={`/broker/brief?brokerage=${encodeURIComponent(brokerage.id)}`} className="mt-5 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Reload</a>
+        </div>
+      </section>
+    );
+  }
+
   const pendingInvitations = (invitationsRes.data ?? []) as Array<{
     id: string;
     email: string;
@@ -463,15 +477,9 @@ export default async function BrokerBriefPage() {
           carrying Chippi's chief-of-staff sentence, and the small hairline
           stats row inside the story handles the context numbers. No second
           muted line — two stat surfaces stacked read as noise. */}
-      <BriefReveal delay={0.01} className={cn(BROKER_HERO, 'min-h-[30rem] sm:min-h-[34rem]')}>
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
-        <header className="relative z-10 min-h-[24rem] sm:min-h-[27rem]">
+      <BriefReveal delay={0.01} className={BROKER_HERO}>
+
+        <header className="relative z-10">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
@@ -481,7 +489,7 @@ export default async function BrokerBriefPage() {
                 {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <p className="mt-10 text-sm text-muted-foreground">
+            <p className="mt-4 text-sm text-muted-foreground">
               {getGreeting()}. {brokerage.name}.
             </p>
             <div className="mt-3">
@@ -490,6 +498,9 @@ export default async function BrokerBriefPage() {
           </div>
         </header>
       </BriefReveal>
+
+      <AssignmentHandoffs brokerageId={ctx.brokerage.id} />
+
 
       {/* Chippi — the focal entry, and the view's ONE solid accent card.
           The broker's chief of staff is the home of this page, not its
@@ -528,7 +539,7 @@ export default async function BrokerBriefPage() {
             className="inline-flex items-center gap-1 text-sm font-medium text-foreground hover:underline"
           >
             Open settings
-            <ArrowRight size={12} />
+            <ArrowRight size={12} aria-hidden="true" />
           </Link>
         </section>
       )}
@@ -546,12 +557,12 @@ export default async function BrokerBriefPage() {
       >
         <BriefKpiTile
           label="Pipeline"
-          display={`$${formatCompact(totalPipeline)}`}
+          display={formatCompact(totalPipeline)}
           sub={`${totalDeals} active deal${totalDeals === 1 ? '' : 's'}`}
         />
         <BriefKpiTile
           label="Won"
-          display={`$${formatCompact(totalWonValue)}`}
+          display={formatCompact(totalWonValue)}
           sub="closed this period"
         />
         <BriefKpiTile
@@ -823,7 +834,7 @@ export default async function BrokerBriefPage() {
                       <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
                         {deals.count > 0 && (
                           <span className="tabular-nums whitespace-nowrap">
-                            {deals.count} deal{deals.count === 1 ? '' : 's'} · ${formatCompact(deals.value)}
+                            {deals.count} deal{deals.count === 1 ? '' : 's'} · {formatCompact(deals.value)}
                           </span>
                         )}
                         {apps > 0 && (

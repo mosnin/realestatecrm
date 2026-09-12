@@ -56,6 +56,7 @@ type DealRow = Pick<
  */
 export async function composePipelineSummary(
   spaceId: string,
+  strict = false,
 ): Promise<PipelineSummary | null> {
   const { data, error } = await tenantTable(supabase, 'Deal', { spaceId })
     .select(
@@ -63,6 +64,7 @@ export async function composePipelineSummary(
     )
     .eq('status', 'active');
 
+  if (error && strict) throw new Error('Activity or pipeline unavailable');
   if (error || !data || data.length === 0) return null;
 
   const today = new Date();
@@ -111,6 +113,13 @@ const BUCKET_OF: Record<string, string> = {
   // Deal-level movement
   update_deal_probability: 'deals advanced',
   set_deal_follow_up: 'deals advanced',
+  set_followup: 'follow-ups scheduled',
+  add_person: 'people added',
+  schedule_tour: 'tours booked',
+  send_property_packet: 'property packets sent',
+  create_automation: 'automations enabled',
+  note_on_person: 'contacts updated',
+  note_on_deal: 'deals updated',
   // Contact-level work
   set_contact_follow_up: 'contacts updated',
   update_lead_score: 'contacts updated',
@@ -132,6 +141,12 @@ const BUCKET_OF: Record<string, string> = {
 const BUCKET_ORDER = [
   'drafts ready',
   'messages sent',
+  'tours booked',
+  'follow-ups scheduled',
+  'people added',
+  'property packets sent',
+  'automations enabled',
+  'deals updated',
   'deals advanced',
   'contacts updated',
   'reminders set',
@@ -153,6 +168,7 @@ interface ActivityRow {
  */
 export async function composeOvernight(
   spaceId: string,
+  strict = false,
 ): Promise<OvernightSummary | null> {
   const since = new Date(
     Date.now() - OVERNIGHT_WINDOW_HOURS * 60 * 60 * 1000,
@@ -163,11 +179,13 @@ export async function composeOvernight(
     .eq('outcome', 'completed')
     .gte('createdAt', since);
 
+  if (error && strict) throw new Error('Activity or pipeline unavailable');
   if (error || !data || data.length === 0) return null;
 
   const counts = new Map<string, number>();
   for (const row of data as ActivityRow[]) {
     const label = BUCKET_OF[row.actionType] ?? 'updates';
+    if (label === 'drafts ready') continue;
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
 
@@ -177,7 +195,7 @@ export async function composeOvernight(
     .map((label) => ({ label, count: counts.get(label)! }));
 
   if (ordered.length === 0) return null;
-  return { buckets: ordered, total: data.length };
+  return { buckets: ordered, total: [...counts.values()].reduce((sum, count) => sum + count, 0) };
 }
 
 export const __sectionsInternals = { BUCKET_OF, BUCKET_ORDER, MAX_BUCKETS };

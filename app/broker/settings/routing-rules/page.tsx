@@ -21,7 +21,7 @@ type BrokerageMember = { userId: string; role: string; name: string | null; emai
  */
 export default async function RoutingRulesPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   // Rule list (pre-sorted for evaluation order).
   let initialRules: DealRoutingRuleRow[] = [];

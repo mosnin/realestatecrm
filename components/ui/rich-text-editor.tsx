@@ -4,7 +4,6 @@ import { useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Bold,
-  Italic,
   Underline,
   Heading2,
   Heading3,
@@ -98,7 +97,6 @@ export function RichTextEditor({
             break;
           case 'i':
             e.preventDefault();
-            execCommand('italic');
             break;
           case 'u':
             e.preventDefault();
@@ -128,13 +126,6 @@ export function RichTextEditor({
           disabled={disabled}
         >
           <Bold size={iconSize} />
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => execCommand('italic')}
-          title="Italic (Ctrl+I)"
-          disabled={disabled}
-        >
-          <Italic size={iconSize} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => execCommand('underline')}

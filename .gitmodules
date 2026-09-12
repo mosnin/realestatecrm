@@ -1,0 +1,3 @@
+[submodule "integrations/cadre"]
+	path = integrations/cadre
+	url = https://github.com/mosnin/cadre.git

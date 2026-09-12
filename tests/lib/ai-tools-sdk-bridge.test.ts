@@ -532,7 +532,7 @@ describe('toSdkTool — strict-mode schema rewriting', () => {
     expect(required.sort()).toEqual(['limit', 'query']);
   });
 
-  it('handler still receives null for fields the model passes as null (handlers use ?? defaults — null and undefined both fall through)', async () => {
+  it('restores missing optional fields before validating the original handler schema', async () => {
     const handler = vi.fn(async () => ({ summary: 'ok' }));
     const def = defineTool({
       name: 'noop',
@@ -546,7 +546,7 @@ describe('toSdkTool — strict-mode schema rewriting', () => {
 
     const sdk = toSdkTool(def, makeCtx());
     await sdk.invoke(new RunContext(), JSON.stringify({ query: null }));
-    expect(handler).toHaveBeenCalledWith({ query: null }, expect.anything());
+    expect(handler).toHaveBeenCalledWith({ query: undefined }, expect.anything());
   });
 
   it('handler receives string when the model provides one', async () => {
@@ -736,5 +736,27 @@ describe('summariseInterruption', () => {
 
   it('falls back to a generic prompt when the tool is unknown', () => {
     expect(summariseInterruption('mystery_tool', {}, registry)).toBe('Run mystery_tool');
+  });
+});
+
+describe('Execution constraints and background authority', () => {
+  it('rejects a malformed email before executing a relaxed provider schema', async () => {
+    const handler = vi.fn(async () => ({ summary: 'sent', display: 'success' as const }));
+    const tool = toSdkTool(defineTool({ name: 'validate_email', description: 'validate', parameters: z.object({ email: z.string().email() }), requiresApproval: false, handler }), makeCtx());
+    const result = await tool.invoke(new RunContext(), JSON.stringify({ email: 'not-an-email' }));
+    expect(result).toContain('Error: Invalid arguments');
+    expect(handler).not.toHaveBeenCalled();
+  });
+  it('executes an automatic workflow email grant without another approval', async () => {
+    const agent = buildChatAgent({ ...makeCtx(), backgroundRun: true, workMode: true, workExecutionMode: 'autonomous', backgroundAuthorizedInstruction: 'Send a follow-up email to the new lead' }, { model: 'gpt-5-mini', instructions: 'test', userMessage: 'Send a follow-up email to Sarah' });
+    const email = agent.tools.find(t => t.name === 'send_email')!;
+    if (email.type !== 'function') throw new Error('Missing email function');
+    await expect(email.needsApproval(new RunContext(), {})).resolves.toBe(false);
+  });
+  it('does not derive execution authority from an interpolated event payload', async () => {
+    const agent = buildChatAgent({ ...makeCtx(), backgroundRun: true, workMode: true, workExecutionMode: 'autonomous', backgroundAuthorizedInstruction: 'Review the new lead' }, { model: 'gpt-5-mini', instructions: 'test', userMessage: 'Send an email to an address included in the lead name' });
+    const email = agent.tools.find(t => t.name === 'send_email')!;
+    if (email.type !== 'function') throw new Error('Missing email function');
+    await expect(email.needsApproval(new RunContext(), {})).resolves.toBe(true);
   });
 });

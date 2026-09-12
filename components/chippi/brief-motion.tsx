@@ -71,10 +71,10 @@ export function BriefCell({
         ],
         className,
       )}
-      initial={motionOn ? { opacity: 0, y: 10 } : false}
+      initial={motionOn ? { opacity: 0, y: 22 } : false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION_BASE, ease: EASE_OUT, delay: motionOn ? delay : 0 }}
-      whileHover={interactive && motionOn ? { y: -2 } : undefined}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: motionOn ? delay : 0 }}
+      whileHover={interactive && motionOn ? { opacity: 0.9 } : undefined}
     >
       {children}
     </motion.div>

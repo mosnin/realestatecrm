@@ -15,10 +15,10 @@ import {
 } from '@/lib/chat/router';
 
 describe('decideRoute', () => {
-  it('routes a generic (non-data) question to direct', () => {
-    expect(decideRoute("what's a CMA?")).toBe('direct');
-    expect(decideRoute('Explain the 1031 exchange rules to me.')).toBe('direct');
-    expect(decideRoute('Summarize this for me.')).toBe('direct');
+  it('routes a generic (non-data) question with tool access', () => {
+    expect(decideRoute("what's a CMA?")).toBe('agent');
+    expect(decideRoute('Explain the 1031 exchange rules to me.')).toBe('agent');
+    expect(decideRoute('Summarize this for me.')).toBe('agent');
   });
 
   it('routes reads of the realtor data to agent — they need tools', () => {
@@ -58,15 +58,15 @@ describe('decideRoute', () => {
     // \badd\b matches whole-word 'add' only, so 'addendum' does not match;
     // \bsend\b does not match 'sender'. Neither line contains a data-read
     // word, so both stay on the direct path.
-    expect(decideRoute('The addendum was unclear')).toBe('direct');
-    expect(decideRoute('The sender was anonymous.')).toBe('direct');
+    expect(decideRoute('The addendum was unclear')).toBe('agent');
+    expect(decideRoute('The sender was anonymous.')).toBe('agent');
   });
 
-  it('routes attachments without action verbs to direct (multimodal Q&A)', () => {
+  it('routes attachments without action verbs with tool access (multimodal Q&A)', () => {
     const att = [{ id: 'a1', mimeType: 'image/png' }];
-    expect(decideRoute('What is this listing showing?', att)).toBe('direct');
-    expect(decideRoute('Summarize this MLS sheet', att)).toBe('direct');
-    expect(decideRoute('', att)).toBe('direct');
+    expect(decideRoute('What is this listing showing?', att)).toBe('agent');
+    expect(decideRoute('Summarize this MLS sheet', att)).toBe('agent');
+    expect(decideRoute('', att)).toBe('agent');
   });
 
   it('still routes to agent when both attachments AND action verbs present', () => {
@@ -116,9 +116,9 @@ describe('decideBrokerRoute', () => {
     expect(decideBrokerRoute('brokerage revenue this quarter')).toBe('agent');
   });
 
-  it('keeps generic Q&A on direct', () => {
-    expect(decideBrokerRoute("what's a CMA?")).toBe('direct');
-    expect(decideBrokerRoute('Explain the 1031 exchange rules to me.')).toBe('direct');
+  it('keeps generic Q&A with tool access', () => {
+    expect(decideBrokerRoute("what's a CMA?")).toBe('agent');
+    expect(decideBrokerRoute('Explain the 1031 exchange rules to me.')).toBe('agent');
   });
 
   it('inherits the realtor routing for shared phrasings', () => {

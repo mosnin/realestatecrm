@@ -87,4 +87,29 @@ describe('AuthRedirectPage', () => {
     expect(html).toContain("couldn't load your workspace");
     expect(redirectMock).not.toHaveBeenCalled();
   });
+  it.each([
+    ['realtor', 'acme', true, '/s/acme/chippi/brief'],
+    ['broker', 'acme', true, '/broker'],
+    ['realtor', null, true, '/broker'],
+    ['broker', 'acme', false, '/brokerage'],
+  ])('honors %s intent with personal workspace %s and broker access %s', async (intent, slug, broker, destination) => {
+    fromMock
+      .mockReturnValueOnce(thenable({ data: { id: 'user-1', accountType: 'realtor' }, error: null }))
+      .mockReturnValueOnce(thenable({ data: broker ? { id: 'membership-1' } : null, error: null }))
+      .mockReturnValueOnce(thenable({ data: slug ? { slug } : null, error: null }));
+    await expect(renderRedirect(intent)).rejects.toThrow(`redirect:${destination}`);
+    expect(redirectMock).toHaveBeenCalledWith(destination);
+  });
+
+  it('keeps an existing account recoverable when membership lookup fails', async () => {
+    fromMock
+      .mockReturnValueOnce(thenable({ data: { id: 'user-1', accountType: 'realtor' }, error: null }))
+      .mockReturnValueOnce(thenable({ data: null, error: { code: '57014' } }))
+      .mockReturnValueOnce(thenable({ data: { slug: 'acme' }, error: null }));
+    const ui = await renderRedirect('broker');
+    expect(JSON.stringify(ui)).toContain('Your workspace could not be opened');
+    expect(JSON.stringify(ui)).toContain('/auth/redirect?intent=broker');
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
 });

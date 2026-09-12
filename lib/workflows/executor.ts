@@ -180,6 +180,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
           executeAction(action, context, {
             spaceId: workflow.spaceId,
             autonomy: workflow.autonomy,
+            workflowId: workflow.id,
             runId,
           }),
       });
@@ -238,6 +239,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
         result = await executeAction(action, context, {
           spaceId: workflow.spaceId,
           autonomy: workflow.autonomy,
+          workflowId: workflow.id,
           runId,
         });
         if (result.status !== 'failed') break;

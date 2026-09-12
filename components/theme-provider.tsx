@@ -1,8 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 type Theme = 'light' | 'dark';
+function storedTheme(): Theme | null {
+  try {
+    const value = localStorage.getItem('theme');
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 const ThemeContext = createContext<{
   theme: Theme;
@@ -15,25 +23,19 @@ export function useTheme() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
-  const [mounted, setMounted] = useState(false);
+  const explicitChoice = useRef<Theme | null>(null);
 
   useEffect(() => {
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    // Default to the OS theme. A stored choice always wins; with none, a
-    // first-time visitor renders in whatever their system is set to.
-    const stored = localStorage.getItem('theme') as Theme | null;
-    const initial = stored ?? (mql.matches ? 'dark' : 'light');
-    setTheme(initial);
-    document.documentElement.classList.toggle('dark', initial === 'dark');
-    setMounted(true);
-
-    // While the visitor hasn't picked a theme, follow the OS live (they flip
-    // their system to dark, the site follows). An explicit choice opts out.
-    const onChange = (e: MediaQueryListEvent) => {
-      if (localStorage.getItem('theme')) return;
-      const next: Theme = e.matches ? 'dark' : 'light';
+    const apply = (next: Theme) => {
       setTheme(next);
       document.documentElement.classList.toggle('dark', next === 'dark');
+    };
+    explicitChoice.current = storedTheme();
+    apply(explicitChoice.current ?? (mql.matches ? 'dark' : 'light'));
+    const onChange = (event: MediaQueryListEvent) => {
+      if (explicitChoice.current || storedTheme()) return;
+      apply(event.matches ? 'dark' : 'light');
     };
     mql.addEventListener('change', onChange);
     return () => mql.removeEventListener('change', onChange);
@@ -41,16 +43,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
+    explicitChoice.current = next;
     setTheme(next);
-    localStorage.setItem('theme', next);
+    // Storage is an enhancement. Restricted browsers must still be usable.
+    try { localStorage.setItem('theme', next); } catch {}
     document.documentElement.classList.toggle('dark', next === 'dark');
   }
 
-  // Prevent flash of wrong theme
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
+  // Keep the provider tree stable through hydration: introducing it only after
+  // mount tears down every descendant, including forms and active chat effects.
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}

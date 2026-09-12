@@ -13,7 +13,7 @@
  *   - onChange: called with HTML string on each update
  *
  * Extensions:
- *   - StarterKit                       (bold, italic, strike, code, headings, lists, blockquote, codeBlock)
+ *   - StarterKit                       (bold, not-italic, strike, code, headings, lists, blockquote, codeBlock)
  *   - Underline                        (StarterKit doesn't ship underline)
  *   - Link (auto target=_blank, rel)
  *   - Placeholder
@@ -44,7 +44,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Typography from '@tiptap/extension-typography';
 import {
   Bold,
-  Italic,
   Underline as UnderlineIcon,
   Strikethrough,
   Heading1,
@@ -92,6 +91,7 @@ export function TiptapEditor({
         // StarterKit ships an internal Link too — disable it since we're
         // configuring the standalone Link extension below with target=_blank.
         link: false,
+        italic: false,
       }),
       Underline,
       Link.configure({
@@ -166,7 +166,7 @@ export function TiptapEditor({
 /** Hand-rolled toolbar — kept in this file so the editor ships as a
  *  single unit. The icons + button density match the existing dashboard
  *  toolbars (chip-prompt-box, kanban filter row). On mobile, only the
- *  four most-used actions (bold, italic, link, undo) stay inline; the
+ *  four most-used actions (bold, not-italic, link, undo) stay inline; the
  *  rest tuck behind a More button. */
 function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
   // The toolbar re-renders on every editor transaction so active-state
@@ -194,14 +194,6 @@ function Toolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
         disabled={disabled}
       >
         <Bold size={14} />
-      </Btn>
-      <Btn
-        active={editor.isActive('italic')}
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        title="Italic (Ctrl/Cmd+I)"
-        disabled={disabled}
-      >
-        <Italic size={14} />
       </Btn>
 
       {/* sm+ — the rest of the formatting row. Hidden on phones. */}

@@ -1,3 +1,4 @@
+import { ActionCohorts } from './action-cohorts';
 import { supabase } from '@/lib/supabase';
 import { SurfaceCard, SURFACE_CARD } from '@/components/ui/surface-card';
 import { isPlatformAdmin } from '@/lib/permissions';
@@ -105,15 +106,16 @@ export default async function AdminCohortsPage() {
   let totalCanceled = 0;
 
   let fetchError = false;
+  const cohortSpaceIds: string[] = [];
 
   try {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('User')
-      .select('id, createdAt, onboard, Space(id, stripeSubscriptionStatus, stripePeriodEnd)')
+      .select('id, createdAt, onboard, Space(id, stripeSubscriptionStatus, stripePeriodEnd)', { count: 'exact' })
       .gte('createdAt', earliestIso)
       .order('createdAt', { ascending: true });
 
-    if (error) throw error;
+    if (error || (count ?? 0) > (data?.length ?? 0)) throw new Error('Cohort query incomplete');
 
     for (const row of (data ?? []) as UserRow[]) {
       const created = new Date(row.createdAt);
@@ -126,6 +128,7 @@ export default async function AdminCohortsPage() {
 
       const space = Array.isArray(row.Space) ? row.Space[0] : row.Space;
       if (space) {
+        cohortSpaceIds.push(space.id);
         bucket.workspace += 1;
         const status = space.stripeSubscriptionStatus;
         const current = hasCurrentSubscription(status, space.stripePeriodEnd, now);
@@ -142,6 +145,7 @@ export default async function AdminCohortsPage() {
       supabase.from('Space').select('stripeSubscriptionStatus, stripePeriodEnd'),
     ]);
 
+    if (totalUsersRes.error || subStatusRes.error) throw new Error('Billing totals unavailable');
     totalSignups = totalUsersRes.count ?? 0;
     const statuses = (subStatusRes.data ?? []) as {
       stripeSubscriptionStatus: SubscriptionStatus | null;
@@ -209,7 +213,7 @@ export default async function AdminCohortsPage() {
       <AdminPageHeader
         eyebrow="Growth."
         title="Cohort analysis"
-        subtitle="Weekly signup cohorts and their retention through the funnel."
+        subtitle="Weekly signup cohorts and their current setup and subscription status."
       />
 
       <SurfaceCard>
@@ -217,10 +221,10 @@ export default async function AdminCohortsPage() {
             Each row represents users who signed up during a particular ISO week
             (Monday start, UTC). Percentages are calculated against the signup
             count for that cohort. Paid = <code>active</code> +{' '}
-            <code>past_due</code>. Churned = <code>canceled</code>. Still active ={' '}
+            <code>past_due</code>. Canceled = <code>canceled</code>. Active subscription ={' '}
             <code>active</code> only. The most recent cohorts will naturally
             show lower conversion rates as users haven&apos;t had time to
-            progress through the funnel yet.
+            progress through the funnel yet. These are current billing states, not product usage retention.
           </p>
       </SurfaceCard>
 
@@ -231,6 +235,8 @@ export default async function AdminCohortsPage() {
           </p>
         </div>
       )}
+
+      {!fetchError && <ActionCohorts spaceIds={[...new Set(cohortSpaceIds)]} now={now} />}
 
       {/* ── Cohort retention table ───────────────────────────────────── */}
       <div className={cn(SURFACE_CARD, 'overflow-hidden')}>
@@ -244,8 +250,8 @@ export default async function AdminCohortsPage() {
                 <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Workspace</th>
                 <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Trial</th>
                 <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Paid</th>
-                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Churned</th>
-                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Still active</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Canceled</th>
+                <th className={cn('px-3 py-2.5 whitespace-nowrap', SECTION_LABEL)}>Active subscription</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -283,7 +289,7 @@ export default async function AdminCohortsPage() {
             { label: 'Past due', value: totalPastDue, alert: totalPastDue > 0 },
             { label: 'Canceled', value: totalCanceled },
             { label: 'Paid conv.', value: `${overallPaidRate}%` },
-            { label: 'Churn rate', value: `${overallChurnRate}%`, alert: overallChurnRate > 0 },
+            { label: 'Canceled share', value: `${overallChurnRate}%`, alert: overallChurnRate > 0 },
           ]}
         />
       </div>

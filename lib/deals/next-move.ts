@@ -340,6 +340,7 @@ export async function computeNextMove(
       ? new Date(contact.lastContactedAt)
       : null;
   for (const r of contactActivityRows) {
+    if (!['email', 'sms', 'call'].includes(r.type)) continue;
     const d = new Date(r.createdAt);
     if (!isNaN(d.getTime()) && (!lastTouch || d > lastTouch)) lastTouch = d;
   }

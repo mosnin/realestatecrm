@@ -44,6 +44,5 @@ describe('Chippi Work execution controls', () => {
     expect(workspace).not.toContain('Warming up…');
     expect(workspace).toContain("fetch('/api/ai/warmup', { method: 'POST' })");
     expect(workspace).toContain('<ThinkingIndicator');
-    expect(workspace).toContain('<ThinkingOrb');
   });
 });

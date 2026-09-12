@@ -124,3 +124,13 @@ describe('POST /api/contacts — lead-source attribution', () => {
     expect(lastInsertValues).toBeNull();
   });
 });
+
+it('persists explicit seller classification and rejects an unknown relationship type', async () => {
+  const { requireSpaceOwner } = await import('@/lib/api-auth');
+  vi.mocked(requireSpaceOwner).mockResolvedValue({ space: { id: 'space1', slug: 'test' }, user: {} } as never);
+  const { POST } = await import('@/app/api/contacts/route');
+  const create = (leadType: string) => POST(new NextRequest('http://localhost/api/contacts', { method:'POST', body:JSON.stringify({slug:'test',name:'Seller',leadType}) }));
+  expect((await create('seller')).status).toBe(201);
+  expect(lastInsertValues).toMatchObject({leadType:'seller'});
+  expect((await create('unknown')).status).toBe(400);
+});

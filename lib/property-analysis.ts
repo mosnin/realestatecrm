@@ -336,6 +336,19 @@ export function parseAnalysisResponse(raw: RawAnalysisResponse): {
   return { fields, fieldSources, summary };
 }
 
+/** Only values with a source actually consulted may populate canonical columns. */
+export function groundedPropertyFields(fields: AnalyzedFields, fieldSources: FieldSources, sources: AnalysisSource[]): AnalyzedFields {
+  const consulted = new Set(sources.map(source => source.url));
+  const result = { ...fields };
+  for (const key of ['beds', 'baths', 'squareFeet', 'lotSizeSqft', 'yearBuilt', 'propertyType', 'listPrice'] as const) {
+    if (!fieldSources[key] || !consulted.has(fieldSources[key]!)) result[key] = null;
+  }
+  result.listingUrl = fields.listingUrl && consulted.has(fields.listingUrl) ? fields.listingUrl : null;
+  // Photo URLs have no per-photo attribution in this result contract. Keep them as research suggestions.
+  result.photoUrls = [];
+  return result;
+}
+
 // ── Merge: fill EMPTY columns only (pure, unit-tested) ───────────────────────
 
 /** A Property column is "empty" if null/undefined, or '' for strings. */
@@ -512,7 +525,7 @@ export async function analyzeProperty(record: PropertyRecord): Promise<AnalyzeOu
       stats: { searchResults: results.length, scraped: pages.length },
       analyzedAt,
     };
-    const patch = mergePropertyFields(record, fields);
+    const patch = mergePropertyFields(record, groundedPropertyFields(fields, fieldSources, sources));
 
     logger.info('[property-analysis] complete', {
       propertyId: record.id,

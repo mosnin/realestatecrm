@@ -28,14 +28,7 @@ export default async function OffersPage({ params }: PageProps) {
   const userSpace = await getSpaceForUser(userId);
   if (!userSpace || userSpace.id !== space.id) notFound();
 
-  let initialOffers: Awaited<ReturnType<typeof listOffers>> = [];
-  try {
-    initialOffers = await listOffers(space.id);
-  } catch (err) {
-    // Non-fatal: fall back to an empty board, the client re-fetches on
-    // mount. Never hard-block the page on a transient DB hiccup.
-    console.error('[offers] initial SSR fetch failed', err);
-  }
+  const initialOffers = await listOffers(space.id);
 
   const liveOffers = initialOffers.filter((offer) =>
     ['draft', 'submitted', 'countered'].includes(offer.status),
@@ -54,8 +47,8 @@ export default async function OffersPage({ params }: PageProps) {
       <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
         <div className="max-w-3xl space-y-3">
           <p className={SECTION_LABEL}>Negotiation room</p>
-          <h1 className="text-[3rem] leading-[.95] tracking-[-0.045em] text-foreground sm:text-[4.75rem]" style={TITLE_FONT}>
-            <SplitReveal as="span" text="Turn the right offer into a signed deal." />
+          <h1 className="text-2xl font-medium tracking-tight text-foreground" style={TITLE_FONT}>
+            <SplitReveal as="span" text="Offers" />
           </h1>
           <p className={BODY_MUTED}>
             Compare the terms that matter, protect every deadline, and move the strongest offer forward.

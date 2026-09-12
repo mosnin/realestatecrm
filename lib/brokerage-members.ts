@@ -16,14 +16,15 @@ export interface BrokerageMember {
  */
 export async function getBrokerageMembers(
   brokerageId: string,
-  opts?: { includeOnboard?: boolean; includeSpaceName?: boolean }
+  opts?: { includeOnboard?: boolean; includeSpaceName?: boolean; strict?: boolean }
 ): Promise<BrokerageMember[]> {
-  const { data: memberships } = await supabase
+  const { data: memberships, error: membershipError } = await supabase
     .from('BrokerageMembership')
     .select('id, role, createdAt, userId')
     .eq('brokerageId', brokerageId)
     .order('createdAt', { ascending: true });
 
+  if (opts?.strict && membershipError) throw new Error('Team membership unavailable');
   const raw = memberships ?? [];
   if (raw.length === 0) return [];
 
@@ -32,11 +33,12 @@ export async function getBrokerageMembers(
   const userSelect = opts?.includeOnboard ? 'id, name, email, onboard' : 'id, name, email';
   const spaceSelect = opts?.includeSpaceName ? 'ownerId, id, slug, name' : 'ownerId, id, slug';
 
-  const [{ data: users }, { data: spaces }] = await Promise.all([
+  const [{ data: users, error: userError }, { data: spaces, error: spaceError }] = await Promise.all([
     supabase.from('User').select(userSelect).in('id', userIds),
     supabase.from('Space').select(spaceSelect).in('ownerId', userIds),
   ]);
 
+  if (opts?.strict && (userError || spaceError)) throw new Error('Team workspace data unavailable');
   const userMap = new Map((users ?? []).map((u: any) => [u.id, u]));
   const spaceMap = new Map((spaces ?? []).map((s: any) => [s.ownerId, s]));
 

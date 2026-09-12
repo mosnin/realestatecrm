@@ -62,7 +62,7 @@ function SideTab({
     >
       <span
         className={cn(
-          'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-150',
+          'inline-flex items-center justify-center px-2 h-10 rounded-lg transition-colors duration-150',
           isActive
             ? 'bg-foreground text-background shadow-[0_1px_2px_rgb(17_17_19/0.18)]'
             : 'text-muted-foreground hover:text-foreground',
@@ -86,17 +86,13 @@ function ChippiTab({ href, isActive }: { href: string; isActive: boolean }) {
     >
       <span
         className={cn(
-          'inline-flex items-center justify-center w-10 h-10 rounded-full transition-all duration-150',
+          'inline-flex items-center justify-center px-2 h-10 rounded-lg transition-all duration-150',
           isActive
             ? 'ring-2 ring-foreground/40 bg-foreground/[0.05]'
             : 'ring-1 ring-border hover:ring-foreground/30',
         )}
       >
-        <img
-          src="/chip-avatar.png"
-          alt=""
-          className="w-7 h-7 rounded-full object-cover"
-        />
+        <span className="text-xs font-medium">Chippi</span>
       </span>
     </Link>
   );

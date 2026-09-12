@@ -3,8 +3,8 @@
 /**
  * Outcome-first Today dashboard for /chippi/brief.
  *
- * The layout borrows Sicarii/Scalar's hierarchy (one atmospheric hero, one
- * focal metric, four outcomes, ranked work, verified activity) while keeping
+ * The layout borrows Sicarii/Scalar's hierarchy (compact orientation, four outcomes,
+ * ranked work, verified activity, and a secondary goal entry) while keeping
  * Chippi's identity, routes, real CRM data, and action model. Nothing here is
  * seeded or estimated: composeBriefDashboard owns every value on first paint.
  */
@@ -24,7 +24,6 @@ import {
 import { formatCompact, pluralize } from '@/lib/formatting';
 import { CHAT_STAGGER_DELAY, DURATION_FAST, EASE_OUT } from '@/lib/motion';
 import { AnimatedNumber } from '@/components/motion';
-import { AsciiField } from '@/components/marketing/fortitudo/ascii-field';
 import { Button } from '@/components/ui/button';
 import { DASHBOARD_ROW } from '@/components/ui/surface-card';
 import { AuroraGlow } from '@/components/effects/aurora-glow';
@@ -40,7 +39,7 @@ interface Props {
 
 export const TODAY_DASHBOARD_SOURCE = {
   repository: 'mosnin/Sicarii',
-  commit: 'b235cdbd590ae3652e2603a2187b838a8a204b8f',
+  commit: '7922be8b22e6f7cd3e6041ddecfeceac8f0a4414',
   file: 'src/components/dashboard/dashboard-overview.tsx',
 } as const;
 
@@ -131,8 +130,10 @@ export function buildBriefDashboardViewModel(
     data.needsYou.newLeads +
     data.needsYou.followUpsDue +
     data.needsYou.clientsWaiting +
-    data.needsYou.pendingDrafts;
+    data.needsYou.pendingDrafts +
+    (data.needsYou.failedActions ?? 0);
   const isEmpty =
+    (data.unavailable?.length ?? 0) === 0 &&
     waitingTotal === 0 &&
     rankedMoves.length === 0 &&
     (data.pipeline?.active ?? 0) === 0 &&
@@ -181,12 +182,16 @@ export function buildBriefDashboardViewModel(
         : 'Nothing urgent is waiting right now.';
 
   const composedStatus =
-    data.brief.headline.trim() || data.brief.emptyState?.invitation.trim() || fallbackStatus;
+    data.brief.headline.trim() ||
+    data.brief.emptyState?.invitation.trim() ||
+    fallbackStatus;
   // The ranked brief and the independent needs-you queries can diverge when
   // one source is unavailable. Never let the composer's generic "Quiet
   // morning" hide real review work or verified overnight activity.
-  const primaryStatus =
-    rankedMoves.length === 0 && (waitingTotal > 0 || (data.overnight?.total ?? 0) > 0)
+  const primaryStatus = data.unavailable?.length
+    ? 'Some workspace data could not be loaded. Refresh to check your day.'
+    : rankedMoves.length === 0 &&
+        (waitingTotal > 0 || (data.overnight?.total ?? 0) > 0)
       ? fallbackStatus
       : composedStatus;
   const supportingStatus = [
@@ -295,15 +300,9 @@ export function BriefDashboard({ slug, data }: Props) {
       <BriefCell
         span="w-full"
         delay={delay()}
-        className="min-h-[31rem] overflow-hidden sm:min-h-[34rem]"
+        className="overflow-hidden border-b border-border"
+        surface="none"
       >
-        <div
-          aria-hidden="true"
-          data-chippi-atmosphere="ascii-field"
-          className="chippi-dashboard-atmosphere pointer-events-none absolute inset-0"
-        >
-          <AsciiField className="h-full w-full" cell={13} speed={0.035} />
-        </div>
         <Hero slug={slug} data={data} model={model} />
       </BriefCell>
 
@@ -311,9 +310,9 @@ export function BriefDashboard({ slug, data }: Props) {
         <EmptyTodayOrientation slug={slug} />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" data-outcome-grid>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border lg:grid-cols-4 [&>*]:border-border [&>*:nth-child(even)]:border-l [&>*:nth-child(n+3)]:border-t lg:[&>*:nth-child(n+2)]:border-l lg:[&>*:nth-child(n+3)]:border-t-0" data-outcome-grid>
             {model.metrics.map((metric) => (
-              <BriefCell key={metric.label} span="h-full" delay={delay()} interactive>
+              <BriefCell key={metric.label} span="h-full" delay={delay()} surface="none" interactive>
                 <MetricLink metric={metric} />
               </BriefCell>
             ))}
@@ -329,6 +328,13 @@ export function BriefDashboard({ slug, data }: Props) {
           </div>
         </>
       )}
+
+      <BriefCell span="w-full" delay={delay()}>
+        <section className="p-5 sm:p-6" aria-label="Give Chippi work">
+          <h2 className="font-brand text-lg font-medium">Give Chippi work</h2>
+          <WorkTaskEntry slug={slug} data={data} />
+        </section>
+      </BriefCell>
 
       {hasSupportingPanels && (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -362,94 +368,31 @@ export function BriefDashboard({ slug, data }: Props) {
   );
 }
 
-function Hero({
-  slug,
-  data,
-  model,
-}: {
-  slug: string;
-  data: DashboardData;
-  model: BriefDashboardViewModel;
-}) {
-  const greeting = data.ownerName ? `Good to see you, ${data.ownerName}.` : 'Good to see you.';
-  const focusHref = model.isEmpty ? `/s/${slug}/contacts` : model.focal.href;
-  const focusCta = model.isEmpty
-    ? 'Add a contact'
-    : model.focal.href.startsWith('#')
-      ? 'View priorities'
-      : 'Open pipeline';
-
+function Hero({slug, data, model}: {slug: string; data: DashboardData; model: BriefDashboardViewModel}) {
   return (
-    <div className="relative z-10 flex min-h-[31rem] flex-col justify-between p-6 sm:min-h-[34rem] sm:p-9 lg:p-11">
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
-            CHIPPI // TODAY
-          </p>
-          <TodayDate />
-        </div>
-        <h1
-          className="mt-10 max-w-3xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
-          style={TITLE_FONT}
-        >
-          {greeting}
-        </h1>
-        <p className="mt-5 max-w-2xl text-base leading-relaxed text-foreground/80 sm:text-lg">
-          {model.primaryStatus}
-        </p>
-        {model.supportingStatus.length > 0 && (
-          <div className="mt-2 max-w-2xl space-y-1">
-            {model.supportingStatus.map((line) => (
-              <p key={line} className={BODY_MUTED}>
-                {line}
-              </p>
-            ))}
-          </div>
-        )}
-        <WorkTaskEntry slug={slug} data={data} />
+    <header className="relative z-10 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-brand text-2xl font-medium tracking-tight text-foreground sm:text-3xl">Today</h1>
+        <TodayDate />
       </div>
-
-      <div className="mt-10 flex flex-col gap-7 border-t chippi-dashboard-divider pt-7 sm:flex-row sm:items-end sm:justify-between">
+      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{model.primaryStatus}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
         {model.isEmpty ? (
-          <div className="max-w-xl">
-            <p className="text-lg font-medium text-foreground">Your workspace is ready.</p>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Add your first contact or connect an inbox, then Chippi can surface real priorities here.
-            </p>
-          </div>
+          <Link href={`/s/${slug}/contacts`} className="font-medium underline underline-offset-4">Add your first contact</Link>
         ) : (
-          <div>
-            <div className="flex items-baseline gap-3">
-              <span
-                className="text-[4rem] leading-none tracking-[-0.055em] text-foreground sm:text-[5.5rem]"
-                style={TITLE_FONT}
-              >
-                {model.focal.value}
-              </span>
-              <span className="max-w-32 text-sm leading-snug text-muted-foreground">
-                {model.focal.label}
-              </span>
-            </div>
-            {data.pipeline && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                {data.pipeline.active} active · {data.pipeline.closingThisWeek} closing this week ·{' '}
-                {data.pipeline.atRisk} at risk
-              </p>
-            )}
-          </div>
+          <Link href={model.focal.href} className="text-muted-foreground hover:text-foreground">
+            <span className="font-medium tabular-nums text-foreground">{model.focal.value}</span> {model.focal.label}
+          </Link>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={focusHref} className={GHOST_PILL}>
-            {focusCta}
-            <ArrowUpRight aria-hidden className="size-3.5" />
-          </Link>
-          <Link href={`/s/${slug}/chippi`} className={CHIPPI_PILL}>
-            Ask Chippi
-            <ArrowRight aria-hidden className="size-3.5" />
-          </Link>
-        </div>
+        {data.pipeline && <span className="text-muted-foreground">{data.pipeline.closingThisWeek} closing this week · {data.pipeline.atRisk} at risk</span>}
+        {model.supportingStatus.length > 0 && (
+          <details className="basis-full text-muted-foreground">
+            <summary className="w-fit cursor-pointer text-xs hover:text-foreground">More about your day</summary>
+            {model.supportingStatus.map(line => <p key={line} className="mt-2 max-w-3xl text-sm">{line}</p>)}
+          </details>
+        )}
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -504,7 +447,7 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
 
   if (launching) {
     return (
-      <div className="mt-7 max-w-3xl" data-work-launch="aurora">
+      <div className="mt-3 max-w-3xl" data-work-launch="aurora">
         <AuroraGlow
           active
           pulseKey={1}
@@ -535,7 +478,7 @@ function WorkTaskEntry({ slug, data }: { slug: string; data: DashboardData }) {
   }
 
   return (
-    <form onSubmit={submit} className="mt-7 max-w-3xl" data-work-entry="today">
+    <form onSubmit={submit} className="mt-3 max-w-3xl" data-work-entry="today">
       <div className="flex flex-col gap-2 rounded-2xl border border-border/80 bg-background/90 p-2 shadow-[0_8px_28px_-24px_rgba(17,17,19,0.5)] transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:ring-2 focus-within:ring-ring/25 sm:flex-row sm:items-center">
         <label htmlFor="today-work-goal" className="sr-only">
           Work goal for Chippi
@@ -618,15 +561,15 @@ function MetricLink({ metric }: { metric: TodayOutcomeMetric }) {
     <Link
       href={metric.href}
       data-outcome-metric={metric.label}
-      className="group/metric flex min-h-40 h-full flex-col justify-between p-5 sm:p-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/30"
+      className="group/metric flex h-full flex-col justify-between p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/30"
     >
       <p
-        className="text-[2.6rem] leading-none tracking-[-0.04em] text-foreground sm:text-[3.15rem]"
+        className="text-2xl leading-none tracking-tight text-foreground sm:text-3xl"
         style={TITLE_FONT}
       >
         <AnimatedNumber value={metric.value} />
       </p>
-      <div className="mt-7">
+      <div className="mt-3">
         <p className="text-sm font-medium text-foreground group-hover/metric:underline group-hover/metric:underline-offset-4">
           {metric.label}
         </p>
@@ -689,10 +632,10 @@ function NeedsYouPanel({
   const hidden = rankedMoves.slice(RANKED_COMPACT);
 
   return (
-    <section id="needs-you" className="p-6 sm:p-8">
+    <section id="needs-you" className="p-5 sm:p-6">
       <SectionHeader
         eyebrow="Needs you"
-        title="Ranked moves"
+        title="Your next moves"
         meta={`${rankedMoves.length} ${pluralize(rankedMoves.length, 'move')}`}
       />
 
@@ -833,7 +776,7 @@ function ActivityPanel({
   overnight: DashboardData['overnight'];
 }) {
   return (
-    <section className="p-6 sm:p-8" data-verified-activity>
+    <section className="p-5 sm:p-6" data-verified-activity>
       <SectionHeader
         eyebrow="Chippi activity"
         title="Verified moves"
@@ -841,7 +784,7 @@ function ActivityPanel({
         cta="Activity"
       />
       {overnight && overnight.buckets.length > 0 ? (
-        <div className="mt-7">
+        <div className="mt-3">
           <div className="flex items-baseline gap-2">
             <span className="text-[3.8rem] leading-none tracking-[-0.05em] text-foreground" style={TITLE_FONT}>
               <AnimatedNumber value={overnight.total} />
@@ -870,7 +813,7 @@ function ActivityPanel({
 
 function ToursPanel({ slug, tours }: { slug: string; tours: DashboardData['tours'] }) {
   return (
-    <section className="p-6 sm:p-8">
+    <section className="p-5 sm:p-6">
       <SectionHeader
         eyebrow="Today"
         title="Tours"
@@ -911,7 +854,7 @@ function HotLeadsPanel({
   hotLeads: DashboardData['hotLeads'];
 }) {
   return (
-    <section className="p-6 sm:p-8">
+    <section className="p-5 sm:p-6">
       <SectionHeader eyebrow="People" title="Hot leads" href={`/s/${slug}/leads`} cta="All leads" />
       <ul className="mt-6">
         {hotLeads.map((lead) => {
@@ -951,7 +894,7 @@ function PastClientsPanel({
   topReferrers: DashboardData['topReferrers'];
 }) {
   return (
-    <section className="p-6 sm:p-8">
+    <section className="p-5 sm:p-6">
       <SectionHeader eyebrow="Relationships" title="Past clients" href={`/s/${slug}/contacts`} cta="People" />
       {reactivations.length > 0 && (
         <ul className="mt-6">
@@ -1007,7 +950,7 @@ function ReputationPanel({
   reputation: NonNullable<DashboardData['reputation']>;
 }) {
   return (
-    <section className="p-6 sm:p-8">
+    <section className="p-5 sm:p-6">
       <SectionHeader eyebrow="Reputation" title="Review follow-through" />
       <div className="mt-7 grid grid-cols-2 gap-4">
         <div>

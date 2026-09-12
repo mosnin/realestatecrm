@@ -146,11 +146,11 @@ export function HelpCenter() {
             {/* The Chippi wordmark, front and centre for a help destination. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo-white.png"
+              src="/brand/chippi-wordmark.png"
               alt="Chippi"
-              width={512}
-              height={171}
-              className="mx-auto mb-8 h-6 w-auto"
+              width={2055}
+              height={765}
+              className="brightness-0 invert mx-auto mb-8 h-6 w-auto"
             />
           </BlurRise>
           <BlurRise trigger="load" delay={0.15}>

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useFormDraft } from '@/hooks/use-form-draft';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -35,6 +37,7 @@ const schema = z.object({
   preferences: z.string().optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
+  leadType: z.enum(['buyer', 'seller', 'rental', '']).refine(value => value !== '', 'Choose a relationship type'),
   type: z.enum(['QUALIFICATION', 'TOUR', 'APPLICATION']),
   tags: z.string().optional(),
 });
@@ -48,6 +51,7 @@ type SubmitData = Omit<FormData, 'tags' | 'budget'> & {
 };
 
 interface ContactFormProps {
+  recordId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: SubmitData) => Promise<void>;
@@ -212,6 +216,7 @@ export function ContactForm({
   title,
   mode = 'add',
   slug,
+  recordId,
 }: ContactFormProps) {
   const {
     register,
@@ -219,11 +224,19 @@ export function ContactForm({
     setValue,
     watch,
     reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: contactFormResetValues(defaultValues).values,
   });
+  const relationshipType = watch('leadType');
+  const budgetLabel = relationshipType === 'rental'
+    ? 'Monthly rental budget'
+    : relationshipType === 'seller'
+      ? 'Target sale price'
+      : relationshipType === 'buyer'
+        ? 'Purchase budget'
+        : 'Budget';
 
   // Properties live outside react-hook-form so the chip input owns them.
   const [properties, setProperties] = useState<string[]>(
@@ -240,6 +253,7 @@ export function ContactForm({
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [pendingPreview, setPendingPreview] = useState<ParsedContact | null>(null);
+  const { confirmLeave } = useUnsavedChanges(open && (isDirty || typedText.length > 0 || JSON.stringify(properties) !== JSON.stringify(contactFormResetValues(defaultValues).properties)));
 
   // Reset every time the modal opens. defaultValues are only applied on
   // mount by RHF — the edit dialog stays mounted with empty defaults until
@@ -256,10 +270,17 @@ export function ContactForm({
     setPendingPreview(null);
   }, [open, canType, reset]);
 
+  const draftValues={values:watch(),properties,typedText,tab};
+  const draftBaseline=useRef({values:contactFormResetValues(defaultValues).values,properties:contactFormResetValues(defaultValues).properties,typedText:'',tab:canType?'type' as const:'fill' as const});
+  const draft=useFormDraft(`contact:${mode==='add'?'new':recordId??'unavailable'}`,draftValues,saved=>{
+    reset(saved.values,{keepDefaultValues:true});setProperties(saved.properties);setTypedText(saved.typedText);setTab(saved.tab);
+  },draftBaseline.current,open&&(mode==='add'||Boolean(recordId)));
+
   const type = watch('type');
   const displayTitle = title ?? (mode === 'edit' ? 'Edit person' : 'Add a person');
 
   function resetAll() {
+    draft.clear();
     reset();
     setProperties([]);
     setTypedText('');
@@ -268,6 +289,7 @@ export function ContactForm({
   }
 
   async function persistParsed(parsed: ParsedContact) {
+    if (!parsed.type) { flipToFillWith(parsed); return; }
     try {
       await onSubmit({
         name: parsed.name,
@@ -277,6 +299,7 @@ export function ContactForm({
         preferences: parsed.preferences ?? '',
         address: '',
         notes: '',
+        leadType: parsed.type,
         type: stageToType(parsed.stage),
         properties: parsed.properties,
         tags: [],
@@ -301,6 +324,7 @@ export function ContactForm({
       { shouldDirty: true },
     );
     setValue('preferences', parsed.preferences ?? '', { shouldDirty: true });
+    setValue('leadType', parsed.type ?? '', { shouldDirty: true });
     setValue('type', stageToType(parsed.stage), { shouldDirty: true });
     setProperties(parsed.properties);
     setPendingPreview(null);
@@ -393,12 +417,14 @@ export function ContactForm({
   const useSegmented = CONTACT_STAGES.length <= 4;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => { if (next || confirmLeave()) { if (!next) draft.clear(); onOpenChange(next); } }}>
       <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto p-0 gap-0">
         {/* Header — DialogTitle (not a bare h2) so Radix labels the dialog for
             screen readers and doesn't emit its missing-title console error. */}
         <div className="px-6 py-4 border-b border-border/60">
           <DialogTitle className={H2}>{displayTitle}</DialogTitle>
+          {draft.restored && <p role="status" className="mt-2 text-sm text-muted-foreground">Your unsaved person was restored in this tab.</p>}
+          {draft.storageError && <p role="status" className="mt-2 text-sm text-destructive">Draft recovery is unavailable. Keep this page open until you save.</p>}
           <DialogDescription className="sr-only">
             {mode === 'edit'
               ? 'Update this person’s contact details and stage.'
@@ -456,6 +482,7 @@ export function ContactForm({
             preview={pendingPreview}
             onSubmit={handleParseSubmit}
             onCancel={() => {
+              if (!confirmLeave()) return;
               resetAll();
               onOpenChange(false);
             }}
@@ -469,7 +496,12 @@ export function ContactForm({
                 <Input id="name" {...register('name')} autoFocus />
               </FieldRow>
 
-              <FieldRow id="type" label="Stage">
+              <FieldRow id="leadType" label="Relationship type" error={errors.leadType?.message}>
+                <select id="leadType" {...register('leadType')} className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+                  <option value="">Choose type</option><option value="buyer">Buyer</option><option value="seller">Seller</option><option value="rental">Rental</option>
+                </select>
+              </FieldRow>
+              <FieldRow id="type" label="Intake stage">
                 {useSegmented ? (
                   <div
                     role="radiogroup"
@@ -527,12 +559,12 @@ export function ContactForm({
               {/* Hairline divider — identity above, qualification below */}
               <div className="border-t border-border/60 !my-7" />
 
-              <FieldRow id="budget" label="Monthly budget" optional>
+              <FieldRow id="budget" label={budgetLabel} optional>
                 <Input
                   id="budget"
                   type="number"
                   step="0.01"
-                  placeholder="e.g. 2500"
+                  placeholder={relationshipType === 'rental' ? 'e.g. 2500' : 'e.g. 650000'}
                   {...register('budget')}
                 />
               </FieldRow>
@@ -561,6 +593,7 @@ export function ContactForm({
               <button
                 type="button"
                 onClick={() => {
+                  if (!confirmLeave()) return;
                   resetAll();
                   onOpenChange(false);
                 }}

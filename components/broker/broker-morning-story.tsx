@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { DURATION_BASE, EASE_OUT } from '@/lib/motion';
-import { formatCompact } from '@/lib/formatting';
-import { AnimatedNumber } from '@/components/motion/animated-number';
-import type { BrokerMorningResponse } from '@/app/api/broker/morning/route';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
+import { formatCompact } from "@/lib/formatting";
+import { AnimatedNumber } from "@/components/motion/animated-number";
+import type { BrokerMorningResponse } from "@/app/api/broker/morning/route";
 
 /**
  * The /broker home's chief-of-staff opening line.
@@ -25,7 +25,7 @@ import type { BrokerMorningResponse } from '@/app/api/broker/morning/route';
  * non-interactive.
  */
 
-const STATS_LOADING: BrokerMorningResponse['stats'] = {
+const STATS_LOADING: BrokerMorningResponse["stats"] = {
   realtors: 0,
   activeDeals: 0,
   gciMtd: 0,
@@ -39,7 +39,7 @@ const STATS_LOADING: BrokerMorningResponse['stats'] = {
  * at one weight when there's no em-dash (the fallback sentence has none).
  */
 function splitHeadline(text: string): { lead: string; action: string | null } {
-  const idx = text.indexOf(' — ');
+  const idx = text.indexOf(" — ");
   if (idx === -1) return { lead: text, action: null };
   return {
     lead: text.slice(0, idx),
@@ -51,26 +51,48 @@ export function BrokerMorningStory() {
   const router = useRouter();
   const [data, setData] = useState<BrokerMorningResponse | null>(null);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    setError(false);
     void (async () => {
       try {
-        const res = await fetch('/api/broker/morning', { signal: controller.signal });
+        const res = await fetch("/api/broker/morning", {
+          signal: controller.signal,
+        });
         if (res.ok) {
           const body = (await res.json()) as BrokerMorningResponse;
-          setData(body);
+          if (
+            !body ||
+            typeof body.headline !== "string" ||
+            !body.headline.trim() ||
+            !body.stats ||
+            ![
+              body.stats.realtors,
+              body.stats.activeDeals,
+              body.stats.gciMtd,
+            ].every(
+              (value) =>
+                typeof value === "number" &&
+                Number.isFinite(value) &&
+                value >= 0,
+            )
+          ) {
+            throw new Error("Invalid team summary");
+          }
+          if (!controller.signal.aborted) setData(body);
         } else {
           setError(true);
         }
       } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== "AbortError") {
           setError(true);
         }
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
   // While loading, hold the layout with a non-breaking space so the page
   // doesn't jump when the sentence arrives.
@@ -78,8 +100,8 @@ export function BrokerMorningStory() {
     return (
       <div className="space-y-4">
         <h1
-          className="text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
-          style={{ fontFamily: 'var(--font-title)' }}
+          className="text-2xl leading-tight tracking-tight text-foreground sm:text-3xl"
+          style={{ fontFamily: "var(--font-title)" }}
         >
           &nbsp;
         </h1>
@@ -88,9 +110,30 @@ export function BrokerMorningStory() {
     );
   }
 
-  // On a hard error we still anchor the page with the fallback line — never
-  // show marketing copy, never leave the H1 blank.
-  const headline = data?.headline ?? "Quiet morning. Team's healthy.";
+  if (error) {
+    return (
+      <div className="space-y-4" role="alert">
+        <h1
+          className="text-3xl leading-tight text-foreground sm:text-4xl"
+          style={{ fontFamily: "var(--font-title)" }}
+        >
+          Team status could not be loaded.
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Your team data is unavailable. Try again to check current work.
+        </p>
+        <button
+          type="button"
+          onClick={() => setAttempt((value) => value + 1)}
+          className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const headline = data!.headline;
   const suggestedPrompt = data?.suggestedPrompt ?? null;
   const stats = data?.stats ?? STATS_LOADING;
   const { lead, action } = splitHeadline(headline);
@@ -126,10 +169,10 @@ export function BrokerMorningStory() {
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
           className={cn(
-            'block max-w-4xl text-left text-[2.65rem] leading-[0.98] tracking-[-0.035em] sm:text-[3.65rem] lg:text-[4.5rem]',
-            'text-foreground hover:opacity-80 transition-opacity cursor-pointer',
+            "block max-w-4xl text-left text-2xl leading-tight tracking-tight sm:text-3xl",
+            "text-foreground hover:opacity-80 transition-opacity cursor-pointer",
           )}
-          style={{ fontFamily: 'var(--font-title)' }}
+          style={{ fontFamily: "var(--font-title)" }}
         >
           {headlineNode}
         </motion.button>
@@ -139,8 +182,8 @@ export function BrokerMorningStory() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: DURATION_BASE, ease: EASE_OUT }}
-          className="max-w-4xl text-[2.65rem] leading-[0.98] tracking-[-0.035em] text-foreground sm:text-[3.65rem] lg:text-[4.5rem]"
-          style={{ fontFamily: 'var(--font-title)' }}
+          className="max-w-4xl text-2xl leading-tight tracking-tight text-foreground sm:text-3xl"
+          style={{ fontFamily: "var(--font-title)" }}
         >
           {headlineNode}
         </motion.h1>
@@ -165,16 +208,25 @@ function StatsRow({
   stats,
   loading,
 }: {
-  stats: BrokerMorningResponse['stats'];
+  stats: BrokerMorningResponse["stats"];
   loading?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px] tabular-nums text-muted-foreground sm:gap-4">
-      <Stat label="real estate agents" value={stats.realtors} loading={loading} />
+      <Stat
+        label="real estate agents"
+        value={stats.realtors}
+        loading={loading}
+      />
       <Divider />
       <Stat label="active deals" value={stats.activeDeals} loading={loading} />
       <Divider />
-      <Stat label="GCI MTD" value={stats.gciMtd} loading={loading} format={formatCompact} />
+      <Stat
+        label="GCI MTD"
+        value={stats.gciMtd}
+        loading={loading}
+        format={formatCompact}
+      />
     </div>
   );
 }
@@ -193,7 +245,7 @@ function Stat({
   return (
     <span className="inline-flex items-baseline gap-1.5">
       <span className="text-foreground/80">
-        {loading ? '—' : <AnimatedNumber value={value} format={format} />}
+        {loading ? "—" : <AnimatedNumber value={value} format={format} />}
       </span>
       <span>{label}</span>
     </span>

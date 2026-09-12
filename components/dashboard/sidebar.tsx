@@ -1,12 +1,13 @@
 'use client';
 
+import { NamedWorkspaceSwitcher, type WorkspaceSwitcherProps } from './workspace-switcher';
+import { DashboardViewToggle } from "./dashboard-view-toggle";
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useUser } from '@clerk/nextjs';
 import { cn } from '@/lib/utils';
-import { triggerAccountSwitch } from '@/components/dashboard/account-switch';
 import { BrandLogo } from '@/components/brand-logo';
 import { realtorNavItems, realtorMoreNavItems } from '@/lib/nav-items';
 import type { NavItem, NavChild } from '@/lib/nav-items';
@@ -36,7 +37,6 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   Briefcase,
-  ChevronsUpDown,
   PhoneIncoming,
   BarChart3,
   Trophy,
@@ -49,7 +49,6 @@ import {
   Upload,
   ArrowLeft,
   Plus,
-  Check,
   Search,
   Flag,
   History,
@@ -72,11 +71,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from '@/components/ui/popover';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Types
@@ -318,7 +312,7 @@ function FlatNavItem({
   isActive: boolean;
   badge?: React.ReactNode;
   /**
-   * When true the item renders the chip avatar (chip-avatar.png) instead of
+   * When true the item uses a text-only Chippi label instead of
    * the icon — matches the realtor sidebar's top-pinned Chippi treatment.
    * Use for the broker's Chippi nav entry only.
    */
@@ -339,12 +333,8 @@ function FlatNavItem({
       style={{ willChange: 'transform' }}
     >
       {isAI ? (
-        /* Chip avatar — same 16×16 rounded-full as the realtor Chippi row */
-        <img
-          src="/chip-avatar.png"
-          alt=""
-          className="w-[16px] h-[16px] rounded-full flex-shrink-0 ring-1 ring-border/40"
-        />
+        /* Agent branding uses text only. */
+        null
       ) : (
         <Icon
           size={15}
@@ -457,266 +447,11 @@ function QuickCreateMenu({ slug }: { slug: string }) {
 // Workspace switcher
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function WorkspaceSwitcher({
-  currentName,
-  currentSubtitle,
-  currentIcon: Icon,
-  slug,
-  spaceName,
-  brokerageMemberships,
-  isOnBrokerPage,
-  collapsed = false,
-  showQuickCreate = false,
-  userEmail = null,
-  inDrawer = false,
-}: {
-  currentName: string;
-  currentSubtitle: string;
-  currentIcon: React.ComponentType<{ size?: number; className?: string }>;
-  slug: string;
-  spaceName: string;
-  brokerageMemberships: { id: string; name: string; role: string }[];
-  isOnBrokerPage: boolean;
-  collapsed?: boolean;
-  /** Render the SquarePen "new" quick-create dropdown next to the switcher. */
-  showQuickCreate?: boolean;
-  /** Current user's email, rendered as the popover header. */
-  userEmail?: string | null;
-  /**
-   * Mobile-drawer mode — expands the workspace list inline below the chip
-   * instead of opening a Radix Popover. Radix Popover content inside a
-   * modal Sheet ends up pointer-events-blocked because it portals as a
-   * body sibling and the Sheet's modal disables siblings.
-   */
-  inDrawer?: boolean;
-}) {
-  const base = `/s/${slug}`;
-  const [drawerExpanded, setDrawerExpanded] = useState(false);
-
-  // Build the workspace list. The realtor's own workspace is always first;
-  // brokerage memberships follow. Each gets a ⌘1/⌘2/⌘3… shortcut so the
-  // popover doubles as a keyboard switcher — same shape as the inspiration.
-  const workspaces: {
-    key: string;
-    name: string;
-    href: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    isCurrent: boolean;
-  }[] = [];
-  if (slug) {
-    workspaces.push({
-      key: 'solo',
-      name: spaceName,
-      href: base,
-      icon: Briefcase,
-      isCurrent: !isOnBrokerPage,
-    });
-  }
-  for (const b of brokerageMemberships) {
-    workspaces.push({
-      key: b.id,
-      name: b.name,
-      href: '/broker',
-      icon: Building2,
-      isCurrent: isOnBrokerPage,
-    });
-  }
-
-  if (inDrawer) {
-    // Inline-expand inside the mobile drawer. Same rich content as the
-    // popover (email header, ⌘1/⌘2/⌘3, "+ New") just stacked vertically
-    // below the chip instead of in a Popover portal.
-    return (
-      <div className="mx-3">
-        <button
-          type="button"
-          onClick={() => setDrawerExpanded((v) => !v)}
-          aria-expanded={drawerExpanded}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-foreground/[0.025]"
-        >
-          <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6">
-            <Icon size={12} className="text-foreground/80" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium truncate text-foreground leading-tight">
-              {currentName}
-            </p>
-            <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
-              {currentSubtitle}
-            </p>
-          </div>
-          <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
-        </button>
-        {drawerExpanded && (
-          <div className="mt-1 pt-1 border-t border-border/40 space-y-0.5">
-            <WorkspaceSwitcherRows
-              workspaces={workspaces}
-              userEmail={userEmail}
-              hasTeam={brokerageMemberships.length > 0}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn(collapsed ? 'flex justify-center' : 'mx-3')}>
-      <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-1')}>
-        <Popover>
-          <CollapsedTooltip enabled={collapsed} label={`${currentName} · Switch workspace`}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  'group/switcher rounded-md text-left transition-colors hover:bg-foreground/[0.025] cursor-pointer',
-                  collapsed
-                    ? 'flex items-center justify-center w-9 h-9'
-                    : 'flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5',
-                )}
-                aria-label={collapsed ? `${currentName} — switch workspace` : undefined}
-              >
-                <div className="rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0 w-6 h-6 transition-transform duration-150 group-hover/switcher:scale-[1.08]">
-                  <Icon size={12} className="text-foreground/80" />
-                </div>
-                {!collapsed && (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate text-foreground leading-tight">
-                        {currentName}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.08em] leading-tight mt-0.5">
-                        {currentSubtitle}
-                      </p>
-                    </div>
-                    <ChevronsUpDown size={11} className="text-muted-foreground/40 flex-shrink-0" />
-                  </>
-                )}
-              </button>
-            </PopoverTrigger>
-          </CollapsedTooltip>
-          <WorkspaceSwitcherPopoverContent
-            workspaces={workspaces}
-            userEmail={userEmail}
-            hasTeam={brokerageMemberships.length > 0}
-            collapsed={collapsed}
-          />
-        </Popover>
-        {!collapsed && showQuickCreate && (
-          <QuickCreateMenu slug={slug} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function WorkspaceSwitcherRows({
-  workspaces,
-  userEmail,
-  hasTeam,
-}: {
-  workspaces: {
-    key: string;
-    name: string;
-    href: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    isCurrent: boolean;
-  }[];
-  userEmail: string | null;
-  hasTeam: boolean;
-}) {
-  return (
-    <>
-      {userEmail && (
-        <div className="flex items-center gap-2 px-2.5 py-2">
-          <span className="flex-1 truncate text-[12px] text-foreground/85">
-            {userEmail}
-          </span>
-          <ChevronsUpDown
-            size={12}
-            strokeWidth={1.75}
-            className="text-muted-foreground/60 flex-shrink-0"
-          />
-        </div>
-      )}
-      {userEmail && <div className="my-1 mx-1 h-px bg-border/60" />}
-      {workspaces.map((w, idx) => {
-        const WIcon = w.icon;
-        const shortcut = `⌘${idx + 1}`;
-        return (
-          <Link
-            key={w.key}
-            href={w.href}
-            onClick={() => { if (!w.isCurrent && w.href === '/broker') triggerAccountSwitch(); }}
-            className={cn(
-              'group flex items-center gap-2.5 h-9 px-2 rounded-md text-[12px] transition-colors duration-150',
-              w.isCurrent
-                ? 'bg-foreground/[0.04] text-foreground'
-                : 'text-foreground/85 hover:bg-foreground/[0.05] hover:text-foreground',
-            )}
-          >
-            <div className="w-6 h-6 rounded-md bg-foreground/[0.06] flex items-center justify-center flex-shrink-0">
-              <WIcon size={12} className="text-foreground/80" />
-            </div>
-            <span className="flex-1 truncate font-medium">{w.name}</span>
-            {w.isCurrent ? (
-              <Check size={13} strokeWidth={2} className="text-foreground flex-shrink-0" />
-            ) : (
-              <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-                {shortcut}
-              </kbd>
-            )}
-          </Link>
-        );
-      })}
-      <div className="my-1 mx-1 h-px bg-border/60" />
-      <Link
-        href="/brokerage"
-        className="group flex items-center gap-2 h-9 px-2 rounded-md text-[12px] text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground transition-colors duration-150"
-      >
-        <Plus size={13} strokeWidth={1.75} className="flex-shrink-0" />
-        <span className="flex-1 text-left">
-          {hasTeam ? 'New team' : 'Create or join a team'}
-        </span>
-        <kbd className="text-[10px] tabular-nums bg-foreground/[0.04] text-muted-foreground px-1.5 py-0.5 rounded font-mono">
-          ⌘A
-        </kbd>
-      </Link>
-    </>
-  );
-}
-
-function WorkspaceSwitcherPopoverContent({
-  workspaces,
-  userEmail,
-  hasTeam,
-  collapsed,
-}: {
-  workspaces: {
-    key: string;
-    name: string;
-    href: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    isCurrent: boolean;
-  }[];
-  userEmail: string | null;
-  hasTeam: boolean;
-  collapsed: boolean;
-}) {
-  return (
-    <PopoverContent
-      side={collapsed ? 'right' : 'bottom'}
-      align="start"
-      sideOffset={8}
-      className="w-72 p-1 rounded-xl border border-border/70"
-    >
-      <WorkspaceSwitcherRows
-        workspaces={workspaces}
-        userEmail={userEmail}
-        hasTeam={hasTeam}
-      />
-    </PopoverContent>
-  );
+export function WorkspaceSwitcher(props: WorkspaceSwitcherProps) {
+  return <div className="flex min-w-0 items-center gap-1">
+    <div className="min-w-0 flex-1"><NamedWorkspaceSwitcher {...props} /></div>
+    {props.showQuickCreate && !props.collapsed && <QuickCreateMenu slug={props.slug} />}
+  </div>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1718,6 +1453,8 @@ export function Sidebar({
             <SearchPill collapsed={brokerCollapsed} />
           </div>
 
+          {["broker_owner", "broker_admin"].includes(brokerageRole ?? "") && <DashboardViewToggle kind="brokerage" id={brokerageMemberships[0]?.id ?? ""} />}
+
           {/* Broker primary nav — same structural vocabulary as RealtorNav:
               py-2 vertical breathing, space-y-3 between section groups,
               overflow-y-auto so deep section lists don't push the footer off. */}
@@ -2012,6 +1749,7 @@ function RealtorSidebarShell({
           userEmail={email}
         />
 
+        <DashboardViewToggle kind="personal" id={slug} />
         {/* Search */}
         <div className="mt-3">
           <SearchPill collapsed={collapsed} />

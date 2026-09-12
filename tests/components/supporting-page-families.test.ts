@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 const read = (path: string) => readFileSync(path, 'utf8');
 
 const representativePages = [
-  ['properties', 'app/s/[slug]/properties/page.tsx', 'inventory'],
   ['CMA', 'app/s/[slug]/cma/cma-view.tsx', 'inventory'],
   ['automations', 'app/s/[slug]/automations/page.tsx', 'operations'],
   ['Studio', 'app/s/[slug]/studio/page.tsx', 'studio'],

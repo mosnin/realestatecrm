@@ -31,6 +31,10 @@ export function coerceToolArguments(input: unknown, schema?: z.ZodTypeAny): unkn
 }
 
 function coerceAgainst(input: unknown, schema: z.ZodTypeAny): unknown {
+  // Strict provider schemas encode absent optional fields as null. Restore
+  // absence only when the original schema allows it; required/null-invalid
+  // fields must still fail original validation.
+  if (input === null && schema.isOptional() && !schema.isNullable()) return undefined;
   const leaf = unwrap(schema);
   const type = readType(leaf);
 

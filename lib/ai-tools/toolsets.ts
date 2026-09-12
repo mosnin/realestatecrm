@@ -44,6 +44,8 @@ export const CORE_TOOL_NAMES: readonly string[] = [
   'list_contacts',
   'note_on_person',
   'set_followup',
+  'record_client_commitment',
+  'list_client_commitments',
   'log_call',
   'find_deal',
   'note_on_deal',
@@ -290,6 +292,10 @@ function selectWorkMutationScope(message: string): Set<string> | null {
   const allowed = new Set<string>();
   let scoped = false;
 
+  if (/\b(?:record|create|schedule)\b[^.!?\n]{0,60}\bclient commitment\b/i.test(text)) {
+    scoped = true;
+    allowed.add('record_client_commitment');
+  }
   if (CONTACT_CREATION_INTENT.test(text)) {
     scoped = true;
     allowed.add('add_person');

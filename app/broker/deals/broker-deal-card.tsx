@@ -18,6 +18,10 @@ import { formatCurrency, formatCompact } from '@/lib/formatting';
 import { dealHealth, HEALTH_META } from '@/lib/deals/health';
 
 export interface BrokerDealItem {
+  checklist?: {kind?: string; label:string;dueAt:string|null;completedAt:string|null}[];
+  inspectionDeadline?: string | null;
+  earnestDueAt?: string | null;
+  milestones?: import('@/lib/types').DealMilestone[];
   id: string;
   title: string;
   address: string | null;
@@ -74,6 +78,7 @@ export function BrokerDealCard({
       : 0;
 
   const health = dealHealth({
+    ...deal,
     status: deal.status,
     stageChangedAt: deal.stageChangedAt,
     updatedAt: deal.updatedAt,

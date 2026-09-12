@@ -11,7 +11,7 @@
  *     connections: Array<{
  *       toolkit: string;
  *       name: string;
- *       status: 'healthy' | 'expired' | 'error' | 'disconnected';
+ *       status: 'unknown' | 'healthy' | 'expired' | 'error' | 'disconnected';
  *       lastCheckedAt: string;   // ISO-8601
  *       error?: string;          // present when status is 'error' or 'expired'
  *     }>
@@ -36,7 +36,7 @@ import { getComposio, composioConfigured } from '@/lib/integrations/composio';
 import { findIntegration } from '@/lib/integrations/catalog';
 import { logger } from '@/lib/logger';
 
-export type HealthStatus = 'healthy' | 'expired' | 'error' | 'disconnected';
+export type HealthStatus = 'unknown' | 'healthy' | 'expired' | 'error' | 'disconnected';
 
 export interface ConnectionHealth {
   toolkit: string;
@@ -130,7 +130,7 @@ export async function GET() {
     if (row.composioConnectionId.startsWith('native:')) {
       const nativeStatus: HealthStatus =
         row.status === 'active'
-          ? 'healthy'
+          ? 'unknown'
           : row.status === 'expired'
             ? 'expired'
             : row.status === 'failed'
@@ -141,7 +141,7 @@ export async function GET() {
         name,
         status: nativeStatus,
         lastCheckedAt: checkedAt,
-        ...(nativeStatus !== 'healthy' && row.lastError ? { error: row.lastError } : {}),
+        ...(nativeStatus === 'unknown' ? { error: 'Credentials are saved; live access has not been checked.' } : row.lastError ? { error: row.lastError } : {}),
       };
     }
 
@@ -165,7 +165,8 @@ export async function GET() {
         case 'active':
           // Account exists in DB as active but Composio didn't list it —
           // treat as error (drift) rather than healthy (lying).
-          status = composioConfigured() ? 'error' : 'healthy';
+          status = 'unknown';
+          error = 'Live connection status could not be verified. Try checking again.';
           break;
         case 'expired':
           status = 'expired';

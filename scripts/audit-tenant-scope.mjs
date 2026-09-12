@@ -66,7 +66,7 @@ function loadTenantTables() {
   const body = text.slice(openBrace + 1, end);
   /** @type {Record<string, string>} */
   const map = {};
-  const entryRe = /^\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*'(spaceId|brokerageId)'/gm;
+  const entryRe = /^\s*([A-Za-z][A-Za-z0-9]*)\s*:\s*'(spaceId|brokerageId|teamId)'/gm;
   let m;
   while ((m = entryRe.exec(body)) !== null) {
     map[m[1]] = m[2];

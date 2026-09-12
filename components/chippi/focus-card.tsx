@@ -372,13 +372,13 @@ export function FocusCard({
           <p className="mt-3 text-[15px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
             {editContent}
             {isEdited && (
-              <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
+              <span className="ml-1.5 text-[11px] text-muted-foreground not-italic">(edited)</span>
             )}
           </p>
         )}
 
         {!editing && draft.reasoning && (
-          <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground italic">
+          <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground not-italic">
             {draft.reasoning}
           </p>
         )}
@@ -483,7 +483,7 @@ export function FocusCard({
       </p>
 
       {question.context && (
-        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground italic">
+        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground not-italic">
           {question.context}
         </p>
       )}

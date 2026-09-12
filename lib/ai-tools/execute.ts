@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { coerceToolArguments } from './coerce-tool-args';
+import { recordToolOutcome } from './outcomes';
 import { getTool } from './registry';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
 
@@ -146,6 +147,8 @@ export async function executeTool(
   try {
     const result = await (tool as ToolDefinition).handler(parsed.data, ctx);
 
+    recordToolOutcome(name, result, ctx);
+
     // A handler might honour the abort signal itself and return a zero-ish
     // result after cancellation; if the signal fired during execution,
     // surface that explicitly so the loop doesn't try to continue.
@@ -171,14 +174,18 @@ export async function executeTool(
       tool: tool.name,
       userId: ctx.userId,
       spaceId: ctx.space.id,
-      ok: true,
-      errorCode: undefined,
+      ok: result.display !== 'error' && !result.durableExecutionDisposition,
+      errorCode: result.display === 'error' || result.durableExecutionDisposition ? 'handler_error' : undefined,
       display: result.display,
       durationMs: Date.now() - startedAt,
     });
+    if (result.display === 'error' || result.durableExecutionDisposition) {
+      return { ok: false, name, args: parsed.data, result, error: { code: 'handler_error', message: result.summary } };
+    }
     return { ok: true, name, args: parsed.data, result };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    recordToolOutcome(name, { summary: message, display: 'error' }, ctx);
     logger.error('[tools.execute] handler threw', { name }, err);
     logger.info('[tools.usage]', {
       tool: tool.name,

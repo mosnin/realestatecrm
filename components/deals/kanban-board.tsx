@@ -60,7 +60,7 @@ import {
 } from '@/components/ui/select';
 import { useRealtime } from '@/hooks/use-realtime';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { dealHealth } from '@/lib/deals/health';
+import { dealHealth, inferNextAction, HEALTH_META } from '@/lib/deals/health';
 import type { BoardStatus, BoardFocus } from './deals-page-client';
 
 /**
@@ -194,7 +194,7 @@ function MobileKanban({
   onOpenDeal,
   formatCurrency: formatCurrencyProp,
 }: {
-  stages: { id: string; name: string; color: string; deals: Array<{ id: string; title: string; address: string | null; value: number | null }> }[];
+  stages: { id: string; name: string; color: string; deals: DealWithRelations[] }[];
   onOpenDeal: (dealId: string) => void;
   formatCurrency: (n: number | null) => string | null;
 }) {
@@ -334,6 +334,8 @@ function MobileKanban({
                       <p className="text-sm font-medium truncate text-foreground">
                         {deal.title}
                       </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{dealHealth(deal).reason || HEALTH_META[dealHealth(deal).state].label}</p>
+                      {inferNextAction(deal) && <p className="mt-1 text-xs">{inferNextAction(deal)?.label}</p>}
                       {deal.address && (
                         <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1 mt-0.5">
                           <MapPin size={10} />
@@ -1107,6 +1109,7 @@ export function KanbanBoard({
 
   return (
     <div className="space-y-4">
+      {loaded && focus === 'at-risk' && stages.every(stage => stage.deals.every(deal => dealHealth(deal).state === 'on-track')) && <p role="status" className="py-3 text-sm text-muted-foreground">No flagged issues. Open Full pipeline to see all deals. Missing or unrecorded deadlines still need verification.</p>}
       {/* Toolbar (search + focus chip + status toggle) is now part of the
           page chrome above. The board renders just the board. */}
 

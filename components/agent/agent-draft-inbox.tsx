@@ -426,7 +426,7 @@ function DraftRow({
           <p className="break-words whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
             {editedContent}
             {isEdited && (
-              <span className="ml-1.5 text-[11px] text-muted-foreground italic">(edited)</span>
+              <span className="ml-1.5 text-[11px] text-muted-foreground not-italic">(edited)</span>
             )}
           </p>
         </div>
@@ -457,7 +457,7 @@ function DraftRow({
 
       {/* Reasoning — quieter than before, no left border bar */}
       {draft.reasoning && !editing && (
-        <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground italic">
+        <p className="mt-2.5 text-[12px] leading-relaxed text-muted-foreground not-italic">
           {draft.reasoning}
         </p>
       )}

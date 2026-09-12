@@ -1,3 +1,4 @@
+import { CollaborationSection } from '@/components/settings/collaboration-section';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
@@ -261,6 +262,7 @@ export default async function SettingsPage({
             <p className={SECTION_LABEL}>Workspace</p>
             <GeneralSettingsForm space={space} />
           </section>
+          <CollaborationSection teamsEnabled={process.env.CHIPPI_WORKFORCE_ENABLED === 'true'} />
           <section className="space-y-5 pt-10 border-t border-border/60">
             <p className={cn(SECTION_LABEL, 'text-destructive/80')}>Danger zone</p>
             <DangerZone space={space} />

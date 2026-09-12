@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, X, Trash2, Clock } from 'lucide-react';
@@ -116,6 +117,7 @@ export function expiryReadout(expiresAt: string | null, status: OfferStatus): { 
 // ── Component ────────────────────────────────────────────────────────────
 
 export function OffersClient({ slug: _slug, initialOffers }: Props) {
+  const router = useRouter();
   const [offers, setOffers] = useState<OfferRow[]>(initialOffers);
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
@@ -137,7 +139,6 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
 
   async function handleTransition(offer: OfferRow, to: OfferStatus) {
     if (pending.has(offer.id)) return;
-    const prev = offers;
     setPending((p) => new Set(p).add(offer.id));
     setOffers((cur) => cur.map((o) => (o.id === offer.id ? { ...o, status: to } : o)));
 
@@ -149,15 +150,16 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setOffers(prev);
+        setOffers(current => current.some(row => row.id === offer.id) ? current.map(row => row.id === offer.id ? offer : row) : [...current, offer]);
         toast.error(body.error ?? "Couldn't update that offer. Try again.");
         return;
       }
       const updated = (await res.json()) as OfferRow;
       setOffers((cur) => cur.map((o) => (o.id === offer.id ? updated : o)));
+      router.refresh();
       toast.success(`Offer moved to ${STATUS_LABEL[to].toLowerCase()}.`);
     } catch {
-      setOffers(prev);
+      setOffers(current => current.some(row => row.id === offer.id) ? current.map(row => row.id === offer.id ? offer : row) : [...current, offer]);
       toast.error("Couldn't update that offer. Try again.");
     } finally {
       setPending((p) => {
@@ -170,7 +172,6 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
 
   async function handleDeleteDraft(offer: OfferRow) {
     if (pending.has(offer.id)) return;
-    const prev = offers;
     setPending((p) => new Set(p).add(offer.id));
     setOffers((cur) => cur.filter((o) => o.id !== offer.id));
 
@@ -178,13 +179,14 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
       const res = await fetch(`/api/offers/${offer.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setOffers(prev);
+        setOffers(current => current.some(row => row.id === offer.id) ? current.map(row => row.id === offer.id ? offer : row) : [...current, offer]);
         toast.error(body.error ?? "Couldn't delete that offer. Try again.");
         return;
       }
       toast.success('Draft removed.');
+      router.refresh();
     } catch {
-      setOffers(prev);
+      setOffers(current => current.some(row => row.id === offer.id) ? current.map(row => row.id === offer.id ? offer : row) : [...current, offer]);
       toast.error("Couldn't delete that offer. Try again.");
     } finally {
       setPending((p) => {
@@ -223,6 +225,7 @@ export function OffersClient({ slug: _slug, initialOffers }: Props) {
           onCancel={() => setFormOpen(false)}
           onCreated={(offer) => {
             setOffers((cur) => [offer, ...cur]);
+            router.refresh();
             setFormOpen(false);
           }}
         />

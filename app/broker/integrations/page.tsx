@@ -39,7 +39,7 @@ export default async function BrokerIntegrationsPage({
   }>;
 }) {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage, membership } = ctx;
   const canEdit = canEditSettings(membership.role);

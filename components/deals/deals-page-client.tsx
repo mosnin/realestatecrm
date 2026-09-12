@@ -63,7 +63,7 @@ export function DealsPageClient({
   // you click "At risk: 3", the board narrows to those three. The page tells
   // one story instead of two.
   const [boardStatus, setBoardStatus] = useState<BoardStatus>('active');
-  const [focus, setFocus] = useState<BoardFocus>(null);
+  const [focus, setFocus] = useState<BoardFocus>('at-risk');
   // Search is part of the page-level toolbar so the status toggle, search,
   // and focus chip share one row. Used to be in the kanban — but having three
   // separate rows of chrome was the whole problem.
@@ -254,28 +254,22 @@ export function DealsPageClient({
   const hasPipelines = pipelines.length > 0;
 
   return (
-    <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-9 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
+    <div data-realtor-page="today" data-page-family="deal-pipeline" className="chippi-dashboard-canvas min-h-[calc(100vh-10rem)] space-y-4 max-w-[1500px] mx-auto pb-12 pt-3 sm:pt-5">
       {/* A pipeline is a working board, so its orientation reads horizontally:
           outcome statement first, current operating context and action at the
           right edge, then the full-width board below. */}
-      <header className="grid gap-8 border-b border-border/60 pb-9 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
+      <header className="grid gap-4 border-b border-border/60 pb-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-end lg:gap-16">
         <div className="max-w-3xl space-y-3">
           <p className={SECTION_LABEL}>Deal pipeline</p>
-          <h1 className={cn(H1, 'text-[3rem] leading-[.95] sm:text-[4.75rem]')} style={TITLE_FONT}>
-            Move the deal that can close next.
+          <h1 className={cn(H1, 'text-2xl leading-tight sm:text-3xl')} style={TITLE_FONT}>
+            Deals
           </h1>
           <p className={BODY_MUTED}>
-            Read the board left to right. Fix stalled work first, then protect the closings already in motion.
+            Track progress, unblock stalled deals, and protect upcoming closings.
           </p>
         </div>
         {hasPipelines && (
-          <div className="flex flex-col items-start gap-4 lg:items-end">
-            <div className="text-left lg:text-right">
-              <p className={SECTION_LABEL}>Board context</p>
-              <p className="mt-2 text-sm text-foreground">
-                {pipelines.length === 1 ? '1 active pipeline' : `${pipelines.length} active pipelines`}
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
             {/* The conversation is the front door. Saying it out loud is
                 faster than any form, so it gets the primary pill. */}
             <Link
@@ -332,6 +326,7 @@ export function DealsPageClient({
           and the chrome ride the same line. */}
       {hasPipelines && (
         <div className="flex items-center gap-3 flex-wrap border-b border-border/70">
+          {boardStatus === 'active' && <div className="flex gap-1" aria-label="Deal work view"><button type="button" aria-pressed={focus === 'at-risk'} onClick={() => setFocus('at-risk')} className="px-3 py-2 text-sm">Needs attention</button><button type="button" aria-pressed={focus === null} onClick={() => setFocus(null)} className="px-3 py-2 text-sm">Full pipeline</button></div>}
           <div role="tablist" aria-label="Deal status" className="flex items-center gap-0">
             {STATUS_TABS.map((t) => {
               const isActive = boardStatus === t.key;
@@ -512,17 +507,22 @@ function CreateFirstBoardCard({
   onCreated: (p: Pipeline) => void;
 }) {
   const [pending, setPending] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   async function handleCreate() {
     setPending(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/pipelines', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, name: 'Pipeline', color: '#6366f1' }),
+        body: JSON.stringify({ slug, name: 'Pipeline', color: '#ff964f' }),
       });
-      if (!res.ok) return;
+      if (!res.ok) throw new Error('Could not create your board. Please try again.');
       const created: Pipeline = await res.json();
+      if (!created?.id || !created.name) throw new Error('Board creation could not be confirmed. Please try again.');
       onCreated(created);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not create your board. Please try again.');
     } finally {
       setPending(false);
     }
@@ -538,6 +538,7 @@ function CreateFirstBoardCard({
       <p className={cn(BODY_MUTED, 'max-w-sm mb-6')}>
         A board of stages — make one and I&apos;ll start tracking your deals.
       </p>
+      {createError && <p role="alert" className="mb-4 max-w-sm text-sm text-destructive">{createError}</p>}
       <button
         type="button"
         onClick={handleCreate}

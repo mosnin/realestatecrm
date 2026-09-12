@@ -5,17 +5,20 @@ The authenticated Chippi product has one visual source of truth: the live
 the same system. A page may be denser because its job is a calendar, kanban,
 editor, table, or chat, but it may not introduce a different brand language.
 
-The system translates the hierarchy and calm openness of Scalar into Chippi's
-own identity. It does not copy Scalar's blue palette, typography, navigation
-content, or product concepts.
+The authenticated shell uses the actual mosnin/Sicarii dashboard source, adapted
+to Chippi routes and an orange palette. See docs/product-rebuild/sicarii-restoration.md.
+The current refinement follows the owner's ten OpenAI dashboard screenshots in
+Google Drive's `openai_dash` folder. See docs/product-rebuild/execution-2026-09-07.md.
+Use a flush 256px sidebar, neutral selection, visible workspace search, compact
+toolbars, and content divided by hairlines. Keep existing feature routes and the
+Chippi wordmark; the screenshots guide hierarchy, not product branding.
 
 ## Product principles
 
 1. **Outcome first.** Lead with the deal, conversation, follow-up, tour, or
    decision the user can move. Do not sell implementation features in the UI.
-2. **One calm canvas.** Authenticated dashboard pages use the warm
-   `chippi-dashboard-canvas`; working regions use warm paper panels rather than
-   stacks of bordered cards.
+2. **One calm canvas.** Authenticated dashboard pages use the neutral
+   `chippi-dashboard-canvas`; working regions use white or charcoal panels.
 3. **Text carries hierarchy.** Use a quiet eyebrow, an editorial title, one
    status sentence, and generous space. Decorative icons do not substitute for
    information architecture.
@@ -32,19 +35,20 @@ content, or product concepts.
 ## Canonical frame
 
 - Canvas ceiling: `1500px` (`PAGE_MAX`).
-- Desktop gutters: `48px`; tablet `40px`; mobile `16px`.
-- Section rhythm: `32px` minimum; primary orientation regions may use more.
-- Panel radius: `28px` (`rounded-[1.75rem]`).
-- Row radius: `12px`; controls remain rounded pills.
-- Panels are borderless warm paper with the shared shallow editorial shadow.
-- At most one low-opacity shared `AsciiField` atmosphere is allowed on a
-  dashboard view, behind its orientation region only.
+- Desktop gutters: `32px`; tablet `24px`; mobile `16px`.
+- Section rhythm: `20–32px`; compact orientation regions keep work near the top.
+- Panel radius: `12px`; inset radius: `8px`.
+- Controls use `8px` corners; reserve pills for status badges.
+- Panels use white or charcoal surfaces, visible hairline borders, and no decorative shadow.
+- Dashboard orientation is typographic. Do not add animated decorative backgrounds.
 
 ## Type
 
-- Product chrome and body copy use the existing system/SF stack.
-- Editorial page titles, focal values, and section headlines use
-  `TITLE_FONT` and the existing Times voice.
+- Product chrome and body copy use Inter.
+- Page titles and section headlines also use Inter through the shared type variables.
+- All application text is upright sans-serif; serif and italic styling is prohibited.
+- Default page titles are 24–30px. Reserve larger type for exceptional content,
+  not greetings or repetitive KPI cards.
 - Eyebrows use `SECTION_LABEL`; supporting copy uses `BODY_MUTED`.
 - Avoid all-caps body copy, tiny low-contrast metadata, and icon-led headings.
 
@@ -90,16 +94,11 @@ brand system without collapsing into one generic card template.
 
 ## Navigation
 
-Desktop navigation is one collapsible surface:
-
-- expanded: a `240px` labeled sidebar;
-- collapsed: a true `56px` Scalar-style nav strip;
-- the strip shows daily destinations, search, one `More` disclosure, settings,
-  account, and the expand affordance;
-- secondary routes do not become an endless column of icons;
-- every icon has a tooltip and active state; badges remain readable;
-- `Cmd/Ctrl+B` toggles the strip and the preference persists;
-- mobile continues to use the existing drawer and bottom navigation.
+Desktop navigation uses the Sicarii shell with a 256px grouped sidebar by default.
+Daily work comes first, followed by Business and Workspace. Preserve all feature
+routes in Apps. Nested tools use disclosures; the current route remains visible.
+The optional dock is a saved user preference. Mobile uses labeled bottom
+navigation and the full Apps sheet. Account and workspace controls stay in the shell.
 
 Today is the default authenticated landing page for both realtor and brokerage.
 Chat remains a named Chippi destination, not the implicit brokerage home.

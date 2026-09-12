@@ -152,7 +152,7 @@ async function rollupForBrokerage(brokerageId: string, windowDays: number): Prom
 
 export default async function BrokerAgentActivityPage() {
   const ctx = await getBrokerMemberContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const initial = await rollupForBrokerage(ctx.brokerage.id, DEFAULT_WINDOW_DAYS);
 

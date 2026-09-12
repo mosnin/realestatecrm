@@ -65,7 +65,7 @@ function GoalRow({ goal, onAction }: { goal: AgentGoal; onAction: (id: string, s
 
         <p className="mt-1 text-sm text-foreground leading-snug">{goal.description}</p>
         {goal.instructions && (
-          <p className="mt-1 text-[12px] text-muted-foreground italic line-clamp-2">{goal.instructions}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground not-italic line-clamp-2">{goal.instructions}</p>
         )}
       </div>
 

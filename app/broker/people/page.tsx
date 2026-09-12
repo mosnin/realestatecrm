@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'People' };
 
 export default async function BrokerPeoplePage() {
   const ctx = await resolveBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   return (
     <div className={BROKER_PAGE_WIDE} data-broker-premium-page="people">

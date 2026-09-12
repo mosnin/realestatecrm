@@ -15,6 +15,7 @@ import {
   type LeadOrgFilters,
 } from '@/lib/leads/org-filters';
 import type { Contact } from '@/lib/types';
+import { attachPeopleWork } from '@/lib/people-work';
 import { tenantTable } from '@/lib/tenant-db';
 
 export async function GET(req: NextRequest) {
@@ -95,7 +96,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });
   }
 
-  return NextResponse.json(contacts as Contact[]);
+  return NextResponse.json(req.nextUrl.searchParams.get('work') === '1' ? await attachPeopleWork((contacts ?? []) as Contact[]) : contacts as Contact[]);
 }
 
 /**
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  const { slug, name, email, phone, budget, preferences, properties, address, notes, type, tags, source, sourceDetail } = body;
+  const { slug, name, email, phone, budget, preferences, properties, address, notes, type, leadType, tags, source, sourceDetail } = body;
 
   if (typeof slug !== 'string' || !slug) {
     return NextResponse.json({ error: 'slug required' }, { status: 400 });
@@ -146,6 +147,7 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { space } = auth;
 
+  if (leadType !== undefined && !['buyer', 'seller', 'rental'].includes(leadType)) return NextResponse.json({ error: 'Invalid relationship type' }, { status: 400 });
   const id = crypto.randomUUID();
   const budgetVal = budget != null && budget !== '' ? parseFloat(budget) : null;
   if (budgetVal !== null && (Number.isNaN(budgetVal) || budgetVal < 0)) {
@@ -211,6 +213,7 @@ export async function POST(req: NextRequest) {
     address: addressVal,
     notes: notesVal,
     type: contactType,
+    ...(leadType !== undefined ? { leadType } : {}),
     budget: budgetVal,
     preferences: preferencesVal,
     properties: propsVal,

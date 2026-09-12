@@ -1712,7 +1712,7 @@ function ActionZapCard({
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{summary}</p>
               )}
               {row.note && (
-                <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/50">{row.note}</p>
+                <p className="mt-0.5 truncate text-[11px] not-italic text-muted-foreground/50">{row.note}</p>
               )}
             </button>
           ) : (
@@ -5211,7 +5211,7 @@ function LookupTableActionConfig({
       <div className="space-y-1.5">
         <Label className="text-[12px] text-muted-foreground">Key → Value pairs</Label>
         {entries.length === 0 && (
-          <p className="text-[12px] text-muted-foreground/60 italic">
+          <p className="text-[12px] text-muted-foreground/60 not-italic">
             No entries yet. Add rows below.
           </p>
         )}

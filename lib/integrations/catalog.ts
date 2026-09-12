@@ -60,9 +60,8 @@ export interface IntegrationApp {
    */
   comingSoon?: boolean;
   /**
-   * Optional brand mark for the integration card. Single-color SVG sized
-   * to a 24×24 viewBox, served from /public/integrations/. The card tints
-   * it with `currentColor` so the mark inherits the row's text colour.
+   * Local brand artwork for the integration card, served from
+   * /public/integrations/. Preserve the original colors and aspect ratio.
    * No iconUrl → the card renders a letter-circle fallback.
    */
   iconUrl?: string;
@@ -120,10 +119,10 @@ export const INTEGRATIONS: IntegrationApp[] = [
   { toolkit: 'mailchimp', name: 'Mailchimp', blurb: 'Drip nurture, announcements. Chippi notices subscribes and unsubscribes.', category: 'email', promoted: true, iconUrl: '/integrations/mailchimp.svg' },
 
   // ── Calendar ─────────────────────────────────────────────────────────
-  { toolkit: 'googlecalendar', name: 'Google Calendar', blurb: 'Schedule tours, block time. Chippi notices RSVPs and cancellations.', category: 'calendar', promoted: true, iconUrl: '/integrations/googlecalendar.svg' },
+  { toolkit: 'googlecalendar', name: 'Google Calendar', blurb: 'Schedule tours, block time. Chippi notices RSVPs and cancellations.', category: 'calendar', promoted: true, iconUrl: '/integrations/googlecalendar.png' },
   { toolkit: 'outlook_calendar', name: 'Outlook Calendar', blurb: 'Same, for Microsoft accounts.', category: 'calendar', promoted: true, iconUrl: '/integrations/outlook.svg' },
   { toolkit: 'calendly', name: 'Calendly', blurb: 'Sync your booking link with Chippi.', category: 'calendar', promoted: true, iconUrl: '/integrations/calendly.svg' },
-  { toolkit: 'cal', name: 'Cal.com', blurb: 'Open-source booking pages.', category: 'calendar' },
+  { toolkit: 'cal', iconUrl: '/integrations/cal.png', name: 'Cal.com', blurb: 'Open-source booking pages.', category: 'calendar' },
 
   // ── Messaging ────────────────────────────────────────────────────────
   // Twilio + WhatsApp are the realtor's phone — SMS for US clients, WhatsApp
@@ -156,8 +155,8 @@ export const INTEGRATIONS: IntegrationApp[] = [
 
   // ── Docs ─────────────────────────────────────────────────────────────
   { toolkit: 'notion', name: 'Notion', blurb: 'Capture deals, tours, and notes in your workspace.', category: 'docs', promoted: true, iconUrl: '/integrations/notion.svg' },
-  { toolkit: 'googledocs', name: 'Google Docs', blurb: 'Open and edit listing descriptions, scripts, briefs.', category: 'docs', iconUrl: '/integrations/googledocs.svg' },
-  { toolkit: 'googlesheets', name: 'Google Sheets', blurb: 'Update lead trackers and pipeline reports.', category: 'docs', promoted: true, iconUrl: '/integrations/googlesheets.svg' },
+  { toolkit: 'googledocs', name: 'Google Docs', blurb: 'Open and edit listing descriptions, scripts, briefs.', category: 'docs', iconUrl: '/integrations/googledocs.png' },
+  { toolkit: 'googlesheets', name: 'Google Sheets', blurb: 'Update lead trackers and pipeline reports.', category: 'docs', promoted: true, iconUrl: '/integrations/googlesheets.png' },
 
   // ── Storage ──────────────────────────────────────────────────────────
   { toolkit: 'googledrive', name: 'Google Drive', blurb: 'Pull listing photos and disclosures Chippi can attach to drafts.', category: 'storage', iconUrl: '/integrations/googledrive.svg' },
@@ -170,13 +169,13 @@ export const INTEGRATIONS: IntegrationApp[] = [
   // call out what's distinct so the row doesn't read as catalog padding.
   { toolkit: 'hubspot', name: 'HubSpot', blurb: 'Sync deals and contacts. Chippi watches stage changes and new contacts.', category: 'crm', promoted: true, iconUrl: '/integrations/hubspot.svg' },
   { toolkit: 'salesforce', name: 'Salesforce', blurb: 'Mirror to your brokerage Salesforce org.', category: 'crm', iconUrl: '/integrations/salesforce.svg' },
-  { toolkit: 'pipedrive', name: 'Pipedrive', blurb: 'Push pipeline stages into Pipedrive.', category: 'crm' },
+  { toolkit: 'pipedrive', iconUrl: '/integrations/pipedrive.svg', name: 'Pipedrive', blurb: 'Push pipeline stages into Pipedrive.', category: 'crm' },
   { toolkit: 'zoho', name: 'Zoho CRM', blurb: 'Two-way sync with Zoho.', category: 'crm', iconUrl: '/integrations/zoho.svg' },
 
   // ── Real estate ──────────────────────────────────────────────────────
   // Slugs are snake_case to match Composio's catalog convention.
   {
-    toolkit: 'follow_up_boss',
+    toolkit: 'follow_up_boss', iconUrl: '/integrations/follow-up-boss.png',
     name: 'Follow-up Boss',
     blurb: 'Sync your Follow-up Boss pipeline.',
     category: 'real-estate',
@@ -190,10 +189,10 @@ export const INTEGRATIONS: IntegrationApp[] = [
       helpUrl: 'https://help.followupboss.com/hc/en-us/articles/360014289393-API-Key',
     },
   },
-  { toolkit: 'compass', name: 'Compass', blurb: 'Sync your Compass pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
-  { toolkit: 'boomtown', name: 'BoomTown', blurb: 'Pull BoomTown leads into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },
+  { toolkit: 'compass', iconUrl: '/integrations/compass.ico', name: 'Compass', blurb: 'Sync your Compass pipeline.', category: 'real-estate', promoted: true, comingSoon: true },
+  { toolkit: 'boomtown', iconUrl: '/integrations/boomtown.svg', name: 'BoomTown', blurb: 'Pull BoomTown leads into Chippi.', category: 'real-estate', promoted: true, comingSoon: true },
   {
-    toolkit: 'kvcore',
+    toolkit: 'kvcore', iconUrl: '/integrations/kvcore.png',
     name: 'kvCORE',
     blurb: 'Pull kvCORE leads and tasks into Chippi.',
     category: 'real-estate',
@@ -207,11 +206,11 @@ export const INTEGRATIONS: IntegrationApp[] = [
       helpUrl: 'https://help.insiderealestate.com/en/articles/4263959-boldtrail-api-tokens',
     },
   },
-  { toolkit: 'real_geeks', name: 'Real Geeks', blurb: 'Pull Real Geeks leads into Chippi.', category: 'real-estate', comingSoon: true },
+  { toolkit: 'real_geeks', iconUrl: '/integrations/real_geeks.svg', name: 'Real Geeks', blurb: 'Pull Real Geeks leads into Chippi.', category: 'real-estate', comingSoon: true },
 
   // ── Documents + signing ──────────────────────────────────────────────
   { toolkit: 'docusign', name: 'DocuSign', blurb: 'Send contracts and disclosures for signature.', category: 'docs-sign', promoted: true, iconUrl: '/integrations/docusign.svg' },
-  { toolkit: 'dropbox_sign', name: 'Dropbox Sign', blurb: 'Same, for Dropbox Sign.', category: 'docs-sign' },
+  { toolkit: 'dropbox_sign', iconUrl: '/integrations/dropbox_sign.svg', name: 'Dropbox Sign', blurb: 'Same, for Dropbox Sign.', category: 'docs-sign' },
 
   // ── Tasks / project management ───────────────────────────────────────
   { toolkit: 'asana', name: 'Asana', blurb: 'Task list for follow-ups, listing prep, closing checklist.', category: 'tasks', iconUrl: '/integrations/asana.svg' },
@@ -219,12 +218,12 @@ export const INTEGRATIONS: IntegrationApp[] = [
 
   // ── Forms / lead intake ──────────────────────────────────────────────
   { toolkit: 'typeform', name: 'Typeform', blurb: 'Pull form responses into Chippi as new leads.', category: 'forms', iconUrl: '/integrations/typeform.svg' },
-  { toolkit: 'googleforms', name: 'Google Forms', blurb: 'Same, for Google Forms.', category: 'forms', iconUrl: '/integrations/googleforms.svg' },
+  { toolkit: 'googleforms', name: 'Google Forms', blurb: 'Same, for Google Forms.', category: 'forms', iconUrl: '/integrations/googleforms.png' },
 
   // ── Video / meetings ─────────────────────────────────────────────────
   { toolkit: 'zoom', name: 'Zoom', blurb: 'Schedule virtual showings and broker calls.', category: 'video', iconUrl: '/integrations/zoom.svg' },
-  { toolkit: 'googlemeet', name: 'Google Meet', blurb: 'Same, for Google Meet.', category: 'video', iconUrl: '/integrations/googlemeet.svg' },
-  { toolkit: 'loom', name: 'Loom', blurb: 'Async property walkthroughs and contract explanations buyers can replay.', category: 'video', promoted: true, iconUrl: '/integrations/loom.svg' },
+  { toolkit: 'googlemeet', name: 'Google Meet', blurb: 'Same, for Google Meet.', category: 'video', iconUrl: '/integrations/googlemeet.png' },
+  { toolkit: 'loom', name: 'Loom', blurb: 'Async property walkthroughs and contract explanations buyers can replay.', category: 'video', promoted: true, iconUrl: '/integrations/loom.png' },
 
   // ── Spreadsheets / lists ─────────────────────────────────────────────
   { toolkit: 'airtable', name: 'Airtable', blurb: 'Two-way sync for custom pipelines and lists.', category: 'docs', iconUrl: '/integrations/airtable.svg' },

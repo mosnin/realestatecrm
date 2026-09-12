@@ -333,6 +333,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
       .object({
         channel: channelSchema,
         instruction: instructionField,
+        contentMode: z.enum(['literal', 'instruction']).optional(),
         delayMinutes: z.number().int().min(0),
       })
       .strict(),
@@ -373,7 +374,7 @@ export const innerWorkflowActionSchema = z.discriminatedUnion('type', [
     onError: stepOnError,
     maxRetries: stepMaxRetries,
     enabled: stepEnabled,
-    config: z.object({ instruction: instructionField }).strict(),
+    config: z.object({ instruction: instructionField, restrictToTriggerContact: z.boolean().optional() }).strict(),
   }),
   // delay: pause execution before the next step.
   // Two modes: relative (wait N minutes) or until_weekday (wait until the next

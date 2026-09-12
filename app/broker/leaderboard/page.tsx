@@ -26,7 +26,7 @@ export type RealtorStats = {
 
 export default async function LeaderboardPage() {
   const ctx = await getBrokerContext();
-  if (!ctx) redirect('/');
+  if (!ctx) redirect('/workspace-unavailable');
 
   const { brokerage } = ctx;
 

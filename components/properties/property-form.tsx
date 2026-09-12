@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useFormDraft } from '@/hooks/use-form-draft';
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes';
 import { Loader2 } from 'lucide-react';
 import type { Property, PropertyListingStatus, PropertyType } from '@/lib/types';
 import { PROPERTY_LISTING_STATUS_OPTIONS, PROPERTY_TYPE_OPTIONS } from '@/lib/properties';
@@ -15,7 +17,7 @@ type FormValues = Partial<Property>;
 interface Props {
   initial?: FormValues;
   onCancel: () => void;
-  onSubmit: (values: FormValues) => void;
+  onSubmit: (values: FormValues) => void | boolean | Promise<void | boolean>;
   submitting?: boolean;
   submitLabel?: string;
 }
@@ -43,15 +45,20 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
     ...initial,
   });
 
+  const baseline=useRef(v);
+  const draft=useFormDraft(`property:${initial.id??'new'}`,v,setV,baseline.current);
+  const original = useRef(JSON.stringify(v));
+  const { confirmLeave,markSaved } = useUnsavedChanges(JSON.stringify(v) !== original.current);
+
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setV((prev) => ({ ...prev, [key]: value }));
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const address = (v.address ?? '').trim();
     if (!address) return;
-    onSubmit({
+    const result=await onSubmit({
       address,
       unitNumber: v.unitNumber?.toString().trim() || null,
       city: v.city?.toString().trim() || null,
@@ -70,6 +77,7 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
       notes: v.notes?.toString() || null,
       photos: Array.isArray(v.photos) ? v.photos : [],
     });
+    if(result===true){draft.clear();markSaved();}
   }
 
   // Native <select> styled to match <Input> — same height, border, radius,
@@ -84,6 +92,8 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
 
   return (
     <form onSubmit={submit} className="space-y-7">
+      {draft.restored&&<p role="status" className="text-sm text-muted-foreground">Your unsaved listing was restored in this tab.</p>}
+      {draft.storageError&&<p role="status" className="text-sm text-destructive">Draft recovery is unavailable. Keep this page open until you save.</p>}
       {/* Photos first — the realtor is showing a house, not filing an MLS
           form. The featured tile sets what the list, the deal card, and
           the listing detail show. No group label: the editor is the hero,
@@ -250,7 +260,7 @@ export function PropertyForm({ initial = {}, onCancel, onSubmit, submitting, sub
       </Field>
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => { if (confirmLeave()) { draft.clear(); onCancel(); } }}>
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={submitting || !(v.address ?? '').trim()}>

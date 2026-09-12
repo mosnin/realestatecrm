@@ -338,7 +338,7 @@ export function BrokerageMcpSection({ slug }: BrokerageMcpSectionProps) {
         {loading ? (
           <div className="h-16 rounded-md bg-foreground/[0.04] animate-pulse" />
         ) : keys.length === 0 ? (
-          <p className={`${BODY_MUTED} italic`}>
+          <p className={`${BODY_MUTED} not-italic`}>
             No keys yet. Generate one to connect a client.
           </p>
         ) : (

@@ -40,7 +40,7 @@ export function LayoutShell({ slug, children, liveNotifications }: LayoutShellPr
       {/* The ChippiBar overlays the bottom 80-100px of the viewport; pb-28
           on the content gives it just enough clearance without padding the
           page out to 160px. */}
-      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0 px-4 sm:px-6 md:px-10 lg:px-12 py-5 md:py-8 pb-28')}>
+      <div className={cn('dashboard-content w-full', PAGE_MAX, 'mx-auto min-w-0')}>
         <SupabaseRealtimeBridge />
         {liveNotifications}
         <PageTransition>{children}</PageTransition>

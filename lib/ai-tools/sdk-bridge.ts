@@ -42,6 +42,8 @@ import { Agent, run, tool, RunState, type RunContext, type RunResult } from '@op
 import { z } from 'zod';
 import { checkRateLimit } from '@/lib/rate-limit';
 import type { ToolContext, ToolDefinition, ToolResult } from './types';
+import { persistBackgroundDraft } from '@/lib/agent/persist-background-draft';
+import { recordToolOutcome } from './outcomes';
 import { coerceToolArguments } from './coerce-tool-args';
 
 const DEFAULT_MODEL = 'gpt-5-mini';
@@ -133,6 +135,13 @@ export function toSdkTool<TArgs, TData>(
     needsApproval,
     async execute(input, _runCtx, details) {
       try {
+        if (ctx.signal.aborted) return 'Error: Turn was cancelled before execution.';
+        // The provider sees a relaxed schema. Validate the original constraints
+        // here before rate limits or handler side effects, just like executeTool.
+        const parsed = def.parameters.safeParse(coerceToolArguments(input, def.parameters));
+        if (!parsed.success) {
+          return `Error: Invalid arguments for ${def.name}: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`;
+        }
         // The SDK runtime invokes this callback directly; it does not pass
         // through executeTool(). Enforce the definition's blast-radius cap at
         // this boundary before any handler side effect can occur.
@@ -147,10 +156,12 @@ export function toSdkTool<TArgs, TData>(
           }
         }
 
-        const result: ToolResult = await def.handler(
-          coerceToolArguments(input, def.parameters) as never,
+        let result: ToolResult = await def.handler(
+          parsed.data as never,
           ctx,
         );
+        result = await persistBackgroundDraft(def.name, parsed.data, result, ctx, (details as ToolCallDetailsLike | undefined)?.toolCall?.callId);
+        recordToolOutcome(def.name, result, ctx, (details as ToolCallDetailsLike | undefined)?.toolCall?.callId);
         // Route the structured payload to the stream pump's sink (keyed by
         // SDK call id) so the rich card gets `data`/`display` while the model
         // only ever sees the summary string below.
@@ -171,6 +182,7 @@ export function toSdkTool<TArgs, TData>(
         // server logs for debugging; only the friendly summary reaches
         // the model.
         const message = err instanceof Error ? err.message : String(err);
+        recordToolOutcome(def.name, { summary: 'Execution failed', display: 'error' }, ctx);
         return `Error: ${def.name} failed — ${message}`;
       }
     },

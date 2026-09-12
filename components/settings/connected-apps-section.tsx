@@ -55,7 +55,7 @@ interface ConnectionRow {
 
 // ── Health badge types ────────────────────────────────────────────────────────
 
-export type HealthStatus = 'healthy' | 'expired' | 'error' | 'disconnected';
+export type HealthStatus = 'unknown' | 'healthy' | 'expired' | 'error' | 'disconnected';
 
 interface ConnectionHealth {
   toolkit: string;
@@ -108,7 +108,7 @@ function IntegrationHealthBadge({
         ? 'Auth expired'
         : status === 'error'
           ? 'Connection error'
-          : 'Not connected';
+          : status === 'unknown' ? 'Not verified' : 'Not connected';
 
   const textClass =
     status === 'healthy'
@@ -597,7 +597,7 @@ function rank(status: ConnectionRow['status']): number {
   return 1; // failed
 }
 
-function AppIcon({ app, muted = false }: { app: IntegrationApp; muted?: boolean }) {
+function AppIcon({ app }: { app: IntegrationApp }) {
   if (app.iconUrl) {
     return (
       <img
@@ -605,8 +605,8 @@ function AppIcon({ app, muted = false }: { app: IntegrationApp; muted?: boolean 
         alt=""
         aria-hidden
         className={cn(
-          'w-8 h-8 object-contain flex-shrink-0 transition-opacity',
-          muted && 'opacity-50 group-hover/row:opacity-80',
+          'w-8 h-8 rounded-md p-1 object-contain flex-shrink-0 transition-opacity',
+          app.toolkit === 'kvcore' ? 'bg-slate-900' : 'bg-white',
         )}
       />
     );
@@ -757,7 +757,7 @@ function IntegrationRow({
   return (
     <li className="group/row flex flex-col py-3 first:pt-0">
       <div className="flex items-center gap-3">
-        <AppIcon app={app} muted={!isConnected} />
+        <AppIcon app={app} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p

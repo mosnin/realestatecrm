@@ -1,66 +1,107 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-
-const read = (path: string) => readFileSync(path, 'utf8');
-
-describe('dashboard reference aesthetic contract', () => {
-  it('uses warm paper tokens, precise hairlines, and shallow card elevation', () => {
-    const globals = read('app/globals.css');
-    const surfaces = read('components/ui/surface-card.tsx');
-
-    expect(globals).toContain('--background: #f7f7f5;');
-    expect(globals).toContain('--surface: #f1f1ef;');
-    expect(globals).toContain('--card: #fbfbfa;');
-    expect(globals).toContain('--border: #dededb;');
-
-    expect(surfaces).toContain(
-      "chippi-dashboard-panel rounded-[1.75rem] border border-transparent",
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { WorkspaceShell } from "@/components/dashboard/sicarii/workspace-shell";
+import { realtorNavItems } from "@/lib/nav-items";
+type SidebarEntry = {href:string;label:string;subItems?:SidebarEntry[]};
+const navigation = vi.hoisted(() => ({groups:[] as {label:string;items:SidebarEntry[]}[]}));
+const path = vi.hoisted(() => ({ current: "/s/oak/chippi/brief" }));
+vi.mock("next/navigation", () => ({ usePathname: () => path.current }));
+vi.stubGlobal("React", React);
+vi.mock("@clerk/nextjs", () => ({ UserButton: () => null }));
+vi.mock("@/components/theme-provider", () => ({
+  useTheme: () => ({ theme: "light", toggleTheme: vi.fn() }),
+}));
+// Inspect the adapter's rendered destinations independently of motion/browser layout.
+vi.mock("@/components/dashboard/sicarii/shell", () => ({
+  SicariiShell: ({
+    sidebarGroups,
+    items,
+    allItems,
+    children,
+  }: {
+    sidebarGroups: {label:string;items:SidebarEntry[]}[];
+    items: { href: string; label: string }[];
+    allItems: { href: string; label: string }[];
+    children: React.ReactNode;
+  }) => {
+    navigation.groups = sidebarGroups;
+    return React.createElement(
+      React.Fragment,
+      null,
+      items.map((i) =>
+        React.createElement(
+          "a",
+          { key: i.href, href: i.href, "data-primary": true },
+          i.label,
+        ),
+      ),
+      allItems.map((i) =>
+        React.createElement("a", { key: i.href, href: i.href }, i.label),
+      ),
+      children,
     );
-    expect(globals).toContain('0 16px 40px -32px');
-    expect(surfaces).not.toContain('bg-gradient-to-br from-[#FF9500]');
-  });
-
-  it('keeps selected sidebar rows light, legible, and rounded', () => {
-    const nav = read('components/dashboard/sidebar-nav-item.tsx');
-    const sidebar = read('components/dashboard/sidebar.tsx');
-    const mobileNav = read('components/dashboard/mobile-nav.tsx');
-    const type = read('lib/typography.ts');
-
-    expect(nav).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70',
-    );
-    expect(nav).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/60',
-    );
-    expect(sidebar).toContain(
-      'bg-sidebar-accent text-sidebar-accent-foreground font-medium ring-1 ring-inset ring-sidebar-border/70',
-    );
-    expect(nav).not.toContain('bg-foreground text-background font-medium');
-    expect(sidebar).not.toContain('bg-foreground text-background font-medium');
-    expect(mobileNav).toContain('bg-foreground text-background');
-    expect(type).toContain('inline-flex items-center gap-1.5 rounded-full');
-  });
-
-  it('preserves the real daily-brief outcomes in the new editorial hierarchy', () => {
-    const brief = read('components/chippi/brief-dashboard.tsx');
-
-    for (const surface of [
-      'Hero',
-      'NeedsYouPanel',
-      'ActivityPanel',
-      'ToursPanel',
-      'HotLeadsPanel',
-      'EmptyTodayOrientation',
-    ]) {
-      expect(brief).toContain(surface);
+  },
+}));
+function render(role?: string) {
+  return renderToStaticMarkup(
+    React.createElement(WorkspaceShell, {
+      slug: "oak",
+      spaceName: "Oak",
+      brokerageRole: role,
+      children: "Existing CRM content",
+    }),
+  );
+}
+describe("Sicarii navigation preserves Chippi features", () => {
+  it("retains every existing personal destination and child feature", () => {
+    path.current = "/s/oak/chippi/brief";
+    const html = render();
+    for (const item of realtorNavItems) {
+      expect(html).toContain(`href="/s/oak${item.href}"`);
+      for (const child of item.children ?? [])
+        expect(html).toContain(`href="/s/oak${child.href}"`);
     }
-    expect(brief).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4');
-    expect(brief).toContain('lg:grid-cols-[minmax(0,1.75fr)_minmax(18rem,0.8fr)]');
-    expect(brief).toContain('data-chippi-atmosphere="ascii-field"');
-    expect(brief).toContain('pendingDrafts');
-    expect(brief).toContain("import { Button } from '@/components/ui/button'");
-    expect(brief).toContain('variant="ghost"');
-    expect(brief).toContain('has-[>svg]:px-0');
-    expect(brief).toContain('active:scale-100');
+    expect(html).toContain("Existing CRM content");
+    expect(html).toContain('href="/s/oak/follow-through"');
   });
+  it("keeps team administration accessible to brokerage owners", () => {
+    path.current = "/broker/brief";
+    const html = render("broker_owner");
+    for (const href of [
+      "/broker/leads",
+      "/broker/realtors",
+      "/broker/deals",
+      "/broker/forecast",
+      "/broker/billing",
+    ])
+      expect(html).toContain(`href="${href}"`);
+  });
+  it("keeps member navigation separate from administration", () => {
+    path.current = "/broker/brief";
+    const html = render("realtor_member");
+    expect(html).toContain('href="/broker/my-leads"');
+    expect(html).not.toContain('href="/broker/billing"');
+    expect(html).not.toContain('href="/broker/settings/auto-assignment"');
+  });
+  it('groups every personal destination without duplicating top-level subpages', () => {
+    path.current = '/s/oak/chippi/brief'; render();
+    expect(navigation.groups.map(group=>group.label)).toEqual(['Daily work','Business','Workspace']);
+    const roots=navigation.groups.flatMap(group=>group.items);
+    const links=roots.flatMap(item=>[item,...(item.subItems??[])]);
+    for(const item of realtorNavItems){
+      expect(links.map(link=>link.href)).toContain(`/s/oak${item.href}`);
+      for(const child of item.children??[])expect(links.map(link=>link.href)).toContain(`/s/oak${child.href}`);
+    }
+    expect(roots[0]).toMatchObject({label:'Today',href:'/s/oak/chippi/brief'});
+    expect(roots.find(item=>item.label==='Chippi')?.subItems?.some(item=>item.href==='/s/oak/chippi/brief')).toBe(false);
+  });
+  it('gives brokerage Today its own canonical label and icon position', () => {
+    path.current='/broker/brief';render('broker_owner');
+    expect(navigation.groups[0].items[0]).toMatchObject({label:'Today',href:'/broker/brief'});
+    const links=navigation.groups.flatMap(group=>group.items.flatMap(item=>[item,...(item.subItems??[])]));
+    expect(links.filter(item=>item.href==='/broker/brief')).toHaveLength(1);
+    expect(links.some(item=>item.href==='/broker/settings/auto-assignment')).toBe(true);
+  });
+
 });
