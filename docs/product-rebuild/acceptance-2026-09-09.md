@@ -94,3 +94,31 @@ and seven skipped. All 55 script checks and the tenant scanner pass. The prior
 revision's GitHub checks and main preview passed; the separate staging project
 still fails provisioning. This follow-up does not resolve the remaining live
 provider, activation, escalation-delivery or Mac release gates.
+
+## Recovery and theme startup stability
+
+The recovery request referred to an older checkpoint. Accountable Chippi team
+actions and shared-record draft conflicts were already implemented; the newest
+local batch is the reference-inspired light/dark dashboard candidate.
+
+ThemeProvider now keeps its provider tree stable through hydration rather than
+remounting the application when the preference loads. It validates stored values,
+tolerates denied storage reads/writes, and retains an explicit session choice
+when persistence is unavailable. This changes startup behavior, not public-site
+styling. Four behavioral tests cover child mount count, retained draft state,
+OS versus explicit preferences, invalid values, and restricted storage.
+
+The full working-tree gate passes: TypeScript, lint (existing warnings), and
+813 files / 6,908 tests, with seven skipped. This includes the four uncommitted
+dashboard-shell tests from the separate design candidate. The theme fix is
+isolated from those pending layout/palette changes.
+
+Browser access recovered for the root session. Actual shell/control components
+rendered with synthetic People records at desktop and mobile widths, including
+both appearances, dark modal fields, mobile navigation, empty tools search, and
+Escape focus restoration. Tablet DOM width matched its viewport. These are
+component checks, not authenticated CRM/provider or multi-role acceptance. The
+independent reviewer still cannot access a browser in its tool context; the
+broader redesign remains a local candidate. Off-session escalation delivery,
+hosted/provider acceptance and Mac release gates remain open. No migration,
+production activation, provider send, or production CRM write occurred.
