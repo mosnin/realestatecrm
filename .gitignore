@@ -63,3 +63,5 @@ __pycache__/
 
 # Throwaway probe scripts (agent runs)
 _diagnostic*
+
+/supabase/.temp/
