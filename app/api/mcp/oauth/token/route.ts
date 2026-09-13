@@ -28,28 +28,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'rate_limit_exceeded' }, { status: 429 });
   }
 
-  // Parse body — support form-urlencoded (standard) and JSON
-  let params: Record<string, string> = {};
+  let params: Record<string,string> = {};
   try {
-    const contentType = req.headers.get('content-type') ?? '';
-    if (contentType.includes('application/x-www-form-urlencoded')) {
-      const text = await req.text();
-      const urlParams = new URLSearchParams(text);
-      urlParams.forEach((v, k) => { params[k] = v; });
-    } else {
-      const body = await req.text();
-      // Try JSON first, fall back to form-urlencoded
-      try {
-        params = JSON.parse(body);
-      } catch {
-        const urlParams = new URLSearchParams(body);
-        urlParams.forEach((v, k) => { params[k] = v; });
-      }
+    const text=await req.text();
+    if(text.length>16384)throw new Error('body too large');
+    if((req.headers.get('content-type')??'').includes('application/json')){
+      const value=JSON.parse(text);
+      if(!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(v=>typeof v!=='string'))throw new Error('invalid body');
+      params=value;
+    }else{
+      const fields=new URLSearchParams(text);
+      for(const key of fields.keys())if(fields.getAll(key).length!==1)throw new Error('duplicate parameter');
+      params=Object.fromEntries(fields);
     }
-  } catch (err) {
-    console.error('[mcp/token] body parse error:', err);
-    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
-  }
+  } catch {return NextResponse.json({error:'invalid_request'},{status:400});}
 
   // Extract from Basic auth header
   const authHeader = req.headers.get('authorization');
@@ -65,122 +57,31 @@ export async function POST(req: NextRequest) {
   }
 
   const grantType = params.grant_type;
-  console.log('[mcp/token] request:', { grantType, hasCode: !!params.code, hasVerifier: !!params.code_verifier, hasClientId: !!params.client_id, hasClientSecret: !!params.client_secret });
+
 
   // ── Authorization Code Grant (Claude PKCE flow) ──
   if (grantType === 'authorization_code') {
-    const { code, code_verifier, redirect_uri } = params;
-
-    if (!code) {
-      console.error('[mcp/token] missing code');
-      return NextResponse.json({ error: 'invalid_request', error_description: 'code is required' }, { status: 400 });
-    }
-    if (!code_verifier) {
-      console.error('[mcp/token] missing code_verifier');
-      return NextResponse.json({ error: 'invalid_request', error_description: 'code_verifier is required' }, { status: 400 });
-    }
-
-    // Look up auth code
-    const { data: authCode, error: codeErr } = await unscoped(supabase
-      .from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify')
-      .select('*')
-      .eq('code', code)
-      .maybeSingle();
-
-    if (codeErr) {
-      console.error('[mcp/token] DB error looking up code:', codeErr.message, codeErr.code);
-      // Table might not exist
-      if (codeErr.code === '42P01' || codeErr.message?.includes('does not exist')) {
-        return NextResponse.json({ error: 'server_error', error_description: 'Auth code table not configured. Run the migration.' }, { status: 500 });
-      }
-      return NextResponse.json({ error: 'server_error' }, { status: 500 });
-    }
-
-    if (!authCode) {
-      console.error('[mcp/token] code not found:', code.slice(0, 8) + '...');
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }, { status: 400 });
-    }
-
-    console.log('[mcp/token] authorization code found, validating');
-
-    // Check expiry
-    if (new Date(authCode.expiresAt) < new Date()) {
-      console.error('[mcp/token] code expired');
-      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'Authorization code expired' }, { status: 400 });
-    }
-
-    // Verify PKCE
-    const expectedChallenge = crypto
-      .createHash('sha256')
-      .update(code_verifier)
-      .digest('base64url');
-
-    console.log('[mcp/token] PKCE:', { expected: expectedChallenge.slice(0, 12), stored: authCode.codeChallenge?.slice(0, 12), match: expectedChallenge === authCode.codeChallenge });
-
-    if (expectedChallenge !== authCode.codeChallenge) {
-      console.error('[mcp/token] PKCE mismatch');
-      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, { status: 400 });
-    }
-
-    // Verify redirect_uri if provided
-    if (redirect_uri && redirect_uri !== authCode.redirectUri) {
-      console.error('[mcp/token] redirect_uri mismatch:', { expected: authCode.redirectUri, got: redirect_uri });
-      await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, { status: 400 });
-    }
-
-    // Verify state nonce — ensures the authorization response was not forged
-    // or replayed with a tampered state value.
-    if (authCode.stateHash) {
-      const state = params.state;
-      if (!state) {
-        console.error('[mcp/token] state required but missing');
-        await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-        return NextResponse.json({ error: 'invalid_grant', error_description: 'state parameter required' }, { status: 400 });
-      }
-      const expectedStateHash = crypto
-        .createHash('sha256')
-        .update(`${authCode.stateNonce}:${state}`)
-        .digest('hex');
-      if (expectedStateHash !== authCode.stateHash) {
-        console.error('[mcp/token] state nonce verification failed');
-        await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-        return NextResponse.json({ error: 'invalid_grant', error_description: 'state verification failed' }, { status: 400 });
-      }
-    }
-
-    // Delete code (single-use)
-    await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code', code);
-
-    // Update last used
-    if (authCode.clientId) {
-      unscoped(supabase.from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify').update({ lastUsedAt: new Date().toISOString() }).eq('clientId', authCode.clientId).then(() => {});
-    }
-
-    // Issue JWT
-    const expiresIn = 3600; // 1 hour
-    let jwtSecret: Uint8Array;
-    try {
-      jwtSecret = getJwtSecret();
-    } catch {
-      return NextResponse.json({ error: 'MCP not configured' }, { status: 500 });
-    }
-
-    const token = await new SignJWT({ spaceId: authCode.spaceId, sub: authCode.clientId })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime(`${expiresIn}s`)
-      .sign(jwtSecret);
-
-    console.log('[mcp/token] SUCCESS — issued JWT via authorization_code grant');
-
-    return NextResponse.json({
-      access_token: token,
-      token_type: 'bearer',
-      expires_in: expiresIn,
-    });
+    const { code, code_verifier, redirect_uri, client_id } = params;
+    const invalid = () => NextResponse.json({ error: 'invalid_grant' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+    if (!code || typeof code !== 'string' || !client_id || !redirect_uri || typeof code_verifier !== 'string' || !/^[A-Za-z0-9._~-]{43,128}$/.test(code_verifier)) return invalid();
+    let secret: Uint8Array;
+    try { secret = getJwtSecret(); } catch { return NextResponse.json({error:'temporarily_unavailable'},{status:503}); }
+    const storedCode=code.startsWith('chippi_ac_')?crypto.createHash('sha256').update(code).digest('hex'):code;
+    const {data:authCode,error} = await unscoped(supabase.from('McpAuthCode'), 'oauth/capability: lookup by clientId or hashed key then verify').select('*').eq('code',storedCode).eq('clientId',client_id).maybeSingle();
+    if(error) return NextResponse.json({error:'server_error'},{status:500});
+    if(!authCode || authCode.redirectUri !== redirect_uri || authCode.codeChallengeMethod !== 'S256' || new Date(authCode.expiresAt).getTime() <= Date.now()) return invalid();
+    const challenge=crypto.createHash('sha256').update(code_verifier).digest('base64url');
+    const equal=(a:string,b:string)=>typeof a==='string' && typeof b==='string' && Buffer.byteLength(a)===Buffer.byteLength(b) && crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
+    if(!equal(challenge,authCode.codeChallenge)) return invalid();
+    if(authCode.stateHash && (!params.state || !equal(crypto.createHash('sha256').update(`${authCode.stateNonce}:${params.state}`).digest('hex'),authCode.stateHash))) return invalid();
+    const {data:key}=await unscoped(supabase.from('McpApiKey'),'oauth/capability: lookup by clientId or hashed key then verify').select('spaceId, expiresAt').eq('clientId',client_id).maybeSingle();
+    if(!key || key.spaceId!==authCode.spaceId || (key.expiresAt && new Date(key.expiresAt).getTime()<=Date.now())) return invalid();
+    // DELETE RETURNING is the single atomic claim. Concurrent redemptions can
+    // both read above, but only one can consume and receive this row.
+    const {data:consumed,error:consumeError}=await unscoped(supabase.from('McpAuthCode'),'oauth/capability: lookup by clientId or hashed key then verify').delete().eq('code',storedCode).eq('clientId',client_id).eq('redirectUri',redirect_uri).eq('codeChallenge',challenge).gt('expiresAt',new Date().toISOString()).select('spaceId, clientId').maybeSingle();
+    if(consumeError || !consumed) return invalid();
+    const token=await new SignJWT({spaceId:consumed.spaceId,sub:consumed.clientId,scope:'crm:read'}).setProtectedHeader({alg:'HS256'}).setJti(crypto.randomUUID()).setIssuedAt().setExpirationTime('1h').sign(secret);
+    return NextResponse.json({access_token:token,token_type:'Bearer',expires_in:3600,scope:'crm:read'},{headers:{'Cache-Control':'no-store','Pragma':'no-cache'}});
   }
 
   // ── Client Credentials Grant ──

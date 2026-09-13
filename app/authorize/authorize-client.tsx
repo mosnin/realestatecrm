@@ -90,12 +90,12 @@ export function AuthorizeClient({
               <CheckCircle2 size={28} className="text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="space-y-1.5">
-              <h1 className="text-lg font-semibold">Connected.</h1>
+              <h1 className="text-lg font-semibold">Access approved</h1>
               <p className="text-sm text-muted-foreground">
-                Claude now has read-only access to your <span className="font-medium text-foreground">{spaceName}</span> workspace.
+                You approved read-only access for {keyName} to your <span className="font-medium text-foreground">{spaceName}</span> workspace.
               </p>
             </div>
-            <p className="text-xs text-muted-foreground">Redirecting back to Claude...</p>
+            <p className="text-xs text-muted-foreground">Returning to {keyName}...</p>
           </div>
         </div>
       </div>
@@ -118,7 +118,7 @@ export function AuthorizeClient({
             </div>
             <h1 className="text-lg font-semibold">Authorize Connection</h1>
             <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Claude</span> wants to connect to your workspace <span className="font-medium text-foreground">{spaceName}</span>
+              <span className="font-medium text-foreground">{keyName}</span> wants to connect to your workspace <span className="font-medium text-foreground">{spaceName}</span>
             </p>
           </div>
 

@@ -143,7 +143,7 @@ describe('POST /api/mcp/oauth/authorize — workspace + client scoped', () => {
         body: JSON.stringify({
           client_id: 'client_victim',
           redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
-          code_challenge: 'abc',
+          code_challenge: 'a'.repeat(43),
         }),
       }),
     );
@@ -162,7 +162,7 @@ describe('POST /api/mcp/oauth/authorize — workspace + client scoped', () => {
         body: JSON.stringify({
           client_id: 'client_victim',
           redirect_uri: 'https://claude.ai/api/mcp/auth_callback',
-          code_challenge: 'abc',
+          code_challenge: 'a'.repeat(43),
         }),
       }),
     );
