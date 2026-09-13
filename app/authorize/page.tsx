@@ -1,8 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
-import { AuthorizeClient } from './authorize-client';
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { isAllowedOAuthRedirect } from "@/lib/mcp/redirect-allowlist";
+import { resolvePublicClient, isPublicClientId } from "@/lib/mcp/public-client";
+import { getSpaceForUser } from "@/lib/space";
+import { AuthorizeClient } from "./authorize-client";
 
 /**
  * GET /authorize — OAuth 2.0 Authorization Endpoint
@@ -33,12 +35,19 @@ export default async function AuthorizePage({
   }
 
   // Validate required params
-  if (params.response_type !== 'code' || !params.client_id || !params.redirect_uri || !params.code_challenge) {
+  if (
+    params.response_type !== "code" ||
+    !params.client_id ||
+    !params.redirect_uri ||
+    !params.code_challenge
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3 p-8">
           <h1 className="text-xl font-semibold">Invalid Request</h1>
-          <p className="text-sm text-muted-foreground">Missing required OAuth parameters.</p>
+          <p className="text-sm text-muted-foreground">
+            Missing required OAuth parameters.
+          </p>
         </div>
       </div>
     );
@@ -54,17 +63,51 @@ export default async function AuthorizePage({
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3 p-8">
           <h1 className="text-xl font-semibold">Invalid Request</h1>
-          <p className="text-sm text-muted-foreground">The redirect URL is not permitted.</p>
+          <p className="text-sm text-muted-foreground">
+            The redirect URL is not permitted.
+          </p>
         </div>
       </div>
     );
   }
 
+  if (isPublicClientId(params.client_id)) {
+    const client = await resolvePublicClient(
+      params.client_id,
+      params.redirect_uri,
+    );
+    const ownSpace = client ? await getSpaceForUser(userId) : null;
+    if (!client || !ownSpace)
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-3 p-8">
+            <h1 className="text-xl font-semibold">Connection unavailable</h1>
+            <p className="text-sm text-muted-foreground">
+              This request is invalid or your workspace is unavailable.
+              Start a new connection from your application.
+            </p>
+          </div>
+        </div>
+      );
+    return (
+      <AuthorizeClient
+        spaceName={ownSpace.name}
+        keyName={client.name}
+        clientId={params.client_id}
+        redirectUri={params.redirect_uri}
+        codeChallenge={params.code_challenge}
+        codeChallengeMethod={params.code_challenge_method ?? "S256"}
+        state={params.state ?? ""}
+        scope={params.scope ?? ""}
+      />
+    );
+  }
+
   // Validate client_id exists in our database
   const { data: mcpKey } = await supabase
-    .from('McpApiKey')
-    .select('id, name, spaceId')
-    .eq('clientId', params.client_id)
+    .from("McpApiKey")
+    .select("id, name, spaceId")
+    .eq("clientId", params.client_id)
     .maybeSingle();
 
   if (!mcpKey) {
@@ -72,7 +115,9 @@ export default async function AuthorizePage({
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3 p-8">
           <h1 className="text-xl font-semibold">Unknown Application</h1>
-          <p className="text-sm text-muted-foreground">The client ID is not recognized.</p>
+          <p className="text-sm text-muted-foreground">
+            The client ID is not recognized.
+          </p>
         </div>
       </div>
     );
@@ -80,16 +125,16 @@ export default async function AuthorizePage({
 
   // Verify the user owns this space
   const { data: user } = await supabase
-    .from('User')
-    .select('id')
-    .eq('clerkId', userId)
+    .from("User")
+    .select("id")
+    .eq("clerkId", userId)
     .maybeSingle();
 
   const { data: space } = await supabase
-    .from('Space')
-    .select('id, name')
-    .eq('id', mcpKey.spaceId)
-    .eq('ownerId', user?.id ?? '')
+    .from("Space")
+    .select("id, name")
+    .eq("id", mcpKey.spaceId)
+    .eq("ownerId", user?.id ?? "")
     .maybeSingle();
 
   if (!space) {
@@ -97,7 +142,9 @@ export default async function AuthorizePage({
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3 p-8">
           <h1 className="text-xl font-semibold">Unauthorized</h1>
-          <p className="text-sm text-muted-foreground">You don&apos;t own the workspace associated with this MCP key.</p>
+          <p className="text-sm text-muted-foreground">
+            You don&apos;t own the workspace associated with this MCP key.
+          </p>
         </div>
       </div>
     );
@@ -110,9 +157,9 @@ export default async function AuthorizePage({
       clientId={params.client_id}
       redirectUri={params.redirect_uri}
       codeChallenge={params.code_challenge}
-      codeChallengeMethod={params.code_challenge_method ?? 'S256'}
-      state={params.state ?? ''}
-      scope={params.scope ?? ''}
+      codeChallengeMethod={params.code_challenge_method ?? "S256"}
+      state={params.state ?? ""}
+      scope={params.scope ?? ""}
     />
   );
 }

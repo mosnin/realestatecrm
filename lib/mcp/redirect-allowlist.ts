@@ -17,17 +17,29 @@ export function isAllowedOAuthRedirect(redirectUri: string): boolean {
     // Native Codex uses a literal loopback address and one fixed callback path.
     // PKCE binds the response to the requesting local client; hostnames and
     // arbitrary paths are deliberately excluded from this exception.
-    if (url.protocol === 'http:' && ['127.0.0.1', '[::1]'].includes(url.hostname)) {
+    if (
+      url.protocol === "http:" &&
+      ["127.0.0.1", "[::1]"].includes(url.hostname)
+    ) {
       const port = Number(url.port);
-      return port >= 1024 && port <= 65535 && url.pathname === '/oauth/callback' && !url.search;
+      return (
+        port >= 1024 &&
+        port <= 65535 &&
+        (url.pathname === "/oauth/callback" ||
+          /^\/callback\/[A-Za-z0-9_-]{8,64}$/.test(url.pathname)) &&
+        !url.search
+      );
     }
     // OAuth codes are bearer-equivalent secrets — only ever return them over TLS.
-    if (url.protocol !== 'https:' && !(process.env.NODE_ENV === 'development' && url.protocol === 'http:')) {
+    if (
+      url.protocol !== "https:" &&
+      !(process.env.NODE_ENV === "development" && url.protocol === "http:")
+    ) {
       return false;
     }
-    const allowedHosts = ['claude.ai', 'www.claude.ai'];
-    if (process.env.NODE_ENV === 'development') {
-      allowedHosts.push('localhost');
+    const allowedHosts = ["claude.ai", "www.claude.ai"];
+    if (process.env.NODE_ENV === "development") {
+      allowedHosts.push("localhost");
     }
     return allowedHosts.some((h) => url.hostname === h);
   } catch {

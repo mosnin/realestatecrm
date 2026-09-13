@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 const BASE_URL = process.env.NEXT_PUBLIC_ROOT_DOMAIN
   ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}`
-  : 'https://www.usechippi.com';
+  : "https://www.usechippi.com";
 
 /**
  * GET /.well-known/oauth-authorization-server
@@ -13,12 +13,17 @@ export async function GET() {
   return NextResponse.json({
     issuer: BASE_URL,
     authorization_endpoint: `${BASE_URL}/authorize`,
+    registration_endpoint: `${BASE_URL}/api/mcp/oauth/register`,
     token_endpoint: `${BASE_URL}/api/mcp/oauth/token`,
     revocation_endpoint: `${BASE_URL}/api/mcp/oauth/revoke`,
-    scopes_supported: ['crm:read'],
-    response_types_supported: ['code'],
-    grant_types_supported: ['authorization_code'],
-    code_challenge_methods_supported: ['S256'],
-    token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
+    scopes_supported: ["crm:read"],
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: [
+      "none",
+      "client_secret_post",
+      "client_secret_basic",
+    ],
   });
 }

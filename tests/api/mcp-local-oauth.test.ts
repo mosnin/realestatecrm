@@ -2,13 +2,17 @@ import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 import {NextRequest} from 'next/server';
 import {createHash} from 'node:crypto';
 import {jwtVerify} from 'jose';
-const state=vi.hoisted(()=>({code:null as any,key:null as any,revoked:new Map<string,any>(),failRevocation:false}));
+const state=vi.hoisted(()=>({code:null as any,key:null as any,revoked:new Map<string,any>(),failRevocation:false,userSpace:'team'}));
+vi.mock('@/lib/api-auth',()=>({requireAuth:async()=>({userId:'external-user'})}));
+vi.mock('@/lib/space',()=>({getSpaceForUser:async()=>({id:state.userSpace,name:'External team'})}));
+vi.mock('@/lib/tenant-db',()=>({tenantTable:(db:any,table:string)=>db.from(table)}));
 vi.mock('@/lib/rate-limit',()=>({checkRateLimit:async()=>({allowed:true}),getClientIp:()=> 'test'}));
 vi.mock('@/lib/supabase-guard',()=>({unscoped:(x:any)=>x}));
 vi.mock('@/lib/supabase',()=>({supabase:{from:(table:string)=>{
  let operation='read',payload:any,filters:Record<string,any>={};
- const chain:any={select:()=>chain,eq:(k:string,v:any)=>{filters[k]=v;return chain;},gt:(k:string,v:any)=>{filters['gt:'+k]=v;return chain;},delete:()=>{operation='delete';return chain;},update:()=>chain,upsert:(v:any)=>{operation='upsert';payload=v;return chain;}};
+ const chain:any={select:()=>chain,eq:(k:string,v:any)=>{filters[k]=v;return chain;},gt:(k:string,v:any)=>{filters['gt:'+k]=v;return chain;},delete:()=>{operation='delete';return chain;},update:()=>chain,insert:(v:any)=>{operation='insert';payload=v;return chain;},upsert:(v:any)=>{operation='upsert';payload=v;return chain;}};
  function result(){
+  if(operation==='insert'){if(table==='McpAuthCode')state.code=payload;else if(table==='McpApiKey')state.key=payload;else throw new Error('Unexpected insert');return {data:null,error:null};}
   if(table==='McpAuthCode'){
    const row=state.code;
    if(!row||Object.entries(filters).some(([k,v])=>k.startsWith('gt:')?row[k.slice(3)]<=v:row[k]!==v))return {data:null,error:null};
@@ -25,18 +29,40 @@ vi.mock('@/lib/supabase',()=>({supabase:{from:(table:string)=>{
  }
  chain.maybeSingle=async()=>result();chain.then=(resolve:any)=>Promise.resolve(result()).then(resolve);return chain;
 }}}));
+import {POST as authorize} from '@/app/api/mcp/oauth/authorize/route';
+import {registerPublicClient} from '@/lib/mcp/public-client';
+import {POST as register} from '@/app/api/mcp/oauth/register/route';
 import {POST as exchange} from '@/app/api/mcp/oauth/token/route';
 import {POST as revoke} from '@/app/api/mcp/oauth/revoke/route';
 import {authenticateKey} from '@/lib/mcp/authenticate';
 const verifier='a'.repeat(43),secret='test-secret-that-is-not-a-production-credential';
 function request(p:Record<string,string>={}){return new NextRequest('https://www.usechippi.com/api/mcp/oauth/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:'client',code:'chippi_ac_'+'f'.repeat(64),code_verifier:verifier,redirect_uri:'http://127.0.0.1:49152/oauth/callback',...p})});}
 beforeEach(()=>{
- vi.stubEnv('MCP_JWT_SECRET',secret);state.revoked.clear();state.failRevocation=false;
+ vi.stubEnv('MCP_JWT_SECRET',secret);state.userSpace='team';state.revoked.clear();state.failRevocation=false;
  state.key={clientId:'client',spaceId:'team',expiresAt:null};
  state.code={code:createHash('sha256').update('chippi_ac_'+'f'.repeat(64)).digest('hex'),clientId:'client',spaceId:'team',codeChallenge:createHash('sha256').update(verifier).digest('base64url'),codeChallengeMethod:'S256',redirectUri:'http://127.0.0.1:49152/oauth/callback',expiresAt:new Date(Date.now()+300000).toISOString()};
 });
 afterEach(()=>vi.unstubAllEnvs());
 describe('Chippi native OAuth',()=>{
+ it('registers the supported grant subset requested by native clients',async()=>{
+  const response=await register(new NextRequest('https://www.usechippi.com/api/mcp/oauth/register',{method:'POST',body:JSON.stringify({client_name:'Codex',redirect_uris:['http://127.0.0.1:49152/callback/abcdefgh1234'],grant_types:['authorization_code','refresh_token'],response_types:['code'],token_endpoint_auth_method:'none'})}));
+  expect(response.status).toBe(201);expect((await response.json()).grant_types).toEqual(['authorization_code']);
+ });
+ it('creates account authority only after consent and exchanges without echoing state',async()=>{
+  state.key=null;state.code=null;
+  const callback='http://127.0.0.1:49152/callback/abcdefgh1234';
+  const client=await registerPublicClient('Codex',[callback]);
+  expect(state.key).toBeNull();
+  const approval=()=>authorize(new NextRequest('https://www.usechippi.com/api/mcp/oauth/authorize',{method:'POST',body:JSON.stringify({client_id:client,redirect_uri:callback,code_challenge:createHash('sha256').update(verifier).digest('base64url'),code_challenge_method:'S256',state:'browser-correlation',scope:'crm:read'})}));
+  const approved=await approval();expect(approved.status).toBe(200);
+  const redirect=new URL((await approved.json()).redirect_url);
+  expect(redirect.searchParams.get('state')).toBe('browser-correlation');
+  expect(state.code.stateHash).toBeNull();
+  const issued=await exchange(request({client_id:client,code:redirect.searchParams.get('code')!,redirect_uri:callback}));
+  expect(issued.status).toBe(200);
+  const {payload}=await jwtVerify((await issued.json()).access_token,new TextEncoder().encode(secret));expect(payload.spaceId).toBe('team');
+  state.userSpace='another-team';expect((await approval()).status).toBe(400);expect(state.key.spaceId).toBe('team');
+ });
  it('only one concurrent redemption returns a token for the whole team',async()=>{
   const responses=await Promise.all([exchange(request()),exchange(request())]);expect(responses.map(r=>r.status).sort()).toEqual([200,400]);
   const body=await responses.find(r=>r.status===200)!.json();const {payload}=await jwtVerify(body.access_token,new TextEncoder().encode(secret));expect(payload.spaceId).toBe('team');expect(payload.sub).toBe('client');expect(body.scope).toBe('crm:read');expect(state.code).toBeNull();

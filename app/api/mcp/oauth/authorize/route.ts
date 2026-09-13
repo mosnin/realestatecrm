@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
-import { getSpaceForUser } from '@/lib/space';
-import { supabase } from '@/lib/supabase';
-import { isAllowedOAuthRedirect } from '@/lib/mcp/redirect-allowlist';
-import crypto from 'crypto';
-import { unscoped } from '@/lib/supabase-guard';
-import { tenantTable } from '@/lib/tenant-db';
-
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api-auth";
+import { getSpaceForUser } from "@/lib/space";
+import { supabase } from "@/lib/supabase";
+import { isAllowedOAuthRedirect } from "@/lib/mcp/redirect-allowlist";
+import crypto from "crypto";
+import { unscoped } from "@/lib/supabase-guard";
+import { resolvePublicClient, isPublicClientId } from "@/lib/mcp/public-client";
+import { tenantTable } from "@/lib/tenant-db";
 
 /**
  * POST /api/mcp/oauth/authorize
@@ -22,19 +22,41 @@ export async function POST(req: NextRequest) {
   const { userId } = authResult;
 
   const space = await getSpaceForUser(userId);
-  if (!space) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
-  const { client_id, redirect_uri, code_challenge, code_challenge_method, state, scope } = body;
+  const {
+    client_id,
+    redirect_uri,
+    code_challenge,
+    code_challenge_method,
+    state,
+    scope,
+  } = body;
 
-  if (typeof client_id !== 'string' || !client_id || typeof redirect_uri !== 'string' || typeof code_challenge !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(code_challenge) || (code_challenge_method && code_challenge_method !== 'S256') || (scope && scope !== 'crm:read') || (state && (typeof state !== 'string' || state.length > 1024))) {
-    return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+  if (
+    typeof client_id !== "string" ||
+    !client_id ||
+    typeof redirect_uri !== "string" ||
+    typeof code_challenge !== "string" ||
+    !/^[A-Za-z0-9_-]{43}$/.test(code_challenge) ||
+    (code_challenge_method && code_challenge_method !== "S256") ||
+    (scope && scope !== "crm:read") ||
+    (state && (typeof state !== "string" || state.length > 1024))
+  ) {
+    return NextResponse.json(
+      { error: "Missing required parameters" },
+      { status: 400 },
+    );
   }
 
   // Validate redirect_uri — must be a Claude callback (shared allowlist so this
   // leg and the consent screen never drift apart).
   if (!isAllowedOAuthRedirect(redirect_uri)) {
-    return NextResponse.json({ error: 'Invalid redirect_uri' }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid redirect_uri" },
+      { status: 400 },
+    );
   }
 
   // Verify the client_id belongs to this user's space AND hasn't expired.
@@ -42,41 +64,84 @@ export async function POST(req: NextRequest) {
   // can't even start an OAuth flow — the Claude connector gets a clear
   // "invalid_client" instead of silently exchanging a code it'll never
   // be able to use at the token endpoint.
-  const { data: mcpKey } = await unscoped(supabase
-    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
-    .select('spaceId, expiresAt')
-    .eq('clientId', client_id)
+  let { data: mcpKey } = await unscoped(
+    supabase.from("McpApiKey"),
+    "oauth/capability: lookup by clientId or hashed key then verify",
+  )
+    .select("spaceId, expiresAt")
+    .eq("clientId", client_id)
     .maybeSingle();
 
-  if (!mcpKey || mcpKey.spaceId !== space.id) {
-    return NextResponse.json({ error: 'Invalid client_id' }, { status: 400 });
+  const publicClient = isPublicClientId(client_id)
+    ? await resolvePublicClient(client_id, redirect_uri)
+    : null;
+  if (isPublicClientId(client_id) && !publicClient)
+    return NextResponse.json({ error: "invalid_client" }, { status: 400 });
+  if (!mcpKey && publicClient) {
+    // This credential exists only after authenticated consent. The browser
+    // never receives a reusable API secret; removing the connection revokes it.
+    const { error: insertError } = await tenantTable(supabase, "McpApiKey", {
+      spaceId: space.id,
+    }).insert({
+      spaceId: space.id,
+      name: publicClient.name,
+      clientId: client_id,
+      keyHash: crypto
+        .createHash("sha256")
+        .update(crypto.randomBytes(32))
+        .digest("hex"),
+      keyPrefix: "oauth",
+      expiresAt: new Date(Date.now() + 365 * 86400000).toISOString(),
+    });
+    if (insertError && insertError.code !== "23505")
+      return NextResponse.json({ error: "server_error" }, { status: 500 });
+    const found = await unscoped(
+      supabase.from("McpApiKey"),
+      "oauth/capability: lookup by clientId or hashed key then verify",
+    )
+      .select("spaceId, expiresAt")
+      .eq("clientId", client_id)
+      .maybeSingle();
+    mcpKey = found.data;
   }
-  if (mcpKey.expiresAt && new Date(mcpKey.expiresAt as string).getTime() < Date.now()) {
+  if (!mcpKey || mcpKey.spaceId !== space.id) {
+    return NextResponse.json({ error: "Invalid client_id" }, { status: 400 });
+  }
+  if (
+    mcpKey.expiresAt &&
+    new Date(mcpKey.expiresAt as string).getTime() < Date.now()
+  ) {
     return NextResponse.json(
-      { error: 'Invalid client_id', error_description: 'key expired' },
+      { error: "Invalid client_id", error_description: "key expired" },
       { status: 400 },
     );
   }
 
   // Generate authorization code (short-lived, single-use)
-  const code = 'chippi_ac_' + crypto.randomBytes(32).toString('hex');
+  const code = "chippi_ac_" + crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
 
   // Generate a server-side nonce bound to the client-provided state parameter.
   // During token exchange we verify this nonce to ensure the authorization
   // response was not forged or replayed with a different state value.
-  const stateNonce = crypto.randomBytes(32).toString('hex');
-  const stateHash = state
-    ? crypto.createHash('sha256').update(`${stateNonce}:${state}`).digest('hex')
-    : null;
+  const stateNonce = crypto.randomBytes(32).toString("hex");
+  const stateHash =
+    state && !publicClient
+      ? crypto
+          .createHash("sha256")
+          .update(`${stateNonce}:${state}`)
+          .digest("hex")
+      : null;
 
   // Store code with PKCE challenge for verification during token exchange
-  const { error } = await tenantTable(supabase, 'McpAuthCode', { spaceId: space.id }).insert({
-    code: crypto.createHash('sha256').update(code).digest('hex'),
+  const { error } = await tenantTable(supabase, "McpAuthCode", {
+    spaceId: space.id,
+  }).insert({
+    code: crypto.createHash("sha256").update(code).digest("hex"),
     clientId: client_id,
     spaceId: space.id,
     codeChallenge: code_challenge,
-    codeChallengeMethod: code_challenge_method || 'S256',
+    codeChallengeMethod: code_challenge_method || "S256",
     redirectUri: redirect_uri,
     stateNonce,
     stateHash,
@@ -84,14 +149,17 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
-    console.error('[oauth/authorize] code insert failed:', error);
-    return NextResponse.json({ error: 'Failed to generate code' }, { status: 500 });
+    console.error("[oauth/authorize] code insert failed:", error);
+    return NextResponse.json(
+      { error: "Failed to generate code" },
+      { status: 500 },
+    );
   }
 
   // Build redirect URL back to Claude
   const redirectUrl = new URL(redirect_uri);
-  redirectUrl.searchParams.set('code', code);
-  if (state) redirectUrl.searchParams.set('state', state);
+  redirectUrl.searchParams.set("code", code);
+  if (state) redirectUrl.searchParams.set("state", state);
 
   return NextResponse.json({ redirect_url: redirectUrl.toString() });
 }
