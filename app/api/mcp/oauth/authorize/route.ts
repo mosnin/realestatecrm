@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { client_id, redirect_uri, code_challenge, code_challenge_method, state, scope } = body;
 
-  if (!client_id || !redirect_uri || !code_challenge) {
+  if (typeof client_id !== 'string' || !client_id || typeof redirect_uri !== 'string' || typeof code_challenge !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(code_challenge) || (code_challenge_method && code_challenge_method !== 'S256') || (scope && scope !== 'crm:read') || (state && (typeof state !== 'string' || state.length > 1024))) {
     return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
   }
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Generate authorization code (short-lived, single-use)
-  const code = crypto.randomBytes(32).toString('hex');
+  const code = 'chippi_ac_' + crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
 
   // Generate a server-side nonce bound to the client-provided state parameter.
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // Store code with PKCE challenge for verification during token exchange
   const { error } = await tenantTable(supabase, 'McpAuthCode', { spaceId: space.id }).insert({
-    code,
+    code: crypto.createHash('sha256').update(code).digest('hex'),
     clientId: client_id,
     spaceId: space.id,
     codeChallenge: code_challenge,

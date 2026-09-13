@@ -39,3 +39,11 @@ describe('isAllowedOAuthRedirect', () => {
     expect(isAllowedOAuthRedirect('')).toBe(false);
   });
 });
+
+it('allows only the exact native loopback callback in production',()=>{
+ vi.stubEnv('NODE_ENV','production');
+ expect(isAllowedOAuthRedirect('http://127.0.0.1:49152/oauth/callback')).toBe(true);
+ expect(isAllowedOAuthRedirect('http://[::1]:49152/oauth/callback')).toBe(true);
+ for(const url of ['http://localhost:49152/oauth/callback','http://127.0.0.1:80/oauth/callback','http://127.0.0.1:49152/steal','http://127.0.0.1:49152/oauth/callback?forward=evil','http://user@127.0.0.1:49152/oauth/callback','http://127.0.0.1:49152/oauth/callback#code','https://user@claude.ai/callback'])expect(isAllowedOAuthRedirect(url)).toBe(false);
+ vi.unstubAllEnvs();
+});

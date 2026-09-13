@@ -3,10 +3,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { authenticateKey } from '@/lib/mcp/authenticate';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import crypto from 'crypto';
-import { jwtVerify } from 'jose';
-import { unscoped } from '@/lib/supabase-guard';
 
 
 // JWT_SECRET is resolved per-request; see authenticateKey() below.
@@ -14,57 +12,6 @@ import { unscoped } from '@/lib/supabase-guard';
 // ---------------------------------------------------------------------------
 // Auth – validate Bearer token (supports both raw API keys and OAuth JWTs)
 // ---------------------------------------------------------------------------
-async function authenticateKey(req: NextRequest): Promise<{ spaceId: string; ip: string } | null> {
-  const auth = req.headers.get('authorization');
-  if (!auth?.startsWith('Bearer ')) return null;
-  const token = auth.slice(7);
-  if (token.length < 10 || token.length > 500) return null;
-
-  const ip = getClientIp(req);
-
-  // Try JWT first (OAuth flow)
-  if (token.includes('.')) {
-    // Dedicated secret only — never fall back to CLERK_SECRET_KEY. Signing MCP
-    // access tokens (which carry spaceId + grant CRM read) with the Clerk
-    // secret couples two trust domains: a flaw in either implicates both.
-    const secret = process.env.MCP_JWT_SECRET;
-    if (!secret) return null; // No dedicated MCP secret configured — cannot verify JWTs
-    const JWT_SECRET = new TextEncoder().encode(secret);
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET);
-      if (payload.spaceId && typeof payload.spaceId === 'string') {
-        return { spaceId: payload.spaceId, ip };
-      }
-    } catch {
-      // Not a valid JWT — fall through to API key check
-    }
-  }
-
-  // Fall back to raw API key hash lookup. `expiresAt` is read so the
-  // verification path can reject keys whose TTL has passed — see the
-  // 20260607000012_mcp_key_expiry migration. NULL expiresAt = legacy key,
-  // never expires (preserves backward compat for existing integrations).
-  const keyHash = crypto.createHash('sha256').update(token).digest('hex');
-  const { data } = await unscoped(supabase
-    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
-    .select('spaceId, expiresAt')
-    .eq('keyHash', keyHash)
-    .maybeSingle();
-
-  if (!data) return null;
-  if (data.expiresAt && new Date(data.expiresAt as string).getTime() < Date.now()) {
-    return null;
-  }
-
-  unscoped(supabase
-    .from('McpApiKey'), 'oauth/capability: lookup by clientId or hashed key then verify')
-    .update({ lastUsedAt: new Date().toISOString() })
-    .eq('keyHash', keyHash)
-    .then(({ error }) => { if (error) console.error('[mcp] lastUsedAt update failed:', error.message); });
-
-  return { spaceId: data.spaceId, ip };
-}
-
 // ---------------------------------------------------------------------------
 // Build an McpServer scoped to a given spaceId (READ-ONLY tools)
 // ---------------------------------------------------------------------------
