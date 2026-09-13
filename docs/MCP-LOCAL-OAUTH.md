@@ -6,6 +6,6 @@ The code is bound to the client, exact redirect, PKCE S256, team and optional ex
 
 Access lasts one hour. There is no refresh grant in this product flow; sign in again after expiry. OAuth sign-out revokes that access token without deleting the team's API key. A team administrator can revoke the parent connection to end all derived access. The revocation table is private to the service role and scoped to the signed token's team.
 
-Deploy migration `20260913010000_mcp_oauth_revocation.sql` before the routes. Missing revocation storage fails closed for OAuth JWTs; native API-key authentication remains available. Metadata now advertises public PKCE and revocation. The client must continue sending state at code exchange because this product's existing nonce contract requires it.
+Deploy migration `20260918000000_mcp_oauth_revocation.sql` before the routes. Missing revocation storage fails closed for OAuth JWTs; native API-key authentication remains available. Metadata now advertises public PKCE and revocation. The client must continue sending state at code exchange because this product's existing nonce contract requires it.
 
 Verification is local: focused HTTP/auth tests, full unit suite, and TypeScript. The concurrent-redemption fixture models atomic database consumption; hosted PostgreSQL and real Clerk account consent still require live acceptance. The existing consent layout is retained; copy now names the actual connection and says access was approved rather than prematurely claiming the client is connected.
