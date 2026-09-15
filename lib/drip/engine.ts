@@ -7,8 +7,8 @@
  *   advanceEnrollments() — ONE space's due work for one cron tick: for every
  *                           'enrolled' row whose current step's dayOffset has
  *                           come due, either STOP the sequence (the contact
- *                           replied since enrolling) or schedule the step and
- *                           move the pointer forward.
+ *                           replied since enrolling) or CLAIM the pointer
+ *                           forward and then schedule the step.
  *
  * SAFETY — mirrors lib/workflows/scheduled-dispatch.ts's contract exactly:
  * this module NEVER sends a message itself. A due step becomes a
@@ -337,6 +337,20 @@ async function processEnrollment(
     return 'stoppedReplied';
   }
 
+  // CLAIM the step BEFORE inserting ScheduledMessage. The dispatcher can
+  // de-dupe a single row (pending→sending), but two pending rows for the same
+  // enrollment+step both send. Claiming with a guarded UPDATE (currentStep +
+  // status still 'enrolled') means a lost advance, a crash after insert, or a
+  // concurrent tick cannot schedule the same step twice. A missed send if the
+  // insert fails after a won claim is the safe failure; a duplicate client
+  // message is not.
+  const nextStep = enrollment.currentStep + 1;
+  const nextStatus = nextStep >= steps.length ? 'completed' : 'enrolled';
+  const claimed = await claimEnrollmentAdvance(enrollment, nextStep, nextStatus);
+  if (!claimed) {
+    return 'skipped';
+  }
+
   // Schedule this step — mirrors runScheduleMessage's ScheduledMessage insert
   // (lib/workflows/actions.ts) column-for-column, so the existing dispatcher
   // (lib/workflows/scheduled-dispatch.ts) processes it with zero new code.
@@ -366,19 +380,14 @@ async function processEnrollment(
     updatedAt: nowIso,
   });
   if (schedErr) {
-    logger.error('[drip.engine] ScheduledMessage insert failed', {
+    logger.error('[drip.engine] ScheduledMessage insert failed after claim', {
       spaceId: enrollment.spaceId,
       enrollmentId: enrollment.id,
+      step: enrollment.currentStep,
     }, schedErr);
     return 'failed';
   }
 
-  const nextStep = enrollment.currentStep + 1;
-  if (nextStep >= steps.length) {
-    await advanceEnrollmentRow(enrollment, nextStep, 'completed', null);
-  } else {
-    await advanceEnrollmentRow(enrollment, nextStep, 'enrolled', null);
-  }
   return 'scheduled';
 }
 
@@ -395,18 +404,31 @@ async function setEnrollmentStatus(
   }
 }
 
-async function advanceEnrollmentRow(
+/**
+ * Atomically take this enrollment's current step. Guarded on the row still
+ * being status='enrolled' at the same currentStep: at most one tick can
+ * match-and-flip, so at most one tick proceeds to insert a ScheduledMessage.
+ * Returns true iff this caller won the claim. A zero-row result or an error
+ * is treated as NOT claimed — skip rather than risk a duplicate send.
+ */
+async function claimEnrollmentAdvance(
   enrollment: DripEnrollmentRow,
   currentStep: number,
   status: 'enrolled' | 'completed',
-  stopReason: string | null,
-): Promise<void> {
-  const { error } = await tenantTable(supabase, 'DripEnrollment', { spaceId: enrollment.spaceId })
-    .update({ currentStep, status, stopReason, updatedAt: new Date().toISOString() })
-    .eq('id', enrollment.id);
+): Promise<boolean> {
+  const { data, error } = await tenantTable(supabase, 'DripEnrollment', { spaceId: enrollment.spaceId })
+    .update({ currentStep, status, stopReason: null, updatedAt: new Date().toISOString() })
+    .eq('id', enrollment.id)
+    .eq('currentStep', enrollment.currentStep)
+    .eq('status', 'enrolled')
+    .select('id');
   if (error) {
-    logger.warn('[drip.engine] enrollment advance failed', { id: enrollment.id }, error);
+    logger.warn('[drip.engine] enrollment claim failed — treating as not claimed', {
+      id: enrollment.id,
+    }, error);
+    return false;
   }
+  return (data?.length ?? 0) > 0;
 }
 
 // ── cross-space tick driver ──────────────────────────────────────────────
