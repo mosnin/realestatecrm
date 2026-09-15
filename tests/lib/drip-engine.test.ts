@@ -27,6 +27,8 @@ const {
   activityReplyRows,
   inboxReplyRows,
   insertError,
+  claimEmpty,
+  claimError,
 } = vi.hoisted(() => ({
   calls: [] as Array<{ table: string; op: string; payload?: unknown; filters: Array<[string, unknown]> }>,
   // DripSequence per-id lookup (enrollContact): id -> { id, active }
@@ -39,6 +41,8 @@ const {
   activityReplyRows: { value: [] as unknown[] },
   inboxReplyRows: { value: [] as unknown[] },
   insertError: { value: null as { code?: string; message: string } | null },
+  claimEmpty: { value: false },
+  claimError: { value: null as { message: string } | null },
 }));
 
 vi.mock('@/lib/supabase', () => {
@@ -63,11 +67,21 @@ vi.mock('@/lib/supabase', () => {
       update: (payload: unknown) => {
         const filters: Array<[string, unknown]> = [];
         calls.push({ table, op: 'update', payload, filters });
+        const claimResult = () =>
+          claimError.value
+            ? { data: null, error: claimError.value }
+            : claimEmpty.value
+              ? { data: [], error: null }
+              : { data: [{ id: 'enr-1' }], error: null };
         const chain: Record<string, unknown> = {
           eq: (col: string, val: unknown) => {
             filters.push([col, val]);
             return chain;
           },
+          select: () => ({
+            then: (resolve: (v: { data: unknown; error: unknown }) => unknown) =>
+              resolve(claimResult()),
+          }),
           then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
         };
         return chain;
@@ -130,6 +144,8 @@ beforeEach(() => {
   activityReplyRows.value = [];
   inboxReplyRows.value = [];
   insertError.value = null;
+  claimEmpty.value = false;
+  claimError.value = null;
 });
 
 function scheduledMessageInsert() {
@@ -348,6 +364,48 @@ describe('advanceEnrollments — due-step dispatch', () => {
     const update = enrollmentUpdates()[0];
     expect((update.payload as Record<string, unknown>).currentStep).toBe(3);
     expect((update.payload as Record<string, unknown>).status).toBe('completed');
+  });
+
+  it('claims the enrollment (guarded on currentStep + status) BEFORE inserting ScheduledMessage', async () => {
+    sequenceList.value = [baseSequence()];
+    enrollmentRows.value = [baseEnrollment()];
+
+    await advanceEnrollments('space-1', new Date('2026-07-01T00:00:00.000Z'));
+
+    const claim = enrollmentUpdates()[0];
+    expect(claim).toBeDefined();
+    expect(claim.filters).toContainEqual(['id', 'enr-1']);
+    expect(claim.filters).toContainEqual(['currentStep', 0]);
+    expect(claim.filters).toContainEqual(['status', 'enrolled']);
+
+    const claimIdx = calls.findIndex((c) => c.table === 'DripEnrollment' && c.op === 'update');
+    const insertIdx = calls.findIndex((c) => c.table === 'ScheduledMessage' && c.op === 'insert');
+    expect(claimIdx).toBeGreaterThanOrEqual(0);
+    expect(insertIdx).toBeGreaterThan(claimIdx);
+  });
+
+  it('does NOT insert a ScheduledMessage when another tick already claimed the step', async () => {
+    sequenceList.value = [baseSequence()];
+    enrollmentRows.value = [baseEnrollment()];
+    claimEmpty.value = true; // guarded UPDATE matched zero rows
+
+    const summary = await advanceEnrollments('space-1', new Date('2026-07-01T00:00:00.000Z'));
+
+    expect(summary.scheduled).toBe(0);
+    expect(summary.skipped).toBe(1);
+    expect(scheduledMessageInsert()).toBeUndefined();
+  });
+
+  it('does NOT insert a ScheduledMessage when the claim UPDATE errors', async () => {
+    sequenceList.value = [baseSequence()];
+    enrollmentRows.value = [baseEnrollment()];
+    claimError.value = { message: 'connection reset' };
+
+    const summary = await advanceEnrollments('space-1', new Date('2026-07-01T00:00:00.000Z'));
+
+    expect(summary.scheduled).toBe(0);
+    expect(summary.skipped).toBe(1);
+    expect(scheduledMessageInsert()).toBeUndefined();
   });
 
   it('every DripEnrollment/DripSequence/Contact/ScheduledMessage query is spaceId-scoped', async () => {
